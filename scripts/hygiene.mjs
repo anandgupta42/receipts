@@ -27,7 +27,6 @@ export const ROOT_ALLOWLIST = Object.freeze([
   "LICENSE",
   "NOTICE",
   "CLAUDE.md",
-  "LICENSE",
   "README.md",
   "data",
   "docs",

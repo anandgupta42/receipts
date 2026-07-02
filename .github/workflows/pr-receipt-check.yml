@@ -1,0 +1,32 @@
+# SPEC-0019 R5 — soft presence check: notice (never fail) when a PR is missing
+# its aireceipts receipt comment. Generation runs on the developer's machine
+# (transcripts aren't on the runner); this only NOTICES a skip. The verdict logic
+# lives in scripts/check-pr-receipt.mjs (unit-tested); this workflow is the thin
+# caller that feeds it `gh api` output.
+name: pr-receipt-check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for the aireceipts receipt comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh api --paginate "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" > comments.json || echo "[]" > comments.json
+          verdict=$(node scripts/check-pr-receipt.mjs comments.json)
+          if [ "$verdict" = "missing" ]; then
+            echo "::notice::No aireceipts receipt comment found. Run \`npx aireceipts pr --post\` from your worktree to attach one. (Optional — external contributors have no local sessions.)"
+          else
+            echo "aireceipts receipt comment present."
+          fi

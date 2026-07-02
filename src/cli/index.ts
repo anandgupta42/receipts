@@ -32,6 +32,7 @@ import {
 import { buildBenchmarkPayload, confirmPrompt, BENCHMARK_UNAVAILABLE_MESSAGE } from "../benchmark/index.js";
 import { parseArgs } from "./args.js";
 import { runQuota } from "./quota.js";
+import { runPr } from "../pr/index.js";
 
 const HELP_TEXT = `aireceipts — local, deterministic cost receipts for AI coding-agent sessions
 
@@ -47,6 +48,10 @@ Usage:
   aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
   aireceipts week [--by-project] [--since <date>] [--json]
                                         trailing-7-day digest across sessions
+  aireceipts pr [--post] [--session <id>]
+                                        attach the building session's receipt to
+                                         the current PR (dry-run prints the body;
+                                         --post upserts it via gh)
   aireceipts --check-budget             exit 1 if ~/.aireceipts/budget.json's cap is
                                          exceeded (advisory; see docs)
   aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
@@ -476,6 +481,8 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runBenchmark(args.selector, args.dryRun);
     case "statusline":
       return runStatusline();
+    case "pr":
+      return runPr({ post: args.post === true, session: args.prSession });
     case "receipt":
     default:
       return runReceipt(args.selector, args.json, svgOut, args.csvMode);

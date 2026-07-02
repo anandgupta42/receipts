@@ -7,8 +7,12 @@
 // command only; `-o`/`--output` names the file and `--theme light|dark` picks
 // the palette.
 export interface ParsedArgs {
-  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget" | "benchmark" | "mini" | "install-hook" | "uninstall-hook" | "statusline";
+  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget" | "benchmark" | "mini" | "install-hook" | "uninstall-hook" | "statusline" | "pr";
   selector?: string;
+  /** SPEC-0019: `aireceipts pr --post` posts the receipt comment (dry-run without it). */
+  post?: boolean;
+  /** SPEC-0019: `aireceipts pr --session <id>` — explicit session, bypassing auto-selection. */
+  prSession?: string;
   compareA?: string;
   compareB?: string;
   json: boolean;
@@ -51,6 +55,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let png = false;
   let theme: "light" | "dark" = "light";
   let output: string | undefined;
+  let post = false;
+  let prSession: string | undefined;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -83,6 +89,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
       since = argv[++i];
     } else if (arg.startsWith("--since=")) {
       since = arg.slice("--since=".length);
+    } else if (arg === "--post") {
+      post = true;
+    } else if (arg === "--session") {
+      prSession = argv[++i];
+    } else if (arg.startsWith("--session=")) {
+      prSession = arg.slice("--session=".length);
     } else if (arg === "--svg") {
       svg = true;
     } else if (arg === "--png") {
@@ -144,6 +156,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   if (positional[0] === "week") {
     return { command: "week", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+  }
+
+  if (positional[0] === "pr") {
+    return { command: "pr", post, prSession, json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode, png };
   }
 
   if (list) {
