@@ -1,0 +1,84 @@
+# AGENTS.md — aireceipts constitution
+
+*This file is the operating manual. It is the only doc agents must read. ≤150 lines,
+enforced by CI — if you're adding to it, cut something first.*
+
+## Mission
+
+aireceipts is a local, deterministic CLI that reads AI coding-agent transcripts off disk
+(Claude Code, Codex, and other agents) and prints a **cost receipt** for the session: a
+per-tool cost/time breakdown, waste lines (loops, downgrades, redundant work), a
+counterfactual re-pricing ("this session on model X would have cost Y"), and a compact
+handoff block the user can paste into a PR or chat. No servers, no accounts, no dashboards.
+
+## Stack
+
+Node >=20, TypeScript strict, `tsup` (ESM build), `vitest` (tests), `fast-check`
+(property tests on pricing/parsing), Stryker (mutation testing on `src/pricing/**`).
+
+## Verification block (identical to CI — run this before you claim done)
+
+```sh
+npx tsc --noEmit;                    echo $?
+npx eslint . --max-warnings 0;       echo $?
+npx vitest run;                      echo $?
+node scripts/verify-goldens.mjs;     echo $?
+```
+
+**Never pipe these through `tail`/`grep`/`head`.** A pipeline's exit status is the last
+command's — piping hides a real failure behind a green-looking summary. Always check `$?`
+directly, unmasked. This is the single most common way agents ship broken work undetected.
+
+## File ownership
+
+| Path | Owns | Gate |
+|---|---|---|
+| `src/parse/` | Vendor transcript adapters (Claude Code, Codex, …) | goldens |
+| `src/pricing/` | Pure price-lookup + cost calc functions | **mutation-tested**, fast-check |
+| `src/receipt/` | The receipt renderer (text/JSON output) | **golden-gated** (byte-equal) |
+| `src/cli/` | Argument parsing, command surface | vitest |
+| `data/prices/` | Cited price tables (per vendor JSON) | hook-enforced citations |
+
+No duplicated truths: one renderer, one price schema, one numbering scheme for specs.
+
+## Invariants (I1–I6 — restate in every spec and skill; never violate)
+
+- **I1 — Deterministic; zero model calls; zero network in the product path.** Same
+  transcript → byte-identical receipt.
+- **I2 — Never fabricate a dollar.** `$` renders only when a dated price-table row
+  matches the session's model and date; otherwise render tokens. No silent fallback
+  prices.
+- **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
+  its attribution methodology; counterfactuals are labeled estimates (≈).
+- **I4 — Local-first, zero telemetry, ever.** The only network use is the opt-in
+  benchmark command, if it ever ships — and it says so out loud.
+- **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.
+- **I6 — Facts, not rankings.** Report what a session cost; never rank models or agents
+  as better/worse.
+
+## The founder's four buttons
+
+1. Approve/reject spec proposals (drafts never self-approve).
+2. One-click cited price-table PRs.
+3. Curate the skill surface (agents cannot add or modify skills).
+4. Cut release tags (npm publish never happens without the founder).
+
+## Current-state inventory
+
+*Updated only by the `release` skill. Keep this section, and only this section, current
+after each release — don't hand-edit it elsewhere.*
+
+- **Tier 0 (now):** harness only — AGENTS.md, spec system, skills, hooks, CI gates. No
+  product code yet.
+- **Tier 1 (M1, not started):** receipt engine — parse adapters, price tables, per-tool
+  attribution, waste lines, counterfactual, compare, handoff, goldens.
+- **Tier 2+ (M2–M4, not started):** compare/handoff polish, PNG export, opt-in benchmark.
+
+## Working here
+
+- Every non-trivial change starts from a spec under `specs/`. See `specs/TEMPLATE.md` and
+  `specs/SPEC-0000-product.md`.
+- One skill per task type, under `.claude/skills/`. Agents pick the matching skill; they
+  do not improvise a workflow.
+- Hooks are law: a hook exit code of 2 blocks the action. Don't work around a hook —
+  fix what it's rejecting.

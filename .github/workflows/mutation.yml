@@ -1,0 +1,40 @@
+name: Mutation
+
+# Runs Stryker mutation testing on src/pricing/** — the anti-gaming moat
+# (AGENTS.md): agent-written tests routinely hit ~100% coverage but only
+# ~91% mutation score, so coverage alone doesn't prove the tests assert
+# anything real. Gate is placeholder-only until src/pricing/ and a Stryker
+# config exist (Tier 0 — harness only, no product code yet).
+
+on:
+  pull_request:
+    paths:
+      - "src/pricing/**"
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm install
+
+      - name: mutation score (placeholder — no src/pricing/ yet)
+        run: |
+          if [ ! -d src/pricing ] || [ -z "$(ls -A src/pricing 2>/dev/null)" ]; then
+            echo "src/pricing/ is empty — nothing to mutate yet (Tier 0 harness). Skipping."
+            exit 0
+          fi
+          if [ ! -f stryker.config.json ] && [ ! -f stryker.conf.json ]; then
+            echo "No Stryker config yet — add one before this workflow can gate real code."
+            exit 0
+          fi
+          npx stryker run
+        # TODO(M1+): once src/pricing/ and a Stryker config land, replace the
+        # placeholder body with a real run that fails the job if the mutation
+        # score has decreased vs. the baseline on main (score-not-decreased).

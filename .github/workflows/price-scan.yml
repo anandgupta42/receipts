@@ -1,0 +1,29 @@
+name: Price scan
+
+# Daily freshness check for data/prices/. Placeholder: commented out until
+# ANTHROPIC_API_KEY (or equivalent) secrets exist for claude-code-action to
+# run the update-prices skill unattended. Enabling this without a secret
+# configured would fail every run for the wrong reason (auth, not staleness).
+
+on:
+  schedule:
+    - cron: "43 7 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  update-prices:
+    if: false # flip to `github.repository == github.repository` once secrets exist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # - uses: anthropics/claude-code-action@v1
+      #   with:
+      #     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+      #     prompt: |
+      #       Run the update-prices skill (.claude/skills/update-prices/SKILL.md)
+      #       for one vendor whose price page hasn't been checked in the longest
+      #       time. Open a PR with a cited source; do not merge it yourself.
+
+      - name: placeholder (secrets not configured)
+        run: echo "price-scan is disabled until secrets exist — see workflow comments."
