@@ -1,7 +1,7 @@
 ---
 id: SPEC-0008
 title: "Weekly digest"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001]
 ---

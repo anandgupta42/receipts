@@ -1,7 +1,7 @@
 ---
 id: SPEC-0013
 title: "Handoff v2 — standing-rule suggestions"
-status: draft
+status: approved
 milestone: M4
 depends: [SPEC-0001, SPEC-0008]
 ---

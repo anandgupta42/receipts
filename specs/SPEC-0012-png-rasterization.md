@@ -1,7 +1,7 @@
 ---
 id: SPEC-0012
 title: "PNG rasterization"
-status: draft
+status: approved
 milestone: M4
 depends: [SPEC-0003]
 ---

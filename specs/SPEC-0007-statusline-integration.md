@@ -1,7 +1,7 @@
 ---
 id: SPEC-0007
 title: "Statusline integration"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001]
 ---

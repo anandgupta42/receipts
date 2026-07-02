@@ -1,7 +1,7 @@
 ---
 id: SPEC-0014
 title: "Subscription quota context"
-status: draft
+status: approved
 milestone: M4
 depends: [SPEC-0001]
 ---

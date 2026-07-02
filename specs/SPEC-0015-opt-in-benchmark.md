@@ -1,7 +1,7 @@
 ---
 id: SPEC-0015
 title: "Opt-in benchmark"
-status: draft
+status: approved
 milestone: M4
 depends: [SPEC-0001, SPEC-0002]
 ---
