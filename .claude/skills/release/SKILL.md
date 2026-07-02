@@ -6,6 +6,14 @@ trigger: /release
 
 # /release — tag-matches-manifest, human clicks publish
 
+## 0. Release-manager verdict (mechanical gate — do this FIRST)
+
+Require `docs/releases/<version>-verdict.md` produced by `/release-manager` for the
+EXACT version and SHA being cut, containing the line `VERDICT: GO`. Missing, NO-GO,
+or a SHA that doesn't match HEAD → STOP; run `/release-manager` first. No exceptions,
+no maintainer override at this step (overrides live inside the verdict file, written
+and signed there).
+
 ## 1. Preconditions
 
 `main`'s CI is green. No open PR is claiming to be part of this release that isn't

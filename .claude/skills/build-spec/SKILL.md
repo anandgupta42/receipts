@@ -78,6 +78,17 @@ Run the built CLI against real behavior (not just unit tests) for each Success c
 checkbox. Check the boxes once verified and set `status: building` while the PR is open —
 `shipped` is flipped only after the human merges (release/archive step).
 
+## 6.3 Tests catch real issues, not coverage
+
+Every test must assert behavior a user could observe breaking. Forbidden: tests that
+only import/instantiate, `toBeDefined()`-grade assertions, snapshots without a stated
+intent. Required per requirement: the matrix row PLUS at least one adversarial case
+(malformed input, boundary, wrong-order call). Any NEW command or flag gets an
+e2e-level test through the real CLI dispatch (`main()`/dist binary on a fixture),
+not just its module functions. Mutation testing on money paths is the enforcement
+backstop — a test that kills no mutants is decoration and will be treated as a
+finding in review.
+
 ## 6.4 Design comes from the lead
 
 If the spec touches a user-visible surface (receipt layout, exported artifacts, docs
