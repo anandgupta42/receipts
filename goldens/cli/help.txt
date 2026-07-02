@@ -1,0 +1,37 @@
+aireceipts — local, deterministic cost receipts for AI coding-agent sessions
+
+Usage:
+  aireceipts [selector] [--json|--csv]  print a receipt (default: newest session)
+  aireceipts --list [--json]            list sessions, newest first
+  aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
+  aireceipts --handoff [selector] [--handoff-threshold N]
+                                        paste-ready block of fired waste lines;
+                                         suggests CLAUDE.md rules for waste classes
+                                         recurring in N+ recent sessions (default 3)
+  aireceipts --quota                    current Claude Code rate-limit window usage
+                                         (statusline stdin mode only; silent if unavailable)
+  aireceipts [selector] --svg [-o f]    write a shareable SVG receipt (default receipt.svg)
+  aireceipts [selector] --png [-o f]    write a rasterized PNG receipt (default receipt.png)
+  aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
+  aireceipts week [--by-project] [--since <date>] [--json]
+                                        trailing-7-day digest across sessions
+  aireceipts pr [--post] [--session <id>]
+                                        attach the building session's receipt to
+                                         the current PR (dry-run prints the body;
+                                         --post upserts it via gh)
+  aireceipts --check-budget             exit 1 if ~/.aireceipts/budget.json's cap is
+                                         exceeded (advisory; see docs)
+  aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
+                                         contract only, sends disabled)
+  aireceipts [selector] --template <name>  render a receipt style (classic|grocery|datavis)
+  aireceipts templates                  list the templates with a live preview of each
+  aireceipts --mini [selector]          6-line mini-receipt (newest session)
+  aireceipts install-hook               add a Claude Code SessionEnd auto-receipt hook
+  aireceipts uninstall-hook             remove that hook
+  aireceipts statusline                 one-line summary for Claude Code's statusLine
+  aireceipts --help                     show this help
+
+flags: --svg renders an SVG file; --png rasterizes it (receipt only, not compare);
+       --theme light|dark picks the palette (default light); -o/--output names the file.
+--csv[=session|tool]: export CSV (session summary rows, or one row per tool).
+selector: a 1-based index into --list, a session id, or a title substring.

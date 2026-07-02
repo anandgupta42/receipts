@@ -190,3 +190,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   return { command: "receipt", selector: positional[0], json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold, template };
 }
+
+/**
+ * SPEC-0018 stable selection seam: the command an argv selects, independent of
+ * how selection is implemented. Pre-refactor this wraps `parseArgs`; the command
+ * registry (SPEC-0018 R1/R2) reimplements it over per-command metadata — a async
+ * discovery step — without changing callers, so the R8 preservation suite proves
+ * selection precedence is byte-identical across the refactor. Async because
+ * registry discovery loads command modules; today's body is synchronous.
+ */
+export async function resolveCommand(argv: string[]): Promise<string> {
+  return parseArgs(argv).command;
+}
