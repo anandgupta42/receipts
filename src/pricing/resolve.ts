@@ -41,7 +41,9 @@ function rate(perMillion: number, tokens: number): number {
  * Code transcripts split the write by ephemeral TTL), each priced at its own
  * cited rate — `input_cache_write_5m ?? input` / `input_cache_write_1h ??
  * input` — a conservative fallback to the base input rate when the row
- * doesn't cite that tier (never under-charges, I2).
+ * doesn't cite that tier. Cache-write billing runs at a premium over base
+ * input (typically ≥1.25×), so this fallback may *understate* the true
+ * cost; it never overstates it by inventing an uncited premium (I2).
  *
  * Any part of `cacheCreation` not covered by a known tier (either because
  * the transcript never split it, or a partial split leaves a remainder) is
@@ -72,8 +74,9 @@ function cacheWriteCost(usage: TokenUsage, row: PriceRow): number {
  * 5-minute/1-hour tier tokens at their own cited rate, and any unsplit
  * remainder under the documented assumption that it's 5-minute-tier —
  * Claude Code's default cache TTL. If a row cites neither cache-write rate,
- * writes fall back to the base `input` rate (never under-charges, I2). See
- * `cacheWriteCost` for the exact fallback chain.
+ * writes fall back to the base `input` rate — this may understate real cost
+ * (cache-write billing runs ≥1.25× input) but never overstates it with a
+ * guessed premium (I2). See `cacheWriteCost` for the exact fallback chain.
  */
 export function costOf(usage: TokenUsage, row: PriceRow): number {
   return (
