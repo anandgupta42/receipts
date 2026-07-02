@@ -59,6 +59,12 @@ The PR description must follow the template: missing "What to review" ordering,
 or a user-visible change without a "See it" output capture, is a finding — a PR
 you can't evaluate in 30 seconds wastes every reviewer after you.
 
+## 4.7 Record the review (unblocks gh pr create)
+
+On completion write the reviewed sha: `git rev-parse HEAD > .review-ok` (untracked;
+any new commit invalidates it — re-review the delta). The PreToolUse hook BLOCKS
+`gh pr create` without it.
+
 ## 5. Post the review
 
 State pass/fail per section above with specifics (`file:line`), not a vague "looks

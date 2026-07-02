@@ -4,3 +4,4 @@ dist/
 coverage/
 .stryker-tmp/
 reports/
+.review-ok
