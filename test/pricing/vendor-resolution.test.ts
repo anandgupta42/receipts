@@ -58,12 +58,18 @@ describe("vendor resolution (R4, table-driven over data/prices/*.json)", () => {
         });
       }
 
-      it("returns no vendor and no price for an unknown id in this family's namespace", async () => {
-        const bogus = `${table.vendor}-model-does-not-exist-9999`;
-        // Unknown ids never guess a vendor…
-        expect(vendorForModel(bogus)).toBeUndefined();
-        // …and never resolve a dollar, even queried against the right vendor.
-        const resolved = await resolvePrice(table.vendor, bogus, "2026-06-15", dataDir);
+      it("returns no vendor for an id outside every known family prefix, and no price for any unknown id", async () => {
+        // An id that matches no vendor's id-prefix family maps to no vendor —
+        // never guessed. (Built with a foreign prefix so this holds even when a
+        // vendor's name equals its own id-prefix, e.g. deepseek/deepseek-.)
+        const foreign = `not-a-real-family-${table.vendor}-9999`;
+        expect(vendorForModel(foreign)).toBeUndefined();
+        // …and an unknown model id never resolves a dollar, even queried against
+        // this exact vendor (I2). This uses an id inside the family's own prefix
+        // namespace — the case a same-name-as-prefix vendor makes real — so the
+        // guarantee under test is the null price, independent of prefix mapping.
+        const unknownInFamily = `${table.vendor}-model-does-not-exist-9999`;
+        const resolved = await resolvePrice(table.vendor, unknownInFamily, "2026-06-15", dataDir);
         expect(resolved).toBeNull();
       });
     });

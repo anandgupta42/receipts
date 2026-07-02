@@ -1,0 +1,53 @@
+{
+  "vendor": "deepseek",
+  "models": {
+    "deepseek-v4-flash": {
+      "price_history": [
+        {
+          "input": 0.14,
+          "output": 0.28,
+          "input_cached": 0.0028,
+          "from_date": "2026-01-01",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "observed_at": "2026-07-02",
+              "excerpt": "The prices listed below are in units of per 1M tokens. ... MODEL deepseek-v4-flash — PRICING: 1M INPUT TOKENS (CACHE HIT) $0.0028; 1M INPUT TOKENS (CACHE MISS) $0.14; 1M OUTPUT TOKENS $0.28. [mapping: CACHE MISS -> input, CACHE HIT -> input_cached; the page lists no off-peak/discount or otherwise time-variant tier — this is the standard flat rate.]"
+            }
+          ]
+        }
+      ]
+    },
+    "deepseek-v4-pro": {
+      "price_history": [
+        {
+          "input": 0.435,
+          "output": 0.87,
+          "input_cached": 0.003625,
+          "from_date": "2026-01-01",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "observed_at": "2026-07-02",
+              "excerpt": "The prices listed below are in units of per 1M tokens. ... MODEL deepseek-v4-pro — PRICING: 1M INPUT TOKENS (CACHE HIT) $0.003625; 1M INPUT TOKENS (CACHE MISS) $0.435; 1M OUTPUT TOKENS $0.87. [mapping: CACHE MISS -> input, CACHE HIT -> input_cached; the page lists no off-peak/discount or otherwise time-variant tier — this is the standard flat rate.]"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "omitted": [
+    {
+      "model": "deepseek-chat",
+      "reason": "Not priced with its own standalone rate. The page states only a correspondence — deepseek-chat 'will be deprecated on 2026/07/24 15:59 UTC. For compatibility, [it corresponds] to the non-thinking mode ... of deepseek-v4-flash'. Per SPEC-0005 R1 / I2 (never a number the page does not state as this id's standard rate), it stays tokens-only rather than carry a cross-referenced number; priced sessions on deepseek-v4-flash resolve directly.",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing"
+    },
+    {
+      "model": "deepseek-reasoner",
+      "reason": "Not priced with its own standalone rate. The page states only a correspondence — deepseek-reasoner 'will be deprecated on 2026/07/24 15:59 UTC. For compatibility, [it corresponds] to the ... thinking mode of deepseek-v4-flash'. Per SPEC-0005 R1 / I2, it stays tokens-only rather than carry a cross-referenced number; priced sessions on deepseek-v4-flash resolve directly.",
+      "source": "https://api-docs.deepseek.com/quick_start/pricing"
+    }
+  ]
+}
