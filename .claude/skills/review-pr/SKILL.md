@@ -53,6 +53,12 @@ they're risky. **Docs staleness is a finding**: if the diff changes user-visible
 behavior (flags, commands, output) and no README/docs/help update rides in the PR,
 flag it (build-spec 6.5 requires docs in the same PR).
 
+## 4.6 Description conformance
+
+The PR description must follow the template: missing "What to review" ordering,
+or a user-visible change without a "See it" output capture, is a finding — a PR
+you can't evaluate in 30 seconds wastes every reviewer after you.
+
 ## 5. Post the review
 
 State pass/fail per section above with specifics (`file:line`), not a vague "looks

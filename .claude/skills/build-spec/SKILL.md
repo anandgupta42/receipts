@@ -72,7 +72,15 @@ follow-up." Then run `/review-docs` on the touched docs (advisory at PR time, bu
 release gate re-runs it as blocking, so fix now). A feature PR with stale docs is an
 incomplete PR.
 
-## 7. Commit + PR
+## 7. Commit + PR (structured description — non-negotiable)
+
+The PR description follows `.github/pull_request_template.md` exactly: What this
+adds / Why it matters to users (user-facing only) / **See it** (mandatory output
+capture for any user-visible change — a terminal code block or committed image
+path; the receipt IS the screenshot) / What changed / **What to review, in order**
+(numbered, riskiest first, file:line pointers) / Evidence (gates + spec +
+validation record) / Notes. A reviewer should know in 30 seconds what was added,
+what to look at first, and what a user gains.
 
 Conventional commit subject, backticked code terms, bullets for multiple changes. Open
 the PR against `main`; wait for CI green (ci.yml matrix + goldens + mutation if
