@@ -90,6 +90,28 @@ gate before anything lands. Telemetry's `parse_failure` event is the format-drif
 sensor: when an agent vendor changes its transcript format in the wild, the maintenance
 loop hears about it.
 
+**The dispatcher — orchestration must not live in anyone's attention.** The costliest
+failure mode we hit was not bad code but *idle finished work*: builders completed,
+and their output sat unpublished until someone remembered to look. Three mechanisms
+close it:
+
+1. **Queue in the repo, not in a head.** Work that is ready to build is marked as
+   GitHub state (approved specs; issues labeled `build-ready`) — visible, durable,
+   and pollable by machinery. A label, not a memory, is the dispatch signal.
+2. **A heartbeat sweep** (a scheduled prompt, ~10 min): publish any worktree with
+   committed-but-unpushed work; collect finished builder reports; dispatch idle
+   capacity against the queue; stay silent when there is nothing to do. The sweep is
+   dumb on purpose — judgment happens in review, not in dispatch.
+3. **Self-publishing builders.** A builder's brief ends with: self-review the diff
+   (independent-model pass), write the review marker, push, open the PR through the
+   template. The lead reviews *opened PRs*, never ferries work — the courier role is
+   abolished.
+
+Enforcement backstop: a PreToolUse hook blocks `gh pr create`, `gh pr merge`, and
+feature-branch `git push` unless a review marker exists for the exact HEAD sha —
+so speed can never quietly drop the review step (it was dropped twice under
+deadline pressure before this hook existed; hence the hook).
+
 ## How a feature flows
 
 ```
