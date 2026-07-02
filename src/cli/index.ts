@@ -2,8 +2,8 @@
 // `listSessions`/`selectSummary`/`loadSession` (parse layer, core-engine's) —
 // no selector logic is reimplemented here.
 import { writeFile } from "node:fs/promises";
-import { anyDetected, listSessions, loadSession, rootsHint, selectSummary } from "../index.js";
-import type { SessionSummary } from "../parse/types.js";
+import { anyDetected, listSessions, loadById, loadSession, rootsHint, selectSummary } from "../index.js";
+import type { Session, SessionSummary } from "../parse/types.js";
 import { evaluateBudget } from "../budget/index.js";
 import { renderCompare, compareDeltaLine } from "../receipt/compare.js";
 import { toCompareCsv } from "../receipt/csv.js";
@@ -16,7 +16,7 @@ import { renderReceipt } from "../receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
 import { renderWeek, weekToJson } from "../receipt/week.js";
 import { buildWeekDigest } from "../aggregate/week.js";
-import { renderMiniReceipt } from "../receipt/mini.js";
+import { renderMiniReceipt, renderStatusline } from "../receipt/mini.js";
 import { installHook, uninstallHook } from "../hook/install.js";
 import type { HookIo } from "../hook/install.js";
 import { createInterface } from "node:readline";
@@ -52,6 +52,7 @@ Usage:
   aireceipts --mini [selector]          6-line mini-receipt (newest session)
   aireceipts install-hook               add a Claude Code SessionEnd auto-receipt hook
   aireceipts uninstall-hook             remove that hook
+  aireceipts statusline                 one-line summary for Claude Code's statusLine
   aireceipts --help                     show this help
 
 flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
@@ -347,6 +348,81 @@ function cliHookIo(): HookIo {
   };
 }
 
+/**
+ * R3a: read the whole of `stream`. TTY streams (interactive terminal, no
+ * pipe) are treated as "no payload" rather than blocking on a read that will
+ * never end.
+ */
+export async function readStdin(stream: NodeJS.ReadStream): Promise<string> {
+  if (stream.isTTY) {
+    return "";
+  }
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * R3a: parse Claude Code's statusLine stdin payload (`{"transcript_path": "...", ...}`)
+ * and load the referenced session directly — no session-list scan needed.
+ * Returns `null` on any malformed/absent payload so the caller can fall back
+ * to R3b disk mode; never throws.
+ */
+export async function loadFromStdinPayload(raw: string): Promise<Session | null> {
+  if (!raw.trim()) {
+    return null;
+  }
+  let payload: unknown;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const transcriptPath = (payload as { transcript_path?: unknown } | null)?.transcript_path;
+  if (typeof transcriptPath !== "string" || !transcriptPath) {
+    return null;
+  }
+  return loadById("claude-code", transcriptPath).catch(() => null);
+}
+
+/**
+ * R3b: no usable stdin payload — fall back to the most-recently-ended session
+ * on disk (already the fast, summary-only scan from `listSessions`).
+ * `listSessionsFn`/`loadSessionFn` are injectable (default: the real
+ * disk-scanning implementations) so tests can point this at a fixture corpus
+ * instead of the real session roots — mirrors `runStatusline`'s injectable
+ * `stdin` parameter below.
+ */
+export async function loadFromDisk(
+  listSessionsFn: () => Promise<SessionSummary[]> = listSessions,
+  loadSessionFn: (summary: SessionSummary) => Promise<Session | null> = loadSession,
+): Promise<Session | null> {
+  const sessions = await listSessionsFn();
+  const summary = sessions[0];
+  if (!summary) {
+    return null;
+  }
+  return loadSessionFn(summary);
+}
+
+/** R3/R4: statusline one-liner. stdin mode first, then disk fallback, then a neutral no-session placeholder (never an error, always exit 0). */
+export async function runStatusline(
+  stdin: NodeJS.ReadStream = process.stdin,
+  loadFromDiskFn: () => Promise<Session | null> = loadFromDisk,
+): Promise<number> {
+  const raw = await readStdin(stdin);
+  const session = (await loadFromStdinPayload(raw)) ?? (await loadFromDiskFn());
+  if (!session) {
+    process.stdout.write("aireceipts: no sessions detected\n");
+    return 0;
+  }
+  const model = await buildReceiptModel(session);
+  process.stdout.write(`${renderStatusline(model)}\n`);
+  return 0;
+}
+
 async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
   const svgOut: SvgOut = { svg: args.svg, theme: args.theme, output: args.output };
   switch (args.command) {
@@ -379,6 +455,8 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runCheckBudget();
     case "benchmark":
       return runBenchmark(args.selector, args.dryRun);
+    case "statusline":
+      return runStatusline();
     case "receipt":
     default:
       return runReceipt(args.selector, args.json, svgOut, args.csvMode);

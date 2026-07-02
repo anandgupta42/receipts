@@ -6,7 +6,7 @@
 // `compare` commands to SVG output; `-o`/`--output` names the file and
 // `--theme light|dark` picks the palette.
 export interface ParsedArgs {
-  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget" | "benchmark" | "mini" | "install-hook" | "uninstall-hook";
+  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget" | "benchmark" | "mini" | "install-hook" | "uninstall-hook" | "statusline";
   selector?: string;
   compareA?: string;
   compareB?: string;
@@ -130,6 +130,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   if (positional[0] === "uninstall-hook") {
     return { command: "uninstall-hook", json, svg, theme, output, byProject, since, dryRun, csvMode, checkBudget };
+  }
+
+  if (positional[0] === "statusline") {
+    return { command: "statusline", selector: positional[1], json, svg, theme, output, byProject, since, dryRun, csvMode, checkBudget } as ParsedArgs;
   }
 
   if (positional[0] === "week") {
