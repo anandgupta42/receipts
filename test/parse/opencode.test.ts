@@ -2,7 +2,13 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DatabaseSync } from "node:sqlite";
+// node:sqlite is absent on Node 20 and pre-22.5 — a static import crashes the whole
+// suite at load (broke CI). Feature-detect and skip fixture-building tests where the
+// module is missing; the adapter itself uses the shared sqlite.ts seam (dynamic import
+// + sqlite3-CLI fallback) and stays covered on every Node via the committed fixtures.
+const sqliteMod = await import("node:sqlite").then((m) => m).catch(() => null);
+const DatabaseSync = sqliteMod?.DatabaseSync as typeof import("node:sqlite").DatabaseSync;
+const hasNodeSqlite = sqliteMod !== null;
 import { afterEach, describe, expect, it } from "vitest";
 import { OpenCodeAdapter } from "../../src/parse/opencode.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
@@ -98,7 +104,7 @@ function makeSessionMessageDb(dbPath: string): void {
   db.close();
 }
 
-describe("OpenCodeAdapter", () => {
+describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
   const dirs: string[] = [];
   afterEach(() => {
     for (const dir of dirs.splice(0)) {
