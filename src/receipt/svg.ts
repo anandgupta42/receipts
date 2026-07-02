@@ -63,7 +63,8 @@ function paintsFor(theme: Theme): Paints {
 }
 
 // --- Canvas geometry (Design section, all logical px) ------------------------
-const WIDTH = 640;
+/** Fixed logical width every receipt SVG renders at (also SPEC-0012 R3's PNG basis). */
+export const WIDTH = 640;
 const PAD_X = 32;
 const LEFT = PAD_X;
 const RIGHT = WIDTH - PAD_X; // 608

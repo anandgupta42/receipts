@@ -14,6 +14,7 @@ import { summaryToJson, toCompareJsonModel, toJsonModel } from "../receipt/json.
 import { buildReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
+import { rasterizeSvgToPng } from "../receipt/png.js";
 import { renderWeek, weekToJson } from "../receipt/week.js";
 import { buildWeekDigest } from "../aggregate/week.js";
 import { renderMiniReceipt, renderStatusline } from "../receipt/mini.js";
@@ -42,6 +43,7 @@ Usage:
   aireceipts --quota                    current Claude Code rate-limit window usage
                                          (statusline stdin mode only; silent if unavailable)
   aireceipts [selector] --svg [-o f]    write a shareable SVG receipt (default receipt.svg)
+  aireceipts [selector] --png [-o f]    write a rasterized PNG receipt (default receipt.png)
   aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
   aireceipts week [--by-project] [--since <date>] [--json]
                                         trailing-7-day digest across sessions
@@ -55,13 +57,14 @@ Usage:
   aireceipts statusline                 one-line summary for Claude Code's statusLine
   aireceipts --help                     show this help
 
-flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
-       -o/--output names the file.
+flags: --svg renders an SVG file; --png rasterizes it (receipt only, not compare);
+       --theme light|dark picks the palette (default light); -o/--output names the file.
 --csv[=session|tool]: export CSV (session summary rows, or one row per tool).
 selector: a 1-based index into --list, a session id, or a title substring.`;
 
 interface SvgOut {
   svg: boolean;
+  png: boolean;
   theme: "light" | "dark";
   output?: string;
 }
@@ -69,6 +72,11 @@ interface SvgOut {
 async function writeSvg(svg: string, path: string): Promise<void> {
   await writeFile(path, svg, "utf8");
   process.stdout.write(`wrote ${path} (${Buffer.byteLength(svg)} bytes)\n`);
+}
+
+async function writePng(png: Buffer, path: string): Promise<void> {
+  await writeFile(path, png);
+  process.stdout.write(`wrote ${path} (${png.length} bytes)\n`);
 }
 
 async function noSessionsMessage(): Promise<string> {
@@ -106,6 +114,11 @@ async function runReceipt(selector: string | undefined, json: boolean, svgOut: S
   const model = await buildReceiptModel(session);
   if (svgOut.svg) {
     await writeSvg(renderReceiptSvg(model, { theme: svgOut.theme }), svgOut.output ?? "receipt.svg");
+    return 0;
+  }
+  if (svgOut.png) {
+    const svg = renderReceiptSvg(model, { theme: svgOut.theme });
+    await writePng(rasterizeSvgToPng(svg), svgOut.output ?? "receipt.png");
     return 0;
   }
   if (csvMode !== undefined) {
@@ -186,6 +199,12 @@ async function runCompare(
   // compare CSV is strictly two session rows + a delta (R3) — per-tool granularity has no two-row shape here.
   if (csvMode !== undefined && csvMode !== "session") {
     process.stderr.write(`compare supports --csv=session only (got "${csvMode}")\n`);
+    return 1;
+  }
+  // SPEC-0012 R5: compare --png is deferred (doubles the blast radius of a new
+  // native dependency) — checked before any session lookup, same as csvMode above.
+  if (svgOut.png) {
+    process.stderr.write("compare --png is not supported yet — use compare --svg\n");
     return 1;
   }
   const sessions = await listSessions();
@@ -424,7 +443,7 @@ export async function runStatusline(
 }
 
 async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
-  const svgOut: SvgOut = { svg: args.svg, theme: args.theme, output: args.output };
+  const svgOut: SvgOut = { svg: args.svg, png: args.png, theme: args.theme, output: args.output };
   switch (args.command) {
     case "mini":
       return runMini(args.selector);
