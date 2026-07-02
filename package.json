@@ -2,7 +2,7 @@
   "name": "aireceipts",
   "version": "0.1.0",
   "description": "Local receipts for AI coding-agent transcripts.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "private": false,
   "bin": {
