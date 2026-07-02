@@ -71,5 +71,14 @@ for (const theme of ["light", "dark"] as const) {
 const loopModel = await modelFor(LOOP.source, LOOP.path);
 check(`goldens/svg/compare-${nameOf(PRICED.path)}-vs-${nameOf(LOOP.path)}.svg`, renderCompareSvg(pricedModel, loopModel));
 
+// SPEC-0020 R5: {grocery, datavis} × {terminal, SVG light} on the priced fixture
+// (4 new artifacts). classic's existing goldens above are the refactor's
+// regression gate; SVG dark stays classic-only.
+const stem = `${PRICED.source}-${nameOf(PRICED.path)}`;
+for (const template of ["grocery", "datavis"] as const) {
+  check(`goldens/${stem}-${template}.txt`, renderReceipt(pricedModel, { color: false, template }) + "\n");
+  check(`goldens/svg/${stem}-${template}-light.svg`, renderReceiptSvg(pricedModel, { theme: "light", template }));
+}
+
 if (drift > 0) process.exit(1);
 if (!update) console.log(`goldens: ${count} artifacts byte-identical.`);
