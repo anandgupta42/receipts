@@ -38,8 +38,10 @@ export interface ReceiptView {
   total: RowView;
   /** Plain note rendered under TOTAL in the degraded modes (Cursor totals-only, or no price table matched). `undefined` when the session priced. */
   totalNote?: string;
-  /** The price-delta footnote sentence (unwrapped). `undefined` in tokens-only mode. */
-  priceDelta?: string;
+  /** The same-tokens comparison as a receipt row (label/value, renders right under TOTAL). `undefined` in tokens-only mode. */
+  priceDeltaRow?: RowView;
+  /** The fixed honesty note rendered small under the delta row. Present iff `priceDeltaRow` is. */
+  priceDeltaNote?: string;
   /** The methodology brief (constant), rendered as a wrapped muted footnote. */
   methodologyBrief: string;
 }
@@ -134,11 +136,13 @@ function totalRow(model: ReceiptModel): { total: RowView; totalNote?: string } {
   return { total: { label: "TOTAL", value: `${formatInt(model.totalTokens.total)} tok` }, totalNote: NO_PRICE_MATCH_NOTE };
 }
 
-function priceDeltaSentence(model: ReceiptModel): string | undefined {
+export const PRICE_DELTA_NOTE = "(arithmetic, not a prediction)";
+
+function priceDeltaRow(model: ReceiptModel): RowView | undefined {
   if (!model.priceDelta) {
     return undefined;
   }
-  return `same tokens on ${model.priceDelta.cheaperModel}: $${formatUsd(model.priceDelta.usd)} — arithmetic, not a prediction`;
+  return { label: `same tokens on ${model.priceDelta.cheaperModel}`, value: `$${formatUsd(model.priceDelta.usd)}` };
 }
 
 /** Build the shared, layout-agnostic view every renderer formats. Pure over the already-priced {@link ReceiptModel} — no pricing/attribution here. */
@@ -151,7 +155,8 @@ export function buildReceiptView(model: ReceiptModel): ReceiptView {
     wasteRows: model.wasteLines.map(wasteRow),
     total,
     totalNote,
-    priceDelta: priceDeltaSentence(model),
+    priceDeltaRow: priceDeltaRow(model),
+    priceDeltaNote: model.priceDelta ? PRICE_DELTA_NOTE : undefined,
     methodologyBrief: METHODOLOGY_BRIEF,
   };
 }

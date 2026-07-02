@@ -286,10 +286,22 @@ function layoutContent(view: ReceiptView, p: Paints): LaidOut {
     y += FOOT_LH;
   }
 
-  // Footnotes: price-delta (if priced) then the methodology brief.
-  if (view.priceDelta) {
-    y += SECTION_GAP;
-    y = footnoteLines(view.priceDelta, y, RIGHT - LEFT, p.muted, els);
+  // Same-tokens comparison: a muted dotted row right under TOTAL, number aligned
+  // with the total for instant visual compare, honesty note small beneath it.
+  if (view.priceDeltaRow) {
+    els.push(...rowElements(view.priceDeltaRow.label, view.priceDeltaRow.value, y, {
+      labelStartX: LEFT,
+      size: SZ_BODY,
+      weight: 400,
+      labelFill: p.muted,
+      valueFill: p.muted,
+      muted: p.muted,
+    }));
+    y += ROW_H;
+    if (view.priceDeltaNote) {
+      els.push(textEl(LEFT + 14, y + 9, view.priceDeltaNote, { size: SZ_FOOT, fill: p.muted }));
+      y += FOOT_LH;
+    }
   }
   y += SECTION_GAP;
   y = footnoteLines(view.methodologyBrief, y, RIGHT - LEFT, p.muted, els);
