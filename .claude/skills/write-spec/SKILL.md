@@ -52,4 +52,6 @@ directory ownership, dependency waves, critical path, team prompt.
 - Keep it as tight as the reference specs — no restating AGENTS.md, no type definitions
   that belong in code (cite `file:line` / a zod schema instead).
 
-When done: write the file, print the path, and a 2-line summary of what's still open.
+When done: write the file, print the path, and a 2-line summary of what's still open —
+then run `/validate-spec` on it. A draft without a `## Validation` record never reaches
+the founder.

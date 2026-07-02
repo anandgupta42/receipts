@@ -33,6 +33,9 @@ jobs:
       - name: goldens
         run: node scripts/verify-goldens.mjs
 
+      - name: spec-lint
+        run: node scripts/spec-lint.mjs
+
   prices:
     # Mechanical enforcement of I2/I3: any PR touching data/prices/** must pass
     # cite-check (schema + non-empty cited sources). The Claude Code hook is UX;
