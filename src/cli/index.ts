@@ -1,6 +1,7 @@
 // R6 CLI dispatcher. Delegates session lookup/selection to the already-shipped
 // `listSessions`/`selectSummary`/`loadSession` (parse layer, core-engine's) —
 // no selector logic is reimplemented here.
+import { writeFile } from "node:fs/promises";
 import { anyDetected, listSessions, loadSession, rootsHint, selectSummary } from "../index.js";
 import type { SessionSummary } from "../parse/types.js";
 import { renderCompare, compareDeltaLine } from "../receipt/compare.js";
@@ -9,6 +10,7 @@ import { formatAbsoluteUtc, formatInt } from "../receipt/format.js";
 import { summaryToJson, toJsonModel } from "../receipt/json.js";
 import { buildReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
+import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
 import { METHODOLOGY } from "../pricing/attribution.js";
 import {
   ensureFirstRunNotice,
@@ -29,9 +31,24 @@ Usage:
   aireceipts --handoff [selector]       paste-ready block of fired waste lines
   aireceipts --quota                    current Claude Code rate-limit window usage
                                          (statusline stdin mode only; silent if unavailable)
+  aireceipts [selector] --svg [-o f]    write a shareable SVG receipt (default receipt.svg)
+  aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
   aireceipts --help                     show this help
 
+flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
+       -o/--output names the file.
 selector: a 1-based index into --list, a session id, or a title substring.`;
+
+interface SvgOut {
+  svg: boolean;
+  theme: "light" | "dark";
+  output?: string;
+}
+
+async function writeSvg(svg: string, path: string): Promise<void> {
+  await writeFile(path, svg, "utf8");
+  process.stdout.write(`wrote ${path} (${Buffer.byteLength(svg)} bytes)\n`);
+}
 
 async function noSessionsMessage(): Promise<string> {
   if (!(await anyDetected())) {
@@ -52,7 +69,7 @@ async function resolveSelector(selector: string | undefined): Promise<{ summary:
   return { summary };
 }
 
-async function runReceipt(selector: string | undefined, json: boolean): Promise<number> {
+async function runReceipt(selector: string | undefined, json: boolean, svgOut: SvgOut): Promise<number> {
   const resolved = await resolveSelector(selector);
   if ("error" in resolved) {
     process.stderr.write(`${resolved.error}\n`);
@@ -64,7 +81,9 @@ async function runReceipt(selector: string | undefined, json: boolean): Promise<
     return 1;
   }
   const model = await buildReceiptModel(session);
-  if (json) {
+  if (svgOut.svg) {
+    await writeSvg(renderReceiptSvg(model, { theme: svgOut.theme }), svgOut.output ?? "receipt.svg");
+  } else if (json) {
     process.stdout.write(`${JSON.stringify(toJsonModel(model), null, 2)}\n`);
   } else {
     process.stdout.write(`${renderReceipt(model)}\n`);
@@ -92,7 +111,12 @@ async function runList(json: boolean): Promise<number> {
   return 0;
 }
 
-async function runCompare(selectorA: string | undefined, selectorB: string | undefined, json: boolean): Promise<number> {
+async function runCompare(
+  selectorA: string | undefined,
+  selectorB: string | undefined,
+  json: boolean,
+  svgOut: SvgOut,
+): Promise<number> {
   if (!selectorA || !selectorB) {
     process.stderr.write("compare requires two selectors: aireceipts compare <a> <b>\n");
     return 1;
@@ -118,7 +142,9 @@ async function runCompare(selectorA: string | undefined, selectorB: string | und
     return 1;
   }
   const [modelA, modelB] = await Promise.all([buildReceiptModel(sessionA), buildReceiptModel(sessionB)]);
-  if (json) {
+  if (svgOut.svg) {
+    await writeSvg(renderCompareSvg(modelA, modelB, { theme: svgOut.theme }), svgOut.output ?? "compare.svg");
+  } else if (json) {
     process.stdout.write(
       `${JSON.stringify(
         { a: toJsonModel(modelA), b: toJsonModel(modelB), delta: compareDeltaLine(modelA, modelB) },
@@ -149,6 +175,7 @@ async function runHandoff(selector: string | undefined): Promise<number> {
 }
 
 async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
+  const svgOut: SvgOut = { svg: args.svg, theme: args.theme, output: args.output };
   switch (args.command) {
     case "telemetry-show":
       process.stdout.write(JSON.stringify(showTelemetryPayload(process.env), null, 2) + "\n");
@@ -162,14 +189,14 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
     case "list":
       return runList(args.json);
     case "compare":
-      return runCompare(args.compareA, args.compareB, args.json);
+      return runCompare(args.compareA, args.compareB, args.json, svgOut);
     case "handoff":
       return runHandoff(args.selector);
     case "quota":
       return runQuota();
     case "receipt":
     default:
-      return runReceipt(args.selector, args.json);
+      return runReceipt(args.selector, args.json, svgOut);
   }
 }
 

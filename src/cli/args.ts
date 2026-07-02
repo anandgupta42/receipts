@@ -2,15 +2,24 @@
 // library in devDependencies). `--list`, `--json`, `--handoff`, `--help`/`-h`
 // are flags; `compare` is the one subcommand, taking two positional
 // selectors; anything else positional is the session selector for the
-// default receipt command.
+// default receipt command. `--svg` (SPEC-0003) switches the receipt and
+// `compare` commands to SVG output; `-o`/`--output` names the file and
+// `--theme light|dark` picks the palette.
 export interface ParsedArgs {
   command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota";
   selector?: string;
   compareA?: string;
   compareB?: string;
   json: boolean;
+  /** SPEC-0003 R1/R3: render the receipt (or comparison) as an SVG file. */
+  svg: boolean;
+  /** SPEC-0003: SVG palette. */
+  theme: "light" | "dark";
+  /** SPEC-0003: output file for `--svg` (defaults to receipt.svg / compare.svg). */
+  output?: string;
 }
 
+/** Value-consuming flags: `--theme dark`, `-o out.svg`. Anything else is a boolean flag or positional. */
 export function parseArgs(argv: string[]): ParsedArgs {
   let json = false;
   let list = false;
@@ -19,9 +28,13 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let methodology = false;
   let telemetryShow = false;
   let quota = false;
+  let svg = false;
+  let theme: "light" | "dark" = "light";
+  let output: string | undefined;
   const positional: string[] = [];
 
-  for (const arg of argv) {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
     if (arg === "--json") {
       json = true;
     } else if (arg === "--list") {
@@ -34,6 +47,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
       methodology = true;
     } else if (arg === "--quota") {
       quota = true;
+    } else if (arg === "--svg") {
+      svg = true;
+    } else if (arg === "--theme") {
+      theme = argv[++i] === "dark" ? "dark" : "light";
+    } else if (arg === "-o" || arg === "--output") {
+      output = argv[++i];
     } else if (arg === "--help" || arg === "-h") {
       help = true;
     } else {
@@ -42,32 +61,32 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (help) {
-    return { command: "help", json };
+    return { command: "help", json, svg, theme, output };
   }
 
   if (methodology) {
-    return { command: "methodology", json };
+    return { command: "methodology", json, svg, theme, output };
   }
 
   if (telemetryShow) {
-    return { command: "telemetry-show", json };
+    return { command: "telemetry-show", json, svg, theme, output };
   }
 
   if (quota) {
-    return { command: "quota", json };
+    return { command: "quota", json, svg, theme, output };
   }
 
   if (positional[0] === "compare") {
-    return { command: "compare", compareA: positional[1], compareB: positional[2], json };
+    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, theme, output };
   }
 
   if (list) {
-    return { command: "list", json };
+    return { command: "list", json, svg, theme, output };
   }
 
   if (handoff) {
-    return { command: "handoff", selector: positional[0], json };
+    return { command: "handoff", selector: positional[0], json, svg, theme, output };
   }
 
-  return { command: "receipt", selector: positional[0], json };
+  return { command: "receipt", selector: positional[0], json, svg, theme, output };
 }
