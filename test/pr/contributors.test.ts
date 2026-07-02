@@ -94,6 +94,15 @@ describe("R1 contributor selection", () => {
     expect(sel.excludedCount).toBe(1);
   });
 
+  it("excludes a Codex session that DID git-write but printed no SHA (no-op/failed) — a real git write is not a 'pure helper'", async () => {
+    // Regression (codex review): `writeCount` must count git writes independent of
+    // SHA output, so this is NOT mistaken for a no-git-writes helper.
+    const noop = makeSession("cx-noop", [bashTurn(0, "git commit -m x", "nothing to commit, working tree clean")], "codex");
+    const sel = await selectContributors([summaryOf(noop)], [BRANCH_SHA], loaderFor([noop]));
+    expect(sel.contributors).toHaveLength(0);
+    expect(sel.excludedCount).toBe(1);
+  });
+
   it("counts a candidate it can't load as excluded, never guessed in", async () => {
     const owned = ownCommit("owned");
     const ghost = summaryOf(makeSession("ghost", []));

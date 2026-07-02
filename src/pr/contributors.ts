@@ -54,10 +54,11 @@ export async function selectContributors(
     }
     const anchors = classifyBranchAnchors(session.turns, branchShas);
     const isCodex = summary.source === "codex";
-    // Own branch SHA → contributes (any source). Codex with no git writes → a
-    // pure helper on the cwd+time rule. Claude with no own anchor, or any
-    // foreign-only session (committed elsewhere) → excluded.
-    const include = anchors.hasOwn || (isCodex && anchors.anchorCount === 0);
+    // Own branch SHA → contributes (any source). Codex that made NO git writes
+    // at all → a pure helper on the cwd+time rule. A session that DID commit or
+    // push but produced no branch SHA (foreign branch, or a no-op / failed write
+    // with no SHA in its output) is excluded — not proven ours (R1, conservative).
+    const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0);
     if (!include) {
       excludedCount++;
       continue;

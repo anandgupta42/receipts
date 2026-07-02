@@ -55,24 +55,33 @@ function classifyAnchors(turns: Turn[], branchShas: readonly string[]): GitAncho
 
 /** SPEC-0023 R1 — a session's branch-SHA anchor summary, the contributor gate.
  * `hasOwn`: a git-write span's OUTPUT prefix-matches a branch SHA (this session
- * committed/pushed to THIS branch). `hasForeign`: a git-write span carried SHAs
- * but none on this branch (worked on another branch). `anchorCount`: git-write
- * spans whose output carried any SHA. A session with `anchorCount === 0` did no
- * SHA-bearing git writes at all (a pure helper). */
+ * committed/pushed to THIS branch). `writeCount`: the number of REAL
+ * `git commit`/`git push` tool calls, counted regardless of what their output
+ * contained — so a commit that printed no SHA ("nothing to commit", a failed
+ * push) still counts as a git write. A session with `writeCount === 0` did no
+ * git writes at all (a pure helper); one with writes but no own anchor
+ * committed elsewhere or produced no branch SHA (excluded — not proven ours). */
 export interface BranchAnchorSummary {
   hasOwn: boolean;
-  hasForeign: boolean;
-  anchorCount: number;
+  writeCount: number;
 }
 
-/** Classify a session's git-write anchors against the branch SHAs (SPEC-0023 R1). Pure; reuses the slicer's own/foreign logic. */
+/** Classify a session's git writes against the branch SHAs (SPEC-0023 R1). Pure. `writeCount` is output-independent; `hasOwn` needs a branch SHA in a span's output. */
 export function classifyBranchAnchors(turns: Turn[], branchShas: readonly string[]): BranchAnchorSummary {
-  const anchors = classifyAnchors(turns, branchShas);
-  return {
-    hasOwn: anchors.some((a) => a.own),
-    hasForeign: anchors.some((a) => !a.own),
-    anchorCount: anchors.length,
-  };
+  let hasOwn = false;
+  let writeCount = 0;
+  for (const turn of turns) {
+    for (const call of turn.toolCalls) {
+      if (!toolCallGitVerb(call)) {
+        continue;
+      }
+      writeCount++;
+      if (hexRuns(String(call.output ?? "")).some((r) => matchesBranchSha(r, branchShas))) {
+        hasOwn = true;
+      }
+    }
+  }
+  return { hasOwn, writeCount };
 }
 
 /**
