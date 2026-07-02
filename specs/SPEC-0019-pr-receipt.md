@@ -36,9 +36,15 @@ only.
   process*; sibling worktrees of the same repo (the dogfood shape:
   `../aireceipts-specNNNN`) are included via `git worktree list --porcelain`
   common-dir matching. A session's `cwd` must be at/inside one of those roots.
-- **R1c — Top-level selection, child rollup.** Auto-selection targets top-level
-  sessions only, but the receipt SUMS the selected slice's linked subagent/sidechain
-  transcripts (children discovered via the session's transcript-adjacent metadata):
+- **R1c — Top-level selection, child rollup (exact discovery contract).** The parse
+  layer gains a child index: children live at
+  `<parentSessionId>/subagents/**/agent-<agentId>.jsonl` beside the parent transcript,
+  carrying `isSidechain: true` and the shared session id; the model gains
+  `isSidechain`, `parentSessionId`, `agentId`, `parentFilePath`. Children are EXCLUDED
+  from top-level selection (today the adapter lists every .jsonl as a session — that
+  changes here). **Inclusion boundary:** a child rolls up iff its launching
+  Task/Workflow invocation turn OR its result turn falls inside the selected parent
+  slice (straddling cases tested). The receipt SUMS included children:
   child costs render as their own labeled section (`SUBAGENTS · N sessions`) with a
   per-child row (name/model, cost or tokens) and are included in TOTAL. A child that
   fails to parse is listed as `(unreadable)` — never silently dropped from the count.
@@ -70,6 +76,18 @@ only.
   `entire session (slice unavailable)` — full-session cost is never presented as PR
   cost unlabeled (I3 applied to attribution). Time windows (R1d) remain only a
   candidate FILTER, never the slicer.
+  (f) **Stale-anchor rule (rebase/amend safety):** after a rebase or amend, old SHAs
+  in earlier outputs read as "foreign" and a later push of the new SHA could slice
+  away the real earlier work — so an own-anchor from a `git push` output alone,
+  with no matching `git commit` anchor for the same branch in the session, renders
+  the labeled full-session fallback instead of a slice (ambiguity → honesty, never a
+  confident wrong cut).
+  (g) **Model-layer extension (named):** `sliceSessionForReceipt(session,
+  {startTurn, endTurn})` recomputes totals/timestamps/tool counts over the range
+  while preserving the original turn count for the `turns A–B of N` header. Claude's
+  adapter already retains tool output (verified against real transcripts: hundreds
+  of SHA-bearing commit/push results); the codex adapter must be brought to parity
+  or its sessions fall back labeled.
 - **R2 — Post via gh (concrete upsert sequence).** `aireceipts pr --post`: (1) resolve
   the PR via `gh pr view --json number`; (2) list issue comments via `gh api`; (3) find
   the comment whose body starts with marker `<!-- aireceipts-dogfood -->`; (4) PATCH it
@@ -135,6 +153,11 @@ non-GitHub forges.
 | R1e tokenized matcher | codex-exec instruction-in-string fixture | NOT an anchor |
 | R1e input SHA | SHA pasted in command input | not authorship |
 | R1e foreign anchor | two-branch session fixture | slice starts after sibling's anchor |
+| R1e stale anchor | push-only own anchor (rebase fixture) | labeled full-session fallback, no slice |
+| R1e fixtures | NEW claude fixtures: commit/push outputs w/ own, foreign, input-only, no SHA | each classified per (b)–(d) |
+| R1c discovery | parent + subagents/ tree fixture | children indexed, excluded from top-level list |
+| R1c straddle | child launched in-slice, result after | included per boundary rule |
+| slice model | sliceSessionForReceipt on fixture range | totals recomputed, header preserves N |
 
 ## Success criteria
 
@@ -156,7 +179,12 @@ git-write matcher, output-only hex-run authorship, foreign-anchor window) after
 maintainer direction to reuse the proven implementation — the time-window heuristic
 survives only as a candidate filter. Prerequisite named: adapters must RETAIN tool
 input/output text for git-write spans (they currently keep usage only), bounded to
-those spans. Needs a fresh S2 pass on the amendments before approval.
+those spans. **S2 delta (Codex): PASS-WITH-FIXES → all 6 applied** (child-discovery contract made
+exact incl. straddle rule; stale-anchor rebase rule added — ambiguity renders the
+labeled fallback, never a confident wrong cut; empirical confirmation that real
+transcripts carry SHA anchors (541 commit / 903 push outputs scanned) and that the
+Claude adapter retains tool output — the prerequisite narrows to fixtures + codex
+parity; sliceSessionForReceipt named; matrix +5 rows). Ready for approval.
 
 **2026-07-02 · S2 (Codex): REWORK → reworked same day, all 8 applied.** Blockers: the
 parse model carried no `cwd` (adapters drop it) → R1a extension requirement added;
