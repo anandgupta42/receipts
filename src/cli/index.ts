@@ -4,6 +4,7 @@
 import { writeFile } from "node:fs/promises";
 import { anyDetected, listSessions, loadSession, rootsHint, selectSummary } from "../index.js";
 import type { SessionSummary } from "../parse/types.js";
+import { evaluateBudget } from "../budget/index.js";
 import { renderCompare, compareDeltaLine } from "../receipt/compare.js";
 import { renderHandoff } from "../receipt/handoff.js";
 import { formatAbsoluteUtc, formatInt } from "../receipt/format.js";
@@ -37,6 +38,8 @@ Usage:
   aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
   aireceipts week [--by-project] [--since <date>] [--json]
                                         trailing-7-day digest across sessions
+  aireceipts --check-budget             exit 1 if ~/.aireceipts/budget.json's cap is
+                                         exceeded (advisory; see docs)
   aireceipts --help                     show this help
 
 flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
@@ -87,12 +90,39 @@ async function runReceipt(selector: string | undefined, json: boolean, svgOut: S
   const model = await buildReceiptModel(session);
   if (svgOut.svg) {
     await writeSvg(renderReceiptSvg(model, { theme: svgOut.theme }), svgOut.output ?? "receipt.svg");
-  } else if (json) {
-    process.stdout.write(`${JSON.stringify(toJsonModel(model), null, 2)}\n`);
+    return 0;
+  }
+  // R1/R5: absent or malformed budget.json → `lines` is [] → output below is
+  // byte-identical to pre-SPEC-0009 (goldens gate this). Malformed only adds
+  // a stderr note, never a rendered line.
+  const budget = await evaluateBudget(Date.now());
+  if (budget.status === "invalid") {
+    process.stderr.write(`budget.json ignored: ${budget.invalidReason}\n`);
+  }
+  if (json) {
+    const jsonModel = toJsonModel(model);
+    const withBudget = budget.lines.length > 0 ? { ...jsonModel, budget: budget.lines } : jsonModel;
+    process.stdout.write(`${JSON.stringify(withBudget, null, 2)}\n`);
   } else {
-    process.stdout.write(`${renderReceipt(model)}\n`);
+    const budgetSuffix = budget.lines.length > 0 ? `\n\n${budget.lines.join("\n")}` : "";
+    process.stdout.write(`${renderReceipt(model)}${budgetSuffix}\n`);
   }
   return 0;
+}
+
+async function runCheckBudget(): Promise<number> {
+  const budget = await evaluateBudget(Date.now());
+  if (budget.status === "invalid") {
+    process.stderr.write(`budget.json ignored: ${budget.invalidReason}\n`);
+    return 0;
+  }
+  if (budget.status === "absent") {
+    return 0;
+  }
+  for (const line of budget.lines) {
+    process.stdout.write(`${line}\n`);
+  }
+  return budget.exceeded ? 1 : 0;
 }
 
 function listLine(index: number, summary: SessionSummary): string {
@@ -219,6 +249,8 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runQuota();
     case "week":
       return runWeek(args);
+    case "check-budget":
+      return runCheckBudget();
     case "receipt":
     default:
       return runReceipt(args.selector, args.json, svgOut);
