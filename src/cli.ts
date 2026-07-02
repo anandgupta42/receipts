@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+// (shebang injected by tsup banner — do not add one here)
 // CLI entry point — delegates to `src/cli/index.ts` for argument parsing and
 // command dispatch (R6, SPEC-0001).
 import { main } from "./cli/index.js";
