@@ -54,6 +54,11 @@ function titleLine(model: ReceiptModel): string | undefined {
     return undefined;
   }
   const flat = model.title.replace(/\s+/g, " ").trim();
+  // A markup-shaped title (agent-injected XML, system tags) is machine noise, not a
+  // work description — render nothing rather than garbage on the masthead.
+  if (flat.startsWith("<")) {
+    return undefined;
+  }
   const cut = flat.length > TITLE_MAX ? `${flat.slice(0, TITLE_MAX - 1).trimEnd()}…` : flat;
   return `“${cut}”`;
 }
