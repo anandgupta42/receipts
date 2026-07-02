@@ -26,3 +26,26 @@ export type { AttributionResult, ToolAttribution } from "./pricing/attribution.j
 export { attributeByTool, METHODOLOGY } from "./pricing/attribution.js";
 export type { PriceDeltaFootnote, StuckLoopFinding, TrivialSpansFinding } from "./pricing/waste.js";
 export { detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "./pricing/waste.js";
+
+// SPEC-0008 weekly digest + the shared waste-aggregation primitive (also consumed by SPEC-0013).
+export type { WasteClassAggregate } from "./aggregate/waste.js";
+export { aggregateWaste } from "./aggregate/waste.js";
+export { deriveProjectBucket, UNKNOWN_PROJECT } from "./aggregate/project.js";
+export type {
+  AgentSplit,
+  ProjectSplit,
+  WeekDelta,
+  WeekDigest,
+  WeekOptions,
+  WindowAggregate,
+  WindowBounds,
+} from "./aggregate/week.js";
+export {
+  aggregateWindow,
+  assembleWeekDigest,
+  buildWeekDigest,
+  computeDelta,
+  partitionWindows,
+  windowBounds,
+} from "./aggregate/week.js";
+export { renderWeek, weekToJson } from "./receipt/week.js";

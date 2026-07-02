@@ -16,6 +16,12 @@ export function formatAbsoluteUtc(epochMs: number): string {
   return `${MONTH_ABBR[d.getUTCMonth()]} ${pad2(d.getUTCDate())} ${d.getUTCFullYear()} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}:${pad2(d.getUTCSeconds())} UTC`;
 }
 
+/** Fixed `Mon DD YYYY` UTC date — for digests/windows that report a day, not an instant (no time-of-day, no locale). */
+export function formatDateUtc(epochMs: number): string {
+  const d = new Date(epochMs);
+  return `${MONTH_ABBR[d.getUTCMonth()]} ${pad2(d.getUTCDate())} ${d.getUTCFullYear()}`;
+}
+
 export function formatDuration(ms: number): string {
   const totalSeconds = Math.round(ms / 1000);
   const h = Math.floor(totalSeconds / 3600);

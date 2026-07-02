@@ -11,6 +11,8 @@ import { summaryToJson, toJsonModel } from "../receipt/json.js";
 import { buildReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
+import { renderWeek, weekToJson } from "../receipt/week.js";
+import { buildWeekDigest } from "../aggregate/week.js";
 import { METHODOLOGY } from "../pricing/attribution.js";
 import {
   ensureFirstRunNotice,
@@ -33,6 +35,8 @@ Usage:
                                          (statusline stdin mode only; silent if unavailable)
   aireceipts [selector] --svg [-o f]    write a shareable SVG receipt (default receipt.svg)
   aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
+  aireceipts week [--by-project] [--since <date>] [--json]
+                                        trailing-7-day digest across sessions
   aireceipts --help                     show this help
 
 flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
@@ -174,6 +178,25 @@ async function runHandoff(selector: string | undefined): Promise<number> {
   return 0;
 }
 
+async function runWeek(args: ReturnType<typeof parseArgs>): Promise<number> {
+  let sinceMs: number | undefined;
+  if (args.since !== undefined) {
+    const parsed = Date.parse(args.since);
+    if (Number.isNaN(parsed)) {
+      process.stderr.write(`invalid --since date: "${args.since}"\n`);
+      return 1;
+    }
+    sinceMs = parsed;
+  }
+  const digest = await buildWeekDigest({ sinceMs, byProject: args.byProject });
+  if (args.json) {
+    process.stdout.write(`${JSON.stringify(weekToJson(digest), null, 2)}\n`);
+  } else {
+    process.stdout.write(`${renderWeek(digest)}\n`);
+  }
+  return 0;
+}
+
 async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
   const svgOut: SvgOut = { svg: args.svg, theme: args.theme, output: args.output };
   switch (args.command) {
@@ -194,6 +217,8 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runHandoff(args.selector);
     case "quota":
       return runQuota();
+    case "week":
+      return runWeek(args);
     case "receipt":
     default:
       return runReceipt(args.selector, args.json, svgOut);
