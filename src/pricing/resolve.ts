@@ -128,6 +128,27 @@ export function vendorForSource(source: AgentSource): string | undefined {
   }
 }
 
+/**
+ * Vendor id for a raw model id, by id-prefix family (R4). Mirrors the vendor
+ * whose `data/prices/<vendor>.json` actually holds that family's rows, so a
+ * model id resolved here is one `resolvePrice` can price. Unknown prefixes
+ * return `undefined` — an unrecognized id stays tokens-only, never guessed to
+ * a vendor (I2). Extended one landed vendor per PR (SPEC-0005 R2/R4); a family
+ * is added here only alongside its cited price table.
+ */
+export function vendorForModel(modelId: string): string | undefined {
+  if (modelId.startsWith("claude-")) {
+    return "anthropic";
+  }
+  if (modelId.startsWith("gpt-")) {
+    return "openai";
+  }
+  if (modelId.startsWith("gemini-")) {
+    return "google";
+  }
+  return undefined;
+}
+
 /** `YYYY-MM-DD` for an epoch-milliseconds timestamp, or `undefined` if absent. */
 export function isoDateOf(epochMs: number | undefined): string | undefined {
   return epochMs === undefined ? undefined : new Date(epochMs).toISOString().slice(0, 10);

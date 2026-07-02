@@ -29,9 +29,24 @@ export interface PriceRow {
   sources: PriceSource[];
 }
 
+/**
+ * A model deliberately left out of `models` because its official page prices
+ * it in a shape the flat schema can't hold honestly (tiered-by-context,
+ * priority/batch, tool-priced). Documented, not priced — so a reviewer sees
+ * *why* a well-known model is absent rather than assuming an oversight
+ * (SPEC-0005 R1). Never consulted by the resolver: an omitted model has no
+ * row, so it stays tokens-only (I2).
+ */
+export interface OmittedModel {
+  model: string;
+  reason: string;
+  source?: string;
+}
+
 export interface PriceTable {
   vendor: string;
   models: Record<string, { price_history: PriceRow[] }>;
+  omitted?: OmittedModel[];
 }
 
 /** A resolved row plus the vendor/model it was resolved for, so callers never need to re-thread that context. */

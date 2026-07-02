@@ -1,0 +1,53 @@
+{
+  "vendor": "google",
+  "models": {
+    "gemini-2.5-flash": {
+      "price_history": [
+        {
+          "input": 0.3,
+          "output": 2.5,
+          "input_cached": 0.03,
+          "from_date": "2026-01-01",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "observed_at": "2026-07-02",
+              "excerpt": "gemini-2.5-flash — Paid Tier, per 1M tokens in USD: Input price $0.30 (text / image / video) $1.00 (audio); Output price (including thinking tokens) $2.50; Context caching price $0.03 (text / image / video) $0.1 (audio) $1.00 / 1,000,000 tokens per hour (storage price)"
+            }
+          ]
+        }
+      ]
+    },
+    "gemini-2.5-flash-lite": {
+      "price_history": [
+        {
+          "input": 0.1,
+          "output": 0.4,
+          "input_cached": 0.01,
+          "from_date": "2026-01-01",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "observed_at": "2026-07-02",
+              "excerpt": "gemini-2.5-flash-lite — Paid Tier, per 1M tokens in USD: Input price (text, image, video) $0.10 (text / image / video) $0.30 (audio); Output price (including thinking tokens) $0.40; Context caching price $0.01 (text / image / video) $0.03 (audio) $1.00 / 1,000,000 tokens per hour (storage price)"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "omitted": [
+    {
+      "model": "gemini-2.5-pro",
+      "reason": "Tiered by context length, which the flat schema cannot hold honestly (SPEC-0005 R1): Input $1.25 for prompts <= 200k tokens, $2.50 for prompts > 200k tokens; Output $10.00 / $15.00.",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    },
+    {
+      "model": "gemini-2.5-computer-use-preview-10-2025",
+      "reason": "Tiered by context length (SPEC-0005 R1): Input $1.25 for prompts <= 200k tokens, $2.50 for prompts > 200k tokens; Output $10.00 / $15.00.",
+      "source": "https://ai.google.dev/gemini-api/docs/pricing"
+    }
+  ]
+}
