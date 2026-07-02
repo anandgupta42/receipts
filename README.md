@@ -9,7 +9,7 @@ block you can paste into a PR.
 I'm building this in the open, as one person, not released yet — no npm install that
 does anything useful today. Follow along or poke at the code; it'll get sharper fast.
 
-Local only, zero accounts. It sends anonymous crash/performance diagnostics (never your
+Offline-complete, zero accounts, with opt-out diagnostics telemetry (never your
 code, prompts, paths, or costs — schema in docs/telemetry.md; kill with
 `AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1`) — I
 don't want your transcripts and I built this so I never see them.

@@ -62,7 +62,7 @@ doubt, this file wins.
 | M1 | Receipt engine: parse adapters, price tables, per-tool attribution, waste lines, price-delta + routable-spend lines, compare, handoff, goldens | not started |
 | M2 | Compare + handoff polish | not started |
 | M3 | PNG export | not started |
-| M4 | Opt-in benchmark (the only network call the CLI will ever make; explicit opt-in) | not started |
+| M4 | Opt-in benchmark (explicit opt-in, separate from the I4 diagnostics contract) | not started |
 
 ## OSS / indie / zero-telemetry stance
 
