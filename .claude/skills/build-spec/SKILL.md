@@ -23,6 +23,17 @@ never edits a spec's status to `approved`; that's the maintainer's button (AGENT
 - If you feel context pressure (repeated compaction), STOP and report progress to the lead
   instead of pushing through — a partial report beats a dead builder.
 
+## 0.6 Modularity law (parallel agents must not collide)
+
+This repo is built by concurrent agents. A spec that grows a shared file grows the
+merge-conflict funnel for every sibling branch. Rules:
+- Adding a capability means adding FILES, not growing a shared union/switch/help
+  string. If the extension point doesn't exist, building the seam is part of your spec.
+- One file > 300 lines or a type union/switch that every feature edits = an
+  architecture smell; flag it to the lead rather than growing it.
+- Shared-file diffs must be one-line registrations at most (import lists, registry
+  rows) — order-insensitive lines that merge cleanly.
+
 ## 1. Branch — never touch main
 
 `git checkout -b feat/<milestone>-<slug> origin/main`. Everything in this skill lands on
