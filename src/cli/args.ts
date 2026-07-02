@@ -4,7 +4,7 @@
 // selectors; anything else positional is the session selector for the
 // default receipt command.
 export interface ParsedArgs {
-  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show";
+  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota";
   selector?: string;
   compareA?: string;
   compareB?: string;
@@ -18,6 +18,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let help = false;
   let methodology = false;
   let telemetryShow = false;
+  let quota = false;
   const positional: string[] = [];
 
   for (const arg of argv) {
@@ -31,6 +32,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       telemetryShow = true;
     } else if (arg === "--methodology") {
       methodology = true;
+    } else if (arg === "--quota") {
+      quota = true;
     } else if (arg === "--help" || arg === "-h") {
       help = true;
     } else {
@@ -48,6 +51,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   if (telemetryShow) {
     return { command: "telemetry-show", json };
+  }
+
+  if (quota) {
+    return { command: "quota", json };
   }
 
   if (positional[0] === "compare") {
