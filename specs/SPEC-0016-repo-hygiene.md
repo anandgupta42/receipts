@@ -59,7 +59,7 @@ around is worse than none.
   title lint given a `--title "<t>"` argument. R4/R5/R6-scan run via their own
   documented commands (listed in the script's `--help`). CI and the script share one
   rules module — no CI-vs-local drift.
-- **R8 — False-positive log.** `docs/hygiene-fp-log.md`: any false or overridden gate
+- **R8 — False-positive log.** `docs/internal/hygiene-fp-log.md`: any false or overridden gate
   finding is appended (date · gate · cause · action). This makes the kill criterion
   ("two FPs in a month → fix or delete the gate") measurable instead of vibes.
 

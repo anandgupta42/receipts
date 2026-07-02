@@ -8,6 +8,47 @@ const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const DOCS_DIR = join(ROOT, "docs");
 const OUT_DIR = join(ROOT, "site", "docs");
 
+// The site's information architecture: an ordered list of sections, each an
+// ordered list of doc paths relative to docs/. This is the single source of
+// truth for both the nav order and which docs are published — anything under
+// docs/internal/ is absent here and therefore never rendered to the site.
+const NAV_SECTIONS = Object.freeze([
+  {
+    section: "Start here",
+    items: ["guide/01-getting-started.md", "guide/02-install.md", "guide/03-install-hook.md"],
+  },
+  {
+    section: "Using it",
+    items: [
+      "guide/04-read-a-receipt.md",
+      "guide/05-compare.md",
+      "guide/06-week.md",
+      "guide/07-statusline.md",
+      "guide/08-budget.md",
+      "guide/09-handoff.md",
+      "guide/10-templates.md",
+      "guide/11-share-and-export.md",
+    ],
+  },
+  {
+    section: "Reference",
+    items: [
+      "guide/12-troubleshooting.md",
+      "json-schema.md",
+      "statusline.md",
+      "pr-receipts.md",
+      "telemetry.md",
+    ],
+  },
+  {
+    section: "Why",
+    items: ["guide/13-pricing.md", "guide/14-session-attribution.md"],
+  },
+]);
+
+// Directories under docs/ that are intentionally never published to the site.
+const EXCLUDED_DIRS = Object.freeze(["internal", "spikes"]);
+
 const RESOURCE_LOAD_PATTERNS = [
   /<script\b[^>]*\bsrc=["']https?:/iu,
   /<link\b[^>]*\bhref=["']https?:/iu,
@@ -17,10 +58,6 @@ const RESOURCE_LOAD_PATTERNS = [
   /@import\s+(?:url\()?["']?https?:/iu,
   /url\(\s*["']?https?:/iu,
 ];
-
-function sortAscii(values) {
-  return [...values].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-}
 
 function escapeHtml(value) {
   return value
@@ -481,6 +518,15 @@ h1{
   letter-spacing:.18em;
   text-transform:uppercase;
 }
+.toc-section{
+  margin:18px 0 8px;
+  color:var(--faint);
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.toc-section:first-of-type{margin-top:0}
 .toc ol,.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .toc a{color:var(--muted);font-size:14px;text-decoration:none}
 .toc a:hover{color:var(--ink);text-decoration:underline}
@@ -653,12 +699,17 @@ function barcodeSvg() {
 </svg>`;
 }
 
-function wrapPage({ title, sourcePath, body, docs }) {
+function wrapPage({ title, sourcePath, body, navSections }) {
   const sourceLine = sourcePath === undefined
     ? "Every page below is generated from the markdown in docs/ — each one names the source it wraps."
     : `Rendered from <code>${escapeHtml(sourcePath)}</code>.`;
-  const navItems = docs
-    .map((doc) => `<li><a href="${escapeAttr(doc.href)}">${escapeHtml(doc.title)}</a></li>`)
+  const navMarkup = navSections
+    .map((sec) => {
+      const items = sec.items
+        .map((doc) => `        <li><a href="${escapeAttr(doc.href)}">${escapeHtml(doc.title)}</a></li>`)
+        .join("\n");
+      return `      <p class="toc-section">${escapeHtml(sec.section)}</p>\n      <ul>\n${items}\n      </ul>`;
+    })
     .join("\n");
 
   return `<!DOCTYPE html>
@@ -693,9 +744,7 @@ ${css()}
   <main class="doc-grid">
     <aside class="toc" aria-label="Docs contents">
       <h2>Contents</h2>
-      <ol>
-${navItems}
-      </ol>
+${navMarkup}
     </aside>
     <article class="doc-content">
 ${body}
@@ -735,50 +784,98 @@ function writeHtml(file, html) {
   writeFileSync(file, html, "utf8");
 }
 
-function main() {
-  const names = sortAscii(readdirSync(DOCS_DIR).filter((name) => name.endsWith(".md")));
-  if (names.length === 0) throw new Error("docs-site: no root docs/*.md files found");
-
-  const docs = names.map((name) => {
-    const path = join(DOCS_DIR, name);
-    const markdown = readFileSync(path, "utf8");
-    return {
-      name,
-      path,
-      sourcePath: `docs/${name}`,
-      href: `${basename(name, ".md")}.html`,
-      title: getTitle(markdown, basename(name, ".md")),
-      excerpt: getExcerpt(markdown),
-      markdown,
-    };
-  });
-
-  mkdirSync(OUT_DIR, { recursive: true });
-  if (existsSync(OUT_DIR)) {
-    for (const name of readdirSync(OUT_DIR)) {
-      if (name.endsWith(".html")) rmSync(join(OUT_DIR, name));
+/** Every publishable `.md` under docs/, as paths relative to docs/, excluding {@link EXCLUDED_DIRS}. */
+function collectPublishableMdFiles() {
+  const results = [];
+  const walk = (relDir) => {
+    const abs = relDir === "" ? DOCS_DIR : join(DOCS_DIR, relDir);
+    for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      const rel = relDir === "" ? entry.name : `${relDir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (EXCLUDED_DIRS.includes(entry.name)) continue;
+        walk(rel);
+      } else if (entry.name.endsWith(".md")) {
+        results.push(rel);
+      }
     }
+  };
+  walk("");
+  return results;
+}
+
+function main() {
+  const manifestItems = NAV_SECTIONS.flatMap((s) => s.items);
+
+  // Completeness + integrity: every publishable doc must be placed in the nav,
+  // every nav item must exist on disk, and no two docs may collapse to the same
+  // output file. A new page therefore can't be silently dropped, and internal/
+  // is provably excluded because nothing there is in NAV_SECTIONS.
+  const onDisk = collectPublishableMdFiles();
+  const inManifest = new Set(manifestItems);
+  if (manifestItems.length !== inManifest.size) {
+    throw new Error("docs-site: NAV_SECTIONS contains a duplicate item");
+  }
+  const missingFromManifest = onDisk.filter((f) => !inManifest.has(f)).sort();
+  if (missingFromManifest.length > 0) {
+    throw new Error(`docs-site: publishable docs missing from NAV_SECTIONS: ${missingFromManifest.join(", ")}`);
+  }
+  const missingOnDisk = manifestItems.filter((f) => !existsSync(join(DOCS_DIR, f)));
+  if (missingOnDisk.length > 0) {
+    throw new Error(`docs-site: NAV_SECTIONS references missing file(s): ${missingOnDisk.join(", ")}`);
   }
 
-  for (const doc of docs) {
+  const docByPath = new Map();
+  const byHref = new Map();
+  for (const rel of manifestItems) {
+    const markdown = readFileSync(join(DOCS_DIR, rel), "utf8");
+    const href = `${basename(rel, ".md")}.html`;
+    if (byHref.has(href)) {
+      throw new Error(`docs-site: basename collision on ${href} (${byHref.get(href)} vs ${rel})`);
+    }
+    byHref.set(href, rel);
+    docByPath.set(rel, {
+      rel,
+      sourcePath: `docs/${rel}`,
+      href,
+      title: getTitle(markdown, basename(rel, ".md")),
+      excerpt: getExcerpt(markdown),
+      markdown,
+    });
+  }
+
+  const navSections = NAV_SECTIONS.map((s) => ({
+    section: s.section,
+    items: s.items.map((rel) => ({ href: docByPath.get(rel).href, title: docByPath.get(rel).title })),
+  }));
+
+  mkdirSync(OUT_DIR, { recursive: true });
+  for (const name of readdirSync(OUT_DIR)) {
+    if (name.endsWith(".html")) rmSync(join(OUT_DIR, name));
+  }
+
+  for (const doc of docByPath.values()) {
     const body = renderMarkdown(doc.markdown);
-    const html = wrapPage({ title: doc.title, sourcePath: doc.sourcePath, body, docs });
+    const html = wrapPage({ title: doc.title, sourcePath: doc.sourcePath, body, navSections });
     writeHtml(join(OUT_DIR, doc.href), html);
   }
 
   const indexBody = `
-<p>Root repository docs rendered as static pages for GitHub Pages. Source paths are shown so the generated site remains traceable to the markdown it wraps.</p>
+<p>The aireceipts user guide, rendered as static pages for GitHub Pages. Source paths are shown so the generated site stays traceable to the markdown it wraps.</p>
+${NAV_SECTIONS.map((s) => `<h2>${escapeHtml(s.section)}</h2>
 <ul class="doc-index-list">
-${docs.map((doc) => `  <li>
+${s.items.map((rel) => {
+  const doc = docByPath.get(rel);
+  return `  <li>
     <a href="${escapeAttr(doc.href)}">${escapeHtml(doc.title)}</a>
     <span class="path">${escapeHtml(doc.sourcePath)}</span>
     <p>${escapeHtml(doc.excerpt)}</p>
-  </li>`).join("\n")}
-</ul>`;
-  const indexHtml = wrapPage({ title: "Docs", body: indexBody, docs });
+  </li>`;
+}).join("\n")}
+</ul>`).join("\n")}`;
+  const indexHtml = wrapPage({ title: "Docs", body: indexBody, navSections });
   writeHtml(join(OUT_DIR, "index.html"), indexHtml);
 
-  console.log(`build-docs-site: wrote ${docs.length + 1} page(s) to ${relative(ROOT, OUT_DIR)}`);
+  console.log(`build-docs-site: wrote ${docByPath.size + 1} page(s) to ${relative(ROOT, OUT_DIR)}`);
 }
 
 main();

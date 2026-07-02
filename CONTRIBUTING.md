@@ -1,7 +1,7 @@
 # Contributing
 
 aireceipts is mostly built by AI coding agents under a spec-driven harness —
-`docs/harness.md` has the full design. This file is the practical version.
+`docs/internal/harness.md` has the full design. This file is the practical version.
 
 ## The pipeline
 

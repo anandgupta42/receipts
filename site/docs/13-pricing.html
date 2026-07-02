@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hygiene False-Positive Log — aireceipts docs</title>
+<title>How pricing is estimated — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -117,6 +117,15 @@ h1{
   letter-spacing:.18em;
   text-transform:uppercase;
 }
+.toc-section{
+  margin:18px 0 8px;
+  color:var(--faint);
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.toc-section:first-of-type{margin-top:0}
 .toc ol,.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .toc a{color:var(--muted);font-size:14px;text-decoration:none}
 .toc a:hover{color:var(--ink);text-decoration:underline}
@@ -274,34 +283,90 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Hygiene False-Positive Log</h1>
-      <p class="sub">Rendered from <code>docs/hygiene-fp-log.md</code>.</p>
+      <h1>How pricing is estimated</h1>
+      <p class="sub">Rendered from <code>docs/guide/13-pricing.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
     <aside class="toc" aria-label="Docs contents">
       <h2>Contents</h2>
-      <ol>
-<li><a href="harness.html">The harness — how this repo builds itself</a></li>
-<li><a href="hygiene-fp-log.html">Hygiene False-Positive Log</a></li>
-<li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
-<li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
-<li><a href="statusline.html">Statusline</a></li>
-<li><a href="telemetry.html">Diagnostics telemetry</a></li>
-      </ol>
+      <p class="toc-section">Start here</p>
+      <ul>
+        <li><a href="01-getting-started.html">Get started in 60 seconds</a></li>
+        <li><a href="02-install.html">Install</a></li>
+        <li><a href="03-install-hook.html">Install the agent hook</a></li>
+      </ul>
+      <p class="toc-section">Using it</p>
+      <ul>
+        <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
+        <li><a href="05-compare.html">Compare two sessions</a></li>
+        <li><a href="06-week.html">Aggregate the week</a></li>
+        <li><a href="07-statusline.html">Show a statusline in your shell</a></li>
+        <li><a href="08-budget.html">Set and watch a budget</a></li>
+        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="10-templates.html">Use a template</a></li>
+        <li><a href="11-share-and-export.html">Share and export</a></li>
+      </ul>
+      <p class="toc-section">Reference</p>
+      <ul>
+        <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
+        <li><a href="statusline.html">Statusline</a></li>
+        <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+      </ul>
+      <p class="toc-section">Why</p>
+      <ul>
+        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="14-session-attribution.html">How session attribution works</a></li>
+      </ul>
     </aside>
     <article class="doc-content">
-<h1 id="hygiene-false-positive-log">Hygiene False-Positive Log</h1>
+<h1 id="how-pricing-is-estimated">How pricing is estimated</h1>
 
-<p>Any false or intentionally overridden hygiene finding is appended here. The kill criterion from SPEC-0016 is mechanical: two false positives in a month means the gate is fixed or deleted.</p>
+<p>Every dollar on a receipt is an <strong>estimate computed locally</strong> from token counts and a cited price table — not a feed from your vendor's billing system. This page explains the math, where the prices come from, and why the number can differ from the invoice you eventually get.</p>
 
-<p>Format:</p>
+<h2 id="the-method-verbatim">The method, verbatim</h2>
 
-<p><code>YYYY-MM-DD · gate · cause · action</code></p>
+<p>The exact attribution method is printed by the tool itself, so the docs can't drift from it:</p>
 
-<h2 id="log">Log</h2>
+<pre class="doc-code"><code class="language-sh">aireceipts --methodology</code></pre>
 
-<p>_No entries._</p>
+<blockquote>Cost is attributed per assistant turn: each turn's priced usage (tokens × the dated price row matching its model and date) is split evenly across the tool(s) it called; a turn with no tool calls is attributed to &quot;(thinking/reply)&quot;. Turns whose model has no matching price row contribute tokens only — never a guessed dollar amount. Cache-write tokens are priced per known TTL tier when the transcript splits them (5-minute and 1-hour rates); any unsplit cache-write tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and priced at that rate, or the plain input rate if the price row cites neither — a conservative fallback that may understate real cost (cache-write billing runs ≥1.25× input) but never overstates it with a guessed premium.</blockquote>
+
+<p>Two properties fall out of this. First, cost is per-tool because it's split across the tools a turn called — that's why <code>Bash</code> and <code>Edit</code> carry a dollar figure. Second, every fallback is chosen to <strong>under</strong>-state rather than over-state, so the receipt is a floor, not an inflated guess.</p>
+
+<h2 id="where-the-prices-come-from">Where the prices come from</h2>
+
+<p>Prices live in <code>data/prices/</code> — one JSON file per vendor. Each model carries a <code>price_history</code>: a list of rate rows, each with a <code>from_date</code>/ <code>to_date</code> and one or more <code>sources</code>. The model is ported from <a href="https://github.com/simonw/llm-prices">simonw/llm-prices</a>: a rate change is a <strong>new row, never an overwrite</strong>, so a session is always priced at the rate that was live on the day it ran.</p>
+
+<p>Every row is cited and checked:</p>
+
+<ul>
+  <li><strong><code>sources</code> is required.</strong> Each source is a real vendor page <code>url</code>, an <code>observed_at</code> date, and a quoted <code>excerpt</code> of the price text. A PR that touches <code>data/prices/</code> without a <code>sources</code> array is rejected mechanically, before review.</li>
+  <li><strong>Citations are liveness-checked.</strong> CI fetches every <code>url</code> and requires it to resolve; a source dated recently must carry an excerpt a reviewer can match against the page. No price is ever invented, inferred, or remembered.</li>
+  <li><strong>Awkward pricing is omitted, not faked.</strong> A model priced in a shape the flat schema can't hold honestly — tiered by context length, batch, or tool-priced — is listed in an <code>omitted</code> array with the reason, and stays tokens-only. It is never given a fabricated flat rate.</li>
+</ul>
+
+<h2 id="same-tokens-on-claude-haiku-4-5">&quot;same tokens on claude-haiku-4-5&quot;</h2>
+
+<p>The line under the total re-prices the session's <strong>identical token counts</strong> on a cheaper model. It is arithmetic on numbers you already spent — not a claim that the other model would have completed the task, used the same tokens, or produced the same result. Read it as &quot;the floor if those exact tokens had been that model's rate,&quot; nothing more.</p>
+
+<h2 id="why-it-may-differ-from-your-bill">Why it may differ from your bill</h2>
+
+<ul>
+  <li><strong>Flat-rate and subscription plans.</strong> If you pay a fixed monthly fee, the receipt still shows the metered token cost — useful for comparing sessions, but not what you're charged. It is a measure of <em>effort</em>, not an invoice line.</li>
+  <li><strong>Rounding.</strong> The receipt rounds to cents; <code>--json</code>/<code>--csv</code> carry full precision.</li>
+  <li><strong>Cache-write tiers.</strong> When a transcript doesn't split cache-write tokens by TTL, aireceipts prices them at the conservative tier (see the method above), which can land below what the vendor actually billed.</li>
+  <li><strong>Unpriced models.</strong> A model with no cited row contributes tokens only, so its dollars are absent rather than approximated — the total covers the priced part.</li>
+</ul>
+
+<h2 id="next">Next</h2>
+
+<ul>
+  <li><strong><a href="14-session-attribution.html">How session attribution works</a></strong> — what a &quot;session&quot; is.</li>
+  <li><strong><a href="12-troubleshooting.html">Troubleshooting</a></strong> — what a tokens-only receipt means.</li>
+</ul>
     </article>
   </main>
   <footer>

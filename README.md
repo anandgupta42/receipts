@@ -91,7 +91,9 @@ send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 aireceipts is designed and largely built by AI agents under a spec-driven harness —
 adversarially validated specs, mutation-tested gates, byte-golden outputs, and PRs
 that carry the receipt of the agent session that built them. The design and the
-motivation: [docs/harness.md](docs/harness.md).
+motivation: [docs/internal/harness.md](docs/internal/harness.md).
+
+**[User guide](docs/guide/01-getting-started.md)** — get started, every command, pricing, and troubleshooting.
 
 More docs: [JSON schema](docs/json-schema.md) · [statusline setup](docs/statusline.md)
 

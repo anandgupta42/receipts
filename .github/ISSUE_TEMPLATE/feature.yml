@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Non-trivial features go through a spec (`specs/`) before anything gets built —
-        this issue is the seed for that, not a commitment. See `docs/harness.md` for
+        this issue is the seed for that, not a commitment. See `docs/internal/harness.md` for
         how an issue becomes a spec becomes a PR.
   - type: textarea
     id: problem

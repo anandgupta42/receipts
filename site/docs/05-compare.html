@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Statusline — aireceipts docs</title>
+<title>Compare two sessions — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -283,8 +283,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Statusline</h1>
-      <p class="sub">Rendered from <code>docs/statusline.md</code>.</p>
+      <h1>Compare two sessions</h1>
+      <p class="sub">Rendered from <code>docs/guide/05-compare.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -322,42 +322,84 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="statusline">Statusline</h1>
+<h1 id="compare-two-sessions">Compare two sessions</h1>
 
-<p><code>aireceipts statusline</code> prints one line — the last-completed session's cost (or tokens, if unpriced) plus a waste flag if one fired — meant for Claude Code's <code>statusLine</code> command config, so a number is visible on every prompt without running <code>aireceipts</code> manually.</p>
+<p>Goal: put two receipts next to each other and see the ratio between them — which run cost more, and by how much.</p>
 
-<h2 id="setup">Setup</h2>
+<pre class="doc-code"><code class="language-sh">aireceipts compare &quot;email format&quot; &quot;intermittently&quot;</code></pre>
 
-<p>Add a <code>statusLine</code> entry to your Claude Code <code>settings.json</code> (global: <code>~/.claude/settings.json</code>, or project-local: <code>.claude/settings.json</code>):</p>
+<p>Each argument is a <a href="04-read-a-receipt.html#pick-a-different-session">selector</a> — an index, a session id, or a title substring. aireceipts prints both receipts, then a one-line ratio:</p>
 
-<pre class="doc-code"><code class="language-json">{
-  &quot;statusLine&quot;: {
-    &quot;type&quot;: &quot;command&quot;,
-    &quot;command&quot;: &quot;aireceipts statusline&quot;
-  }
-}</code></pre>
+<pre class="doc-code"><code>=== Add email format validation to the signup form and add a unit test for it. The signup form is in src/components/SignupF… ===
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Add email format validation to the signup for…” 
+ Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s 
+    claude-opus-4-8 87% · claude-sonnet-5 13%     
+         cache served 85% of input tokens         
 
-<p>Claude Code invokes this command on its own schedule and pipes a JSON payload (including <code>transcript_path</code> for the active session) on stdin. <code>aireceipts</code> reads that payload, loads the referenced transcript directly, and prints one line — no polling, no background process, no daemon.</p>
+Bash..............................$0.05  (3 calls)
+Edit..............................$0.05  (2 calls)
+(thinking/reply)..................$0.03  (2 turns)
+Write.............................$0.03  (2 calls)
+Read...............................$0.02  (1 call)
+--------------------------------------------------
+TOTAL........................................$0.18
+same tokens on claude-haiku-4-5..............$0.04
+  (arithmetic, not a prediction)
 
-<p>If <code>aireceipts</code> isn't on your <code>PATH</code>, use an absolute path to the binary instead of <code>aireceipts</code> in the <code>command</code> field (for example, the output of <code>which aireceipts</code>).</p>
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -
 
-<h2 id="output">Output</h2>
+=== Can you fix the flaky login test in src/auth/login.test.ts? It's failing intermittently in CI. ===
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Can you fix the flaky login test in src/auth/…” 
+ Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s  
+               claude-opus-4-8 100%               
+         cache served 88% of input tokens         
 
-<pre class="doc-code"><code>[Claude Code] $1.23 · 12k tok
-[Claude Code] $2.50 · 20k tok · ⚠ Bash loop ×5
-[Cursor] 8k tok</code></pre>
+Bash..............................$0.08  (5 calls)
+(thinking/reply)...................$0.02  (1 turn)
+
+⚠ Bash loop ×5......................$0.08 (3m 45s)
+--------------------------------------------------
+TOTAL........................................$0.09
+same tokens on claude-haiku-4-5..............$0.02
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -
+
+Add email format validation to the signup form and add a unit test for it. The signup form is in src/components/SignupF… cost 1.9× Can you fix the flaky login test in src/auth/login.test.ts? It's failing intermittently in CI. ($0.18 vs $0.09)</code></pre>
+
+<p>The closing line is the whole point: the first session cost <strong>1.9×</strong> the second (<code>$0.18</code> vs <code>$0.09</code>). Note the second receipt also surfaces a <code>⚠ Bash loop ×5</code> waste line — comparison is often how a cheaper-looking run turns out to have burned its budget in a loop.</p>
+
+<p>On a wide terminal the two receipts render side by side; on a narrow one they stack, as above. Either way the numbers are identical.</p>
+
+<h2 id="save-it-as-an-image">Save it as an image</h2>
+
+<p>To share the comparison, render it as an SVG:</p>
+
+<pre class="doc-code"><code class="language-sh">aireceipts compare &quot;email format&quot; &quot;intermittently&quot; --svg -o compare.svg</code></pre>
+
+<p>See <a href="11-share-and-export.html">Share and export</a> for themes and formats.</p>
+
+<h2 id="next">Next</h2>
 
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session's cost is priced; <code>Nk tok</code> only when it isn't (never a fabricated <code>$</code> amount).</li>
-  <li>The waste flag (<code>⚠ ...</code>) appears only when a waste detector actually fired on the session — its absence is not itself a claim that nothing was found.</li>
-  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk. If no sessions are detected at all, it prints a neutral placeholder line rather than an error, so the statusline layout never breaks.</li>
-</ul>
-
-<h2 id="notes">Notes</h2>
-
-<ul>
-  <li>One line, one on-disk read per invocation — this is a snapshot, not a live view. Nothing streams mid-session (see the CLI's non-goals).</li>
-  <li>Sessions that can't be priced (missing price rows) render tokens-only — <code>aireceipts</code> never estimates a dollar figure it can't source to a price row.</li>
+  <li><strong><a href="06-week.html">Aggregate the week</a></strong> — compare against a whole week, not one session.</li>
+  <li><strong><a href="09-handoff.html">Fix it next time</a></strong> — turn a waste line into a rule for your agent.</li>
 </ul>
     </article>
   </main>
