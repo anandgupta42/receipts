@@ -50,6 +50,8 @@
       "source": "gemini",
       "path": "test/fixtures/gemini/rewind-dedupe.jsonl",
       "expected": []
+    },
+    {
       "source": "opencode",
       "path": "test/fixtures/opencode/clean-multi-vendor.db",
       "expected": []
