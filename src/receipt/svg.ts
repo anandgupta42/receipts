@@ -8,7 +8,8 @@
 // never collide, whatever monospace the viewer substitutes.
 //
 // Colours are theme CSS variables *with a concrete hex fallback*
-// (`var(--ink,#1B1E22)`): browsers pick up the `:root` token so a consumer can
+// Literal per-theme hex only — CSS var() (even with fallbacks) renders BLACK in
+// resvg (our own --png engine); portability of the share-artifact wins over
 // re-theme by swapping one variable, while renderers that don't implement CSS
 // custom properties (librsvg, some GitHub image paths) fall back to the hex and
 // still render correctly — non-negotiable for "the screenshot IS the
@@ -40,7 +41,7 @@ export interface SvgOptions {
   theme?: ThemeName;
 }
 
-/** Themed paint strings (`var(--token,#hex)`) resolved once per render and threaded through the layout. */
+/** Themed paint strings (literal hex) resolved once per render and threaded through the layout. */
 interface Paints {
   card: string;
   ink: string;
@@ -52,12 +53,12 @@ interface Paints {
 
 function paintsFor(theme: Theme): Paints {
   return {
-    card: `var(--card,${theme.card})`,
-    ink: `var(--ink,${theme.ink})`,
-    muted: `var(--muted,${theme.muted})`,
-    rule: `var(--rule,${theme.rule})`,
-    accent: `var(--accent,${theme.accent})`,
-    flag: `var(--flag,${theme.flag})`,
+    card: theme.card,
+    ink: theme.ink,
+    muted: theme.muted,
+    rule: theme.rule,
+    accent: theme.accent,
+    flag: theme.flag,
   };
 }
 
@@ -94,7 +95,9 @@ const BADGE_GAP = 4;
 const WASTE_LABEL_X = LEFT + BADGE + BADGE_GAP; // label start when a badge prefixes the row
 const STAMP_ROTATE = -4;
 
-const FOOTER_TEXT = "aireceipts · buy me a samosa 🥟";
+// Emoji deliberately absent: a glyph outside the monospace face poisons the whole
+// text run in resvg-class renderers (tofu). The terminal footer keeps the 🥟.
+const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
 const STAMP_TEXT = "LOCAL · DETERMINISTIC";
 
 // --- Primitives --------------------------------------------------------------
@@ -342,13 +345,7 @@ function cardGroup(els: string[], height: number, xOffset: number, idSuffix: str
   return `<g transform="translate(${n(xOffset)} 0)">${inner}</g>`;
 }
 
-/** `:root` theme variables — browsers use these to re-theme; the per-attribute hex fallbacks keep non-CSS-var renderers correct. */
-function styleBlock(theme: Theme): string {
-  const vars =
-    `--card:${theme.card};--ink:${theme.ink};--muted:${theme.muted};` +
-    `--rule:${theme.rule};--accent:${theme.accent};--flag:${theme.flag};`;
-  return `<style>:root{${vars}}</style>`;
-}
+
 
 function svgDocument(width: number, height: number, body: string, label: string): string {
   return (
@@ -363,7 +360,7 @@ export function renderReceiptSvg(model: ReceiptModel, opts: SvgOptions = {}): st
   const theme = THEMES[opts.theme ?? "light"];
   const p = paintsFor(theme);
   const { els, height } = layoutContent(buildReceiptView(model), p);
-  const body = styleBlock(theme) + cardGroup(els, height, 0, "0", p.card);
+  const body = cardGroup(els, height, 0, "0", p.card);
   return svgDocument(WIDTH, height, body, "aireceipts cost receipt");
 }
 
@@ -389,6 +386,6 @@ export function renderCompareSvg(a: ReceiptModel, b: ReceiptModel, opts: SvgOpti
     y += META_LH;
   }
   const height = y + 20;
-  const body = styleBlock(theme) + cards + deltaEls.join("");
+  const body = cards + deltaEls.join("");
   return svgDocument(COMPARE_WIDTH, height, body, "aireceipts receipt comparison");
 }

@@ -239,7 +239,7 @@ describe("renderCompareSvg — R3", () => {
     const deltaTexts = [...svg.matchAll(/<text[^>]*fill="([^"]+)"[^>]*>[^<]*×[^<]*<\/text>/g)];
     expect(deltaTexts.length).toBeGreaterThan(0);
     for (const t of deltaTexts) {
-      expect(t[1]).toContain("--muted");
+      expect(t[1]).toContain(THEMES.light.muted);
     }
   });
 });
