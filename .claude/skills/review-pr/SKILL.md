@@ -6,10 +6,16 @@ trigger: /review-pr
 
 # /review-pr — the critic (generator ≠ critic)
 
-Run as a **different model family** from whoever built the PR (e.g. Codex reviewing a
-Claude-built PR, or vice versa) — a same-family review tends to share the same blind
-spots as the build. If you built the PR yourself, say so explicitly and flag the review
-as same-author, not independent.
+Run as a **different model family** from whoever built the PR — a same-family review
+tends to share the same blind spots as the build. **For coding PRs the default critic is
+Codex at deep reasoning effort** (maintainer directive 2026-07-02): invoke
+`codex exec --sandbox read-only -C <repo> "<review brief>"` with sections 1–4 below as
+the brief; Codex's reasoning effort should be its deepest available tier for anything
+touching src/. If you built the PR yourself, say so explicitly and flag the review as
+same-author, not independent — then STILL run the Codex pass before merge.
+
+No coding PR merges without a recorded deep review. The review (or its verdict summary)
+is pasted into the PR as a comment so the record survives.
 
 ## 1. Run the gates yourself, silently, unmasked
 
@@ -43,7 +49,9 @@ I6 (no ranking language snuck into receipt copy).
 
 Does the diff match the spec it claims to implement — nothing more? Flag unrelated
 refactors, drive-by renames, or scope creep as separate findings, not blockers unless
-they're risky.
+they're risky. **Docs staleness is a finding**: if the diff changes user-visible
+behavior (flags, commands, output) and no README/docs/help update rides in the PR,
+flag it (build-spec 6.5 requires docs in the same PR).
 
 ## 5. Post the review
 

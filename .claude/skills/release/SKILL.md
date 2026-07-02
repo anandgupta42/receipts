@@ -25,6 +25,13 @@ Generate the changelog entry from commits since the last tag, grouped by type (`
 `fix`, `chore`, ...). Don't hand-write marketing copy here — this is a factual log (I6:
 facts, not rankings, applies to the project's own changelog too).
 
+## 3.5 Docs panel (blocking)
+
+Run `/review-docs` — the two-lens agent panel (cold-reader simplicity + correctness
+auditor). Any unfixed correctness finding blocks the release; simplicity findings are
+fixed or explicitly waived with a one-line reason in the release notes. No release
+ships docs that a cold reader can't follow or that claim things the code doesn't do.
+
 ## 4. Flip shipped specs from `building` to `shipped`
 
 For every spec under `specs/` at `status: building` whose PR merged into `main` as part
