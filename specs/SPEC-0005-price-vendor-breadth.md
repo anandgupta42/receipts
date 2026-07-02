@@ -1,7 +1,7 @@
 ---
 id: SPEC-0005
 title: "Price-table vendor breadth — flat-rate rows for Google/DeepSeek (+ xAI if citable)"
-status: draft
+status: approved
 milestone: M2
 depends: [SPEC-0001]
 ---

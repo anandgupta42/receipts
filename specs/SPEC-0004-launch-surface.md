@@ -1,7 +1,7 @@
 ---
 id: SPEC-0004
 title: "Launch surface — README, docs, demo assets"
-status: draft
+status: approved
 milestone: M2
 depends: [SPEC-0001, SPEC-0002, SPEC-0003, SPEC-0005]
 ---

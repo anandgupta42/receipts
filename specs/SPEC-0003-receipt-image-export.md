@@ -1,7 +1,7 @@
 ---
 id: SPEC-0003
 title: "Receipt SVG export — the shareable artifact"
-status: draft
+status: approved
 milestone: M2
 depends: [SPEC-0001]
 ---
