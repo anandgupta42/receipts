@@ -114,7 +114,10 @@ function parseCache(raw: string): Record<string, CacheEntry> {
 
 function stripTurns(session: Session): SessionSummary {
   const summary: Partial<Session> = { ...session };
+  // Both are full-Session-only concepts — the cache stores SessionSummary rows,
+  // and SPEC-0017 compactions (like turns) are recomputed on a full load.
   delete summary.turns;
+  delete summary.compactions;
   return summary as SessionSummary;
 }
 

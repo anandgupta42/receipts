@@ -1,0 +1,19 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Two compactions far apart — no thrash window.”  
+ Claude Code · Jun 15 2026 14:00:30 UTC · 16m 00s 
+              claude-haiku-4-5 100%               
+
+(thinking/reply).................$5.50  (30 turns)
+--------------------------------------------------
+TOTAL........................................$5.50
+same tokens on claude-haiku-4-5..............$5.50
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

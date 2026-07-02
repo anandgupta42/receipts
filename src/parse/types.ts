@@ -131,8 +131,26 @@ export interface SessionSummary {
   parentFilePath?: string;
 }
 
+/**
+ * SPEC-0017 R1/R2 — a raw compaction event extracted from the transcript before
+ * the adapter drops `isMeta`/command-echo records. `turnIndex` is the index of
+ * the next assistant turn after the raw compact record (so a compaction between
+ * two assistant turns points at the second); a compaction after the final
+ * assistant turn is retained with `turnIndex = turns.length` and is
+ * thrash-ineligible (no following turns to prove refill). `atMs` is the raw
+ * record's own timestamp, absent (not synthesized) when the record carried none.
+ * Only the Claude Code adapter populates this — other agents record no
+ * compaction signal, so their sessions never carry compactions and never thrash.
+ */
+export interface Compaction {
+  turnIndex: number;
+  atMs?: number;
+}
+
 export interface Session extends SessionSummary {
   turns: Turn[];
+  /** SPEC-0017 — raw compaction events, ordered by `turnIndex`. Absent when the adapter records none. */
+  compactions?: Compaction[];
 }
 
 export interface ListSessionsOptions {

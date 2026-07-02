@@ -9,7 +9,7 @@ import { attributeByTool, METHODOLOGY } from "../pricing/attribution.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
 import { isoDateOf, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
 import type { ResolvedPrice } from "../pricing/types.js";
-import { detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "../pricing/waste.js";
+import { detectContextThrash, detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "../pricing/waste.js";
 import type { PriceDeltaFootnote } from "../pricing/waste.js";
 
 export interface ModelMixEntry {
@@ -44,7 +44,16 @@ export interface TrivialSpansWasteLine {
   cheaperModel: string;
 }
 
-export type WasteLine = StuckLoopWasteLine | TrivialSpansWasteLine;
+export interface ContextThrashWasteLine {
+  kind: "context-thrash";
+  compactionCount: number;
+  turnSpan: number;
+  turnIndices: number[];
+  usd: number | null;
+  tokens: TokenUsage;
+}
+
+export type WasteLine = StuckLoopWasteLine | TrivialSpansWasteLine | ContextThrashWasteLine;
 
 /** One dated price row actually consulted while building this receipt — the `--json` "price rows used" requirement (I3: every number traceable). */
 export type PriceRowUsed = ResolvedPrice;
@@ -103,6 +112,14 @@ export function sliceSessionForReceipt(session: Session, range: { startTurn: num
     }
   }
 
+  // SPEC-0017 — the sliced turns are re-indexed 0..k, so compaction turnIndices
+  // must be re-based onto the slice too (a stale original index would misplace or
+  // fabricate thrash on a PR-scoped receipt). Keep only compactions that fall
+  // inside the slice or immediately after its last turn (after-final, ineligible).
+  const compactions = (session.compactions ?? [])
+    .filter((c) => c.turnIndex >= start && c.turnIndex <= end + 1)
+    .map((c) => ({ ...c, turnIndex: c.turnIndex - start }));
+
   return {
     ...session,
     startedAt,
@@ -114,6 +131,7 @@ export function sliceSessionForReceipt(session: Session, range: { startTurn: num
       toolCallCount,
     },
     turns: slice,
+    compactions,
   };
 }
 
@@ -178,6 +196,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
   const attribution = await attributeByTool(session, dataDir);
   const stuckLoops = await detectStuckLoops(session, dataDir);
   const trivialSpans = await detectTrivialSpans(session, dataDir);
+  const contextThrash = await detectContextThrash(session, dataDir);
   const priceDelta =
     attribution.totalUsd !== null
       ? await priceDeltaFootnote(session, attribution.totalTokens, attribution.totalUsd, dataDir)
@@ -208,6 +227,18 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
           },
         ]
       : []),
+    // SPEC-0017 R7 — context-thrash lines append after the existing classes so a
+    // session that never thrashes renders byte-identically to before (I5).
+    ...contextThrash.map(
+      (f): ContextThrashWasteLine => ({
+        kind: "context-thrash",
+        compactionCount: f.compactionCount,
+        turnSpan: f.turnSpan,
+        turnIndices: f.turnIndices,
+        usd: f.usd,
+        tokens: f.tokens,
+      }),
+    ),
   ];
 
   const priceRowsUsed = await collectPriceRowsUsed(session, dataDir);

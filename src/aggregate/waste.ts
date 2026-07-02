@@ -6,7 +6,7 @@
 import type { Session, TokenUsage } from "../parse/types.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
-import { detectStuckLoops, detectTrivialSpans } from "../pricing/waste.js";
+import { detectContextThrash, detectStuckLoops, detectTrivialSpans } from "../pricing/waste.js";
 
 export interface WasteClassAggregate {
   /** Waste-class id, matching the receipt's `WasteLine.kind` ("stuck-loop" | "trivial-spans"). */
@@ -26,6 +26,16 @@ export interface WasteClassAggregate {
    * recurrence signal), even though `cost`/`tokens` sum every firing.
    */
   distinctSessionCount: number;
+  /**
+   * SPEC-0017 R6 — set when this class's turns overlap another class's turns in
+   * at least one session, so a caller must NOT add this row's `cost` to the
+   * overlapping class's as a session total (the shared turns would double-count).
+   * Absent (not `false`) when there is no overlap, keeping non-overlapping
+   * output byte-identical to pre-SPEC-0017.
+   */
+  nonAdditive?: boolean;
+  /** SPEC-0017 R6 — the other class ids whose turns this class overlaps (sorted). Present only alongside `nonAdditive`. */
+  overlapsWith?: string[];
 }
 
 interface ClassAcc {
@@ -51,28 +61,61 @@ function bump(acc: Map<string, ClassAcc>, cls: string, usd: number | null, token
  * that fires no class contributes nothing; a class no session fired never
  * appears (no padding).
  */
+/** SPEC-0017 R6 — record a symmetric cross-class overlap so both rows are later marked non-additive. */
+function markOverlap(overlaps: Map<string, Set<string>>, a: string, b: string): void {
+  (overlaps.get(a) ?? overlaps.set(a, new Set<string>()).get(a)!).add(b);
+  (overlaps.get(b) ?? overlaps.set(b, new Set<string>()).get(b)!).add(a);
+}
+
 export async function aggregateWaste(
   sessions: Session[],
   dataDir: string = defaultDataDir(),
 ): Promise<WasteClassAggregate[]> {
   const acc = new Map<string, ClassAcc>();
+  // SPEC-0017 R6 — class → the other classes it shares a turn with in some session.
+  const overlaps = new Map<string, Set<string>>();
 
   for (const session of sessions) {
-    for (const loop of await detectStuckLoops(session, dataDir)) {
+    const loops = await detectStuckLoops(session, dataDir);
+    for (const loop of loops) {
       bump(acc, "stuck-loop", loop.usd, loop.tokens, session.id);
     }
     const trivial = await detectTrivialSpans(session, dataDir);
     if (trivial) {
       bump(acc, "trivial-spans", trivial.usd, trivial.tokens, session.id);
     }
+    const thrash = await detectContextThrash(session, dataDir);
+    for (const t of thrash) {
+      bump(acc, "context-thrash", t.usd, t.tokens, session.id);
+    }
+
+    // R6 — a context-thrash turn that also belongs to stuck-loop or trivial-spans
+    // makes those class costs non-summable (the shared turn's tokens are in both).
+    if (thrash.length > 0) {
+      const thrashTurns = new Set<number>(thrash.flatMap((t) => t.turnIndices));
+      const loopTurns = new Set<number>(loops.flatMap((l) => l.turnIndices));
+      const trivialTurns = new Set<number>(trivial?.turnIndices ?? []);
+      if ([...thrashTurns].some((i) => loopTurns.has(i))) {
+        markOverlap(overlaps, "context-thrash", "stuck-loop");
+      }
+      if ([...thrashTurns].some((i) => trivialTurns.has(i))) {
+        markOverlap(overlaps, "context-thrash", "trivial-spans");
+      }
+    }
   }
 
   return [...acc.entries()]
-    .map(([cls, e]): WasteClassAggregate => ({
-      class: cls,
-      cost: e.cost,
-      tokens: e.tokens,
-      distinctSessionCount: e.sessions.size,
-    }))
+    .map(([cls, e]): WasteClassAggregate => {
+      const overlapSet = overlaps.get(cls);
+      const base: WasteClassAggregate = {
+        class: cls,
+        cost: e.cost,
+        tokens: e.tokens,
+        distinctSessionCount: e.sessions.size,
+      };
+      return overlapSet && overlapSet.size > 0
+        ? { ...base, nonAdditive: true, overlapsWith: [...overlapSet].sort((a, b) => a.localeCompare(b)) }
+        : base;
+    })
     .sort((a, b) => b.cost - a.cost || b.tokens.total - a.tokens.total || a.class.localeCompare(b.class));
 }

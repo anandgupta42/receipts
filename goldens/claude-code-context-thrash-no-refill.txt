@@ -1,0 +1,19 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Two compactions close together but the contex…” 
+ Claude Code · Jun 15 2026 14:00:30 UTC · 4m 00s  
+              claude-haiku-4-5 100%               
+
+(thinking/reply)..................$0.56  (6 turns)
+--------------------------------------------------
+TOTAL........................................$0.56
+same tokens on claude-haiku-4-5..............$0.56
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Claude Code · claude-haiku-4-5 · 5m 30s
+total  $0.90
+top    (thinking/reply) · $0.90 (8 turns)
+⚠ context thrash ×3 compactions · $0.39
+run  aireceipts  for the full receipt

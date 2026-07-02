@@ -39,6 +39,11 @@ function handoffBullet(waste: WasteLine): string {
     const clockPart = waste.wallClockMs !== null ? `, ${formatDuration(waste.wallClockMs)} wall-clock` : "";
     return `- ${waste.tool} loop ×${waste.runLength}: ${valuePart}${clockPart}`;
   }
+  if (waste.kind === "context-thrash") {
+    // R7: the static clear/split-context suggestion rides with the bullet.
+    const valuePart = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
+    return `- context thrash ×${waste.compactionCount} compactions (${waste.turnSpan} turns): ${valuePart} — clear or split context at task boundaries`;
+  }
   return `- ${TRIVIAL_SPANS_LABEL}: $${formatUsd(waste.usd)} (${waste.eligibleTurnCount} turns → ${waste.cheaperModel})`;
 }
 

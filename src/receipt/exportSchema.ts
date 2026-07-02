@@ -62,6 +62,16 @@ const wasteLineSchema = z.discriminatedUnion("kind", [
       cheaperModel: z.string(),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("context-thrash"),
+      compactionCount: z.number(),
+      turnSpan: z.number(),
+      turnIndices: z.array(z.number()),
+      tokens: tokenUsageSchema,
+      usd: z.number().nullable(),
+    })
+    .strict(),
 ]);
 
 const priceDeltaSchema = z

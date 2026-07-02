@@ -1,0 +1,22 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Thrashy session on a model with no cited pric…” 
+ Claude Code · Jun 15 2026 14:00:30 UTC · 5m 30s  
+          claude-unknown-model-zzz 100%           
+         cache served 44% of input tokens         
+
+(thinking/reply)..........1,354,000 tok  (8 turns)
+
+≈ context thrash: 3 compactions in…....700,000 tok
+  context refilled ≥80% of peak within 5 turns
+--------------------------------------------------
+TOTAL................................1,354,000 tok
+no price table matched
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

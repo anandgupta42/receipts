@@ -1,0 +1,19 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “A compaction mid-session and one after the la…” 
+ Claude Code · Jun 15 2026 14:00:30 UTC · 3m 00s  
+              claude-haiku-4-5 100%               
+
+(thinking/reply)..................$0.75  (4 turns)
+--------------------------------------------------
+TOTAL........................................$0.75
+same tokens on claude-haiku-4-5..............$0.75
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

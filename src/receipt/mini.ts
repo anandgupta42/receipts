@@ -87,10 +87,11 @@ function topToolLine(s: MiniSummary): string {
 }
 
 function wasteValue(waste: WasteLine): string {
-  if (waste.kind === "stuck-loop") {
-    return waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
+  if (waste.kind === "trivial-spans") {
+    return `$${formatUsd(waste.usd)}`;
   }
-  return `$${formatUsd(waste.usd)}`;
+  // stuck-loop and context-thrash both carry a nullable usd → tokens when unpriced (I2).
+  return waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
 }
 
 function wasteLine(s: MiniSummary): string {
@@ -100,6 +101,9 @@ function wasteLine(s: MiniSummary): string {
   }
   if (waste.kind === "stuck-loop") {
     return `⚠ ${waste.tool} loop ×${waste.runLength} · ${wasteValue(waste)}`;
+  }
+  if (waste.kind === "context-thrash") {
+    return `⚠ context thrash ×${waste.compactionCount} compactions · ${wasteValue(waste)}`;
   }
   return `⚠ ${formatInt(waste.eligibleTurnCount)} trivial spans → ${waste.cheaperModel} · ${wasteValue(waste)}`;
 }
@@ -139,6 +143,9 @@ export function renderMiniSummary(s: MiniSummary): string {
 function statuslineWasteFlag(waste: WasteLine): string {
   if (waste.kind === "stuck-loop") {
     return `⚠ ${waste.tool} loop ×${waste.runLength}`;
+  }
+  if (waste.kind === "context-thrash") {
+    return `⚠ context thrash ×${waste.compactionCount}`;
   }
   return `⚠ ${formatInt(waste.eligibleTurnCount)} trivial spans`;
 }
