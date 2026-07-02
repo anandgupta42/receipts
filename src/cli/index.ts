@@ -9,6 +9,7 @@ import { formatAbsoluteUtc, formatInt } from "../receipt/format.js";
 import { summaryToJson, toJsonModel } from "../receipt/json.js";
 import { buildReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
+import { METHODOLOGY } from "../pricing/attribution.js";
 import { parseArgs } from "./args.js";
 
 const HELP_TEXT = `aireceipts — local, deterministic cost receipts for AI coding-agent sessions
@@ -140,6 +141,9 @@ async function runHandoff(selector: string | undefined): Promise<number> {
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
   const args = parseArgs(argv);
   switch (args.command) {
+    case "methodology":
+      process.stdout.write(METHODOLOGY + "\n");
+      return 0;
     case "help":
       process.stdout.write(`${HELP_TEXT}\n`);
       return 0;

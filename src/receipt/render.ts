@@ -3,6 +3,7 @@
 // `src/pricing/**`, core-engine's), and no I/O. `renderReceiptLines` returns
 // an array (not a joined string) so `compare.ts` can zip two receipts
 // side-by-side at the line level.
+import { METHODOLOGY_BRIEF } from "../pricing/attribution.js";
 import { colorEnabled, makeColorizer } from "./color.js";
 import {
   center,
@@ -52,7 +53,8 @@ function masthead(model: ReceiptModel, width: number, bold: (s: string) => strin
 function toolRowLines(model: ReceiptModel, width: number): string[] {
   const lines: string[] = [];
   for (const row of model.toolRows) {
-    const countLabel = `(${formatInt(row.callCount)} call${row.callCount === 1 ? "" : "s"})`;
+    const unit = row.tool === "(thinking/reply)" ? "turn" : "call";
+    const countLabel = `(${formatInt(row.callCount)} ${unit}${row.callCount === 1 ? "" : "s"})`;
     if (model.unpriceable) {
       // Cursor: per-tool tokens are always zero (no per-turn usage) — call counts are the only real number.
       lines.push(dottedLine(row.tool, countLabel, width));
@@ -121,7 +123,7 @@ export function renderReceiptLines(model: ReceiptModel, opts: RenderOptions = {}
   }
 
   lines.push("");
-  lines.push(...wrapText(model.methodology, width).map((l) => dim(l)));
+  lines.push(...wrapText(METHODOLOGY_BRIEF, width).map((l) => dim(l)));
 
   lines.push(dim(perforation(width)));
   lines.push(center("aireceipts · local · buy me a samosa 🥟", width));

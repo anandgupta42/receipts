@@ -15,7 +15,13 @@ export const METHODOLOGY =
   "transcript splits them (5-minute and 1-hour rates); any unsplit cache-write " +
   "tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and " +
   "priced at that rate, or the plain input rate if the price row cites neither — " +
-  "never a guessed discount.";
+  "a conservative fallback that may understate real cost (cache-write billing " +
+  "runs ≥1.25× input) but never overstates it with a guessed premium.";
+
+/** Short form of {@link METHODOLOGY} printed on the receipt card itself (R5 polish — the full text is ~17 lines). `--methodology` prints the full text; `--json` still carries the full string. */
+export const METHODOLOGY_BRIEF =
+  "Per-turn cost split evenly across that turn's tool calls; unpriced models " +
+  "show tokens only, never guessed dollars. Full method: aireceipts --methodology";
 
 export interface ToolAttribution {
   tool: string;
