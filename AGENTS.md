@@ -24,6 +24,9 @@ npx tsc --noEmit;                    echo $?
 npx eslint . --max-warnings 0;       echo $?
 npx vitest run;                      echo $?
 node scripts/verify-goldens.mjs;     echo $?
+node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs; echo $?
+node scripts/spec-lint.mjs;          echo $?
+node scripts/hygiene.mjs;            echo $?
 ```
 
 **Never pipe these through `tail`/`grep`/`head`.** A pipeline's exit status is the last

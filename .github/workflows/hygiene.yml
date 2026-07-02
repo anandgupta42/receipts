@@ -1,0 +1,126 @@
+name: Hygiene
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  workflow_dispatch: {}
+
+jobs:
+  repo-hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: local hygiene
+        run: node scripts/hygiene.mjs
+
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PR title lint
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: node scripts/hygiene.mjs --title "$PR_TITLE"
+
+  actionlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      ACTIONLINT_VERSION: "1.7.7"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: detect workflow changes
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA"...HEAD -- '.github/workflows/*.yml' '.github/workflows/*.yaml'; then
+            echo "workflows=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "workflows=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: install checksum-verified actionlint
+        if: steps.changed.outputs.workflows == 'true'
+        run: |
+          set -euo pipefail
+          workdir="${RUNNER_TEMP}/actionlint"
+          mkdir -p "$workdir"
+          cd "$workdir"
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          base_url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          curl -fsSLO "${base_url}/${archive}"
+          curl -fsSLO "${base_url}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          grep " ${archive}$" "actionlint_${ACTIONLINT_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "$archive"
+
+      - name: actionlint
+        if: steps.changed.outputs.workflows == 'true'
+        run: |
+          files=()
+          while IFS= read -r -d '' file; do
+            files+=("$file")
+          done < <(find .github/workflows -maxdepth 1 \( -name '*.yml' -o -name '*.yaml' \) -print0)
+          "${RUNNER_TEMP}/actionlint/actionlint" "${files[@]}"
+
+  gitleaks-diff:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.24.3"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: install checksum-verified gitleaks
+        run: |
+          set -euo pipefail
+          workdir="${RUNNER_TEMP}/gitleaks"
+          mkdir -p "$workdir"
+          cd "$workdir"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          base_url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -fsSLO "${base_url}/${archive}"
+          curl -fsSLO "${base_url}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " ${archive}$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "$archive" gitleaks
+
+      - name: gitleaks PR diff scan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          "${RUNNER_TEMP}/gitleaks/gitleaks" git --log-opts="${BASE_SHA}..HEAD" --redact --exit-code 1 .
+
+  gitleaks-full-history:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.24.3"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: install checksum-verified gitleaks
+        run: |
+          set -euo pipefail
+          workdir="${RUNNER_TEMP}/gitleaks"
+          mkdir -p "$workdir"
+          cd "$workdir"
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          base_url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -fsSLO "${base_url}/${archive}"
+          curl -fsSLO "${base_url}/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " ${archive}$" "gitleaks_${GITLEAKS_VERSION}_checksums.txt" | sha256sum -c -
+          tar -xzf "$archive" gitleaks
+
+      - name: gitleaks full-history scan
+        run: |
+          "${RUNNER_TEMP}/gitleaks/gitleaks" git --log-opts="--all" --redact --exit-code 1 .
