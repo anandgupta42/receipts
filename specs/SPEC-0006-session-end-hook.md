@@ -1,7 +1,7 @@
 ---
 id: SPEC-0006
 title: "Session-end auto-receipt hook"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001, SPEC-0007]
 ---

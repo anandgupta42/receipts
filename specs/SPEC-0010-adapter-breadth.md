@@ -1,7 +1,7 @@
 ---
 id: SPEC-0010
 title: "Adapter breadth — Cursor full adapter, Gemini CLI, opencode"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001]
 ---

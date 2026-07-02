@@ -1,7 +1,7 @@
 ---
 id: SPEC-0011
 title: "Export surfaces — CSV + versioned JSON schema"
-status: draft
+status: approved
 milestone: M4
 depends: [SPEC-0001, SPEC-0002, SPEC-0003, SPEC-0008]
 ---

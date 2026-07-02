@@ -1,7 +1,7 @@
 ---
 id: SPEC-0009
 title: "Local budget line"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001, SPEC-0008]
 ---
