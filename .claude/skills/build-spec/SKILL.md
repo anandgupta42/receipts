@@ -13,6 +13,16 @@ not get built. The spec must also carry a `## Validation` record (from /validate
 an approved spec without one means the gate was skipped — stop and run it. This skill
 never edits a spec's status to `approved`; that's the maintainer's button (AGENTS.md, button 1).
 
+## 0.5 Context discipline (two builders died of autocompact thrashing — this is law)
+
+- NEVER read real transcripts from `~/.claude/projects` or any user data dir — they are
+  megabytes and will thrash your context. Fixtures in `test/fixtures/**` only.
+- Before any Read: `ls -la` the file; >100KB → read targeted ranges or grep, never whole.
+- Pipe every command's output through a filter (`| tail -20`, `grep -c`, `--reporter=dot`) —
+  raw vitest/npm/build output is a context bomb.
+- If you feel context pressure (repeated compaction), STOP and report progress to the lead
+  instead of pushing through — a partial report beats a dead builder.
+
 ## 1. Branch — never touch main
 
 `git checkout -b feat/<milestone>-<slug> origin/main`. Everything in this skill lands on
@@ -72,7 +82,15 @@ follow-up." Then run `/review-docs` on the touched docs (advisory at PR time, bu
 release gate re-runs it as blocking, so fix now). A feature PR with stale docs is an
 incomplete PR.
 
-## 7. Commit + PR
+## 7. Commit + PR (structured description — non-negotiable)
+
+The PR description follows `.github/pull_request_template.md` exactly: What this
+adds / Why it matters to users (user-facing only) / **See it** (mandatory output
+capture for any user-visible change — a terminal code block or committed image
+path; the receipt IS the screenshot) / What changed / **What to review, in order**
+(numbered, riskiest first, file:line pointers) / Evidence (gates + spec +
+validation record) / Notes. A reviewer should know in 30 seconds what was added,
+what to look at first, and what a user gains.
 
 Conventional commit subject, backticked code terms, bullets for multiple changes. Open
 the PR against `main`; wait for CI green (ci.yml matrix + goldens + mutation if
