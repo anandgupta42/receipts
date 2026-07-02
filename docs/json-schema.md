@@ -40,6 +40,7 @@ JSON export.
 | `schemaVersion` | number (literal `1`) | This schema's major version. Bumped only on a breaking change. |
 | `agentLabel` | string | Human label for the agent, e.g. "Claude Code". |
 | `source` | enum | One of `claude-code`, `codex`, `cursor`, `gemini`. |
+| `source` | enum | One of `claude-code`, `codex`, `cursor`, `opencode`. |
 | `sessionId` | string | Adapter-local id (an absolute file path for file-based adapters). |
 | `title` | string \| null | Session title, or null when the adapter reports none. |
 | `startedAtMs` | number \| null | Session start, epoch milliseconds, or null. |

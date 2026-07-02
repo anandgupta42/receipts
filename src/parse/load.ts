@@ -21,7 +21,7 @@ export async function listFullSessions(agent?: AgentSource): Promise<SessionSumm
   const lists = await Promise.all(
     pool.map(async (adapter) => {
       try {
-        if (adapter.id === "cursor") {
+        if (adapter.id === "cursor" || adapter.id === "opencode") {
           return adapter.listSessions({ full: true });
         }
         const lazy = await adapter.listSessions();

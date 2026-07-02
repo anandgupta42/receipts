@@ -25,7 +25,7 @@ describe("R2: valid events pass their schema", () => {
         os: "darwin",
         nodeMajor: 22,
         commandClass: "receipt",
-        agentType: "claude-code",
+        agentType: "opencode",
         durationBucket: "100-500ms",
         ok: true,
       },

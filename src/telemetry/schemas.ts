@@ -19,7 +19,7 @@ export type OsValue = (typeof OS_VALUES)[number];
 export const COMMAND_CLASS_VALUES = ["receipt", "compare", "other"] as const;
 export type CommandClassValue = (typeof COMMAND_CLASS_VALUES)[number];
 
-export const AGENT_TYPE_VALUES = ["claude-code", "codex", "cursor", "gemini", "unknown"] as const;
+export const AGENT_TYPE_VALUES = ["claude-code", "codex", "cursor", "gemini", "opencode", "unknown"] as const;
 export type AgentTypeValue = (typeof AGENT_TYPE_VALUES)[number];
 
 /** Coarse, fixed buckets — never the raw millisecond count, which could be fingerprint-able alongside other signals. */

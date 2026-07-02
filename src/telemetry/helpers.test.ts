@@ -29,6 +29,7 @@ describe("toAgentTypeTelemetry", () => {
     expect(toAgentTypeTelemetry("claude-code")).toBe("claude-code");
     expect(toAgentTypeTelemetry("codex")).toBe("codex");
     expect(toAgentTypeTelemetry("cursor")).toBe("cursor");
+    expect(toAgentTypeTelemetry("opencode")).toBe("opencode");
   });
 
   it("defaults to 'unknown' when no agent source is available", () => {

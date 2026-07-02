@@ -2,9 +2,10 @@ import { ClaudeCodeAdapter } from "./claudeCode.js";
 import { CodexAdapter } from "./codex.js";
 import { CursorAdapter } from "./cursor.js";
 import { GeminiAdapter } from "./gemini.js";
+import { OpenCodeAdapter } from "./opencode.js";
 import type { AgentSource, SessionAdapter } from "./types.js";
 
-const ADAPTERS: SessionAdapter[] = [new ClaudeCodeAdapter(), new CodexAdapter(), new CursorAdapter(), new GeminiAdapter()];
+const ADAPTERS: SessionAdapter[] = [new ClaudeCodeAdapter(), new CodexAdapter(), new CursorAdapter(), new GeminiAdapter(), new OpenCodeAdapter()];
 
 /** All registered adapters, in a stable order. */
 export function adapters(): SessionAdapter[] {

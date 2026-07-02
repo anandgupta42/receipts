@@ -13,7 +13,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolvePrice, vendorForModel } from "../../src/pricing/resolve.js";
+import { resolvePrice, vendorForModel, vendorForTurn } from "../../src/pricing/resolve.js";
 import type { PriceTable } from "../../src/pricing/types.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
@@ -87,5 +87,17 @@ describe("vendorForModel — landed families and unknowns", () => {
     expect(vendorForModel("llama-4-70b")).toBeUndefined();
     expect(vendorForModel("mistral-large")).toBeUndefined();
     expect(vendorForModel("")).toBeUndefined();
+  });
+
+  it("resolves aggregator-agent turns by model id while leaving ambiguous model ids unpriced", () => {
+    expect(vendorForTurn("opencode", "claude-haiku-4-5")).toBe("anthropic");
+    expect(vendorForTurn("opencode", "gpt-5.3-codex")).toBe("openai");
+    expect(vendorForTurn("opencode", "mistral-large")).toBeUndefined();
+  });
+
+  it("prefers model-id vendor evidence before source fallback", () => {
+    expect(vendorForTurn("claude-code", "gpt-5.3-codex")).toBe("openai");
+    expect(vendorForTurn("codex", "claude-haiku-4-5")).toBe("anthropic");
+    expect(vendorForTurn("claude-code", "unknown-model")).toBe("anthropic");
   });
 });

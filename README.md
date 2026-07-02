@@ -77,6 +77,7 @@ Full methodology: `aireceipts --methodology`.
 | Claude Code | Full: per-turn models, tools, cache tiers |
 | Codex CLI | Full per-turn parsing |
 | Cursor | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
+| opencode | Full: per-message models, tools, cache read/write |
 
 ## Telemetry, disclosed
 

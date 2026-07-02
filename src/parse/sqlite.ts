@@ -55,10 +55,12 @@ function trySqlite3Cli(dbPath: string): SqliteReader | null {
 }
 
 /**
- * Open a SQLite database read-only. Prefers `node:sqlite` (zero dependency), then
- * the `sqlite3` CLI. Returns null when neither is usable — callers degrade
- * gracefully (e.g. the Cursor adapter reports not-detected).
+ * Open a SQLite database read-only. Prefers the stable `sqlite3` CLI so normal
+ * CLI/golden runs do not emit Node's process-specific experimental
+ * `node:sqlite` warning; falls back to `node:sqlite` when the CLI is absent.
+ * Returns null when neither is usable — callers degrade gracefully (e.g. the
+ * Cursor adapter reports not-detected).
  */
 export async function openReadOnly(dbPath: string): Promise<SqliteReader | null> {
-  return (await tryNodeSqlite(dbPath)) ?? trySqlite3Cli(dbPath);
+  return trySqlite3Cli(dbPath) ?? (await tryNodeSqlite(dbPath));
 }

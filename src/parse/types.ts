@@ -4,14 +4,14 @@
  * them onto these shapes so downstream code works the same regardless of which
  * agent produced the session.
  *
- * Trimmed for M1 scope (SPEC-0001, agent team config): three sources only
- * (claude-code, codex, cursor); no receipt/attestation/store concepts; a
+ * Trimmed for M1 scope (SPEC-0001, agent team config) and extended by
+ * SPEC-0010 for opencode; no receipt/attestation/store concepts; a
  * turn-based (not per-message) session shape, since pricing/attribution/waste
  * detection all reason in terms of one assistant turn's usage + tool calls.
  */
 
 /** The canonical, ordered list of supported agent sources — the single source of truth other modules (e.g. the export schema's `source` enum) derive from. */
-export const AGENT_SOURCES = ["claude-code", "codex", "cursor", "gemini"] as const;
+export const AGENT_SOURCES = ["claude-code", "codex", "cursor", "gemini", "opencode"] as const;
 export type AgentSource = (typeof AGENT_SOURCES)[number];
 
 export const SOURCE_LABELS: Record<AgentSource, string> = {
@@ -19,6 +19,7 @@ export const SOURCE_LABELS: Record<AgentSource, string> = {
   codex: "Codex",
   cursor: "Cursor",
   gemini: "Gemini CLI",
+  opencode: "opencode",
 };
 
 /**
