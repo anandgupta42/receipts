@@ -31,7 +31,11 @@ spec includes a **one-time view refactor**: `ReceiptView` becomes an ordered
 total | note | footnote | barcode | footer`), and BOTH renderers become block
 interpreters (each block type has one terminal and one SVG layout). After that,
 a template is a pure function `buildReceiptView(model, template)` emitting a block
-list — adding a template touches no renderer. Classic's block list must reproduce
+list — adding a template touches no renderer. **Blocks are plain serializable data**
+(a JSON-safe discriminated union, no functions/closures): this is what lets the future
+user-template file (~/.aireceipts/templates/<name>.json, exported via a future
+`templates export`, validated by validateReceiptBlocks at load) be a declarative
+document rather than code. Classic's block list must reproduce
 today's output byte-identically (the refactor's no-regression proof). **Per-template
 parity test:** terminal and SVG are asserted to consume the identical block list per
 template (structure parity, not just model-field parity). No template re-derives a
