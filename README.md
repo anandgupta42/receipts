@@ -29,6 +29,8 @@ same tokens on claude-haiku-4-5..............$6.15
 One command. No account, no API key, no upload — it reads the transcripts your
 agent already writes to disk and prices them against cited, dated price tables.
 
+**Site & docs: [anandgupta42.github.io/aireceipts](https://anandgupta42.github.io/aireceipts/)** · [user guide](https://anandgupta42.github.io/aireceipts/docs/)
+
 ```sh
 npx aireceipts          # receipt for your newest session
 ```
@@ -95,7 +97,7 @@ motivation: [docs/internal/harness.md](docs/internal/harness.md).
 
 **[User guide](docs/guide/01-getting-started.md)** — get started, every command, pricing, and troubleshooting.
 
-More docs: [JSON schema](docs/json-schema.md) · [statusline setup](docs/statusline.md)
+More docs: [the hosted guide](https://anandgupta42.github.io/aireceipts/docs/) · [JSON schema](docs/json-schema.md) · [statusline setup](docs/statusline.md)
 
 ## License
 
