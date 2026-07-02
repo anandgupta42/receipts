@@ -24,7 +24,7 @@ describe("SC connection-string honesty: empty/unset/malformed all collapse to th
   it("an unset connection string uses the shipped default key — enabled (docs/telemetry.md states the key openly)", () => {
     const config = resolveTelemetryConfig({});
     expect(config.enabled).toBe(true);
-    expect(config.instrumentationKey).toBe("34293e98-bc05-47c7-bab3-5dd0535ac315");
+    expect(config.instrumentationKey).toBe("394da360-a50c-4700-bcf9-87b8d9d6e0ee");
     expect(config.ingestionEndpoint).toContain("eastus-8.in.applicationinsights.azure.com");
   });
 

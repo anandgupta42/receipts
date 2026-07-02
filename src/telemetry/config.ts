@@ -21,7 +21,7 @@
 // App Insights ingestion key is a write-only address, not a secret; override or
 // disable via AIRECEIPTS_TELEMETRY_CONNECTION / the kill switches).
 const DEFAULT_CONNECTION_STRING =
-  "InstrumentationKey=34293e98-bc05-47c7-bab3-5dd0535ac315;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=5ce2840c-b895-46d4-8085-291c7740581d";
+  "InstrumentationKey=394da360-a50c-4700-bcf9-87b8d9d6e0ee;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=27aef4ec-bd68-44e1-968b-913ddc5ed538";
 
 export interface TelemetryConfig {
   enabled: boolean;
