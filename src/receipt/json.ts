@@ -1,7 +1,14 @@
 // R6 `--json`: full structured breakdown with a schema-stable key order (key
 // order is an explicit requirement, not incidental — JS object literals
 // preserve insertion order, so the order below IS the schema).
+//
+// SPEC-0011: every top-level export now carries `schemaVersion` (R1); its shape
+// is validated against `receiptJsonSchema`/`compareJsonSchema` in
+// `exportSchema.ts` (the single source of truth) and documented field-by-field
+// in `docs/json-schema.md` (parity-tested).
 import type { SessionSummary, TokenUsage } from "../parse/types.js";
+import { compareDeltaLine } from "./compare.js";
+import { SCHEMA_VERSION } from "./exportSchema.js";
 import type { ModelMixEntry, PriceRowUsed, ReceiptModel, ToolRow, WasteLine } from "./model.js";
 
 function tokenUsageJson(t: TokenUsage) {
@@ -72,8 +79,8 @@ function priceRowUsedJson(row: PriceRowUsed) {
   };
 }
 
-/** Full structured breakdown for `--json` — fixed key order, includes the price rows actually consulted (I3: every number traceable). */
-export function toJsonModel(model: ReceiptModel) {
+/** The receipt body — every field of a single-session receipt, minus the `schemaVersion` envelope. Reused verbatim as `compare`'s `a`/`b` so both surfaces share one shape (single-source-of-truth). */
+function receiptBody(model: ReceiptModel) {
   return {
     agentLabel: model.agentLabel,
     source: model.source,
@@ -97,6 +104,21 @@ export function toJsonModel(model: ReceiptModel) {
       : null,
     methodology: model.methodology,
     priceRowsUsed: model.priceRowsUsed.map(priceRowUsedJson),
+  };
+}
+
+/** Full structured breakdown for `--json` — `schemaVersion` first, then the fixed-order receipt body (I3: every number traceable). Validated against `receiptJsonSchema`. */
+export function toJsonModel(model: ReceiptModel) {
+  return { schemaVersion: SCHEMA_VERSION, ...receiptBody(model) };
+}
+
+/** `compare <a> <b> --json` (R3): the two receipt bodies plus a factual delta line — never a better/worse ranking field (I6). Validated against `compareJsonSchema`. */
+export function toCompareJsonModel(a: ReceiptModel, b: ReceiptModel) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    a: receiptBody(a),
+    b: receiptBody(b),
+    delta: compareDeltaLine(a, b),
   };
 }
 

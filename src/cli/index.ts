@@ -6,9 +6,11 @@ import { anyDetected, listSessions, loadSession, rootsHint, selectSummary } from
 import type { SessionSummary } from "../parse/types.js";
 import { evaluateBudget } from "../budget/index.js";
 import { renderCompare, compareDeltaLine } from "../receipt/compare.js";
+import { toCompareCsv } from "../receipt/csv.js";
+import { getExporter } from "../receipt/exporters.js";
 import { renderHandoff } from "../receipt/handoff.js";
 import { formatAbsoluteUtc, formatInt } from "../receipt/format.js";
-import { summaryToJson, toJsonModel } from "../receipt/json.js";
+import { summaryToJson, toCompareJsonModel, toJsonModel } from "../receipt/json.js";
 import { buildReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
@@ -29,9 +31,9 @@ import { runQuota } from "./quota.js";
 const HELP_TEXT = `aireceipts — local, deterministic cost receipts for AI coding-agent sessions
 
 Usage:
-  aireceipts [selector] [--json]        print a receipt (default: newest session)
+  aireceipts [selector] [--json|--csv]  print a receipt (default: newest session)
   aireceipts --list [--json]            list sessions, newest first
-  aireceipts compare <a> <b> [--json]   side-by-side (or stacked) comparison
+  aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
   aireceipts --handoff [selector]       paste-ready block of fired waste lines
   aireceipts --quota                    current Claude Code rate-limit window usage
                                          (statusline stdin mode only; silent if unavailable)
@@ -47,6 +49,7 @@ Usage:
 
 flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
        -o/--output names the file.
+--csv[=session|tool]: export CSV (session summary rows, or one row per tool).
 selector: a 1-based index into --list, a session id, or a title substring.`;
 
 interface SvgOut {
@@ -79,7 +82,9 @@ async function resolveSelector(selector: string | undefined): Promise<{ summary:
   return { summary };
 }
 
-async function runReceipt(selector: string | undefined, json: boolean, svgOut: SvgOut): Promise<number> {
+const CSV_MODE_HINT = 'use --csv=session or --csv=tool';
+
+async function runReceipt(selector: string | undefined, json: boolean, svgOut: SvgOut, csvMode: string | undefined): Promise<number> {
   const resolved = await resolveSelector(selector);
   if ("error" in resolved) {
     process.stderr.write(`${resolved.error}\n`);
@@ -93,6 +98,17 @@ async function runReceipt(selector: string | undefined, json: boolean, svgOut: S
   const model = await buildReceiptModel(session);
   if (svgOut.svg) {
     await writeSvg(renderReceiptSvg(model, { theme: svgOut.theme }), svgOut.output ?? "receipt.svg");
+    return 0;
+  }
+  if (csvMode !== undefined) {
+    const exporter = getExporter(`csv-${csvMode}`);
+    if (!exporter) {
+      process.stderr.write(`unknown --csv mode "${csvMode}" (${CSV_MODE_HINT})
+`);
+      return 1;
+    }
+    // CSV is a data contract — budget advisory lines never ride along (SPEC-0009 x SPEC-0011).
+    process.stdout.write(`${exporter.export(model)}\n`);
     return 0;
   }
   // R1/R5: absent or malformed budget.json → `lines` is [] → output below is
@@ -153,9 +169,15 @@ async function runCompare(
   selectorB: string | undefined,
   json: boolean,
   svgOut: SvgOut,
+  csvMode: string | undefined,
 ): Promise<number> {
   if (!selectorA || !selectorB) {
     process.stderr.write("compare requires two selectors: aireceipts compare <a> <b>\n");
+    return 1;
+  }
+  // compare CSV is strictly two session rows + a delta (R3) — per-tool granularity has no two-row shape here.
+  if (csvMode !== undefined && csvMode !== "session") {
+    process.stderr.write(`compare supports --csv=session only (got "${csvMode}")\n`);
     return 1;
   }
   const sessions = await listSessions();
@@ -181,14 +203,10 @@ async function runCompare(
   const [modelA, modelB] = await Promise.all([buildReceiptModel(sessionA), buildReceiptModel(sessionB)]);
   if (svgOut.svg) {
     await writeSvg(renderCompareSvg(modelA, modelB, { theme: svgOut.theme }), svgOut.output ?? "compare.svg");
+  } else if (csvMode !== undefined) {
+    process.stdout.write(`${toCompareCsv(modelA, modelB, compareDeltaLine(modelA, modelB))}\n`);
   } else if (json) {
-    process.stdout.write(
-      `${JSON.stringify(
-        { a: toJsonModel(modelA), b: toJsonModel(modelB), delta: compareDeltaLine(modelA, modelB) },
-        null,
-        2,
-      )}\n`,
-    );
+    process.stdout.write(`${JSON.stringify(toCompareJsonModel(modelA, modelB), null, 2)}\n`);
   } else {
     process.stdout.write(`${renderCompare(modelA, modelB)}\n`);
   }
@@ -282,7 +300,7 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
     case "list":
       return runList(args.json);
     case "compare":
-      return runCompare(args.compareA, args.compareB, args.json, svgOut);
+      return runCompare(args.compareA, args.compareB, args.json, svgOut, args.csvMode);
     case "handoff":
       return runHandoff(args.selector);
     case "quota":
@@ -295,7 +313,7 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runBenchmark(args.selector, args.dryRun);
     case "receipt":
     default:
-      return runReceipt(args.selector, args.json, svgOut);
+      return runReceipt(args.selector, args.json, svgOut, args.csvMode);
   }
 }
 
