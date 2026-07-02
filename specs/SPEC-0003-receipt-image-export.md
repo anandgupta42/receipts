@@ -47,6 +47,52 @@ PNG/raster output (own spec: renderer dependency decision); auto-posting/upload;
 custom themes beyond light/dark; embedded font files (revisit if glyph-width variance
 breaks layout in practice); watermarks.
 
+## Design (lead-authored, binding — implementers execute, don't invent)
+
+**Canvas.** 640px logical width; height = computed from row count (no clipping, R2).
+Outer paper margin 0 — the card IS the image. Card padding: 32px sides, 26px top/bottom.
+Corner radius 0 (till receipts are square). Drop shadow: none (transparent-friendly).
+
+**Palette (CSS-var'd in the SVG for theme swap).** Light: card `#FFFFFF`, ink `#1B1E22`,
+muted `#5A6068`, rule `#D8DBD6`, accent `#3947C2`, flag `#B3372E`. Dark: card `#1E2226`,
+ink `#E8E8E4`, muted `#9AA0A6`, rule `#2E3438`, accent `#8B96F8`, flag `#E0705F`.
+(Both pairs clear the R2 ≥4.5 contrast assertion.)
+
+**Perforation (geometry, never glyphs).** Scalloped edges: a row of circles r=5,
+spacing 14px, fill = page-background token, centered ON the top and bottom card edges —
+the classic torn-receipt scallop. No dashes.
+
+**Type.** One family stack: `"SF Mono", "Cascadia Code", "JetBrains Mono", Menlo,
+Consolas, monospace`. Sizes: masthead wordmark 15px/700/letter-spacing 3px, centered;
+meta lines 11.5px muted; body rows 12.5px; TOTAL 14px/700; footnotes 10.5px muted;
+footer 11px centered. Row height 22px; 10px gaps between sections.
+
+**Rows (geometry leaders).** Label left-anchored at x=32; value right-anchored at
+x=608; leader = a dotted stroke (`stroke-dasharray="0.1 7"`, round caps, muted token)
+drawn between label-end+8px and value-start−8px at the row's baseline−4px. Column
+overlap is impossible by construction (R1 font-safety: labels truncate with "…" at
+where value-start−24px would be crossed at +10% glyph width).
+
+**Waste lines.** Prefix badge instead of the terminal's ⚠ (emoji is font-dependent):
+a 12px equilateral-triangle path, flag fill, 1.5px white "!" stroke, vertically
+centered. Waste row text in ink, its value in flag.
+
+**TOTAL.** Full-inner-width 1.5px rule (rule token) above; TOTAL row bold.
+
+**Stamp (the signature, once per receipt).** Bottom-right, 18px above the footer:
+rounded-rect (radius 4) 2px stroke in accent, rotated −4°, opacity 0.8, padding
+6×12px, text 10px/700/letter-spacing 2px uppercase: `LOCAL · DETERMINISTIC`.
+
+**Footer.** Centered, muted: `aireceipts · buy me a samosa 🥟` (text glyph acceptable;
+all layout-critical marks are geometry).
+
+**compare --svg.** Two full cards side-by-side, 24px gutter, on one canvas (1304px);
+the ratio-only delta line centered below both in muted 11.5px. Nothing colored
+green/red across cards (I6 — no winner styling).
+
+**Tokens-only mode.** Identical layout; every value column shows token counts; the
+price-delta/stamp unchanged; zero `$` glyphs (I2) — asserted in the matrix.
+
 ## Test matrix
 
 | Case | Input | Expected |
