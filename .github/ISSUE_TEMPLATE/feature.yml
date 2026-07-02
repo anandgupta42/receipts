@@ -1,0 +1,31 @@
+name: Feature request
+description: Propose something aireceipts doesn't do yet.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Non-trivial features go through a spec (`specs/`) before anything gets built —
+        this issue is the seed for that, not a commitment. See `docs/harness.md` for
+        how an issue becomes a spec becomes a PR.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you hitting?
+      description: The situation, not the solution — what were you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: existing
+    attributes:
+      label: Why doesn't an existing command solve this?
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: Proposed shape (optional)
+      description: A flag, a new subcommand, a change in output — sketch it if you have one.
+    validations:
+      required: false
