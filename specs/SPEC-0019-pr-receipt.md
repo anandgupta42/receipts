@@ -1,7 +1,7 @@
 ---
 id: SPEC-0019
 title: "aireceipts pr — attach the building session's receipt to the current PR"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001]
 ---
