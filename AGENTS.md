@@ -8,7 +8,8 @@ enforced by CI — if you're adding to it, cut something first.*
 aireceipts is a local, deterministic CLI that reads AI coding-agent transcripts off disk
 (Claude Code, Codex, and other agents) and prints a **cost receipt** for the session: a
 per-tool cost/time breakdown, waste lines (loops, downgrades, redundant work), a
-counterfactual re-pricing ("this session on model X would have cost Y"), and a compact
+an honest cheaper-model story (price-delta arithmetic + routable-spend estimate —
+never "model X would have done it" predictions; `compare` measures that), and a compact
 handoff block the user can paste into a PR or chat. No servers, no accounts, no dashboards.
 
 ## Stack
@@ -49,7 +50,8 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
   matches the session's model and date; otherwise render tokens. No silent fallback
   prices.
 - **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
-  its attribution methodology; counterfactuals are labeled estimates (≈).
+  its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
+  and no line ever claims another model would have completed the task.
 - **I4 — Local-first, zero telemetry, ever.** The only network use is the opt-in
   benchmark command, if it ever ships — and it says so out loud.
 - **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.
@@ -71,7 +73,7 @@ after each release — don't hand-edit it elsewhere.*
 - **Tier 0 (now):** harness only — AGENTS.md, spec system, skills, hooks, CI gates. No
   product code yet.
 - **Tier 1 (M1, not started):** receipt engine — parse adapters, price tables, per-tool
-  attribution, waste lines, counterfactual, compare, handoff, goldens.
+  attribution, waste lines, price-delta + routable-spend lines, compare, handoff, goldens.
 - **Tier 2+ (M2–M4, not started):** compare/handoff polish, PNG export, opt-in benchmark.
 
 ## Working here

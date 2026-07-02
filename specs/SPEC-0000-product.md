@@ -24,8 +24,14 @@ doubt, this file wins.
   single-vendor tool.
 - **Per-tool breakdown.** Cost and time are attributed per tool call, not just a session
   total — the receipt shows *where* the money went.
-- **Counterfactual re-pricing.** "This session on model X would have cost ≈$Y" —
-  a labeled estimate, computed from the same transcript against a different price row.
+- **Honest cheaper-model story (never a whole-session prediction).** We cannot know
+  whether a cheaper model *would have managed the task*, so we never claim it. Three
+  claims we can stand behind: (a) **price-delta** — same token volume at model X's list
+  price, labeled as arithmetic, footnote-tier; (b) **routable spend** — re-price only
+  spans where capability barely matters (short tool-free turns, identical-command
+  retries): "~$1.68 of this session was trivial turns a cheaper model handles" (labeled
+  estimate); (c) **`compare`** — the empirical answer: run the task on two models, two
+  receipts side by side. Measure counterfactuals, don't predict them.
 - **Paste-back handoff.** A compact block designed to be pasted into a PR description or
   a chat thread, not a link to a hosted page.
 
@@ -37,7 +43,8 @@ doubt, this file wins.
   matches the session's model and date; otherwise render tokens. No silent fallback
   prices.
 - **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
-  its attribution methodology; counterfactuals are labeled estimates (≈).
+  its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
+  and no line ever claims another model would have completed the task.
 - **I4 — Local-first, zero telemetry, ever.** The only network use is the opt-in
   benchmark command, if it ever ships — and it says so out loud.
 - **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.
@@ -48,7 +55,7 @@ doubt, this file wins.
 
 | Milestone | Delivers | Status |
 |---|---|---|
-| M1 | Receipt engine: parse adapters, price tables, per-tool attribution, waste lines, counterfactual, compare, handoff, goldens | not started |
+| M1 | Receipt engine: parse adapters, price tables, per-tool attribution, waste lines, price-delta + routable-spend lines, compare, handoff, goldens | not started |
 | M2 | Compare + handoff polish | not started |
 | M3 | PNG export | not started |
 | M4 | Opt-in benchmark (the only network call the CLI will ever make; explicit opt-in) | not started |

@@ -23,7 +23,7 @@ log, matching whatever adapters exist. Don't fabricate a transcript to demo agai
 node dist/cli.js receipt <path-to-transcript>
 ```
 
-Read the output: per-tool breakdown, any waste lines, the counterfactual (if a
+Read the output: per-tool breakdown, any waste lines, the cheaper-model lines (if a
 comparison model was requested), and the handoff block.
 
 ## 4. Sanity-check it against I2/I6 before showing anyone
@@ -41,4 +41,4 @@ description — this is the dogfood loop: every agent-authored PR can carry its 
 session's receipt as provenance.
 
 If the receipt looks wrong (an FP waste line, a fabricated-looking number, a confusing
-counterfactual), that's a real bug — file it via `/fix-issue`, don't quietly ignore it.
+cheaper-model line), that's a real bug — file it via `/fix-issue`, don't quietly ignore it.
