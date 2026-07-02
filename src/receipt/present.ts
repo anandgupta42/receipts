@@ -46,12 +46,46 @@ export interface ReceiptView {
 
 const WORDMARK = "AIRECEIPTS";
 
+const TITLE_MAX = 46;
+
+/** One-line session title: newlines collapsed, truncated with an ellipsis. The receipt must say WHAT the work was, not just what it cost. */
+function titleLine(model: ReceiptModel): string | undefined {
+  if (model.title === undefined || model.title.trim() === "") {
+    return undefined;
+  }
+  const flat = model.title.replace(/\s+/g, " ").trim();
+  const cut = flat.length > TITLE_MAX ? `${flat.slice(0, TITLE_MAX - 1).trimEnd()}…` : flat;
+  return `“${cut}”`;
+}
+
+/** Share of prompt-side tokens served from cache — the single most explanatory cost fact a session has. `undefined` when there is no per-turn usage (Cursor) or no prompt tokens at all. */
+function cacheLine(model: ReceiptModel): string | undefined {
+  if (model.unpriceable) {
+    return undefined;
+  }
+  const t = model.totalTokens;
+  const promptSide = t.input + t.cacheRead + t.cacheCreation;
+  if (promptSide <= 0 || t.cacheRead <= 0) {
+    return undefined;
+  }
+  return `cache served ${Math.round((t.cacheRead / promptSide) * 100)}% of input tokens`;
+}
+
 function metaLines(model: ReceiptModel): string[] {
   const startLabel = model.startedAtMs !== undefined ? formatAbsoluteUtc(model.startedAtMs) : "start time unknown";
   const durationLabel = model.durationMs !== undefined ? formatDuration(model.durationMs) : "duration unknown";
-  const lines = [`${model.agentLabel} · ${startLabel} · ${durationLabel}`];
+  const lines: string[] = [];
+  const title = titleLine(model);
+  if (title !== undefined) {
+    lines.push(title);
+  }
+  lines.push(`${model.agentLabel} · ${startLabel} · ${durationLabel}`);
   if (model.modelMix.length > 0) {
     lines.push(model.modelMix.map((m) => `${m.model} ${Math.round(m.tokenShare * 100)}%`).join(" · "));
+  }
+  const cache = cacheLine(model);
+  if (cache !== undefined) {
+    lines.push(cache);
   }
   return lines;
 }
@@ -81,7 +115,7 @@ function wasteRow(waste: WasteLine): WasteView {
     kind: "trivial-spans",
     label: TRIVIAL_SPANS_LABEL,
     value: `$${formatUsd(waste.usd)}`,
-    detail: `(${waste.eligibleTurnCount} turns → ${waste.cheaperModel})`,
+    detail: `(${waste.eligibleTurnCount} tiny turns, priced at ${waste.cheaperModel})`,
   };
 }
 
@@ -99,10 +133,7 @@ function priceDeltaSentence(model: ReceiptModel): string | undefined {
   if (!model.priceDelta) {
     return undefined;
   }
-  return (
-    `arithmetic, not a prediction: same tokens on ${model.priceDelta.cheaperModel} would cost ` +
-    `$${formatUsd(model.priceDelta.usd)} (actual: $${formatUsd(model.priceDelta.actualUsd)})`
-  );
+  return `same tokens on ${model.priceDelta.cheaperModel}: $${formatUsd(model.priceDelta.usd)} — arithmetic, not a prediction`;
 }
 
 /** Build the shared, layout-agnostic view every renderer formats. Pure over the already-priced {@link ReceiptModel} — no pricing/attribution here. */

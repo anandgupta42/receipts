@@ -1,17 +1,19 @@
 - - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
+ “What HTTP status code should a successful DEL…” 
    Claude Code · Jun 24 2026 10:00:10 UTC · 50s   
                claude-opus-4-8 100%               
+         cache served 37% of input tokens         
 
 (thinking/reply)..................$0.01  (3 turns)
 
 ≈ re-priced eligible trivial spans...........$0.00
-  (3 turns → claude-haiku-4-5)
+  (3 tiny turns, priced at claude-haiku-4-5)
 --------------------------------------------------
 TOTAL........................................$0.01
 
-arithmetic, not a prediction: same tokens on
-claude-haiku-4-5 would cost $0.00 (actual: $0.01)
+same tokens on claude-haiku-4-5: $0.00 —
+arithmetic, not a prediction
 
 Per-turn cost split evenly across that turn's tool
 calls; unpriced models show tokens only, never
