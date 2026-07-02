@@ -33,8 +33,14 @@ jobs:
       - name: goldens
         run: node scripts/verify-goldens.mjs
 
+      - name: determinism
+        run: node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs
+
       - name: spec-lint
         run: node scripts/spec-lint.mjs
+
+      - name: hygiene
+        run: node scripts/hygiene.mjs
 
   prices:
     # Mechanical enforcement of I2/I3: any PR touching data/prices/** must pass

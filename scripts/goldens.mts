@@ -2,13 +2,14 @@
 // renders of every eval-corpus fixture against goldens/; `--update` rewrites
 // them. Run with frozen env: NO_COLOR=1 TZ=UTC LANG=C (the caller enforces it).
 import { loadById } from "../src/index.js";
+import type { AgentSource } from "../src/index.js";
 import { buildReceiptModel } from "../src/receipt/model.js";
 import { renderReceipt } from "../src/receipt/render.js";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
 const update = process.argv.includes("--update");
 const corpus = JSON.parse(readFileSync("eval/corpus.json", "utf8")).entries as
-  { source: string; path: string }[];
+  { source: AgentSource; path: string }[];
 
 let drift = 0;
 for (const e of corpus) {
