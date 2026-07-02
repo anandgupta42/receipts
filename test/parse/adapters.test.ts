@@ -8,8 +8,8 @@
 // export it needs, rather than gating the whole file on one guess.
 //
 // Contract names below are not invented blind: SPEC-0001 R1 states
-// core-engine ports these adapters from the private altimate-receipts repo's
-// `src/trace/{types,load,registry}.ts` (founder owns both repos). That
+// core-engine adapted these adapters from the maintainer's earlier private
+// tooling (same author; re-licensed for this project). That
 // repo's `loadById(source, id)` treats `id` as the absolute transcript file
 // path for claude-code/codex, which is exactly what's needed to load an
 // arbitrary fixture file directly, bypassing the real on-disk session roots
