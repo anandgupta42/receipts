@@ -28,19 +28,28 @@ new/upgraded adapters and documents why — a valid, honest close.
 
 ## Requirements
 
-- **R1 — Feasibility spike (blocking, per vendor).** Locate and confirm the vendor's
-  actual on-disk session format on a real install; for Cursor specifically, verify the
-  cited `agent-transcripts/*.jsonl` path exists and carries per-turn token usage (not
-  just the totals `cursor.ts` already reads) before writing any new parser. A vendor
-  with no stable local per-turn transcript is dropped from this spec.
+- **R1 — Feasibility spike (blocking, per vendor, versioned evidence).** Confirm the
+  vendor's actual on-disk format on a real install, recording the vendor app version.
+  For Cursor: the `agent-transcripts/*.jsonl` claim rests on ONE forum post while
+  shipped code marks Cursor `unpriceable` (`src/parse/cursor.ts:15`) — any "fully
+  priced" acceptance requires evidence from ≥2 real fixtures (different sessions)
+  showing per-turn model ids AND per-turn token usage, captured with the Cursor version
+  noted. A vendor with no stable local per-turn transcript is dropped from this spec.
 - **R2 — One adapter per PR.** Each lands independently (mirrors SPEC-0005 R2); a
   Cursor upgrade replaces its `unpriceable: true` path in place rather than adding a
   second adapter entry. Registered in `ADAPTERS` (`src/parse/registry.ts:6`); new
   vendors add their id to the `AgentSource` union (`src/parse/types.ts:13`).
 - **R3 — Full-fidelity adapter (if R1 finds per-turn usage).** Implements
-  `SessionAdapter` fully: per-turn model id, `TokenUsage` (input/output/cacheRead), and
-  tool calls with enough timing to feed SPEC-0001 R4a's loop detector. Corrupt/partial
-  files degrade per SPEC-0001 R1 (skip + stderr note, never crash).
+  `SessionAdapter` fully: per-turn model id, the COMPLETE `TokenUsage` contract
+  (input/output/cacheRead/`cacheCreation` — buckets a vendor doesn't expose are zeroed,
+  with the zeroing rule documented per field), and tool calls with enough timing to
+  feed SPEC-0001 R4a. **Vendor resolution is part of this requirement:** a session's
+  per-turn model ids must map to their true price-vendor tables (e.g. an anthropic
+  model inside a Cursor session prices from `anthropic.json`) via an explicit
+  model-id→vendor rule extending `vendorForSource` — today it returns `undefined` for
+  anything beyond the three `AgentSource` values. If the mapping is ambiguous for a
+  turn, that turn is unpriced (I2) — never a guessed vendor. Corrupt/partial files
+  degrade per SPEC-0001 R1.
 - **R4 — Degraded fallback (if only totals are exposed).** Same `unpriceable: true`
   pattern already shipped for Cursor: `--list` + tokens-only receipt, explicit note,
   never priced attribution. Applies to Gemini CLI/opencode if R1 finds totals-only.
@@ -76,7 +85,10 @@ corrupt-file rule); network calls to any vendor API (I1).
 | R1 spike documented | real install of each vendor | path + shape recorded in PR, or vendor dropped |
 | R1 Cursor upgrade check | Cursor agent-transcripts fixture | confirmed per-turn usage or fallback stays |
 | R2 registry wiring | landed/upgraded adapter | appears in ADAPTERS (+ AgentSource union if new) |
+| R1 versioned evidence | 2 Cursor fixtures + version note | per-turn model+usage present in both, or fallback stays |
 | R3 full parse | per-turn-usage fixture | priced receipt, correct per-tool split |
+| R3 vendor mapping | anthropic-model turn in Cursor session | priced from anthropic.json; ambiguous id → unpriced |
+| R3 usage zeroing | vendor w/o cache buckets | cacheRead/cacheCreation zeroed per documented rule |
 | R3 corrupt file | truncated transcript | skipped w/ stderr note, exit 0 |
 | R4 degraded parse | totals-only fixture | `--list` shows it; tokens-only receipt + note |
 | R5 goldens | ≥2 fixtures per landed/upgraded adapter | golden receipts committed |
@@ -88,3 +100,11 @@ corrupt-file rule); network calls to any vendor API (I1).
       non-result).
 - [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
+
+## Validation
+
+**2026-07-02 · S2 (Codex): PASS-WITH-FIXES → applied.** Cursor "fully priced" claims
+now require versioned evidence from ≥2 real fixtures (one forum post isn't
+load-bearing); vendor-resolution made explicit (model-id→price-vendor mapping extending
+`vendorForSource`; ambiguous → unpriced per I2); full `TokenUsage` contract incl.
+`cacheCreation` with per-field zeroing rules. **S4:** spec-lint green.

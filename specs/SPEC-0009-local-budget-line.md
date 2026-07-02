@@ -1,28 +1,24 @@
 ---
 id: SPEC-0009
-title: "Local budget line + watch/alerts"
+title: "Local budget line"
 status: draft
 milestone: M3
-depends: [SPEC-0001]
+depends: [SPEC-0001, SPEC-0008]
 ---
 
-# SPEC-0009 · Local budget line + watch/alerts
+# SPEC-0009 · Local budget line
 
-Invariants: I1 (advisory only, never controls the agent; `watch` is a bounded,
-foreground, local-file poll — never a daemon, never a network call), I2 (honest, never
+Invariants: I1 (advisory only, never controls the agent), I2 (honest, never
 fabricated sums), I5 (no budget file → byte-identical receipt to before this spec).
 
 ## Purpose
 
 An optional `~/.aireceipts/budget.json` (daily or weekly, USD or tokens) adds one budget
-line to the receipt ("today: $34.20 of $50.00"), a `--check-budget` flag that exits
-non-zero when exceeded (scriptable for CI), and `aireceipts watch --threshold
-<usd|tokens> --on-exceed "<cmd>"` — a foreground command that polls the active session's
-JSONL file for deltas and fires `<cmd>` once when the threshold is crossed (Cursor's
-native 50/80/100% usage alerts are the cited precedent for this pattern). None of the
-three ever controls the agent itself. **Kill criterion:** if the budget line is read as
-a hard cap (support requests asking "why didn't it stop the agent") despite R4's
-labeling, the framing has failed and the feature needs rework or removal.
+line to the receipt ("today: $34.20 of $50.00") and a `--check-budget` flag that exits
+non-zero when exceeded (scriptable for CI). A live `watch` command was cut from this
+spec by S2 review — see Non-goals. **Kill criterion:** if the
+budget line is read as a hard cap (support requests asking "why didn't it stop the
+agent") despite R4's labeling, the framing has failed and the feature needs rework.
 
 ## Requirements
 
@@ -40,13 +36,10 @@ labeling, the framing has failed and the feature needs rework or removal.
   explicitly.
 - **R5 — Graceful degradation.** Invalid JSON or an out-of-range value degrades to "no
   budget line" + a stderr note, never a crash (mirrors SPEC-0001 R1).
-- **R6 — `watch` (bounded, foreground).** `aireceipts watch --threshold <usd|tokens>
-  --on-exceed "<cmd>"` polls the active session's JSONL file on a fixed local interval
-  (no network calls), computes the running total the same way as R2, and shell-execs
-  `<cmd>` exactly once when the total crosses the threshold (never repeatedly). Exits on
-  Ctrl-C or when the session file goes silent past a timeout. Requires an explicit
-  `aireceipts watch` invocation — never started automatically, never backgrounded (I1).
-  With no `--on-exceed`, `watch` prints the running total on each poll tick instead.
+- **R6 — Windowing correctness.** Daily/weekly sums reuse SPEC-0008's windowing —
+  matrix rows cover the date boundary (session ending 23:59 vs 00:01), frozen-clock
+  determinism, and a priced-coverage change between windows (coverage change must not
+  read as spend change — SPEC-0008 R6's rule applies to budget sums too).
 
 ## Scenarios
 
@@ -57,17 +50,17 @@ labeling, the framing has failed and the feature needs rework or removal.
 - **Given** the daily cap exceeded, **when** `--check-budget` runs, **then** exit 1.
 - **Given** a malformed `budget.json`, **when** a receipt renders, **then** no budget
   line + stderr note, exit 0.
-- **Given** an active session crossing a $10 threshold, **when** `watch --threshold 10
-  --on-exceed "notify-send hi"` runs, **then** the command fires exactly once.
-- **Given** an active session that never crosses the threshold, **when** `watch` runs,
-  **then** `--on-exceed` never fires and `watch` exits cleanly on Ctrl-C or timeout.
+- **Given** a session ending at 23:59 vs one at 00:01, **when** daily sums compute,
+  **then** each lands in its own day's window (frozen-clock test).
 
 ## Non-goals
 
 Enforcement/blocking of the underlying agent (R4); multi-currency; org/team budgets
-(local single-user only); a background daemon or auto-started watcher (R6 is always an
-explicit, foreground, user-invoked command); network-based alerting (email/Slack —
-`--on-exceed` shells out locally; the user wires up anything further).
+(local single-user only); **live `watch`/alerts — cut by S2 review**: mid-write JSONL
+polling is nondeterministic, the `SessionAdapter` seam has no active-session tailing,
+and shell-exec'ing a user command is an injection surface whose network activity would
+sit outside our guarantees — a future spec must define fake-clock/partial-line/timeout
+semantics and an argv-style (non-shell) command contract before this ships.
 
 ## Test matrix
 
@@ -80,12 +73,21 @@ explicit, foreground, user-invoked command); network-based alerting (email/Slack
 | R3 check-budget | cap exceeded / not exceeded / absent | exit 1 / 0 / 0 |
 | R4 advisory label | budget line rendered | line text states advisory-only, no enforcement claim |
 | R5 malformed file | invalid JSON | no line + stderr note, exit 0 |
-| R6 threshold fire | active session crosses threshold | `--on-exceed` cmd fires exactly once |
-| R6 no false fire | active session stays under threshold | `--on-exceed` never fires; clean exit |
+| R6 date boundary | sessions at 23:59 / 00:01 | each in own day (frozen clock) |
+| R6 coverage change | priced-coverage differs across window | sum honesty note, not spend change |
 
 ## Success criteria
 
-- [ ] A real `budget.json` round-trip (create, exceed, `--check-budget`) and a real
-      `watch --on-exceed` firing, both attached to the PR (dogfood).
+- [ ] A real `budget.json` round-trip (create, exceed, `--check-budget`) attached to
+      the PR (dogfood).
 - [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
+
+## Validation
+
+**2026-07-02 · S2 (Codex): REWORK → reworked.** Accepted: `watch` cut entirely — the
+adapter seam has no active-session tailing, mid-write JSONL polling breaks I1
+determinism, and `--on-exceed` shell-exec is an injection/network footgun; a future spec
+owns it with argv-style commands and defined tailing semantics. SPEC-0008 added as a
+dependency; windowing matrix rows added (date boundary, frozen clock, priced-coverage
+honesty). **S4:** spec-lint green.

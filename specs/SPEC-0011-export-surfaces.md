@@ -1,12 +1,12 @@
 ---
 id: SPEC-0011
-title: "Export surfaces — CSV, versioned JSON schema, OTEL spans"
+title: "Export surfaces — CSV + versioned JSON schema"
 status: draft
 milestone: M4
-depends: [SPEC-0001, SPEC-0008]
+depends: [SPEC-0001, SPEC-0002, SPEC-0003, SPEC-0008]
 ---
 
-# SPEC-0011 · Export surfaces — CSV, versioned JSON schema, OTEL spans
+# SPEC-0011 · Export surfaces — CSV + versioned JSON schema
 
 Invariants: I2 (empty, never fabricated, cells/attributes for missing $ data), I5
 (schema is a byte-stable, versioned contract), I6 (no ranking fields).
@@ -14,13 +14,13 @@ Invariants: I2 (empty, never fabricated, cells/attributes for missing $ data), I
 ## Purpose
 
 Formalizes SPEC-0001 R6's existing `--json` flag into a documented, semver'd schema
-(`schemaVersion: 1`), adds `--csv` (per-session and per-tool rows) for FinOps/
-spreadsheet ingestion, and adds `aireceipts export otel --endpoint <url>` — OTLP spans
-carrying per-tool cost/token attributes for teams that already run an observability
-pipeline. All three are one-shot, opt-in exporters over the same computed receipt; none
-run automatically. **Kill criterion:** if no external tool, spreadsheet, or OTEL
-collector ever consumes an export within two releases of shipping, the surfaces are
-frozen (no v2) rather than expanded further.
+(`schemaVersion: 1`) and adds `--csv` (per-session and per-tool rows) for FinOps/
+spreadsheet ingestion. Both are one-shot, opt-in exporters over the same computed
+receipt (the shared `ReceiptModel` from SPEC-0003; zod arrives as a dependency via
+SPEC-0002). OTLP/OTEL export was cut to its own future spec by S2 review — see
+Non-goals.
+**Kill criterion:** if no external tool, spreadsheet, or OTEL collector ever consumes an
+export within two releases of shipping, the surfaces are frozen (no v2), not expanded.
 
 ## Requirements
 
@@ -40,13 +40,9 @@ frozen (no v2) rather than expanded further.
 - **R5 — `week` reuse.** SPEC-0008's existing `week --json` is brought under the same
   `schemaVersion`, rather than a second undocumented shape (single-source-of-truth
   rule).
-- **R6 — `export otel`.** A registered exporter (single-source-of-truth discipline: one
-  `Exporter` interface, one registry array, `--format`/id-based selection — mirrors this
-  repo's own EXPORTERS registry pattern) converts the already-computed receipt into OTLP
-  spans over HTTP to `--endpoint`: one root span per session, one child span per tool
-  call, each carrying cost and token attributes (the cost attribute is omitted, never
-  `0`, when unpriced). Emit-only — `aireceipts` never runs or bundles a collector; an
-  unreachable endpoint fails loudly with a clear error, never a silent drop.
+- **R6 — Exporter seam.** CSV and JSON land behind one `Exporter` interface + registry
+  (id-based selection) so future exporters (OTLP among them) plug in without touching
+  the render path — the seam ships now, the network-touching exporter does not.
 
 ## Scenarios
 
@@ -60,17 +56,18 @@ frozen (no v2) rather than expanded further.
   the parity test runs, **then** it fails the build.
 - **Given** `week --json`, **when** validated, **then** it carries the same
   `schemaVersion` field as the single-session `--json`.
-- **Given** an unpriced fixture, **when** `export otel --endpoint <url>` runs, **then**
-  the emitted spans carry token attributes with no cost attribute present.
-- **Given** an unreachable `--endpoint`, **when** `export otel` runs, **then** it fails
-  loudly with a non-zero exit, never a silent no-op.
+- **Given** a second exporter registered in a test, **when** selected by id, **then**
+  it receives the same `ReceiptModel` the CSV/JSON exporters consume (seam proof).
 
 ## Non-goals
 
-XML or other export formats; a hosted ingestion endpoint (local file output only for
-CSV/JSON, I1); schema v2 design; backward-incompatible changes to the existing `--json`
-shape beyond adding the version field; bundling or running an OTEL collector (`export
-otel` emits only — bring your own collector).
+XML or other export formats; a hosted ingestion endpoint (local file output only,
+I1); schema v2 design; backward-incompatible `--json` changes beyond the version field;
+**OTLP/OTEL export — cut by S2 review**: an `--endpoint` send is a product network call
+requiring its own opt-in consent flow, an explicit I4 exception, and a precise
+emit-only OTLP/HTTP JSON definition (span/trace-id determinism, resource attrs,
+collector interop) — a dedicated future spec owns all of that on top of this spec's
+exporter seam.
 
 ## Test matrix
 
@@ -82,12 +79,20 @@ otel` emits only — bring your own collector).
 | R3 compare export | compare --csv / --json | 2 rows + delta, no ranking field |
 | R4 semver guard | bumped schemaVersion, stale docs | parity test fails build |
 | R5 week parity | week --json | same schemaVersion as session --json |
-| R6 otel spans | priced + unpriced fixture, export otel | spans emitted; cost attr omitted when unpriced |
-| R6 unreachable endpoint | export otel, bad --endpoint | loud failure, non-zero exit, no silent drop |
+| R6 seam | test-registered second exporter | receives the shared ReceiptModel by id selection |
 
 ## Success criteria
 
-- [ ] `docs/json-schema.md` published; a real CSV+JSON pair and a real OTEL span
-      capture from a live session attached to the PR (dogfood).
+- [ ] `docs/json-schema.md` published; a real CSV+JSON pair from a live session
+      attached to the PR (dogfood).
 - [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
+
+## Validation
+
+**2026-07-02 · S2 (Codex): REWORK → reworked.** Accepted: OTEL cut to its own future
+spec — an endpoint send is a product network call needing SPEC-0015-style consent, an
+I4 exception, and a precise OTLP/HTTP JSON emit definition none of which belong in a
+CSV spec; the exporter SEAM ships here instead so that spec plugs in cleanly. Real
+dependencies added (SPEC-0002 for zod, SPEC-0003 for the shared ReceiptModel — the
+cited `src/receipt/**` did not yet exist when drafted). **S4:** spec-lint green.
