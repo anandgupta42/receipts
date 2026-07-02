@@ -3,7 +3,10 @@
 # The review step (review-pr skill / codex exec) writes HEAD's sha to .review-ok;
 # any new commit invalidates it. Exit 2 blocks the tool call with guidance.
 cmd=$(jq -r '.tool_input.command // ""' 2>/dev/null)
-case "$cmd" in *"gh pr create"*) ;; *) exit 0;; esac
+case "$cmd" in *"gh pr create"*|*"gh pr merge"*) ;; *"git push"*)
+  # pushes of feature branches carry PR commits — same review requirement; main is chore-lane
+  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+  [ "$branch" = "main" ] && exit 0 ;; *) exit 0;; esac
 head=$(git rev-parse HEAD 2>/dev/null)
 ok=$(cat .review-ok 2>/dev/null)
 if [ -n "$head" ] && [ "$head" = "$ok" ]; then exit 0; fi
