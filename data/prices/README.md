@@ -19,7 +19,7 @@ at the rate that was live on the day it ran (I3, `AGENTS.md`).
           "input_cached": 0.3,
           "from_date": "2026-05-01",
           "to_date": null,
-          "sources": ["https://www.anthropic.com/pricing"]
+          "sources": [{ "url": "https://www.anthropic.com/pricing", "observed_at": "2026-07-01" }]
         }
       ]
     }
@@ -32,7 +32,7 @@ at the rate that was live on the day it ran (I3, `AGENTS.md`).
   separately; omit the field if not applicable (never guess a value).
 - `from_date` / `to_date` — ISO date the rate took effect / was superseded. `to_date:
   null` means the row is currently active.
-- `sources` — **required**, non-empty array of URLs actually fetched and read. This is
+- `sources` — **required**, non-empty array of objects, each with a `url` (http/https) actually fetched and read, plus optional `observed_at` (YYYY-MM-DD) and `excerpt`. This is
   the field the `block-price-edit-without-citation` hook checks for; a PR that touches
   this directory without a `sources` array is rejected mechanically before it ever
   reaches review.
