@@ -1,0 +1,23 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+     “Review <receipt total="x"> & escape >”      
+   Claude Code · Jun 26 2026 11:00:00 UTC · 45s   
+               claude-sonnet-5 100%               
+         cache served 56% of input tokens         
+
+[##########] = priciest line; others in proportion
+
+--- TOOL CALLS ---
+Read............................$0.01 [##########]
+--------------------------------------------------
+TOTAL........................................$0.01
+same tokens on claude-haiku-4-5..............$0.00
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

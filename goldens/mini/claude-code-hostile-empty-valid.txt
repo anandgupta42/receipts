@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Claude Code · model unknown · duration unknown
+total  0 tok
+top    (no tool calls)
+no waste detected
+run  aireceipts  for the full receipt

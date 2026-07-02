@@ -60,6 +60,36 @@
       "source": "opencode",
       "path": "test/fixtures/opencode/loop-shell-3x.db",
       "expected": ["stuck-loop"]
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/hostile-long-mcp-tool-name.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/hostile-markup-title.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/hostile-huge-numbers.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/hostile-unicode-title.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/hostile-empty-valid.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/hostile-100-tool-variety.jsonl",
+      "expected": []
     }
   ]
 }

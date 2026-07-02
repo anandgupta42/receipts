@@ -1,0 +1,20 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+  Claude Code · unknown start · duration unknown  
+
+TXN #28B8B839
+ITEM                              QTY          AMT
+--------------------------------------------------
+TOTAL                                        0 tok
+no price table matched
+
+CARDHOLDER: unknown
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      THANK YOU FOR VIBING WITH Claude Code       
+            ||| | ||| | ||| | |||| ||             
+- - - - - - - - - - - - - - - - - - - - - - - - -

@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Claude Code · claude-sonnet-5 · 45s
+total  $0.01
+top    Read · $0.01 (1 call)
+no waste detected
+run  aireceipts  for the full receipt
