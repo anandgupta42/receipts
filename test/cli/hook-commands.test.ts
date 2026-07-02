@@ -51,8 +51,8 @@ describe("--mini fail-safe (R6)", () => {
 describe("install-hook consent on EOF / no TTY (R1)", () => {
   it("defaults to No — exits 0, writes nothing, never hangs on closed stdin", () => {
     const dir = mkdtempSync(join(tmpdir(), "aireceipts-eof-"));
-    // Real CLI entry via tsx, empty stdin (immediate EOF), isolated config dir.
-    const res = spawnSync("npx", ["tsx", "src/cli.ts", "install-hook"], {
+    // Real CLI entry via vite-node, empty stdin (immediate EOF), isolated config dir.
+    const res = spawnSync(process.execPath, ["node_modules/vite-node/vite-node.mjs", "src/cli.ts", "install-hook"], {
       input: "",
       timeout: 30_000,
       encoding: "utf8",
