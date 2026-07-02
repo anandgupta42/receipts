@@ -105,3 +105,8 @@ export function wrapText(text: string, width: number): string[] {
 export function formatRatio(ratio: number): string {
   return `${ratio.toFixed(1)}×`;
 }
+
+/** `Nk tok` — token count rounded to the nearest thousand, for compact one-line surfaces (statusline R1). Never fabricates precision the caller doesn't have. */
+export function formatTokensK(n: number): string {
+  return `${formatInt(Math.round(n / 1000))}k tok`;
+}
