@@ -12,6 +12,7 @@
 // (I2/I3) are non-removable by construction rather than by renderer politeness.
 import { METHODOLOGY_BRIEF } from "../pricing/attribution.js";
 import type { ReceiptModel } from "./model.js";
+import { formatUsd } from "./format.js";
 
 export type TemplateName = "classic" | "grocery" | "datavis";
 
@@ -135,8 +136,33 @@ export function groceryLine(item: string, qty: string, amt: string): string {
 
 /** One honesty-invariant breach found by {@link validateReceiptBlocks}. */
 export interface BlockViolation {
-  code: "dollar-in-unpriced" | "missing-methodology" | "missing-delta-note" | "waste-label-drift";
+  code: "dollar-in-unpriced" | "untraced-dollar" | "missing-methodology" | "missing-delta-note" | "waste-label-drift";
   detail: string;
+}
+
+const DOLLAR_AMOUNT_RE = /\$-?\d[\d,]*(?:\.\d+)?/g;
+
+function dollarAmounts(s: string): string[] {
+  return s.match(DOLLAR_AMOUNT_RE) ?? [];
+}
+
+function addDollar(out: Set<string>, usd: number | null | undefined): void {
+  if (usd !== null && usd !== undefined) {
+    out.add(`$${formatUsd(usd)}`);
+  }
+}
+
+function tracedDollarAmounts(model: ReceiptModel): Set<string> {
+  const out = new Set<string>();
+  addDollar(out, model.totalUsd);
+  for (const row of model.toolRows) {
+    addDollar(out, row.usd);
+  }
+  for (const waste of model.wasteLines) {
+    addDollar(out, waste.usd);
+  }
+  addDollar(out, model.priceDelta?.usd);
+  return out;
 }
 
 /** Every display string a block puts on the receipt — what the `$`-scan inspects. */
@@ -183,6 +209,16 @@ export function validateReceiptBlocks(blocks: Block[], model: ReceiptModel): Blo
     const hasMethodology = blocks.some((b) => b.kind === "footnote" && b.text === METHODOLOGY_BRIEF);
     if (!hasMethodology) {
       violations.push({ code: "missing-methodology", detail: "priced receipt lacks the exact METHODOLOGY_BRIEF footnote" });
+    }
+    const allowedDollars = tracedDollarAmounts(model);
+    for (const b of blocks) {
+      for (const s of blockStrings(b)) {
+        for (const amount of dollarAmounts(s)) {
+          if (!allowedDollars.has(amount)) {
+            violations.push({ code: "untraced-dollar", detail: `priced receipt renders untraced ${amount} in ${b.kind}: ${s}` });
+          }
+        }
+      }
     }
     if (model.priceDelta) {
       const hasDeltaNote = blocks.some((b) => b.kind === "note" && b.text === PRICE_DELTA_NOTE);

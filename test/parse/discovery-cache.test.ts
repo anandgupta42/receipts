@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { ClaudeCodeAdapter } from "../../src/parse/claudeCode.js";
 import type { DiscoveryFs } from "../../src/parse/discovery.js";
 import { completeSummariesWithCache } from "../../src/parse/summaryCache.js";
+import type { SessionSummary } from "../../src/parse/types.js";
 
 const tmpRoots: string[] = [];
 
@@ -61,6 +62,25 @@ async function writeClaudeTranscript(root: string, name: string, i: number, extr
   return filePath;
 }
 
+async function writeCacheEntry(cachePath: string, filePath: string, summary: unknown): Promise<void> {
+  const s = await stat(filePath);
+  await mkdir(path.dirname(cachePath), { recursive: true });
+  await writeFile(
+    cachePath,
+    `${JSON.stringify(
+      {
+        version: 1,
+        entries: {
+          [filePath]: { mtimeMs: s.mtimeMs, size: s.size, summary },
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
+}
+
 describe("lazy discovery + summary cache", () => {
   it("reuses cached full summaries without changing the uncached parser answer, even after corrupt cache input", async () => {
     const root = await tempRoot("aireceipts-cache-");
@@ -92,6 +112,46 @@ describe("lazy discovery + summary cache", () => {
     expect(first).toEqual(uncached);
     expect(second).toEqual(uncached);
     expect(loads).toBe(0);
+  });
+
+  it.each([
+    {
+      name: "startedAt is not numeric",
+      corrupt: (s: SessionSummary) => ({ ...s, startedAt: "2026-06-18T10:00:00Z" }),
+    },
+    {
+      name: "unpriceable is not boolean",
+      corrupt: (s: SessionSummary) => ({ ...s, unpriceable: "false" }),
+    },
+    {
+      name: "parentFilePath is not a string",
+      corrupt: (s: SessionSummary) => ({ ...s, parentFilePath: 123 }),
+    },
+    {
+      name: "gitBranch is not a string",
+      corrupt: (s: SessionSummary) => ({ ...s, gitBranch: { name: "main" } }),
+    },
+  ])("drops a matching cache entry when the cached SessionSummary is corrupt: $name", async ({ corrupt }) => {
+    const root = await tempRoot("aireceipts-cache-corrupt-");
+    const transcript = await writeClaudeTranscript(root, "one.jsonl", 1);
+    const cachePath = path.join(root, ".aireceipts", "cache.json");
+    const adapter = new ClaudeCodeAdapter({ root });
+    const lazy = await adapter.listSessions();
+    const uncached = await adapter.listSessions({ full: true });
+    await writeCacheEntry(cachePath, transcript, corrupt(uncached[0]));
+
+    let loads = 0;
+    const repaired = await completeSummariesWithCache(lazy, {
+      cachePath,
+      stat,
+      load: async (summary) => {
+        loads++;
+        return adapter.loadSession(summary.id);
+      },
+    });
+
+    expect(repaired).toEqual(uncached);
+    expect(loads).toBe(1);
   });
 
   it("discovers a synthetic 200-file corpus by reading first lines instead of full transcript bodies", async () => {
