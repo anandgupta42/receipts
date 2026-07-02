@@ -1,0 +1,18 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+    “Summarize the architecture of this repo”     
+   Gemini CLI · Jun 21 2026 09:15:00 UTC · 40s    
+               gemini-2.5-pro 100%                
+
+read_file.....................31,600 tok  (1 call)
+--------------------------------------------------
+TOTAL...................................31,600 tok
+no price table matched
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

@@ -134,3 +134,27 @@ export function lazyCodexSummary(input: LazySummaryInput): SessionSummary {
     cwd: typeof item?.cwd === "string" && item.cwd ? item.cwd : undefined,
   };
 }
+
+/**
+ * Gemini CLI's first JSONL line is the session-metadata record (`sessionId`,
+ * `projectHash`, `startTime`, `kind`, `directories`) — it carries no user text,
+ * so `title` fills in only on the full parse. `directories[0]` is the session's
+ * working dir (attribution-only, R1a); `kind === "subagent"` marks a child.
+ */
+export function lazyGeminiSummary(input: LazySummaryInput): SessionSummary {
+  const top = parseFirstRecord(input.firstLine);
+  const startedAt = parseTimestamp(top?.startTime);
+  const dirs = Array.isArray(top?.directories) ? top?.directories : undefined;
+  const cwd = typeof dirs?.[0] === "string" && dirs[0] ? dirs[0] : undefined;
+  return {
+    id: input.filePath,
+    source: "gemini",
+    title: undefined,
+    startedAt,
+    endedAt: input.stat.mtimeMs,
+    totals: emptyTotals(),
+    filePath: input.filePath,
+    cwd,
+    isSidechain: top?.kind === "subagent" ? true : undefined,
+  };
+}

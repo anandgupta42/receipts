@@ -29,7 +29,7 @@ if (!hasDetectors) {
 }
 
 interface CorpusEntry {
-  source: "claude-code" | "codex" | "cursor";
+  source: "claude-code" | "codex" | "cursor" | "gemini";
   path: string;
   expected: string[];
 }

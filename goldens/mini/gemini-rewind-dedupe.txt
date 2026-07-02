@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Gemini CLI · gemini-2.5-flash · 1m 50s
+total  $0.00
+top    read_file · $0.00 (1 call)
+no waste detected
+run  aireceipts  for the full receipt

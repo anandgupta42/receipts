@@ -1,0 +1,22 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Fix the failing build caused by a broken impo…” 
+  Gemini CLI · Jun 20 2026 11:00:00 UTC · 1m 20s  
+              gemini-2.5-flash 100%               
+         cache served 62% of input tokens         
+
+replace............................$0.00  (1 call)
+read_file..........................$0.00  (1 call)
+run_shell_command..................$0.00  (1 call)
+--------------------------------------------------
+TOTAL........................................$0.01
+same tokens on gemini-2.5-flash-lite.........$0.00
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

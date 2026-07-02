@@ -123,6 +123,10 @@ export function vendorForSource(source: AgentSource): string | undefined {
       return "anthropic";
     case "codex":
       return "openai";
+    case "gemini":
+      // Gemini CLI is single-vendor (Google only); per-turn model ids select
+      // the row within google.json. (SPEC-0010 R3.)
+      return "google";
     case "cursor":
       return undefined;
   }

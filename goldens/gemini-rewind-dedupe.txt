@@ -1,0 +1,21 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+   “Add a retry wrapper around the HTTP client”   
+  Gemini CLI · Jun 22 2026 14:00:00 UTC · 1m 50s  
+              gemini-2.5-flash 100%               
+         cache served 50% of input tokens         
+
+read_file..........................$0.00  (1 call)
+replace............................$0.00  (1 call)
+--------------------------------------------------
+TOTAL........................................$0.00
+same tokens on gemini-2.5-flash-lite.........$0.00
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

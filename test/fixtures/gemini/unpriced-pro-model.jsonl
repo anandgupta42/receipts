@@ -1,0 +1,3 @@
+{"sessionId":"b2c3d4e5-f6a7-8901-bcde-f23456789012","projectHash":"proj0def","startTime":"2026-06-21T09:15:00.000Z","lastUpdated":"2026-06-21T09:16:00.000Z","kind":"main","directories":["/home/dev/app"]}
+{"id":"msg-1","timestamp":"2026-06-21T09:15:00.000Z","type":"user","content":"Summarize the architecture of this repo"}
+{"id":"msg-2","timestamp":"2026-06-21T09:15:40.000Z","type":"gemini","model":"gemini-2.5-pro","content":[{"text":"Here is the high-level architecture overview based on the directory layout."}],"tokens":{"input":30000,"output":1200,"cached":0,"thoughts":400,"tool":0,"total":31600},"toolCalls":[{"id":"t1","name":"read_file","displayName":"ReadFile"}]}

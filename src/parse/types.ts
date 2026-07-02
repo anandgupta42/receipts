@@ -11,13 +11,14 @@
  */
 
 /** The canonical, ordered list of supported agent sources — the single source of truth other modules (e.g. the export schema's `source` enum) derive from. */
-export const AGENT_SOURCES = ["claude-code", "codex", "cursor"] as const;
+export const AGENT_SOURCES = ["claude-code", "codex", "cursor", "gemini"] as const;
 export type AgentSource = (typeof AGENT_SOURCES)[number];
 
 export const SOURCE_LABELS: Record<AgentSource, string> = {
   "claude-code": "Claude Code",
   codex: "Codex",
   cursor: "Cursor",
+  gemini: "Gemini CLI",
 };
 
 /**
