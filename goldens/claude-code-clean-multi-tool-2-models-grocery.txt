@@ -1,0 +1,29 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Add email format validation to the signup for…” 
+ Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s 
+    claude-opus-4-8 87% · claude-sonnet-5 13%     
+         cache served 85% of input tokens         
+
+TXN #E336964E
+ITEM                              QTY          AMT
+Bash                                3        $0.05
+Edit                                2        $0.05
+(thinking/reply)                    2        $0.03
+Write                               2        $0.03
+Read                                1        $0.02
+--------------------------------------------------
+TOTAL                                        $0.18
+same tokens on claude-haiku-4-5..............$0.04
+  (arithmetic, not a prediction)
+
+CARDHOLDER: claude-opus-4-8
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      THANK YOU FOR VIBING WITH Claude Code       
+           || |||| |||| ||| || ||| | ||           
+- - - - - - - - - - - - - - - - - - - - - - - - -

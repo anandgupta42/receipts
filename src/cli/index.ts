@@ -15,6 +15,9 @@ import { buildReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
 import { rasterizeSvgToPng } from "../receipt/png.js";
+import { TEMPLATE_NAMES, isTemplateName } from "../receipt/blocks.js";
+import type { TemplateName } from "../receipt/blocks.js";
+import { previewModel } from "../receipt/preview.js";
 import { renderWeek, weekToJson } from "../receipt/week.js";
 import { buildWeekDigest, partitionWindows, windowBounds } from "../aggregate/week.js";
 import { aggregateWaste, type WasteClassAggregate } from "../aggregate/waste.js";
@@ -60,6 +63,8 @@ Usage:
                                          exceeded (advisory; see docs)
   aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
                                          contract only, sends disabled)
+  aireceipts [selector] --template <name>  render a receipt style (classic|grocery|datavis)
+  aireceipts templates                  list the templates with a live preview of each
   aireceipts --mini [selector]          6-line mini-receipt (newest session)
   aireceipts install-hook               add a Claude Code SessionEnd auto-receipt hook
   aireceipts uninstall-hook             remove that hook
@@ -109,7 +114,30 @@ async function resolveSelector(selector: string | undefined): Promise<{ summary:
 
 const CSV_MODE_HINT = 'use --csv=session or --csv=tool';
 
-async function runReceipt(selector: string | undefined, json: boolean, svgOut: SvgOut, csvMode: string | undefined): Promise<number> {
+/** R1: resolve a `--template` string to a name, or report the error listing valid names. */
+function resolveTemplate(template: string | undefined): { template: TemplateName } | { error: string } {
+  if (template === undefined) {
+    return { template: "classic" };
+  }
+  if (!isTemplateName(template)) {
+    return { error: `unknown template "${template}" — valid: ${TEMPLATE_NAMES.join(", ")}` };
+  }
+  return { template };
+}
+
+async function runReceipt(
+  selector: string | undefined,
+  json: boolean,
+  svgOut: SvgOut,
+  csvMode: string | undefined,
+  templateArg: string | undefined,
+): Promise<number> {
+  const resolvedTemplate = resolveTemplate(templateArg);
+  if ("error" in resolvedTemplate) {
+    process.stderr.write(`${resolvedTemplate.error}\n`);
+    return 1;
+  }
+  const template = resolvedTemplate.template;
   const resolved = await resolveSelector(selector);
   if ("error" in resolved) {
     process.stderr.write(`${resolved.error}\n`);
@@ -122,11 +150,11 @@ async function runReceipt(selector: string | undefined, json: boolean, svgOut: S
   }
   const model = await buildReceiptModel(session);
   if (svgOut.svg) {
-    await writeSvg(renderReceiptSvg(model, { theme: svgOut.theme }), svgOut.output ?? "receipt.svg");
+    await writeSvg(renderReceiptSvg(model, { theme: svgOut.theme, template }), svgOut.output ?? "receipt.svg");
     return 0;
   }
   if (svgOut.png) {
-    const svg = renderReceiptSvg(model, { theme: svgOut.theme });
+    const svg = renderReceiptSvg(model, { theme: svgOut.theme, template });
     await writePng(rasterizeSvgToPng(svg), svgOut.output ?? "receipt.png");
     return 0;
   }
@@ -154,8 +182,23 @@ async function runReceipt(selector: string | undefined, json: boolean, svgOut: S
     process.stdout.write(`${JSON.stringify(withBudget, null, 2)}\n`);
   } else {
     const budgetSuffix = budget.lines.length > 0 ? `\n\n${budget.lines.join("\n")}` : "";
-    process.stdout.write(`${renderReceipt(model)}${budgetSuffix}\n`);
+    process.stdout.write(`${renderReceipt(model, { template })}${budgetSuffix}\n`);
   }
+  return 0;
+}
+
+/** R2: list the templates, each with a 6-line preview rendered from the built-in fixture model (shows the style, not prose). The window starts at the body (past the shared masthead/meta header) so each preview shows what makes the template distinct. */
+function runTemplates(): number {
+  const model = previewModel();
+  const blocks = TEMPLATE_NAMES.map((template) => {
+    const lines = renderReceipt(model, { color: false, template }).split("\n");
+    const firstBlank = lines.indexOf("");
+    const start = firstBlank >= 0 ? firstBlank + 1 : 1;
+    const preview = lines.slice(start, start + 6).join("\n");
+    const suffix = template === "classic" ? "  (default)" : "";
+    return `── ${template}${suffix} ──\n${preview}`;
+  });
+  process.stdout.write(`${blocks.join("\n\n")}\n`);
   return 0;
 }
 
@@ -498,6 +541,8 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runQuota();
     case "week":
       return runWeek(args);
+    case "templates":
+      return runTemplates();
     case "check-budget":
       return runCheckBudget();
     case "benchmark":
@@ -508,7 +553,7 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runPr({ post: args.post === true, session: args.prSession });
     case "receipt":
     default:
-      return runReceipt(args.selector, args.json, svgOut, args.csvMode);
+      return runReceipt(args.selector, args.json, svgOut, args.csvMode, args.template);
   }
 }
 

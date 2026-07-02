@@ -1,24 +1,23 @@
-// SPEC-0003: the shareable till-receipt SVG. Formats the SAME shared
-// `ReceiptView` the terminal renderer uses (see `present.ts`) into geometry —
-// zero new deps, deterministic bytes (golden-gated, I5). Everything a font
-// can't be trusted to draw is a shape, never a glyph (R1 font-safety):
-// perforation, leader dots, rules, the waste badge, and the LOCAL·DETERMINISTIC
-// stamp are all paths/strokes. Text layout is computed on a fixed monospace
-// column grid with a +10% glyph-width safety margin so labels and values can
-// never collide, whatever monospace the viewer substitutes.
+// SPEC-0003 / SPEC-0020: the shareable till-receipt SVG — a pure interpreter
+// over the SAME `Block[]` the terminal renderer consumes (see `present.ts` /
+// `blocks.ts`), laid out as geometry. Zero new deps, deterministic bytes
+// (golden-gated, I5). It branches only on a block's kind and its own data, never
+// on which template built it, so `classic` renders byte-identically while
+// `grocery`/`datavis` fall out of the same interpreter. Everything a font can't
+// be trusted to draw is a shape, never a glyph (R1 font-safety): perforation,
+// leader dots, rules, the waste badge, and the LOCAL·DETERMINISTIC stamp are all
+// paths/strokes. Text layout is computed on a fixed monospace column grid with a
+// +10% glyph-width safety margin so labels and values can never collide.
 //
-// Colours are theme CSS variables *with a concrete hex fallback*
-// Literal per-theme hex only — CSS var() (even with fallbacks) renders BLACK in
-// resvg (our own --png engine); portability of the share-artifact wins over
-// re-theme by swapping one variable, while renderers that don't implement CSS
-// custom properties (librsvg, some GitHub image paths) fall back to the hex and
-// still render correctly — non-negotiable for "the screenshot IS the
-// distribution".
+// Colours are literal per-theme hex (not CSS var()) — var() renders BLACK in
+// resvg (our own --png engine); "the screenshot IS the distribution" wins over
+// re-theme-by-one-variable.
 import { compareDeltaLine } from "./compare.js";
+import type { Block } from "./blocks.js";
+import type { ReceiptView, TemplateName } from "./blocks.js";
 import { wrapText } from "./format.js";
 import type { ReceiptModel } from "./model.js";
 import { buildReceiptView } from "./present.js";
-import type { ReceiptView } from "./present.js";
 
 export type ThemeName = "light" | "dark";
 
@@ -39,6 +38,8 @@ export const THEMES: Record<ThemeName, Theme> = {
 
 export interface SvgOptions {
   theme?: ThemeName;
+  /** SPEC-0020: which template to render (default `classic`). */
+  template?: TemplateName;
 }
 
 /** Themed paint strings (literal hex) resolved once per render and threaded through the layout. */
@@ -96,9 +97,12 @@ const BADGE_GAP = 4;
 const WASTE_LABEL_X = LEFT + BADGE + BADGE_GAP; // label start when a badge prefixes the row
 const STAMP_ROTATE = -4;
 
+// One muted-note left indent unit ≈ one monospace space; keeps the price-delta
+// note's SVG offset (LEFT+14 for a 2-space indent) tracking the terminal's.
+const NOTE_INDENT_PX = 7;
+
 // Emoji deliberately absent: a glyph outside the monospace face poisons the whole
 // text run in resvg-class renderers (tofu). The terminal footer keeps the 🥟.
-const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
 const STAMP_TEXT = "LOCAL · DETERMINISTIC";
 
 // --- Primitives --------------------------------------------------------------
@@ -240,81 +244,112 @@ function footnoteLines(text: string, topY: number, innerWidth: number, muted: st
   return y;
 }
 
+/** The `value` a leader-style row renders: grocery folds its two columns into one right-aligned string; every other row uses `value` verbatim. */
+function leaderValue(block: { value: string; columns?: { qty: string; amt: string } }): string {
+  if (!block.columns) {
+    return block.value;
+  }
+  return [block.columns.qty, block.columns.amt].filter((s) => s !== "").join("  ");
+}
+
+function hasSpaceBefore(block: Block): boolean {
+  return (block as { spaceBefore?: boolean }).spaceBefore === true;
+}
+
+/** Mutable layout cursor threaded through the block interpreter. */
+interface Cursor {
+  y: number;
+}
+
+/** Interpret one block into SVG elements, advancing the vertical cursor. */
+function layoutBlock(block: Block, cur: Cursor, p: Paints, els: string[]): void {
+  if (hasSpaceBefore(block)) {
+    cur.y += SECTION_GAP;
+  }
+  switch (block.kind) {
+    case "masthead":
+      els.push(textEl(WIDTH / 2, cur.y + 14, block.text, { size: SZ_WORDMARK, weight: 700, letterSpacing: 3, anchor: "middle", fill: p.ink }));
+      cur.y += 22;
+      return;
+    case "meta":
+      for (const line of block.lines) {
+        els.push(textEl(WIDTH / 2, cur.y + 11, line, { size: SZ_META, anchor: "middle", fill: p.muted }));
+        cur.y += META_LH;
+      }
+      return;
+    case "columnHeader":
+      els.push(...rowElements(block.item, `${block.qty}  ${block.amt}`, cur.y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.ink, labelStartX: LEFT, muted: p.muted }));
+      cur.y += ROW_H;
+      return;
+    case "row": {
+      const fill = block.muted ? p.muted : p.ink;
+      els.push(...rowElements(block.label, leaderValue(block), cur.y, { size: SZ_BODY, weight: block.muted ? 400 : undefined, labelFill: fill, valueFill: fill, labelStartX: LEFT, muted: p.muted }));
+      cur.y += ROW_H;
+      return;
+    }
+    case "wasteRow": {
+      if (block.badge) {
+        els.push(wasteBadge(cur.y + 11, p.flag));
+        els.push(...rowElements(block.label, block.value, cur.y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.flag, labelStartX: WASTE_LABEL_X, muted: p.muted }));
+        cur.y += ROW_H;
+        return;
+      }
+      els.push(...rowElements(block.label, block.value, cur.y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.flag, labelStartX: LEFT, muted: p.muted }));
+      if (block.detail !== undefined) {
+        cur.y += ROW_H - 4;
+        els.push(textEl(LEFT + 12, cur.y + 10, block.detail, { size: SZ_FOOT, fill: p.muted }));
+        cur.y += FOOT_LH + 3;
+      } else {
+        cur.y += ROW_H;
+      }
+      return;
+    }
+    case "rule":
+      cur.y += 6;
+      els.push(`<line x1="${n(LEFT)}" y1="${n(cur.y)}" x2="${n(RIGHT)}" y2="${n(cur.y)}" stroke="${p.rule}" stroke-width="1.5"/>`);
+      cur.y += 8;
+      return;
+    case "total":
+      els.push(...rowElements(block.label, leaderValue(block), cur.y, { size: SZ_TOTAL, weight: 700, labelFill: p.ink, valueFill: p.ink, labelStartX: LEFT, muted: p.muted }));
+      cur.y += ROW_H;
+      return;
+    case "note": {
+      if (block.align === "center") {
+        els.push(textEl(WIDTH / 2, cur.y + 9, block.text, { size: SZ_FOOT, anchor: "middle", fill: p.muted }));
+      } else {
+        els.push(textEl(LEFT + (block.indent ?? 0) * NOTE_INDENT_PX, cur.y + 9, block.text, { size: SZ_FOOT, fill: p.muted }));
+      }
+      cur.y += FOOT_LH;
+      return;
+    }
+    case "footnote":
+      cur.y = footnoteLines(block.text, cur.y, RIGHT - LEFT, p.muted, els);
+      return;
+    case "barcode":
+      els.push(textEl(WIDTH / 2, cur.y + 15, block.pattern, { size: SZ_BODY, anchor: "middle", fill: p.ink }));
+      cur.y += ROW_H;
+      return;
+    case "footer": {
+      cur.y += 12;
+      els.push(stampElement(cur.y, p.accent));
+      const footerBaseline = cur.y + 22 + 18 + SZ_FOOTER;
+      els.push(textEl(WIDTH / 2, footerBaseline, block.text, { size: SZ_FOOTER, anchor: "middle", fill: p.muted }));
+      // Advance past the footer text (not just record a height) so a later block
+      // — grocery's barcode is the last line — lays out BELOW it, never over the
+      // stamp. Height is then cur.y + PAD_BOTTOM for every template.
+      cur.y = footerBaseline + 6;
+      return;
+    }
+  }
+}
+
 function layoutContent(view: ReceiptView, p: Paints): LaidOut {
   const els: string[] = [];
-  let y = PAD_TOP;
-
-  // Masthead: wordmark + centered meta lines.
-  els.push(textEl(WIDTH / 2, y + 14, view.wordmark, { size: SZ_WORDMARK, weight: 700, letterSpacing: 3, anchor: "middle", fill: p.ink }));
-  y += 22;
-  for (const meta of view.metaLines) {
-    els.push(textEl(WIDTH / 2, y + 11, meta, { size: SZ_META, anchor: "middle", fill: p.muted }));
-    y += META_LH;
+  const cur: Cursor = { y: PAD_TOP };
+  for (const block of view.blocks) {
+    layoutBlock(block, cur, p, els);
   }
-  y += SECTION_GAP;
-
-  // Tool rows.
-  for (const row of view.toolRows) {
-    els.push(...rowElements(row.label, row.value, y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.ink, labelStartX: LEFT, muted: p.muted }));
-    y += ROW_H;
-  }
-
-  // Waste rows (value in flag; stuck-loop prefixed with the triangle badge).
-  if (view.wasteRows.length > 0) {
-    y += SECTION_GAP;
-    for (const waste of view.wasteRows) {
-      if (waste.kind === "stuck-loop") {
-        els.push(wasteBadge(y + 11, p.flag));
-        els.push(...rowElements(waste.label, waste.value, y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.flag, labelStartX: WASTE_LABEL_X, muted: p.muted }));
-        y += ROW_H;
-      } else {
-        els.push(...rowElements(waste.label, waste.value, y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.flag, labelStartX: LEFT, muted: p.muted }));
-        y += ROW_H - 4;
-        els.push(textEl(LEFT + 12, y + 10, waste.detail, { size: SZ_FOOT, fill: p.muted }));
-        y += FOOT_LH + 3;
-      }
-    }
-  }
-
-  // TOTAL: full-inner-width rule, then the bold total row.
-  y += 6;
-  els.push(`<line x1="${n(LEFT)}" y1="${n(y)}" x2="${n(RIGHT)}" y2="${n(y)}" stroke="${p.rule}" stroke-width="1.5"/>`);
-  y += 8;
-  els.push(...rowElements(view.total.label, view.total.value, y, { size: SZ_TOTAL, weight: 700, labelFill: p.ink, valueFill: p.ink, labelStartX: LEFT, muted: p.muted }));
-  y += ROW_H;
-  if (view.totalNote) {
-    els.push(textEl(LEFT, y + 10, view.totalNote, { size: SZ_FOOT, fill: p.muted }));
-    y += FOOT_LH;
-  }
-
-  // Same-tokens comparison: a muted dotted row right under TOTAL, number aligned
-  // with the total for instant visual compare, honesty note small beneath it.
-  if (view.priceDeltaRow) {
-    els.push(...rowElements(view.priceDeltaRow.label, view.priceDeltaRow.value, y, {
-      labelStartX: LEFT,
-      size: SZ_BODY,
-      weight: 400,
-      labelFill: p.muted,
-      valueFill: p.muted,
-      muted: p.muted,
-    }));
-    y += ROW_H;
-    if (view.priceDeltaNote) {
-      els.push(textEl(LEFT + 14, y + 9, view.priceDeltaNote, { size: SZ_FOOT, fill: p.muted }));
-      y += FOOT_LH;
-    }
-  }
-  y += SECTION_GAP;
-  y = footnoteLines(view.methodologyBrief, y, RIGHT - LEFT, p.muted, els);
-
-  // Stamp (bottom-right, rotated) then the centered footer 18px below it.
-  y += 12;
-  els.push(stampElement(y, p.accent));
-  const footerBaseline = y + 22 + 18 + SZ_FOOTER;
-  els.push(textEl(WIDTH / 2, footerBaseline, FOOTER_TEXT, { size: SZ_FOOTER, anchor: "middle", fill: p.muted }));
-
-  const height = footerBaseline + 6 + PAD_BOTTOM;
-  return { els, height };
+  return { els, height: cur.y + PAD_BOTTOM };
 }
 
 /** The signature stamp: rounded-rect in accent, rotated −4°, uppercase LOCAL · DETERMINISTIC. `topY` is the top of the stamp box. */
@@ -372,7 +407,7 @@ function svgDocument(width: number, height: number, body: string, label: string)
 export function renderReceiptSvg(model: ReceiptModel, opts: SvgOptions = {}): string {
   const theme = THEMES[opts.theme ?? "light"];
   const p = paintsFor(theme);
-  const { els, height } = layoutContent(buildReceiptView(model), p);
+  const { els, height } = layoutContent(buildReceiptView(model, opts.template ?? "classic"), p);
   const body = cardGroup(els, height, 0, "0", p.card);
   return svgDocument(WIDTH, height, body, "aireceipts cost receipt");
 }

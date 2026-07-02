@@ -283,16 +283,21 @@ describe("R4 — field-set parity between the terminal and SVG renderers", () =>
   });
 });
 
+function metaLinesOf(model: ReceiptModel): string[] {
+  const meta = buildReceiptView(model).blocks.find((b) => b.kind === "meta");
+  return meta?.kind === "meta" ? meta.lines : [];
+}
+
 describe("titleLine — masthead honesty", () => {
   it("renders a truncated quoted title for a real session title", async () => {
     const model = await modelFor(PRICED.source, PRICED.path);
-    const titled = buildReceiptView(model).metaLines.filter((l) => l.startsWith("\u201C"));
+    const titled = metaLinesOf(model).filter((l) => l.startsWith("\u201C"));
     expect(titled).toHaveLength(1);
     expect(titled[0].length).toBeLessThanOrEqual(48);
   });
 
   it("renders NO title when the session title is markup-shaped (agent-injected XML is machine noise)", async () => {
     const model = { ...(await modelFor(PRICED.source, PRICED.path)), title: '<teammate-message teammate_id="x">hi</teammate-message>' };
-    expect(buildReceiptView(model).metaLines.some((l) => l.startsWith("\u201C"))).toBe(false);
+    expect(metaLinesOf(model).some((l) => l.startsWith("\u201C"))).toBe(false);
   });
 });
