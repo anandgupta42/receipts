@@ -28,6 +28,8 @@ export interface ParsedArgs {
   byProject: boolean;
   /** SPEC-0008: re-anchor the trailing window at this YYYY-MM-DD date. */
   since?: string;
+  /** SPEC-0013: distinct-session recurrence threshold for standing-rule suggestions. */
+  handoffThreshold?: number;
   /** SPEC-0011 R2: CSV export mode — "session" (one row) or "tool" (row per tool). */
   csvMode?: "session" | "tool";
   /** SPEC-0015: print the exact benchmark payload without prompting or sending. */
@@ -45,6 +47,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let methodology = false;
   let telemetryShow = false;
   let quota = false;
+  let handoffThreshold: number | undefined;
   let mini = false;
   let csvMode: "session" | "tool" | undefined;
   let dryRun = false;
@@ -73,6 +76,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
       methodology = true;
     } else if (arg === "--quota") {
       quota = true;
+    } else if (arg === "--handoff-threshold") {
+      handoffThreshold = Number(argv[++i]);
+    } else if (arg.startsWith("--handoff-threshold=")) {
+      handoffThreshold = Number(arg.slice("--handoff-threshold=".length));
     } else if (arg === "--mini") {
       mini = true;
     } else if (arg === "--csv" || arg === "--csv=session") {
@@ -111,27 +118,27 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (help) {
-    return { command: "help", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "help", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (methodology) {
-    return { command: "methodology", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "methodology", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (telemetryShow) {
-    return { command: "telemetry-show", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "telemetry-show", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (checkBudget) {
-    return { command: "check-budget", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "check-budget", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (quota) {
-    return { command: "quota", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "quota", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (positional[0] === "compare") {
-    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (positional[0] === "benchmark") {
@@ -139,15 +146,15 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (mini) {
-    return { command: "mini", selector: positional[0], json, svg, png, theme, output, byProject, since, dryRun, csvMode, checkBudget };
+    return { command: "mini", selector: positional[0], json, svg, png, theme, output, byProject, since, dryRun, csvMode, checkBudget, handoffThreshold };
   }
 
   if (positional[0] === "install-hook") {
-    return { command: "install-hook", json, svg, png, theme, output, byProject, since, dryRun, csvMode, checkBudget };
+    return { command: "install-hook", json, svg, png, theme, output, byProject, since, dryRun, csvMode, checkBudget, handoffThreshold };
   }
 
   if (positional[0] === "uninstall-hook") {
-    return { command: "uninstall-hook", json, svg, png, theme, output, byProject, since, dryRun, csvMode, checkBudget };
+    return { command: "uninstall-hook", json, svg, png, theme, output, byProject, since, dryRun, csvMode, checkBudget, handoffThreshold };
   }
 
   if (positional[0] === "statusline") {
@@ -155,20 +162,20 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (positional[0] === "week") {
-    return { command: "week", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "week", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (positional[0] === "pr") {
-    return { command: "pr", post, prSession, json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode, png };
+    return { command: "pr", post, prSession, json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode, png, handoffThreshold };
   }
 
   if (list) {
-    return { command: "list", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "list", json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
   if (handoff) {
-    return { command: "handoff", selector: positional[0], json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "handoff", selector: positional[0], json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
   }
 
-  return { command: "receipt", selector: positional[0], json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+  return { command: "receipt", selector: positional[0], json, svg, png, theme, output, byProject, since, checkBudget, dryRun, csvMode, handoffThreshold };
 }

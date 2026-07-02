@@ -8,7 +8,7 @@ import { evaluateBudget } from "../budget/index.js";
 import { renderCompare, compareDeltaLine } from "../receipt/compare.js";
 import { toCompareCsv } from "../receipt/csv.js";
 import { getExporter } from "../receipt/exporters.js";
-import { renderHandoff } from "../receipt/handoff.js";
+import { DEFAULT_HANDOFF_THRESHOLD, renderHandoff, standingRuleSuggestions } from "../receipt/handoff.js";
 import { formatAbsoluteUtc, formatInt } from "../receipt/format.js";
 import { summaryToJson, toCompareJsonModel, toJsonModel } from "../receipt/json.js";
 import { buildReceiptModel } from "../receipt/model.js";
@@ -16,7 +16,8 @@ import { renderReceipt } from "../receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
 import { rasterizeSvgToPng } from "../receipt/png.js";
 import { renderWeek, weekToJson } from "../receipt/week.js";
-import { buildWeekDigest } from "../aggregate/week.js";
+import { buildWeekDigest, partitionWindows, windowBounds } from "../aggregate/week.js";
+import { aggregateWaste, type WasteClassAggregate } from "../aggregate/waste.js";
 import { renderMiniReceipt, renderStatusline } from "../receipt/mini.js";
 import { installHook, uninstallHook } from "../hook/install.js";
 import type { HookIo } from "../hook/install.js";
@@ -40,7 +41,10 @@ Usage:
   aireceipts [selector] [--json|--csv]  print a receipt (default: newest session)
   aireceipts --list [--json]            list sessions, newest first
   aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
-  aireceipts --handoff [selector]       paste-ready block of fired waste lines
+  aireceipts --handoff [selector] [--handoff-threshold N]
+                                        paste-ready block of fired waste lines;
+                                         suggests CLAUDE.md rules for waste classes
+                                         recurring in N+ recent sessions (default 3)
   aireceipts --quota                    current Claude Code rate-limit window usage
                                          (statusline stdin mode only; silent if unavailable)
   aireceipts [selector] --svg [-o f]    write a shareable SVG receipt (default receipt.svg)
@@ -245,7 +249,25 @@ async function runCompare(
   return 0;
 }
 
-async function runHandoff(selector: string | undefined): Promise<number> {
+/**
+ * SPEC-0013 R1: aggregate waste across the trailing-7-day window (SPEC-0008's
+ * window definition, reused so there's one notion of "recent"). Feeds the
+ * distinct-session recurrence check for standing-rule suggestions.
+ */
+async function recentWasteAggregates(now: number = Date.now()): Promise<WasteClassAggregate[]> {
+  const bounds = windowBounds(now);
+  const summaries = await listSessions();
+  const { current } = partitionWindows(summaries, bounds);
+  const loaded = await Promise.all(current.map((s) => loadSession(s)));
+  return aggregateWaste(loaded.filter((s): s is Session => s !== null));
+}
+
+async function runHandoff(selector: string | undefined, thresholdArg: number | undefined): Promise<number> {
+  const threshold = thresholdArg ?? DEFAULT_HANDOFF_THRESHOLD;
+  if (thresholdArg !== undefined && (!Number.isInteger(threshold) || threshold < 1)) {
+    process.stderr.write("invalid --handoff-threshold (expected a positive integer)\n");
+    return 1;
+  }
   const resolved = await resolveSelector(selector);
   if ("error" in resolved) {
     process.stderr.write(`${resolved.error}\n`);
@@ -257,7 +279,8 @@ async function runHandoff(selector: string | undefined): Promise<number> {
     return 1;
   }
   const model = await buildReceiptModel(session);
-  process.stdout.write(`${renderHandoff(model)}\n`);
+  const suggestions = standingRuleSuggestions(await recentWasteAggregates(), threshold);
+  process.stdout.write(`${renderHandoff(model, suggestions)}\n`);
   return 0;
 }
 
@@ -470,7 +493,7 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
     case "compare":
       return runCompare(args.compareA, args.compareB, args.json, svgOut, args.csvMode);
     case "handoff":
-      return runHandoff(args.selector);
+      return runHandoff(args.selector, args.handoffThreshold);
     case "quota":
       return runQuota();
     case "week":
