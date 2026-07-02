@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Claude Code · claude-opus-4-legacy · 48s
+total  3,325 tok
+top    (thinking/reply) · 1,230 tok (1 turn)
+no waste detected
+run  aireceipts  for the full receipt

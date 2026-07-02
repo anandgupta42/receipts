@@ -1,0 +1,19 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+   Claude Code · Jun 25 2026 14:00:00 UTC · 48s   
+            claude-opus-4-legacy 100%             
+
+(thinking/reply)...............1,230 tok  (1 turn)
+Bash...........................1,155 tok  (1 call)
+Read.............................940 tok  (1 call)
+--------------------------------------------------
+TOTAL....................................3,325 tok
+no price table matched
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

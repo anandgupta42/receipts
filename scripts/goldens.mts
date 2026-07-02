@@ -10,12 +10,14 @@ import { buildReceiptModel } from "../src/receipt/model.js";
 import type { ReceiptModel } from "../src/receipt/model.js";
 import { renderReceipt } from "../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../src/receipt/svg.js";
+import { renderMiniReceipt } from "../src/receipt/mini.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 
 const update = process.argv.includes("--update");
 const corpus = JSON.parse(readFileSync("eval/corpus.json", "utf8")).entries as
   { source: AgentSource; path: string }[];
 
+mkdirSync("goldens/mini", { recursive: true });
 let drift = 0;
 let count = 0;
 
@@ -38,6 +40,15 @@ function check(file: string, content: string): void {
   }
 }
 
+for (const e of corpus) {
+  const session = await loadById(e.source, e.path);
+  if (!session) { console.error(`goldens: failed to load ${e.path}`); process.exit(1); }
+  const model = await buildReceiptModel(session);
+  const stem = `${e.source}-${e.path.split("/").pop()!.replace(/\.jsonl$/, "")}`;
+  check(`goldens/${stem}.txt`, renderReceipt(model, { color: false }) + "\n");
+  check(`goldens/mini/${stem}.txt`, renderMiniReceipt(model) + "\n");
+}
+
 async function modelFor(source: AgentSource, path: string): Promise<ReceiptModel> {
   const session = await loadById(source, path);
   if (!session) {
@@ -48,12 +59,6 @@ async function modelFor(source: AgentSource, path: string): Promise<ReceiptModel
 }
 
 const nameOf = (path: string): string => path.split("/").pop()!.replace(/\.jsonl$/, "");
-
-// Terminal receipts — every corpus fixture.
-for (const e of corpus) {
-  const rendered = renderReceipt(await modelFor(e.source, e.path), { color: false }) + "\n";
-  check(`goldens/${e.source}-${nameOf(e.path)}.txt`, rendered);
-}
 
 // SVG export — a priced fixture in both themes, plus a two-card compare (SPEC-0003).
 mkdirSync("goldens/svg", { recursive: true });
