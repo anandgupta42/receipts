@@ -44,3 +44,22 @@ describe("parseArgs — week (R7)", () => {
     expect(parseArgs(["--list"]).command).toBe("list");
   });
 });
+
+describe("parseArgs — handoff (SPEC-0013)", () => {
+  it("defaults handoffThreshold to undefined (renderer applies its own default)", () => {
+    const a = parseArgs(["--handoff"]);
+    expect(a.command).toBe("handoff");
+    expect(a.handoffThreshold).toBeUndefined();
+  });
+
+  it("parses --handoff-threshold in both spaced and = forms", () => {
+    expect(parseArgs(["--handoff", "--handoff-threshold", "5"]).handoffThreshold).toBe(5);
+    expect(parseArgs(["--handoff", "--handoff-threshold=2"]).handoffThreshold).toBe(2);
+  });
+
+  it("carries a positional selector alongside the threshold", () => {
+    const a = parseArgs(["--handoff", "abc123", "--handoff-threshold=4"]);
+    expect(a.selector).toBe("abc123");
+    expect(a.handoffThreshold).toBe(4);
+  });
+});
