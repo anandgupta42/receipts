@@ -38,7 +38,7 @@ function check(file: string, content: string): void {
   }
 }
 
-async function modelFor(source: string, path: string): Promise<ReceiptModel> {
+async function modelFor(source: AgentSource, path: string): Promise<ReceiptModel> {
   const session = await loadById(source, path);
   if (!session) {
     console.error(`goldens: failed to load ${path}`);
@@ -57,8 +57,8 @@ for (const e of corpus) {
 
 // SVG export — a priced fixture in both themes, plus a two-card compare (SPEC-0003).
 mkdirSync("goldens/svg", { recursive: true });
-const PRICED = { source: "claude-code", path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
-const LOOP = { source: "claude-code", path: "test/fixtures/claude-code/loop-bash-5x.jsonl" };
+const PRICED = { source: "claude-code" as AgentSource, path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
+const LOOP = { source: "claude-code" as AgentSource, path: "test/fixtures/claude-code/loop-bash-5x.jsonl" };
 const pricedModel = await modelFor(PRICED.source, PRICED.path);
 for (const theme of ["light", "dark"] as const) {
   check(`goldens/svg/${PRICED.source}-${nameOf(PRICED.path)}-${theme}.svg`, renderReceiptSvg(pricedModel, { theme }));
