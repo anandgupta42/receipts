@@ -16,6 +16,10 @@ import { renderReceipt } from "../receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../receipt/svg.js";
 import { renderWeek, weekToJson } from "../receipt/week.js";
 import { buildWeekDigest } from "../aggregate/week.js";
+import { renderMiniReceipt } from "../receipt/mini.js";
+import { installHook, uninstallHook } from "../hook/install.js";
+import type { HookIo } from "../hook/install.js";
+import { createInterface } from "node:readline";
 import { METHODOLOGY } from "../pricing/attribution.js";
 import {
   ensureFirstRunNotice,
@@ -45,6 +49,9 @@ Usage:
                                          exceeded (advisory; see docs)
   aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
                                          contract only, sends disabled)
+  aireceipts --mini [selector]          6-line mini-receipt (newest session)
+  aireceipts install-hook               add a Claude Code SessionEnd auto-receipt hook
+  aireceipts uninstall-hook             remove that hook
   aireceipts --help                     show this help
 
 flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
@@ -249,6 +256,30 @@ async function runWeek(args: ReturnType<typeof parseArgs>): Promise<number> {
 }
 
 /**
+ * `--mini` (SPEC-0006 R4): render the newest session's 6-line receipt. Invoked
+ * by the SessionEnd hook, so it is fail-safe (R6) — any error (no sessions, a
+ * parse failure) is swallowed and the process still exits 0, never blocking or
+ * failing Claude Code's own shutdown.
+ */
+async function runMini(selector: string | undefined): Promise<number> {
+  try {
+    const resolved = await resolveSelector(selector);
+    if ("error" in resolved) {
+      process.stderr.write(`${resolved.error}\n`);
+      return 0;
+    }
+    const session = await loadSession(resolved.summary);
+    if (!session) {
+      return 0;
+    }
+    process.stdout.write(`${renderMiniReceipt(await buildReceiptModel(session))}\n`);
+  } catch {
+    // Fire-and-forget: a mini-receipt failure must never surface as a hook error.
+  }
+  return 0;
+}
+
+/**
  * SPEC-0015 v1: client contract only, sends disabled.
  * `--dry-run` builds+prints the exact payload and returns without prompting
  * (R3). Otherwise every call re-prompts `[y/N]` (R1, no persisted
@@ -285,9 +316,46 @@ async function runBenchmark(selector: string | undefined, dryRun: boolean): Prom
   return 0;
 }
 
+/**
+ * Read a single `[y/N]` answer from stdin; true only on an explicit yes (R1).
+ * On EOF / no TTY (piped or non-interactive invocation) the `question` callback
+ * never fires, so a `close` handler resolves the default `No` rather than
+ * hanging the process — the prompt must never block or write without a yes.
+ */
+function stdinConfirm(promptText: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    let answered = false;
+    rl.question(promptText, (answer) => {
+      answered = true;
+      rl.close();
+      resolve(/^y(es)?$/i.test(answer.trim()));
+    });
+    rl.on("close", () => {
+      if (!answered) {
+        resolve(false);
+      }
+    });
+  });
+}
+
+function cliHookIo(): HookIo {
+  return {
+    confirm: stdinConfirm,
+    out: (s) => process.stdout.write(`${s}\n`),
+    err: (s) => process.stderr.write(`${s}\n`),
+  };
+}
+
 async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
   const svgOut: SvgOut = { svg: args.svg, theme: args.theme, output: args.output };
   switch (args.command) {
+    case "mini":
+      return runMini(args.selector);
+    case "install-hook":
+      return installHook(cliHookIo());
+    case "uninstall-hook":
+      return uninstallHook(cliHookIo());
     case "telemetry-show":
       process.stdout.write(JSON.stringify(showTelemetryPayload(process.env), null, 2) + "\n");
       return 0;

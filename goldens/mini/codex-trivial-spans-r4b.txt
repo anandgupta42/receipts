@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Codex · gpt-5.3-codex · 1m 12s
+total  $0.00
+top    (thinking/reply) · $0.00 (3 turns)
+⚠ 3 trivial spans → gpt-5.4-mini · $0.00
+run  aireceipts  for the full receipt

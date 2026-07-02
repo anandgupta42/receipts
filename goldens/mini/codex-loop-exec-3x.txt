@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Codex · gpt-5.3-codex · 1m 12s
+total  $0.01
+top    exec_command · $0.01 (3 calls)
+⚠ exec_command loop ×3 · $0.01
+run  aireceipts  for the full receipt

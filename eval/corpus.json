@@ -30,6 +30,11 @@
       "source": "claude-code",
       "path": "test/fixtures/claude-code/trivial-spans-quick-qa.jsonl",
       "expected": ["trivial-spans"]
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/unpriced-unknown-model.jsonl",
+      "expected": []
     }
   ]
 }

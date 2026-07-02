@@ -6,7 +6,7 @@
 // `compare` commands to SVG output; `-o`/`--output` names the file and
 // `--theme light|dark` picks the palette.
 export interface ParsedArgs {
-  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget" | "benchmark";
+  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget" | "benchmark" | "mini" | "install-hook" | "uninstall-hook";
   selector?: string;
   compareA?: string;
   compareB?: string;
@@ -38,6 +38,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let methodology = false;
   let telemetryShow = false;
   let quota = false;
+  let mini = false;
   let csvMode: "session" | "tool" | undefined;
   let dryRun = false;
   let checkBudget = false;
@@ -62,6 +63,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       methodology = true;
     } else if (arg === "--quota") {
       quota = true;
+    } else if (arg === "--mini") {
+      mini = true;
     } else if (arg === "--csv" || arg === "--csv=session") {
       csvMode = "session";
     } else if (arg === "--csv=tool") {
@@ -115,6 +118,18 @@ export function parseArgs(argv: string[]): ParsedArgs {
 
   if (positional[0] === "benchmark") {
     return { command: "benchmark", selector: positional[1], json, svg, theme, output, byProject, since, dryRun } as ParsedArgs;
+  }
+
+  if (mini) {
+    return { command: "mini", selector: positional[0], json, svg, theme, output, byProject, since, dryRun, csvMode, checkBudget };
+  }
+
+  if (positional[0] === "install-hook") {
+    return { command: "install-hook", json, svg, theme, output, byProject, since, dryRun, csvMode, checkBudget };
+  }
+
+  if (positional[0] === "uninstall-hook") {
+    return { command: "uninstall-hook", json, svg, theme, output, byProject, since, dryRun, csvMode, checkBudget };
   }
 
   if (positional[0] === "week") {
