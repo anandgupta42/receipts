@@ -88,6 +88,8 @@ with it, not the reverse.
 
 The exact prompt to paste into Claude Code to spawn the team (roles, model assignment —
 **critical-path/core/money-math roles run Opus; mechanical roles (fixtures, boilerplate,
-scaffolds) may run Sonnet** (maintainer directive 2026-07-02),
+scaffolds) may run Sonnet; and any user-visible surface (receipt/artifact layout, docs IA,
+copy) implements a design section authored by the lead (Fable-tier) in this spec — the
+implementer executes the design, never invents it** (maintainer directives 2026-07-02),
 what to build first, coordination rule). Keep it self-contained — a fresh lead should be
 able to run it without reading anything else.

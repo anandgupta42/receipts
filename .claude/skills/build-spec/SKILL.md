@@ -57,6 +57,13 @@ Run the built CLI against real behavior (not just unit tests) for each Success c
 checkbox. Check the boxes once verified and set `status: building` while the PR is open —
 `shipped` is flipped only after the human merges (release/archive step).
 
+## 6.4 Design comes from the lead
+
+If the spec touches a user-visible surface (receipt layout, exported artifacts, docs
+structure, README copy) and lacks a design section, STOP: the lead (Fable-tier model)
+authors the design artifact — mock, layout spec, exact copy — before implementation is
+delegated. Implementers execute designs; they don't invent them.
+
 ## 6.5 Docs ride with the feature
 
 Any user-visible change (new flag/command, changed output, new behavior) updates the
