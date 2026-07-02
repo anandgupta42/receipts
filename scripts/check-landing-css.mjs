@@ -62,7 +62,10 @@ for (const value of fontDecls) {
 // Any CSS grid must declare grid-template-columns. A grid without it falls back
 // to a single implicit `auto` track that grows to its widest (nowrap) child's
 // max-content width, blowing the page out horizontally — the grey-void defect.
-const gridBlocks = [...css.matchAll(/([.#][\w-]+(?:[^{};]*)?)\{([^}]*display\s*:\s*grid[^}]*)\}/gi)];
+// Match ANY rule block whose body contains display:grid — including bare element
+// selectors like `main{...}` or `section{...}`, not just class/id selectors — so
+// a grid without grid-template-columns cannot slip through under a tag selector.
+const gridBlocks = [...css.matchAll(/([^{}]+?)\s*\{([^{}]*display\s*:\s*grid[^{}]*)\}/gi)];
 for (const [, selector, body] of gridBlocks) {
   if (!/grid-template-columns\s*:/i.test(body) && !/grid-template\s*:/i.test(body)) {
     errors.push(`grid selector "${selector.trim()}" declares display:grid without grid-template-columns — add "grid-template-columns:minmax(0,1fr)" (or explicit tracks) so a nowrap child cannot blow out the layout.`);
