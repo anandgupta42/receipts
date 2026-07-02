@@ -21,6 +21,8 @@ export interface ParsedArgs {
   byProject: boolean;
   /** SPEC-0008: re-anchor the trailing window at this YYYY-MM-DD date. */
   since?: string;
+  /** SPEC-0011 R2: CSV export mode — "session" (one row) or "tool" (row per tool). */
+  csvMode?: "session" | "tool";
   /** SPEC-0015: print the exact benchmark payload without prompting or sending. */
   dryRun: boolean;
   /** SPEC-0009 R4: evaluate the budget and exit 1 if any configured cap is exceeded. */
@@ -36,6 +38,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let methodology = false;
   let telemetryShow = false;
   let quota = false;
+  let csvMode: "session" | "tool" | undefined;
   let dryRun = false;
   let checkBudget = false;
   let byProject = false;
@@ -59,6 +62,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
       methodology = true;
     } else if (arg === "--quota") {
       quota = true;
+    } else if (arg === "--csv" || arg === "--csv=session") {
+      csvMode = "session";
+    } else if (arg === "--csv=tool") {
+      csvMode = "tool";
     } else if (arg === "--dry-run") {
       dryRun = true;
     } else if (arg === "--check-budget") {
@@ -83,27 +90,27 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (help) {
-    return { command: "help", json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "help", json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (methodology) {
-    return { command: "methodology", json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "methodology", json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (telemetryShow) {
-    return { command: "telemetry-show", json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "telemetry-show", json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (checkBudget) {
-    return { command: "check-budget", json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "check-budget", json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (quota) {
-    return { command: "quota", json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "quota", json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (positional[0] === "compare") {
-    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (positional[0] === "benchmark") {
@@ -111,16 +118,16 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (positional[0] === "week") {
-    return { command: "week", json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "week", json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (list) {
-    return { command: "list", json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "list", json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
   if (handoff) {
-    return { command: "handoff", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget, dryRun };
+    return { command: "handoff", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
   }
 
-  return { command: "receipt", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget, dryRun };
+  return { command: "receipt", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
 }
