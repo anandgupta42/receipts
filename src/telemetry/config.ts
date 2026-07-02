@@ -17,7 +17,11 @@
  * Azure resource, not something to invent (I2's "never fabricate" applies
  * equally to secret-shaped strings).
  */
-const DEFAULT_CONNECTION_STRING = "";
+// Openly-embedded ingest-only connection string (see docs/telemetry.md — an
+// App Insights ingestion key is a write-only address, not a secret; override or
+// disable via AIRECEIPTS_TELEMETRY_CONNECTION / the kill switches).
+const DEFAULT_CONNECTION_STRING =
+  "InstrumentationKey=34293e98-bc05-47c7-bab3-5dd0535ac315;IngestionEndpoint=https://eastus-8.in.applicationinsights.azure.com/;LiveEndpoint=https://eastus.livediagnostics.monitor.azure.com/;ApplicationId=5ce2840c-b895-46d4-8085-291c7740581d";
 
 export interface TelemetryConfig {
   enabled: boolean;

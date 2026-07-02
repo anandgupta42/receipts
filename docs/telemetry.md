@@ -91,8 +91,8 @@ This prints whether telemetry is currently enabled and the exact events queued f
 
 This section exists so the code and this document can never quietly disagree.
 
-- The ingestion key this package ships with is **not a secret** — Application Insights instrumentation keys are write-only and are commonly embedded in open-source clients. It will be listed here plainly once one is provisioned.
-- **Current status**: no Azure resource has been wired up yet. The shipped default connection string is intentionally **empty**, not a placeholder-that-looks-real. An empty connection string takes the exact same code path as the kill switches: `resolveTelemetryConfig()` reports `enabled: false`, and zero network calls are made. This is deliberate, not a bug — until a real key is provisioned, `aireceipts` sends no telemetry to anyone, full stop, regardless of the kill switches.
+- The ingestion key this package ships with is **not a secret** — Application Insights instrumentation keys are write-only and are commonly embedded in open-source clients. The shipped key, plainly: `InstrumentationKey=34293e98-bc05-47c7-bab3-5dd0535ac315` (ingestion endpoint `eastus-8.in.applicationinsights.azure.com`).
+- **Current status**: a real Azure Application Insights resource is wired up as of 2026-07-02, so the diagnostics events documented above are sent by default (subject to the kill switches and the 300 ms bounded flush). Run `aireceipts --telemetry-show` to see exactly what a run would send before it sends anything.
 - `AIRECEIPTS_TELEMETRY_CONNECTION` overrides the shipped default. Set it to point at your own Application Insights resource (e.g. for local development or a private fork), or set it to an empty string to force-disable telemetry independent of the kill switches.
 - A malformed connection string (missing either `InstrumentationKey` or `IngestionEndpoint`) also degrades to `enabled: false` rather than sending to an incomplete endpoint.
 
