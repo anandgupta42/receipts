@@ -61,7 +61,12 @@ function cacheLine(model: ReceiptModel): string | undefined {
   if (promptSide <= 0 || t.cacheRead <= 0) {
     return undefined;
   }
-  return `cache served ${Math.round((t.cacheRead / promptSide) * 100)}% of input tokens`;
+  const ratio = t.cacheRead / promptSide;
+  // Display honesty: never round a partial ratio up to the impossible-sounding
+  // "100%" — a real session always has SOME uncached prompt. True 100% (synthetic
+  // fixtures) may say it; 99.5%+ says ">99%".
+  const pct = ratio >= 1 ? "100" : Math.round(ratio * 100) >= 100 ? ">99" : String(Math.round(ratio * 100));
+  return `cache served ${pct}% of input tokens`;
 }
 
 function metaLines(model: ReceiptModel): string[] {

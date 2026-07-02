@@ -13,3 +13,17 @@ describe("dottedLine — long labels never move the value column (A4)", () => {
     expect(dottedLine("Bash", "$0.05", 20)).toBe("Bash...........$0.05");
   });
 });
+
+describe("cache line display honesty", () => {
+  it("never rounds a partial cache ratio up to 100%", async () => {
+    const { buildReceiptView } = await import("../../src/receipt/present.js");
+    const { loadById } = await import("../../src/index.js");
+    const { buildReceiptModel } = await import("../../src/receipt/model.js");
+    const m = await buildReceiptModel((await loadById("claude-code", "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl"))!);
+    const tweaked = { ...m, totalTokens: { ...m.totalTokens, input: 1, cacheRead: 10000, cacheCreation: 0 } };
+    const view = buildReceiptView(tweaked) as any;
+    const all = JSON.stringify(view);
+    expect(all).toContain("cache served >99% of input tokens");
+    expect(all).not.toContain("cache served 100%");
+  });
+});
