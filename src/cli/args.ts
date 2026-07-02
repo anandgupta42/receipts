@@ -6,7 +6,7 @@
 // `compare` commands to SVG output; `-o`/`--output` names the file and
 // `--theme light|dark` picks the palette.
 export interface ParsedArgs {
-  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget";
+  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget" | "benchmark";
   selector?: string;
   compareA?: string;
   compareB?: string;
@@ -21,6 +21,8 @@ export interface ParsedArgs {
   byProject: boolean;
   /** SPEC-0008: re-anchor the trailing window at this YYYY-MM-DD date. */
   since?: string;
+  /** SPEC-0015: print the exact benchmark payload without prompting or sending. */
+  dryRun: boolean;
   /** SPEC-0009 R4: evaluate the budget and exit 1 if any configured cap is exceeded. */
   checkBudget: boolean;
 }
@@ -34,6 +36,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let methodology = false;
   let telemetryShow = false;
   let quota = false;
+  let dryRun = false;
   let checkBudget = false;
   let byProject = false;
   let since: string | undefined;
@@ -56,6 +59,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       methodology = true;
     } else if (arg === "--quota") {
       quota = true;
+    } else if (arg === "--dry-run") {
+      dryRun = true;
     } else if (arg === "--check-budget") {
       checkBudget = true;
     } else if (arg === "--by-project") {
@@ -78,40 +83,44 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (help) {
-    return { command: "help", json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "help", json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
   if (methodology) {
-    return { command: "methodology", json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "methodology", json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
   if (telemetryShow) {
-    return { command: "telemetry-show", json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "telemetry-show", json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
   if (checkBudget) {
-    return { command: "check-budget", json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "check-budget", json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
   if (quota) {
-    return { command: "quota", json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "quota", json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
   if (positional[0] === "compare") {
-    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, theme, output, byProject, since, checkBudget, dryRun };
+  }
+
+  if (positional[0] === "benchmark") {
+    return { command: "benchmark", selector: positional[1], json, svg, theme, output, byProject, since, dryRun } as ParsedArgs;
   }
 
   if (positional[0] === "week") {
-    return { command: "week", json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "week", json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
   if (list) {
-    return { command: "list", json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "list", json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
   if (handoff) {
-    return { command: "handoff", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget };
+    return { command: "handoff", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget, dryRun };
   }
 
-  return { command: "receipt", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget };
+  return { command: "receipt", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget, dryRun };
 }
