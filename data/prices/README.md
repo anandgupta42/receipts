@@ -41,7 +41,28 @@ at the rate that was live on the day it ran (I3, `AGENTS.md`).
 - `sources` — **required**, non-empty array of objects, each with a `url` (http/https) actually fetched and read, plus optional `observed_at` (YYYY-MM-DD) and `excerpt`. This is
   the field the `block-price-edit-without-citation` hook checks for; a PR that touches
   this directory without a `sources` array is rejected mechanically before it ever
-  reaches review.
+  reaches review. `scripts/cite-check.ts` additionally (a) fetches every `url` and
+  requires it to be live (HTTP < 400 — enforced in CI, offline-tolerant locally, and
+  skippable with `--no-network`), and (b) **requires a non-empty `excerpt`** on any
+  source `observed_at` on/after `2026-07-02`, so a reviewer can verify the number
+  against the quoted page text without re-fetching (SPEC-0005 R3).
+
+## Omitted models
+
+A vendor whose official page prices a model in a shape the flat schema can't hold
+honestly — tiered-by-context (e.g. a different rate above 200k tokens), priority/batch,
+or tool-priced — does **not** get a fabricated flat row. Instead the model is listed in
+an optional top-level `omitted` array so a reviewer sees *why* a well-known model is
+absent rather than assuming an oversight (SPEC-0005 R1):
+
+```json
+"omitted": [
+  { "model": "gemini-2.5-pro", "reason": "Tiered by context length …", "source": "https://…" }
+]
+```
+
+Omitted models have no `price_history`, so the resolver never prices them — they stay
+tokens-only, exactly as an unknown id would (I2).
 
 ## Rule
 

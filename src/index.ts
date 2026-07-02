@@ -21,7 +21,7 @@ export { anyDetected, listSessions, loadById, loadSession, rootsHint, selectSumm
 
 export type { PriceRow, PriceSource, PriceTable, ResolvedPrice } from "./pricing/types.js";
 export { defaultDataDir, loadPriceTable } from "./pricing/priceTable.js";
-export { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForSource } from "./pricing/resolve.js";
+export { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForModel, vendorForSource } from "./pricing/resolve.js";
 export type { AttributionResult, ToolAttribution } from "./pricing/attribution.js";
 export { attributeByTool, METHODOLOGY } from "./pricing/attribution.js";
 export type { PriceDeltaFootnote, StuckLoopFinding, TrivialSpansFinding } from "./pricing/waste.js";
