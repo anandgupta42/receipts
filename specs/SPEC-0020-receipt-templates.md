@@ -35,7 +35,11 @@ list — adding a template touches no renderer. Classic's block list must reprod
 today's output byte-identically (the refactor's no-regression proof). **Per-template
 parity test:** terminal and SVG are asserted to consume the identical block list per
 template (structure parity, not just model-field parity). No template re-derives a
-number.
+number. **Forward-compatibility (binding):** the R3 honesty battery is implemented
+as a pure function over a block list (`validateReceiptBlocks(blocks, model) →
+violations[]`), used by the tests today and reusable unchanged as a load-time
+validator when user-supplied templates arrive (a future `--template-file` that fails
+validation refuses to render — honesty blocks are non-removable by construction).
 
 ## Design (lead-authored, binding — implementers execute, don't invent)
 
@@ -89,8 +93,10 @@ full bar = the most expensive row, axis legend printed once above:
 
 ## Non-goals
 
-User-composed/custom templates and any "receipts designer" (future spec, explicitly
-deferred); per-template color schemes (SVG themes stay orthogonal); template-specific
+User-composed/custom templates and any "receipts designer" — deferred on an explicit
+ladder: v1.x community templates arrive as code PRs passing this spec's battery +
+goldens; a `--template-file`/designer only after that, gated on the
+validateReceiptBlocks load-time validator (see Architecture); per-template color schemes (SVG themes stay orthogonal); template-specific
 new data derivations; a config-file default template (`~/.aireceipts/config.json`
 needs its own shared-config spec — SPEC-0009's budget.json rejects extra keys, and
 two ad-hoc config files is how config stories rot; flag-only in v1).
