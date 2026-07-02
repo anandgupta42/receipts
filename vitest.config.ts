@@ -5,7 +5,7 @@ const hasNodeSqlite = maj > 22 || (maj === 22 && min >= 5);
 
 export default defineConfig({
   test: {
-    include: ["test/**/*.test.ts"],
+    include: ["test/**/*.test.ts", "src/telemetry/**/*.test.ts"],
     environment: "node",
     testTimeout: 20_000,
     pool: "forks",

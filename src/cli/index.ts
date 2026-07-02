@@ -10,6 +10,13 @@ import { summaryToJson, toJsonModel } from "../receipt/json.js";
 import { buildReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { METHODOLOGY } from "../pricing/attribution.js";
+import {
+  ensureFirstRunNotice,
+  flushTelemetry,
+  recordCliError,
+  recordCliRun,
+  showTelemetryPayload,
+} from "../telemetry/index.js";
 import { parseArgs } from "./args.js";
 
 const HELP_TEXT = `aireceipts — local, deterministic cost receipts for AI coding-agent sessions
@@ -138,9 +145,11 @@ async function runHandoff(selector: string | undefined): Promise<number> {
   return 0;
 }
 
-export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
-  const args = parseArgs(argv);
+async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
   switch (args.command) {
+    case "telemetry-show":
+      process.stdout.write(JSON.stringify(showTelemetryPayload(process.env), null, 2) + "\n");
+      return 0;
     case "methodology":
       process.stdout.write(METHODOLOGY + "\n");
       return 0;
@@ -156,5 +165,25 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     case "receipt":
     default:
       return runReceipt(args.selector, args.json);
+  }
+}
+
+/** CLI entrypoint: first-run notice → dispatch → telemetry record → bounded flush (SPEC-0002 wiring). */
+export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
+  const args = parseArgs(argv);
+  if (args.command !== "telemetry-show") {
+    await ensureFirstRunNotice((text) => process.stderr.write(text + "\n"), undefined);
+  }
+  const started = Date.now();
+  try {
+    const code = await dispatch(args);
+    recordCliRun({ command: args.command, agentType: undefined, durationMs: Date.now() - started, ok: code === 0 });
+    return code;
+  } catch (err) {
+    recordCliError({ command: args.command, agentType: undefined, err });
+    process.stderr.write(String(err instanceof Error ? err.message : err) + "\n");
+    return 1;
+  } finally {
+    await flushTelemetry();
   }
 }
