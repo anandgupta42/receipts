@@ -1,0 +1,6 @@
+aireceipts · session receipt
+opencode · claude-haiku-4-5 · 50s
+total  $0.01
+top    bash · $0.01 (1 call)
+no waste detected
+run  aireceipts  for the full receipt

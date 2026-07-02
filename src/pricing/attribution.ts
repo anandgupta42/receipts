@@ -1,7 +1,7 @@
 import type { Session, TokenUsage } from "../parse/types.js";
 import { addUsage, emptyUsage, scaleUsage } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
-import { isoDateOf, priceTurn, vendorForSource } from "./resolve.js";
+import { isoDateOf, priceTurn, vendorForTurn } from "./resolve.js";
 
 const THINKING_REPLY = "(thinking/reply)";
 
@@ -55,7 +55,6 @@ interface Accumulator {
  * guessed figure (I2).
  */
 export async function attributeByTool(session: Session, dataDir: string = defaultDataDir()): Promise<AttributionResult> {
-  const vendor = session.unpriceable ? undefined : vendorForSource(session.source);
   const acc = new Map<string, Accumulator>();
 
   for (const turn of session.turns) {
@@ -63,6 +62,7 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
     const share = 1 / units.length;
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
+    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
     const turnUsd = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
 

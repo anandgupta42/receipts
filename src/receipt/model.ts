@@ -7,7 +7,7 @@ import { SOURCE_LABELS } from "../parse/types.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
 import { attributeByTool, METHODOLOGY } from "../pricing/attribution.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
-import { isoDateOf, resolvePrice, vendorForSource } from "../pricing/resolve.js";
+import { isoDateOf, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
 import type { ResolvedPrice } from "../pricing/types.js";
 import { detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "../pricing/waste.js";
 import type { PriceDeltaFootnote } from "../pricing/waste.js";
@@ -149,17 +149,17 @@ function sortToolRows(rows: ToolRow[]): ToolRow[] {
 
 async function collectPriceRowsUsed(
   session: Session,
-  vendor: string | undefined,
   dataDir: string,
 ): Promise<PriceRowUsed[]> {
-  if (!vendor) {
+  if (session.unpriceable) {
     return [];
   }
   const seen = new Map<string, PriceRowUsed>();
   for (const turn of session.turns) {
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    if (!model || !dateISO) {
+    const vendor = vendorForTurn(session.source, model);
+    if (!vendor || !model || !dateISO) {
       continue;
     }
     const key = `${model}|${dateISO}`;
@@ -210,8 +210,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
       : []),
   ];
 
-  const vendor = session.unpriceable ? undefined : vendorForSource(session.source);
-  const priceRowsUsed = await collectPriceRowsUsed(session, vendor, dataDir);
+  const priceRowsUsed = await collectPriceRowsUsed(session, dataDir);
 
   const durationMs =
     session.totals.durationMs ??

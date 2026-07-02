@@ -1,7 +1,7 @@
 import type { Session, TokenUsage } from "../parse/types.js";
 import { addUsage, emptyUsage, scaleUsage } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
-import { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForSource } from "./resolve.js";
+import { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForSource, vendorForTurn } from "./resolve.js";
 
 /** Deterministically stringify `value` with object keys sorted, so structurally-identical tool inputs compare equal regardless of key order. */
 function stableStringify(value: unknown): string {
@@ -46,7 +46,7 @@ interface FlatCall {
   endedAt?: number;
 }
 
-async function flattenCalls(session: Session, vendor: string | undefined, dataDir: string): Promise<FlatCall[]> {
+async function flattenCalls(session: Session, dataDir: string): Promise<FlatCall[]> {
   const out: FlatCall[] = [];
   for (const turn of session.turns) {
     if (turn.toolCalls.length === 0) {
@@ -54,6 +54,7 @@ async function flattenCalls(session: Session, vendor: string | undefined, dataDi
     }
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
+    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
     const turnUsd = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const share = 1 / turn.toolCalls.length;
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
@@ -79,8 +80,7 @@ async function flattenCalls(session: Session, vendor: string | undefined, dataDi
  * `null` in that case, never the finding itself.
  */
 export async function detectStuckLoops(session: Session, dataDir: string = defaultDataDir()): Promise<StuckLoopFinding[]> {
-  const vendor = session.unpriceable ? undefined : vendorForSource(session.source);
-  const calls = await flattenCalls(session, vendor, dataDir);
+  const calls = await flattenCalls(session, dataDir);
   const findings: StuckLoopFinding[] = [];
 
   let i = 0;

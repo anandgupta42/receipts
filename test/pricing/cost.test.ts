@@ -148,6 +148,7 @@ describe("vendorForSource", () => {
     expect(vendorForSource("claude-code")).toBe("anthropic");
     expect(vendorForSource("codex")).toBe("openai");
     expect(vendorForSource("cursor")).toBeUndefined();
+    expect(vendorForSource("opencode")).toBeUndefined();
   });
 });
 

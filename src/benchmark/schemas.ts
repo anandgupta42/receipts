@@ -17,7 +17,7 @@ import { z } from "zod";
  * raw model strings, install IDs / caller tokens (R2, R6).
  */
 
-export const BENCHMARK_AGENT_TYPE_VALUES = ["claude-code", "codex", "cursor", "unknown"] as const;
+export const BENCHMARK_AGENT_TYPE_VALUES = ["claude-code", "codex", "cursor", "opencode", "unknown"] as const;
 export type BenchmarkAgentTypeValue = (typeof BENCHMARK_AGENT_TYPE_VALUES)[number];
 
 /** Derived from `vendorForSource` (src/pricing/resolve.ts) — never a raw model ID string. */

@@ -128,6 +128,7 @@ export function vendorForSource(source: AgentSource): string | undefined {
       // the row within google.json. (SPEC-0010 R3.)
       return "google";
     case "cursor":
+    case "opencode":
       return undefined;
   }
 }
@@ -154,6 +155,16 @@ export function vendorForModel(modelId: string): string | undefined {
     return "deepseek";
   }
   return undefined;
+}
+
+/**
+ * Vendor id for one concrete turn. Model-id resolution wins so aggregator
+ * agents such as opencode price each turn from the true vendor table. The
+ * source-level fallback preserves existing single-vendor agents whose model ids
+ * are not covered by prefix rules. Unknown prefixes stay unpriced (I2).
+ */
+export function vendorForTurn(source: AgentSource, modelId: string | undefined): string | undefined {
+  return (modelId ? vendorForModel(modelId) : undefined) ?? vendorForSource(source);
 }
 
 /** `YYYY-MM-DD` for an epoch-milliseconds timestamp, or `undefined` if absent. */

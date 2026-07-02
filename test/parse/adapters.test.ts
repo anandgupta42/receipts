@@ -174,3 +174,55 @@ describe.skipIf(!hasLoadById)("cursor adapter (R1 degraded mode)", () => {
     }
   });
 });
+
+describe.skipIf(!hasLoadById)("opencode adapter (SPEC-0010 full parse)", () => {
+  it("parses a SQLite session with per-turn model ids, usage, cache buckets, and tools", async () => {
+    const filePath = path.join(fixturesDir, "opencode/clean-multi-vendor.db");
+    const session = await contracts!.loadById("opencode", filePath);
+    expect(session).not.toBeNull();
+    expect(session.source).toBe("opencode");
+    expect(session.unpriceable).toBeUndefined();
+    expect(session.turns).toHaveLength(2);
+    expect(session.turns[0].model).toBe("claude-haiku-4-5");
+    expect(session.turns[1].model).toBe("gpt-5.3-codex");
+    expect(session.turns[0].usage).toMatchObject({
+      input: 1200,
+      output: 350,
+      cacheRead: 100,
+      cacheCreation: 40,
+      total: 1690,
+    });
+    expect(session.turns[1].usage).toMatchObject({
+      input: 1000,
+      output: 350,
+      cacheRead: 50,
+      cacheCreation: 50,
+      total: 1450,
+    });
+    expect(session.totals.tokens).toMatchObject({
+      input: 2200,
+      output: 700,
+      cacheRead: 150,
+      cacheCreation: 90,
+      total: 3140,
+    });
+    expect(session.turns[0].toolCalls[0]).toMatchObject({
+      name: "read",
+      status: "ok",
+      startedAt: 1782950412000,
+      endedAt: 1782950418000,
+    });
+  });
+
+  it("loads a single-session fixture by db path and preserves repeated tool inputs", async () => {
+    const filePath = path.join(fixturesDir, "opencode/loop-shell-3x.db");
+    const session = await contracts!.loadById("opencode", filePath);
+    expect(session).not.toBeNull();
+    expect(session.source).toBe("opencode");
+    expect(session.turns).toHaveLength(3);
+    const calls = session.turns.flatMap((t: { toolCalls: { name: string; input?: unknown }[] }) => t.toolCalls);
+    expect(calls).toHaveLength(3);
+    expect(calls.every((call) => call.name === "bash")).toBe(true);
+    expect(calls.every((call) => JSON.stringify(call.input) === JSON.stringify({ cmd: "npm install" }))).toBe(true);
+  });
+});

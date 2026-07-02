@@ -29,6 +29,7 @@ describe("toBenchmarkAgentType", () => {
     expect(toBenchmarkAgentType("claude-code")).toBe("claude-code");
     expect(toBenchmarkAgentType("codex")).toBe("codex");
     expect(toBenchmarkAgentType("cursor")).toBe("cursor");
+    expect(toBenchmarkAgentType("opencode")).toBe("opencode");
   });
 
   it("falls back to unknown for anything else", () => {
@@ -46,8 +47,9 @@ describe("toModelFamily", () => {
     expect(toModelFamily("codex")).toBe("openai");
   });
 
-  it("derives unknown from cursor (vendorForSource returns undefined)", () => {
+  it("derives unknown from cursor and opencode (vendorForSource returns undefined)", () => {
     expect(toModelFamily("cursor")).toBe("unknown");
+    expect(toModelFamily("opencode")).toBe("unknown");
   });
 });
 

@@ -11,7 +11,7 @@ import type { BenchmarkAgentTypeValue, BenchmarkRunEvent, CostPerTurnBucketValue
  */
 
 export function toBenchmarkAgentType(source: AgentSource | undefined): BenchmarkAgentTypeValue {
-  if (source === "claude-code" || source === "codex" || source === "cursor") {
+  if (source === "claude-code" || source === "codex" || source === "cursor" || source === "opencode") {
     return source;
   }
   return "unknown";

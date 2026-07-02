@@ -16,13 +16,14 @@ export { ClaudeCodeAdapter } from "./parse/claudeCode.js";
 export { CodexAdapter } from "./parse/codex.js";
 export { CursorAdapter } from "./parse/cursor.js";
 export { GeminiAdapter } from "./parse/gemini.js";
+export { OpenCodeAdapter } from "./parse/opencode.js";
 
 export { adapterFor, adapters, agentIds, detectedAdapters } from "./parse/registry.js";
 export { anyDetected, listSessions, listFullSessions, loadById, loadSession, newestSession, rootsHint, selectSummary } from "./parse/load.js";
 
 export type { PriceRow, PriceSource, PriceTable, ResolvedPrice } from "./pricing/types.js";
 export { defaultDataDir, loadPriceTable } from "./pricing/priceTable.js";
-export { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForModel, vendorForSource } from "./pricing/resolve.js";
+export { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForModel, vendorForSource, vendorForTurn } from "./pricing/resolve.js";
 export type { AttributionResult, ToolAttribution } from "./pricing/attribution.js";
 export { attributeByTool, METHODOLOGY } from "./pricing/attribution.js";
 export type { PriceDeltaFootnote, StuckLoopFinding, TrivialSpansFinding } from "./pricing/waste.js";

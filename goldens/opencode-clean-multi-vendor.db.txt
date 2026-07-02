@@ -1,0 +1,19 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+              “Port parser adapter”               
+    opencode · Jul 02 2026 00:00:10 UTC · 50s     
+     claude-haiku-4-5 54% · gpt-5.3-codex 46%     
+         cache served 6% of input tokens          
+
+bash...............................$0.01  (1 call)
+read...............................$0.00  (1 call)
+--------------------------------------------------
+TOTAL........................................$0.01
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -
