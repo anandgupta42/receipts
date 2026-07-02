@@ -2,7 +2,7 @@
 // `listSessions`/`selectSummary`/`loadSession` (parse layer, core-engine's) —
 // no selector logic is reimplemented here.
 import { writeFile } from "node:fs/promises";
-import { anyDetected, listSessions, loadById, loadSession, rootsHint, selectSummary } from "../index.js";
+import { anyDetected, listFullSessions, listSessions, loadById, loadSession, newestSession, rootsHint, selectSummary } from "../index.js";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { evaluateBudget } from "../budget/index.js";
 import { renderCompare, compareDeltaLine } from "../receipt/compare.js";
@@ -101,7 +101,14 @@ async function noSessionsMessage(): Promise<string> {
 }
 
 async function resolveSelector(selector: string | undefined): Promise<{ summary: SessionSummary } | { error: string }> {
-  const sessions = await listSessions();
+  if (selector === undefined || selector.trim() === "") {
+    const summary = await newestSession();
+    if (!summary) {
+      return { error: await noSessionsMessage() };
+    }
+    return { summary };
+  }
+  const sessions = await listFullSessions();
   if (sessions.length === 0) {
     return { error: await noSessionsMessage() };
   }
@@ -224,7 +231,7 @@ function listLine(index: number, summary: SessionSummary): string {
 }
 
 async function runList(json: boolean): Promise<number> {
-  const sessions = await listSessions();
+  const sessions = await listFullSessions();
   if (sessions.length === 0) {
     process.stdout.write(`${await noSessionsMessage()}\n`);
     return 0;
@@ -259,7 +266,7 @@ async function runCompare(
     process.stderr.write("compare --png is not supported yet — use compare --svg\n");
     return 1;
   }
-  const sessions = await listSessions();
+  const sessions = await listFullSessions();
   if (sessions.length === 0) {
     process.stderr.write(`${await noSessionsMessage()}\n`);
     return 1;

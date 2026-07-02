@@ -12,14 +12,14 @@ import type { SessionSummary } from "../../src/parse/types.js";
 import type { BudgetSum } from "../../src/budget/compute.js";
 
 vi.mock("../../src/parse/load.js", () => ({
-  listSessions: vi.fn(),
+  listFullSessions: vi.fn(),
   loadSession: vi.fn(),
 }));
 
-const { listSessions } = await import("../../src/parse/load.js");
+const { listFullSessions } = await import("../../src/parse/load.js");
 const { budgetExceeded, evaluateBudget, renderBudgetLine } = await import("../../src/budget/line.js");
 
-const listSessionsMock = vi.mocked(listSessions);
+const listSessionsMock = vi.mocked(listFullSessions);
 
 describe("renderBudgetLine (R2, R4)", () => {
   it("R4: a usd line always states it is advisory only and never claims enforcement", () => {

@@ -1,4 +1,5 @@
-import type { AgentSource, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
+import type { AgentSource, ListSessionsOptions, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
+import { lazyCodexSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import {
   addUsage,
   emptyUsage,
@@ -11,7 +12,6 @@ import {
   truncate,
   withTotal,
 } from "./util.js";
-import * as fs from "node:fs";
 
 /** Raw usage shape from a Codex `rollout-*.jsonl` `token_count` event. */
 interface CodexUsage {
@@ -252,21 +252,33 @@ export class CodexAdapter implements SessionAdapter {
   readonly id: AgentSource = "codex";
   readonly label = "Codex";
 
+  private readonly root: string;
+  private readonly discoveryFs: DiscoveryFs;
+
+  constructor(opts: { root?: string; fs?: DiscoveryFs } = {}) {
+    this.root = opts.root ?? expandHome(ROOT);
+    this.discoveryFs = opts.fs ?? nodeDiscoveryFs;
+  }
+
   roots(): string[] {
-    return [expandHome(ROOT)];
+    return [this.root];
   }
 
   async detect(): Promise<boolean> {
-    return pathExists(expandHome(ROOT));
+    return pathExists(this.root);
   }
 
-  async listSessions(): Promise<SessionSummary[]> {
-    const files = await listFiles(expandHome(ROOT), (name) => name.startsWith("rollout-") && name.endsWith(".jsonl"));
+  async listSessions(options: ListSessionsOptions = {}): Promise<SessionSummary[]> {
+    const files = await listFiles(this.root, (name) => name.startsWith("rollout-") && name.endsWith(".jsonl"));
     const results = await mapWithConcurrency(files, 16, async (file) => {
       try {
-        const stat = await fs.promises.stat(file);
+        const stat = await this.discoveryFs.stat(file);
         if (stat.size === 0) {
           return null;
+        }
+        if (!options.full) {
+          const firstLine = await this.discoveryFs.readFirstLine(file);
+          return lazyCodexSummary({ filePath: file, source: this.id, stat, firstLine });
         }
         const { summary } = await parseTranscript(file, false);
         return summary;

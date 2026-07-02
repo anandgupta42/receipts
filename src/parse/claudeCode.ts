@@ -1,5 +1,6 @@
-import type { AgentSource, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
+import type { AgentSource, ListSessionsOptions, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
 import { isChildPath, parseChildPath } from "./children.js";
+import { lazyClaudeCodeSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import {
   addUsage,
   emptyUsage,
@@ -12,7 +13,6 @@ import {
   truncate,
   withTotal,
 } from "./util.js";
-import * as fs from "node:fs";
 
 /** Raw shapes from a Claude Code `.jsonl` transcript line. Only the fields we use. */
 interface RawUsage {
@@ -274,24 +274,42 @@ export class ClaudeCodeAdapter implements SessionAdapter {
   readonly id: AgentSource = "claude-code";
   readonly label = "Claude Code";
 
+  private readonly root: string;
+  private readonly discoveryFs: DiscoveryFs;
+
+  constructor(opts: { root?: string; fs?: DiscoveryFs } = {}) {
+    this.root = opts.root ?? expandHome(ROOT);
+    this.discoveryFs = opts.fs ?? nodeDiscoveryFs;
+  }
+
   roots(): string[] {
-    return [expandHome(ROOT)];
+    return [this.root];
   }
 
   async detect(): Promise<boolean> {
-    return pathExists(expandHome(ROOT));
+    return pathExists(this.root);
   }
 
-  async listSessions(): Promise<SessionSummary[]> {
-    const all = await listFiles(expandHome(ROOT), (name) => name.endsWith(".jsonl"));
+  async listSessions(options: ListSessionsOptions = {}): Promise<SessionSummary[]> {
+    const all = await listFiles(this.root, (name) => name.endsWith(".jsonl"));
     // R1c: subagent transcripts are excluded from top-level selection — they roll
     // up into their parent's receipt, never appear as standalone sessions.
     const files = all.filter((file) => !isChildPath(file));
     const results = await mapWithConcurrency(files, 16, async (file) => {
       try {
-        const stat = await fs.promises.stat(file);
+        const stat = await this.discoveryFs.stat(file);
         if (stat.size === 0) {
           return null;
+        }
+        if (!options.full) {
+          const firstLine = await this.discoveryFs.readFirstLine(file);
+          const childRef = parseChildPath(file);
+          return {
+            ...lazyClaudeCodeSummary({ filePath: file, source: this.id, stat, firstLine }),
+            parentSessionId: childRef?.parentSessionId,
+            agentId: childRef?.agentId,
+            parentFilePath: childRef?.parentFilePath,
+          };
         }
         const { summary } = await parseTranscript(file, false);
         return summary;

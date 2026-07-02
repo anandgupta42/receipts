@@ -3,7 +3,7 @@
 // a `$` figure sums only priced sessions; a token figure counts every session;
 // the two are never merged, and deltas render per category so a change in
 // price *coverage* can never masquerade as a change in *spend*.
-import { listSessions, loadSession } from "../parse/load.js";
+import { listFullSessions, loadSession } from "../parse/load.js";
 import type { AgentSource, Session, SessionSummary, TokenUsage } from "../parse/types.js";
 import { SOURCE_LABELS } from "../parse/types.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
@@ -300,7 +300,7 @@ export async function buildWeekDigest(opts: WeekOptions = {}): Promise<WeekDiges
   const dataDir = opts.dataDir ?? defaultDataDir();
   const bounds = windowBounds(now, opts.sinceMs);
 
-  const summaries = await listSessions();
+  const summaries = await listFullSessions();
   const partitioned = partitionWindows(summaries, bounds);
   const [curSessions, priSessions] = await Promise.all([loadAll(partitioned.current), loadAll(partitioned.prior)]);
 
