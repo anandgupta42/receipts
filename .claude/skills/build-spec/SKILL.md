@@ -13,6 +13,16 @@ not get built. The spec must also carry a `## Validation` record (from /validate
 an approved spec without one means the gate was skipped — stop and run it. This skill
 never edits a spec's status to `approved`; that's the maintainer's button (AGENTS.md, button 1).
 
+## 0.5 Context discipline (two builders died of autocompact thrashing — this is law)
+
+- NEVER read real transcripts from `~/.claude/projects` or any user data dir — they are
+  megabytes and will thrash your context. Fixtures in `test/fixtures/**` only.
+- Before any Read: `ls -la` the file; >100KB → read targeted ranges or grep, never whole.
+- Pipe every command's output through a filter (`| tail -20`, `grep -c`, `--reporter=dot`) —
+  raw vitest/npm/build output is a context bomb.
+- If you feel context pressure (repeated compaction), STOP and report progress to the lead
+  instead of pushing through — a partial report beats a dead builder.
+
 ## 1. Branch — never touch main
 
 `git checkout -b feat/<milestone>-<slug> origin/main`. Everything in this skill lands on
