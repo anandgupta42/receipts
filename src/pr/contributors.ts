@@ -10,6 +10,7 @@
 // builder.
 import type { Session, SessionSummary } from "../parse/types.js";
 import { classifyBranchAnchors, computeSlice, type SliceResult } from "./slice.js";
+import { cwdInsideRoots } from "./git.js";
 import { isCodexExec, toolCallInvocations } from "./gitWrite.js";
 
 export type Role = "orchestrator" | "builder" | "codex";
@@ -23,18 +24,30 @@ export interface RawContributor {
 
 export interface ContributorSelection {
   contributors: RawContributor[];
-  /** Time-overlapping candidates that were NOT credited (Claude with no branch SHA, or foreign-only) — surfaced, never hidden (R4). */
+  /** Plausible (this-worktree) candidates that were NOT credited — surfaced, never hidden (R4). */
   excludedCount: number;
 }
 
 export interface ContributorDeps {
   loadSession: (summary: SessionSummary) => Promise<Session | null>;
+  /** The process's own worktree root — the SHA-less Codex helper rule is scoped to it (R1). `null` → helper rule off. */
+  currentWorktreeRoot: string | null;
+}
+
+/** True if the session's cwd is inside the current process's worktree (not a sibling worktree). */
+function inCurrentWorktree(summary: SessionSummary, currentRoot: string | null): boolean {
+  return typeof summary.cwd === "string" && currentRoot !== null && cwdInsideRoots(summary.cwd, [currentRoot]);
 }
 
 /**
  * Select the contributing sessions from pre-filtered candidates (R1). Loads each
  * candidate to inspect its git-write anchors — the summary-level filter has
  * already bounded this to cwd-in-repo, time-overlapping, non-sidechain sessions.
+ * A branch-SHA anchor credits any session regardless of worktree (SHA proof);
+ * the SHA-less Codex helper rule is scoped to THIS worktree so unrelated
+ * concurrent Codex work in sibling worktrees is not credited. Only plausible
+ * (this-worktree) exclusions are counted — a sibling-worktree candidate that
+ * only passed the repo-wide filter is silently ignored, not reported as noise.
  * Deterministic order: chronological by start, then session id.
  */
 export async function selectContributors(
@@ -46,24 +59,29 @@ export async function selectContributors(
   let excludedCount = 0;
 
   for (const summary of candidates) {
+    const here = inCurrentWorktree(summary, deps.currentWorktreeRoot);
     const session = await deps.loadSession(summary);
     if (!session) {
-      // A candidate we can't load can't be proven — count it, never guess it in.
-      excludedCount++;
+      // A candidate we can't load can't be proven — count it only if it's plausibly ours.
+      if (here) {
+        excludedCount++;
+      }
       continue;
     }
     const anchors = classifyBranchAnchors(session.turns, branchShas);
     const isCodex = summary.source === "codex";
-    // Own branch SHA → contributes (any source). Codex that made NO git writes
-    // at all → a pure helper on the cwd+time rule. A session that DID commit or
-    // push but produced no branch SHA (foreign branch, or a no-op / failed write
-    // with no SHA in its output) is excluded — not proven ours (R1, conservative).
-    const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0);
-    if (!include) {
+    // Own branch SHA → contributes (any source, SHA-proven). Codex that made NO
+    // git writes at all AND ran in this worktree → a pure helper (cwd+time). A
+    // session that committed/pushed but produced no branch SHA, or a SHA-less
+    // Codex session from a sibling worktree, is not proven ours (R1).
+    const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0 && here);
+    if (include) {
+      contributors.push({ summary, session, slice: computeSlice(session.turns, branchShas) });
+    } else if (here) {
+      // Plausibly ours (this worktree) but unproven — surface it in the honest note.
       excludedCount++;
-      continue;
     }
-    contributors.push({ summary, session, slice: computeSlice(session.turns, branchShas) });
+    // else: a sibling-worktree candidate with no branch-SHA proof — another branch's work, ignored.
   }
 
   contributors.sort(

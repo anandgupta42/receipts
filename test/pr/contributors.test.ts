@@ -30,12 +30,20 @@ function namedToolTurn(index: number, name: string, input: unknown): Turn {
   return { index, timestamp: 1000 + index, model: "claude-opus-4-8", usage, toolCalls: [{ name, input, status: "ok" }] };
 }
 
-function makeSession(id: string, turns: Turn[], source: AgentSource = "claude-code", startedAt = 1000): Session {
+const CURRENT_ROOT = "/home/dev/repo";
+
+function makeSession(
+  id: string,
+  turns: Turn[],
+  source: AgentSource = "claude-code",
+  startedAt = 1000,
+  cwd = CURRENT_ROOT,
+): Session {
   return {
     id,
     source,
     filePath: id,
-    cwd: "/home/dev/repo",
+    cwd,
     startedAt,
     endedAt: startedAt + 1000,
     totals: { tokens: usage, turnCount: turns.length, toolCallCount: turns.length },
@@ -48,10 +56,13 @@ function summaryOf(s: Session): SessionSummary {
   return s;
 }
 
-/** A loader that resolves candidates from a fixed map; unknown ids resolve to null (unreadable). */
+/** A loader that resolves candidates from a fixed map; unknown ids resolve to null (unreadable). Scoped to CURRENT_ROOT. */
 function loaderFor(sessions: Session[]) {
   const byId = new Map(sessions.map((s) => [s.id, s]));
-  return { loadSession: async (summary: SessionSummary) => byId.get(summary.id) ?? null };
+  return {
+    loadSession: async (summary: SessionSummary) => byId.get(summary.id) ?? null,
+    currentWorktreeRoot: CURRENT_ROOT,
+  };
 }
 
 const ownCommit = (id: string, startedAt = 1000, source: AgentSource = "claude-code") =>
@@ -74,11 +85,27 @@ describe("R1 contributor selection", () => {
     expect(sel.excludedCount).toBe(1);
   });
 
-  it("credits a Codex helper that made no git writes (cwd+time rule)", async () => {
+  it("credits a Codex helper that made no git writes in THIS worktree (cwd+time rule)", async () => {
     const helper = makeSession("cx-help", [bashTurn(0, "ls -la", "src\ntest")], "codex");
     const sel = await selectContributors([summaryOf(helper)], [BRANCH_SHA], loaderFor([helper]));
     expect(sel.contributors.map((c) => c.summary.id)).toEqual(["cx-help"]);
     expect(sel.excludedCount).toBe(0);
+  });
+
+  it("does NOT credit (or count) a SHA-less Codex helper from a sibling worktree (dogfood: cross-worktree over-attribution)", async () => {
+    // A codex session doing unrelated work in another worktree of the same repo,
+    // overlapping this branch's window. cwd is a sibling → silently ignored.
+    const sibling = makeSession("cx-sibling", [bashTurn(0, "ls -la", "src")], "codex", 1000, "/home/dev/repo-spec9999");
+    const sel = await selectContributors([summaryOf(sibling)], [BRANCH_SHA], loaderFor([sibling]));
+    expect(sel.contributors).toHaveLength(0);
+    expect(sel.excludedCount).toBe(0); // not plausible for this branch → not even noted
+  });
+
+  it("still credits a sibling-worktree session that carries a branch-SHA anchor (SHA proof beats worktree scope)", async () => {
+    const sibling = ownCommit("builder-sibling", 1000, "claude-code");
+    sibling.cwd = "/home/dev/repo-spec9999";
+    const sel = await selectContributors([summaryOf(sibling)], [BRANCH_SHA], loaderFor([sibling]));
+    expect(sel.contributors.map((c) => c.summary.id)).toEqual(["builder-sibling"]);
   });
 
   it("credits an own-anchored Codex session", async () => {

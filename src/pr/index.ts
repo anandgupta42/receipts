@@ -8,7 +8,7 @@
 import * as path from "node:path";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
-import { branchCommits, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
+import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
 import { isBranchCandidate, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
 import { deriveRole, selectContributors, type RawContributor } from "./contributors.js";
@@ -81,7 +81,10 @@ async function resolveContributors(
   if (candidates.length === 0) {
     return { error: NO_MATCH };
   }
-  const selection = await selectContributors(candidates, shas, { loadSession: deps.loadSession });
+  const selection = await selectContributors(candidates, shas, {
+    loadSession: deps.loadSession,
+    currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
+  });
   if (selection.contributors.length === 0) {
     return { error: NO_MATCH };
   }

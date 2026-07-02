@@ -51,6 +51,23 @@ export function worktreeRoots(run: CommandRunner, cwd?: string): string[] {
   return roots;
 }
 
+/**
+ * The current process's own worktree root (`git rev-parse --show-toplevel`),
+ * or `null` when it can't be resolved. SPEC-0023 scopes the SHA-less Codex
+ * helper rule to THIS worktree — a Codex session invoked here during the branch
+ * window is plausibly helping this branch; one in a sibling worktree is building
+ * another branch and must not be credited (dogfood: `worktreeRoots` returns
+ * every worktree of the repo, so cwd+time alone scoops up unrelated concurrent
+ * Codex work).
+ */
+export function currentWorktreeRoot(run: CommandRunner, cwd?: string): string | null {
+  const res = run("git", ["rev-parse", "--show-toplevel"], { cwd });
+  if (res.code !== 0 || !res.stdout.trim()) {
+    return null;
+  }
+  return path.resolve(res.stdout.trim());
+}
+
 /** The repo's default branch ref for merge-base (origin/HEAD's target, else `main`). */
 export function defaultBranchRef(run: CommandRunner, cwd?: string): string {
   const res = run("git", ["rev-parse", "--abbrev-ref", "origin/HEAD"], { cwd });

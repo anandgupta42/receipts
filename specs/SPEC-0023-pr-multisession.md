@@ -29,8 +29,11 @@ two comment fixes (honest scope header, demoted slice line).
 
 **Kill criterion:** if any session is attributed to a PR it did not contribute to
 in dogfood (a false-positive row), the auto-selection narrows — the
-weakest signal (Codex matched on cwd+time alone) is cut to require a branch-SHA
-anchor like Claude, and the change ships behind an explicit `--session` list.
+weakest signal (Codex matched on cwd+time) is cut further, ultimately to require a
+branch-SHA anchor like Claude, and the change ships behind an explicit `--session`
+list. *(Fired once already — see Validation: the first cut credited SHA-less Codex
+sessions from sibling worktrees; the cwd+time rule was scoped to the current
+worktree.)*
 
 ## Requirements
 
@@ -44,15 +47,22 @@ anchor like Claude, and the change ships behind an explicit `--session` list.
   anchor logic — own = a hex run in a git-write span's OUTPUT prefix-matches a
   branch SHA; foreign = a git-write span with only non-branch SHAs):
   - a **Claude** candidate contributes iff it has an own anchor (it emitted a
-    branch commit/push SHA — the lead/orchestrator/builder slice);
+    branch commit/push SHA — the lead/orchestrator/builder slice); a branch-SHA
+    anchor credits a session regardless of which worktree it ran in (SHA proof
+    can't false-match across branches);
   - a **Codex** candidate contributes iff it has an own anchor OR it made no git
-    writes at all (a pure helper/reviewer matched on cwd+time — Codex's softer
-    rule, since Codex often assists without committing);
-  - any candidate whose git writes are **foreign-only** (it committed to another
-    branch) is excluded — it built a different PR.
-  Empty contributor set → the SPEC-0019 message + exit 1. A time-overlapping
-  candidate that is excluded (Claude with no branch SHA; foreign-only) is
-  never silently included — it is counted for the R4 "not attributed" note.
+    writes **at all** AND ran in the **current** worktree (`git rev-parse
+    --show-toplevel`) — a pure helper/reviewer matched on cwd+time, Codex's
+    softer rule since Codex often assists without committing. The current-worktree
+    scope is load-bearing: `git worktree list` returns *every* worktree of the
+    repo, and unrelated Codex sessions run concurrently in sibling worktrees on
+    other branches — a SHA-less helper is only credited when it ran here;
+  - any candidate that committed/pushed but produced no branch SHA (**foreign-only**,
+    or a no-op/failed write with no SHA in its output) is excluded — not proven ours.
+  Empty contributor set → the SPEC-0019 message + exit 1. A candidate that is
+  excluded but plausibly ours (in the **current** worktree, unproven) is counted
+  for the R4 "not attributed" note; a SHA-less sibling-worktree candidate (another
+  branch's work) is silently ignored, not reported as noise.
 - **R2 — Per-contributor rendering (reuses R1e/R1c per session).** Each
   contributor is sliced to its own PR turn range (`computeSlice` +
   `sliceSessionForReceipt`, unchanged) and its in-window subagent children are
@@ -137,9 +147,12 @@ anchor like Claude, and the change ships behind an explicit `--session` list.
 |---|---|---|
 | R1 union | two Claude sessions, each own-anchored to the branch | both contribute; total sums both |
 | R1 claude no-anchor | Claude in repo+window, no branch SHA in output | excluded; counted in note |
-| R1 codex helper | Codex in repo+window, no git writes | contributes (cwd+time) |
+| R1 codex helper | Codex in THIS worktree+window, no git writes | contributes (cwd+time) |
+| R1 codex sibling | SHA-less Codex helper in a sibling worktree | ignored (not credited, not counted) |
+| R1 sibling own-anchor | branch-SHA session in a sibling worktree | contributes (SHA proof beats scope) |
 | R1 codex own-anchor | Codex with branch-SHA commit output | contributes (own) |
 | R1 foreign-only | session whose only commit SHA is off-branch | excluded; counted in note |
+| R1 no-SHA git write | Codex `git commit` with no SHA in output | excluded (a git write, not a helper) |
 | R1 empty set | no candidate has cwd+time+proof | SPEC-0019 message + exit 1 |
 | R1 sidechain excluded | only a subagent transcript is a candidate | not a top-level contributor |
 | R2 per-session slice | contributor with 2-branch anchors | sliced to its own turn range |
@@ -179,3 +192,16 @@ SPEC-0019's first pass (Codex adapter dropping `cwd`) is already resolved here �
 `cwd` and tool output are retained (R6), so this spec adds no adapter change,
 only wider selection + a rollup renderer. Kill criterion set to the honesty
 failure the maintainer most fears: a session credited with a PR it never touched.
+
+**2026-07-02 · dogfood (kill criterion fired, narrowed):** the first cut ran
+`node dist/cli.js pr` on this PR's own worktree and credited **7 Codex sessions**,
+several of which predated the worktree's creation — i.e. unrelated Codex work in
+*sibling* worktrees, since `git worktree list` returns every worktree of the repo
+and the SHA-less cwd+time Codex rule matched them all. Two fixes landed: (1) the
+SHA-less Codex helper rule is scoped to the **current** worktree
+(`git rev-parse --show-toplevel`) — a branch-SHA anchor still credits any worktree
+(SHA proof), but a helper with no commit is only credited when it ran here; (2)
+the "not attributed" note counts only *plausible* (this-worktree) exclusions, so
+sibling-worktree candidates are silently ignored rather than reported as noise.
+A separate codex-review finding (SHA-less git writes miscounted as "no writes")
+was fixed the same round via output-independent `writeCount`.
