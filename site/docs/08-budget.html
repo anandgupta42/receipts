@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Statusline — aireceipts docs</title>
+<title>Set and watch a budget — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -283,8 +283,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Statusline</h1>
-      <p class="sub">Rendered from <code>docs/statusline.md</code>.</p>
+      <h1>Set and watch a budget</h1>
+      <p class="sub">Rendered from <code>docs/guide/08-budget.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -322,42 +322,54 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="statusline">Statusline</h1>
+<h1 id="set-and-watch-a-budget">Set and watch a budget</h1>
 
-<p><code>aireceipts statusline</code> prints one line — the last-completed session's cost (or tokens, if unpriced) plus a waste flag if one fired — meant for Claude Code's <code>statusLine</code> command config, so a number is visible on every prompt without running <code>aireceipts</code> manually.</p>
+<p>Goal: define a spend cap and get a plain signal — a line, and an exit code — when you're near or over it.</p>
 
-<h2 id="setup">Setup</h2>
+<blockquote><strong>Advisory only.</strong> A budget in aireceipts <strong>does not stop your agent.</strong> Nothing here intercepts a session, pauses a tool call, or blocks work. It reads transcripts your agent already wrote and reports a number after the fact. The disclaimer is printed on every budget line so it can never be mistaken for a hard cap.</blockquote>
 
-<p>Add a <code>statusLine</code> entry to your Claude Code <code>settings.json</code> (global: <code>~/.claude/settings.json</code>, or project-local: <code>.claude/settings.json</code>):</p>
+<h2 id="configure-it">Configure it</h2>
+
+<p>Create <code>~/.aireceipts/budget.json</code> with a <code>daily</code> and/or <code>weekly</code> cap. Each period is exactly one of <code>usd</code> or <code>tokens</code>, a positive number:</p>
 
 <pre class="doc-code"><code class="language-json">{
-  &quot;statusLine&quot;: {
-    &quot;type&quot;: &quot;command&quot;,
-    &quot;command&quot;: &quot;aireceipts statusline&quot;
-  }
+  &quot;daily&quot;: { &quot;usd&quot;: 5 },
+  &quot;weekly&quot;: { &quot;usd&quot;: 20 }
 }</code></pre>
 
-<p>Claude Code invokes this command on its own schedule and pipes a JSON payload (including <code>transcript_path</code> for the active session) on stdin. <code>aireceipts</code> reads that payload, loads the referenced transcript directly, and prints one line — no polling, no background process, no daemon.</p>
+<p>Rules the file must satisfy: at least one of <code>daily</code>/<code>weekly</code>; each period has exactly one of <code>usd</code>/<code>tokens</code>; the value is a positive, finite number. Anything else is reported and ignored (see below) rather than silently accepted.</p>
 
-<p>If <code>aireceipts</code> isn't on your <code>PATH</code>, use an absolute path to the binary instead of <code>aireceipts</code> in the <code>command</code> field (for example, the output of <code>which aireceipts</code>).</p>
+<h2 id="see-it-on-the-receipt">See it on the receipt</h2>
 
-<h2 id="output">Output</h2>
+<p>With a budget configured, the full receipt appends one advisory line per period:</p>
 
-<pre class="doc-code"><code>[Claude Code] $1.23 · 12k tok
-[Claude Code] $2.50 · 20k tok · ⚠ Bash loop ×5
-[Cursor] 8k tok</code></pre>
+<pre class="doc-code"><code>budget (this week): $0.00 of $20.00 — advisory only — does not stop the agent</code></pre>
+
+<p>(The demo sessions here are from an earlier week, so this window's spend is <code>$0.00</code>; on your machine it's your real spend for the current window.)</p>
+
+<h2 id="check-it-in-a-script">Check it in a script</h2>
+
+<pre class="doc-code"><code class="language-sh">aireceipts --check-budget</code></pre>
+
+<p>prints the same advisory line(s) and sets an <strong>exit code</strong>: <code>0</code> when you're under every configured cap, <code>1</code> when any cap is exceeded. &quot;Exceeded&quot; is a strict <code>&gt;</code> — a sum exactly at the cap is not yet over it. That makes it composable:</p>
+
+<pre class="doc-code"><code class="language-sh">aireceipts --check-budget || echo &quot;over budget this week&quot;</code></pre>
+
+<p>The daily window is the current UTC calendar day; the weekly window is the rolling <code>[now − 7 days, now)</code>. Sessions on unpriced models are excluded from a <code>usd</code> sum (and the line says how many), never guessed into it.</p>
+
+<h2 id="when-the-file-is-wrong">When the file is wrong</h2>
+
+<p>A malformed budget file never crashes the command — it's reported on stderr and ignored:</p>
+
+<pre class="doc-code"><code>budget.json ignored: unknown key(s): monthly</code></pre>
+
+<p>(There is no <code>monthly</code> period — only <code>daily</code> and <code>weekly</code>.)</p>
+
+<h2 id="next">Next</h2>
 
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session's cost is priced; <code>Nk tok</code> only when it isn't (never a fabricated <code>$</code> amount).</li>
-  <li>The waste flag (<code>⚠ ...</code>) appears only when a waste detector actually fired on the session — its absence is not itself a claim that nothing was found.</li>
-  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk. If no sessions are detected at all, it prints a neutral placeholder line rather than an error, so the statusline layout never breaks.</li>
-</ul>
-
-<h2 id="notes">Notes</h2>
-
-<ul>
-  <li>One line, one on-disk read per invocation — this is a snapshot, not a live view. Nothing streams mid-session (see the CLI's non-goals).</li>
-  <li>Sessions that can't be priced (missing price rows) render tokens-only — <code>aireceipts</code> never estimates a dollar figure it can't source to a price row.</li>
+  <li><strong><a href="06-week.html">Aggregate the week</a></strong> — the spend the weekly cap is measured against.</li>
+  <li><strong><a href="09-handoff.html">Fix it next time</a></strong> — reduce the number instead of just watching it.</li>
 </ul>
     </article>
   </main>

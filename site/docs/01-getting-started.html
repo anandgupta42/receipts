@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Statusline — aireceipts docs</title>
+<title>Get started in 60 seconds — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -283,8 +283,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Statusline</h1>
-      <p class="sub">Rendered from <code>docs/statusline.md</code>.</p>
+      <h1>Get started in 60 seconds</h1>
+      <p class="sub">Rendered from <code>docs/guide/01-getting-started.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -322,42 +322,93 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="statusline">Statusline</h1>
+<h1 id="get-started-in-60-seconds">Get started in 60 seconds</h1>
 
-<p><code>aireceipts statusline</code> prints one line — the last-completed session's cost (or tokens, if unpriced) plus a waste flag if one fired — meant for Claude Code's <code>statusLine</code> command config, so a number is visible on every prompt without running <code>aireceipts</code> manually.</p>
+<p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost. No account, no API key, no upload.</p>
 
-<h2 id="setup">Setup</h2>
+<p>This page takes you from nothing to a receipt, a weekly total, and an automatic receipt after every session — in about a minute.</p>
 
-<p>Add a <code>statusLine</code> entry to your Claude Code <code>settings.json</code> (global: <code>~/.claude/settings.json</code>, or project-local: <code>.claude/settings.json</code>):</p>
+<h2 id="1-run-it">1. Run it</h2>
 
-<pre class="doc-code"><code class="language-json">{
-  &quot;statusLine&quot;: {
-    &quot;type&quot;: &quot;command&quot;,
-    &quot;command&quot;: &quot;aireceipts statusline&quot;
-  }
-}</code></pre>
+<p>You don't install anything first. One command reads your newest session and prices it:</p>
 
-<p>Claude Code invokes this command on its own schedule and pipes a JSON payload (including <code>transcript_path</code> for the active session) on stdin. <code>aireceipts</code> reads that payload, loads the referenced transcript directly, and prints one line — no polling, no background process, no daemon.</p>
+<pre class="doc-code"><code class="language-sh">npx aireceipts</code></pre>
 
-<p>If <code>aireceipts</code> isn't on your <code>PATH</code>, use an absolute path to the binary instead of <code>aireceipts</code> in the <code>command</code> field (for example, the output of <code>which aireceipts</code>).</p>
+<p>The first time it runs, it prints a one-line note about anonymous diagnostics (and how to turn them off — see <a href="12-troubleshooting.html">Troubleshooting</a>), then the receipt. You'll see something like this:</p>
 
-<h2 id="output">Output</h2>
+<pre class="doc-code"><code>- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Add email format validation to the signup for…” 
+ Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s 
+    claude-opus-4-8 87% · claude-sonnet-5 13%     
+         cache served 85% of input tokens         
 
-<pre class="doc-code"><code>[Claude Code] $1.23 · 12k tok
-[Claude Code] $2.50 · 20k tok · ⚠ Bash loop ×5
-[Cursor] 8k tok</code></pre>
+Bash..............................$0.05  (3 calls)
+Edit..............................$0.05  (2 calls)
+(thinking/reply)..................$0.03  (2 turns)
+Write.............................$0.03  (2 calls)
+Read...............................$0.02  (1 call)
+--------------------------------------------------
+TOTAL........................................$0.18
+same tokens on claude-haiku-4-5..............$0.04
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
+
+<p>That's a real session: which models ran, where the tokens went by tool, and what it cost — priced against dated, cited price tables. The <code>same tokens on claude-haiku-4-5</code> line re-prices the identical token counts on a cheaper model; it's arithmetic, not a claim that Haiku would have finished the job.</p>
+
+<p>If instead you see <code>no agent session data detected</code>, your agent's logs are somewhere aireceipts doesn't look yet — jump to <a href="12-troubleshooting.html">Troubleshooting</a>.</p>
+
+<h2 id="2-add-up-the-week">2. Add up the week</h2>
+
+<p>One session is a number. The trailing week is a habit:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts week</code></pre>
+
+<pre class="doc-code"><code>                  WEEKLY DIGEST                   
+    Jun 18 2026 → Jun 25 2026 · since override    
+
+Sessions.........................................5
+Priced total (5 of 5)........................$0.22
+Tokens (all sessions)..................166,338 tok
+
+By agent
+  Claude Code.......................$0.19 · 2 sess
+  Codex.............................$0.03 · 3 sess
+
+Top waste
+  stuck-loop.....................$0.01 · 1 session
+  trivial-spans.................$0.00 · 2 sessions
+
+vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
+  Priced $ Δ................................+$0.12
+  Tokens Δ.............................+93,700 tok
+  Excluded.........................0 now / 0 prior
+--------------------------------------------------
+      aireceipts · local · buy me a samosa 🥟      </code></pre>
+
+<p>Every session on your machine, across every supported agent, totalled for the last seven days — still local, still no upload.</p>
+
+<h2 id="3-make-it-automatic">3. Make it automatic</h2>
+
+<p>You won't remember to run a command after every session. Let Claude Code run it for you:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts install-hook</code></pre>
+
+<p>It shows you the exact change, asks before writing, and installs a <code>SessionEnd</code> hook. From then on a six-line mini-receipt prints when a Claude Code session ends. Full walkthrough: <a href="03-install-hook.html">Install the agent hook</a>.</p>
+
+<h2 id="next">Next</h2>
 
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session's cost is priced; <code>Nk tok</code> only when it isn't (never a fabricated <code>$</code> amount).</li>
-  <li>The waste flag (<code>⚠ ...</code>) appears only when a waste detector actually fired on the session — its absence is not itself a claim that nothing was found.</li>
-  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk. If no sessions are detected at all, it prints a neutral placeholder line rather than an error, so the statusline layout never breaks.</li>
-</ul>
-
-<h2 id="notes">Notes</h2>
-
-<ul>
-  <li>One line, one on-disk read per invocation — this is a snapshot, not a live view. Nothing streams mid-session (see the CLI's non-goals).</li>
-  <li>Sessions that can't be priced (missing price rows) render tokens-only — <code>aireceipts</code> never estimates a dollar figure it can't source to a price row.</li>
+  <li><strong><a href="02-install.html">Install</a></strong> — run it without <code>npx</code> on every invocation.</li>
+  <li><strong><a href="04-read-a-receipt.html">Read a receipt</a></strong> — pick any session, not just the newest.</li>
+  <li><strong><a href="08-budget.html">Set a budget</a></strong> — get an exit code when the week crosses a cap.</li>
 </ul>
     </article>
   </main>

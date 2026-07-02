@@ -140,7 +140,7 @@ describe("repo hygiene gates", () => {
       cause: "runner label false positive",
       action: "updated allowlist",
     });
-    const log = readFileSync("docs/hygiene-fp-log.md", "utf8");
+    const log = readFileSync("docs/internal/hygiene-fp-log.md", "utf8");
 
     expect(entry).toBe("2026-07-02 · actionlint · runner label false positive · updated allowlist");
     expect(isFalsePositiveEntry(entry)).toBe(true);

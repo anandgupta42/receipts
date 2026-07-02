@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Statusline — aireceipts docs</title>
+<title>How session attribution works — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -283,8 +283,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Statusline</h1>
-      <p class="sub">Rendered from <code>docs/statusline.md</code>.</p>
+      <h1>How session attribution works</h1>
+      <p class="sub">Rendered from <code>docs/guide/14-session-attribution.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -322,42 +322,52 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="statusline">Statusline</h1>
+<h1 id="how-session-attribution-works">How session attribution works</h1>
 
-<p><code>aireceipts statusline</code> prints one line — the last-completed session's cost (or tokens, if unpriced) plus a waste flag if one fired — meant for Claude Code's <code>statusLine</code> command config, so a number is visible on every prompt without running <code>aireceipts</code> manually.</p>
+<p>A receipt is only as trustworthy as its answer to one question: <em>which session is this?</em> This page explains what aireceipts treats as a session, how it finds them, and why one can occasionally look split, merged, or missing.</p>
 
-<h2 id="setup">Setup</h2>
+<h2 id="what-a-session-is">What a session is</h2>
 
-<p>Add a <code>statusLine</code> entry to your Claude Code <code>settings.json</code> (global: <code>~/.claude/settings.json</code>, or project-local: <code>.claude/settings.json</code>):</p>
+<p>A <strong>session is one transcript file</strong> your agent wrote — and its turns are the events inside that file. aireceipts prices each turn and rolls them up. Where the file lives depends on the agent:</p>
 
-<pre class="doc-code"><code class="language-json">{
-  &quot;statusLine&quot;: {
-    &quot;type&quot;: &quot;command&quot;,
-    &quot;command&quot;: &quot;aireceipts statusline&quot;
-  }
-}</code></pre>
+<div class="table-wrap"><table>
+  <thead><tr><th>Agent</th><th>Where a session lives</th></tr></thead>
+  <tbody>
+    <tr><td>Claude Code</td><td><code>~/.claude/projects/&lt;encoded-cwd&gt;/&lt;id&gt;.jsonl</code></td></tr>
+    <tr><td>Codex</td><td><code>~/.codex/sessions/rollout-*.jsonl</code></td></tr>
+    <tr><td>opencode</td><td>a session's rows in <code>~/.local/share/opencode</code> (SQLite)</td></tr>
+    <tr><td>Cursor</td><td><code>~/Library/Application Support/Cursor/.../state.vscdb</code></td></tr>
+  </tbody>
+</table></div>
 
-<p>Claude Code invokes this command on its own schedule and pipes a JSON payload (including <code>transcript_path</code> for the active session) on stdin. <code>aireceipts</code> reads that payload, loads the referenced transcript directly, and prints one line — no polling, no background process, no daemon.</p>
+<p>It reads whatever each agent already writes — it never creates, moves, or rewrites a transcript.</p>
 
-<p>If <code>aireceipts</code> isn't on your <code>PATH</code>, use an absolute path to the binary instead of <code>aireceipts</code> in the <code>command</code> field (for example, the output of <code>which aireceipts</code>).</p>
+<h2 id="how-the-newest-is-chosen">How the newest is chosen</h2>
 
-<h2 id="output">Output</h2>
+<p>With no selector, aireceipts prices your <strong>most-recently-ended</strong> session across all agents. Sessions are ordered by end time (falling back to start time), which is also the order <code>--list</code> shows. A session with no recorded end time still lists and prices, but it's never <em>guessed</em> into a time window — which matters for <a href="06-week.html"><code>week</code></a> and <a href="08-budget.html">budgets</a>, where an end time is required to bucket a session into the current or prior window.</p>
 
-<pre class="doc-code"><code>[Claude Code] $1.23 · 12k tok
-[Claude Code] $2.50 · 20k tok · ⚠ Bash loop ×5
-[Cursor] 8k tok</code></pre>
+<h2 id="subagents-roll-up-into-their-parent">Subagents roll up into their parent</h2>
+
+<p>When a Claude Code session spawns subagents, each one writes its own child transcript (<code>agent-&lt;id&gt;.jsonl</code>, under a <code>subagents/</code> folder beside the parent). aireceipts treats those as <strong>part of the parent session, not standalone sessions</strong>: they're excluded from <code>--list</code>, and their cost rolls up into the parent's receipt (this is what the <code>SUBAGENTS</code> section of a <a href="11-share-and-export.html#as-a-pr-comment-pr">PR receipt</a> sums). So if you launched subagents and expected to see them listed separately — that's by design; look at the parent.</p>
+
+<h2 id="projects-by-project">Projects (<code>--by-project</code>)</h2>
+
+<p><code>week --by-project</code> groups sessions by the working directory they ran in. Claude Code encodes the directory into the path segment under <code>projects/</code>; aireceipts decodes it and keeps the last component (<code>-Users-dev-signup-form</code> → <code>form</code>). The scheme is deliberately lossy — a real <code>-</code> in a folder name is indistinguishable from an encoded <code>/</code> — which is exactly why it's behind an opt-in flag. Any session without that segment (Codex, Cursor, or an unrecognized layout) buckets under <code>(unknown)</code> rather than a fabricated project name.</p>
+
+<h2 id="why-a-session-can-look-off">Why a session can look off</h2>
 
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session's cost is priced; <code>Nk tok</code> only when it isn't (never a fabricated <code>$</code> amount).</li>
-  <li>The waste flag (<code>⚠ ...</code>) appears only when a waste detector actually fired on the session — its absence is not itself a claim that nothing was found.</li>
-  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk. If no sessions are detected at all, it prints a neutral placeholder line rather than an error, so the statusline layout never breaks.</li>
+  <li><strong>Cursor shows totals only.</strong> Cursor's transcript carries no per-turn model, usage, or cache data, so its receipt is a session-level total in a labeled degraded mode. aireceipts never synthesizes the missing per-turn detail.</li>
+  <li><strong>A session is missing from <code>week</code>.</strong> It ended outside the trailing-7-day window, or has no end time. Pin the span with <code>--since</code> to check.</li>
+  <li><strong>A session is missing entirely.</strong> The file may be unreadable (wrong owner or mode); aireceipts skips such files silently rather than erroring. See <a href="12-troubleshooting.html#no-agent-session-data-detected">Troubleshooting</a>.</li>
+  <li><strong>The wrong session matched.</strong> A title-substring selector matched a different session than you meant. Run <code>--list</code> and select by its 1-based index instead.</li>
 </ul>
 
-<h2 id="notes">Notes</h2>
+<h2 id="next">Next</h2>
 
 <ul>
-  <li>One line, one on-disk read per invocation — this is a snapshot, not a live view. Nothing streams mid-session (see the CLI's non-goals).</li>
-  <li>Sessions that can't be priced (missing price rows) render tokens-only — <code>aireceipts</code> never estimates a dollar figure it can't source to a price row.</li>
+  <li><strong><a href="13-pricing.html">How pricing is estimated</a></strong> — from the session's tokens to dollars.</li>
+  <li><strong><a href="04-read-a-receipt.html">Read a receipt</a></strong> — pick and read any one of them.</li>
 </ul>
     </article>
   </main>

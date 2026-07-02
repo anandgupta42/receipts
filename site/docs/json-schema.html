@@ -117,6 +117,15 @@ h1{
   letter-spacing:.18em;
   text-transform:uppercase;
 }
+.toc-section{
+  margin:18px 0 8px;
+  color:var(--faint);
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.toc-section:first-of-type{margin-top:0}
 .toc ol,.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .toc a{color:var(--muted);font-size:14px;text-decoration:none}
 .toc a:hover{color:var(--ink);text-decoration:underline}
@@ -281,14 +290,36 @@ footer{
   <main class="doc-grid">
     <aside class="toc" aria-label="Docs contents">
       <h2>Contents</h2>
-      <ol>
-<li><a href="harness.html">The harness — how this repo builds itself</a></li>
-<li><a href="hygiene-fp-log.html">Hygiene False-Positive Log</a></li>
-<li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
-<li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
-<li><a href="statusline.html">Statusline</a></li>
-<li><a href="telemetry.html">Diagnostics telemetry</a></li>
-      </ol>
+      <p class="toc-section">Start here</p>
+      <ul>
+        <li><a href="01-getting-started.html">Get started in 60 seconds</a></li>
+        <li><a href="02-install.html">Install</a></li>
+        <li><a href="03-install-hook.html">Install the agent hook</a></li>
+      </ul>
+      <p class="toc-section">Using it</p>
+      <ul>
+        <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
+        <li><a href="05-compare.html">Compare two sessions</a></li>
+        <li><a href="06-week.html">Aggregate the week</a></li>
+        <li><a href="07-statusline.html">Show a statusline in your shell</a></li>
+        <li><a href="08-budget.html">Set and watch a budget</a></li>
+        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="10-templates.html">Use a template</a></li>
+        <li><a href="11-share-and-export.html">Share and export</a></li>
+      </ul>
+      <p class="toc-section">Reference</p>
+      <ul>
+        <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
+        <li><a href="statusline.html">Statusline</a></li>
+        <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+      </ul>
+      <p class="toc-section">Why</p>
+      <ul>
+        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="14-session-attribution.html">How session attribution works</a></li>
+      </ul>
     </aside>
     <article class="doc-content">
 <h1 id="export-schema-json-csv">Export schema (<code>--json</code> / <code>--csv</code>)</h1>
@@ -319,6 +350,7 @@ footer{
     <tr><td><code>schemaVersion</code></td><td>number (literal <code>1</code>)</td><td>This schema's major version. Bumped only on a breaking change.</td></tr>
     <tr><td><code>agentLabel</code></td><td>string</td><td>Human label for the agent, e.g. &quot;Claude Code&quot;.</td></tr>
     <tr><td><code>source</code></td><td>enum</td><td>One of <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>gemini</code>.</td></tr>
+    <tr><td><code>source</code></td><td>enum</td><td>One of <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>opencode</code>.</td></tr>
     <tr><td><code>sessionId</code></td><td>string</td><td>Adapter-local id (an absolute file path for file-based adapters).</td></tr>
     <tr><td><code>title</code></td><td>string | null</td><td>Session title, or null when the adapter reports none.</td></tr>
     <tr><td><code>startedAtMs</code></td><td>number | null</td><td>Session start, epoch milliseconds, or null.</td></tr>

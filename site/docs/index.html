@@ -117,6 +117,15 @@ h1{
   letter-spacing:.18em;
   text-transform:uppercase;
 }
+.toc-section{
+  margin:18px 0 8px;
+  color:var(--faint);
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.toc-section:first-of-type{margin-top:0}
 .toc ol,.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .toc a{color:var(--muted);font-size:14px;text-decoration:none}
 .toc a:hover{color:var(--ink);text-decoration:underline}
@@ -281,28 +290,107 @@ footer{
   <main class="doc-grid">
     <aside class="toc" aria-label="Docs contents">
       <h2>Contents</h2>
-      <ol>
-<li><a href="harness.html">The harness — how this repo builds itself</a></li>
-<li><a href="hygiene-fp-log.html">Hygiene False-Positive Log</a></li>
-<li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
-<li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
-<li><a href="statusline.html">Statusline</a></li>
-<li><a href="telemetry.html">Diagnostics telemetry</a></li>
-      </ol>
+      <p class="toc-section">Start here</p>
+      <ul>
+        <li><a href="01-getting-started.html">Get started in 60 seconds</a></li>
+        <li><a href="02-install.html">Install</a></li>
+        <li><a href="03-install-hook.html">Install the agent hook</a></li>
+      </ul>
+      <p class="toc-section">Using it</p>
+      <ul>
+        <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
+        <li><a href="05-compare.html">Compare two sessions</a></li>
+        <li><a href="06-week.html">Aggregate the week</a></li>
+        <li><a href="07-statusline.html">Show a statusline in your shell</a></li>
+        <li><a href="08-budget.html">Set and watch a budget</a></li>
+        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="10-templates.html">Use a template</a></li>
+        <li><a href="11-share-and-export.html">Share and export</a></li>
+      </ul>
+      <p class="toc-section">Reference</p>
+      <ul>
+        <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
+        <li><a href="statusline.html">Statusline</a></li>
+        <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+      </ul>
+      <p class="toc-section">Why</p>
+      <ul>
+        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="14-session-attribution.html">How session attribution works</a></li>
+      </ul>
     </aside>
     <article class="doc-content">
 
-<p>Root repository docs rendered as static pages for GitHub Pages. Source paths are shown so the generated site remains traceable to the markdown it wraps.</p>
+<p>The aireceipts user guide, rendered as static pages for GitHub Pages. Source paths are shown so the generated site stays traceable to the markdown it wraps.</p>
+<h2>Start here</h2>
 <ul class="doc-index-list">
   <li>
-    <a href="harness.html">The harness — how this repo builds itself</a>
-    <span class="path">docs/harness.md</span>
-    <p>aireceipts is designed, implemented, and maintained mostly by AI coding agents. That is not a stunt; it is the constraint the whole repository is engineered around.</p>
+    <a href="01-getting-started.html">Get started in 60 seconds</a>
+    <span class="path">docs/guide/01-getting-started.md</span>
+    <p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost. No account, no API key, no upload.</p>
   </li>
   <li>
-    <a href="hygiene-fp-log.html">Hygiene False-Positive Log</a>
-    <span class="path">docs/hygiene-fp-log.md</span>
-    <p>Any false or intentionally overridden hygiene finding is appended here.</p>
+    <a href="02-install.html">Install</a>
+    <span class="path">docs/guide/02-install.md</span>
+    <p>aireceipts is a Node CLI. It needs Node.js 20 or newer and nothing else — no account, no API key, no daemon.</p>
+  </li>
+  <li>
+    <a href="03-install-hook.html">Install the agent hook</a>
+    <span class="path">docs/guide/03-install-hook.md</span>
+    <p>Goal: get a short receipt automatically, every time a Claude Code session ends, without running a command yourself.</p>
+  </li>
+</ul>
+<h2>Using it</h2>
+<ul class="doc-index-list">
+  <li>
+    <a href="04-read-a-receipt.html">Read a receipt</a>
+    <span class="path">docs/guide/04-read-a-receipt.md</span>
+    <p>Goal: produce and read the receipt for any one session — the newest, or a specific one you pick.</p>
+  </li>
+  <li>
+    <a href="05-compare.html">Compare two sessions</a>
+    <span class="path">docs/guide/05-compare.md</span>
+    <p>Goal: put two receipts next to each other and see the ratio between them — which run cost more, and by how much.</p>
+  </li>
+  <li>
+    <a href="06-week.html">Aggregate the week</a>
+    <span class="path">docs/guide/06-week.md</span>
+    <p>Goal: total every session from the last seven days, across every agent, with an honest comparison to the week before.</p>
+  </li>
+  <li>
+    <a href="07-statusline.html">Show a statusline in your shell</a>
+    <span class="path">docs/guide/07-statusline.md</span>
+    <p>Goal: see the current session's cost on *every* Claude Code prompt, without running a command yourself.</p>
+  </li>
+  <li>
+    <a href="08-budget.html">Set and watch a budget</a>
+    <span class="path">docs/guide/08-budget.md</span>
+    <p>Goal: define a spend cap and get a plain signal — a line, and an exit code — when you're near or over it.</p>
+  </li>
+  <li>
+    <a href="09-handoff.html">Fix it next time (handoff)</a>
+    <span class="path">docs/guide/09-handoff.md</span>
+    <p>Goal: take the waste a session actually hit and turn it into a paste-ready instruction for your agent — so the next run doesn't repeat it.</p>
+  </li>
+  <li>
+    <a href="10-templates.html">Use a template</a>
+    <span class="path">docs/guide/10-templates.md</span>
+    <p>Goal: render the same receipt in a different visual style — for a screenshot, a share, or just taste.</p>
+  </li>
+  <li>
+    <a href="11-share-and-export.html">Share and export</a>
+    <span class="path">docs/guide/11-share-and-export.md</span>
+    <p>Goal: get a receipt out of the terminal — as an image to share, as data to process, or as a comment on your pull request.</p>
+  </li>
+</ul>
+<h2>Reference</h2>
+<ul class="doc-index-list">
+  <li>
+    <a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a>
+    <span class="path">docs/guide/12-troubleshooting.md</span>
+    <p>Symptom first. Find what you're seeing, then the fix.</p>
   </li>
   <li>
     <a href="json-schema.html">Export schema (--json / --csv)</a>
@@ -310,19 +398,32 @@ footer{
     <p>aireceipts can emit a session receipt as machine-readable JSON (--json) or CSV (--csv) instead of the text receipt, for FinOps tooling and spreadsheet ingestion.</p>
   </li>
   <li>
-    <a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a>
-    <span class="path">docs/pr-receipts.md</span>
-    <p>aireceipts pr attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment that stays current across pushes.</p>
-  </li>
-  <li>
     <a href="statusline.html">Statusline</a>
     <span class="path">docs/statusline.md</span>
     <p>aireceipts statusline prints one line — the last-completed session's cost (or tokens, if unpriced) plus a waste flag if one fired — meant for Claude Code's statusLine command…</p>
   </li>
   <li>
+    <a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a>
+    <span class="path">docs/pr-receipts.md</span>
+    <p>aireceipts pr attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment that stays current across pushes.</p>
+  </li>
+  <li>
     <a href="telemetry.html">Diagnostics telemetry</a>
     <span class="path">docs/telemetry.md</span>
     <p>aireceipts can send small, anonymous, content-free diagnostics events to help us find bugs and understand which agent formats and CLI paths are actually used in the wild.</p>
+  </li>
+</ul>
+<h2>Why</h2>
+<ul class="doc-index-list">
+  <li>
+    <a href="13-pricing.html">How pricing is estimated</a>
+    <span class="path">docs/guide/13-pricing.md</span>
+    <p>Every dollar on a receipt is an estimate computed locally from token counts and a cited price table — not a feed from your vendor's billing system.</p>
+  </li>
+  <li>
+    <a href="14-session-attribution.html">How session attribution works</a>
+    <span class="path">docs/guide/14-session-attribution.md</span>
+    <p>A receipt is only as trustworthy as its answer to one question: *which session is this?* This page explains what aireceipts treats as a session, how it finds them, and why one can…</p>
   </li>
 </ul>
     </article>
