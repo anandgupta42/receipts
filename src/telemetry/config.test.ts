@@ -21,9 +21,11 @@ describe("R4: kill switches disable telemetry", () => {
 });
 
 describe("SC connection-string honesty: empty/unset/malformed all collapse to the same disabled shape", () => {
-  it("an unset connection string (default empty placeholder) disables telemetry — zero calls, not a fabricated key", () => {
+  it("an unset connection string uses the shipped default key — enabled (docs/telemetry.md states the key openly)", () => {
     const config = resolveTelemetryConfig({});
-    expect(config).toEqual({ enabled: false, instrumentationKey: undefined, ingestionEndpoint: undefined });
+    expect(config.enabled).toBe(true);
+    expect(config.instrumentationKey).toBe("394da360-a50c-4700-bcf9-87b8d9d6e0ee");
+    expect(config.ingestionEndpoint).toContain("eastus-8.in.applicationinsights.azure.com");
   });
 
   it("an explicitly empty connection string disables telemetry", () => {

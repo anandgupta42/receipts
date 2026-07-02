@@ -48,12 +48,12 @@ describe("R6: no-network proof", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it("an unset (default empty) connection string results in zero fetch calls", async () => {
+  it("an explicitly empty connection string results in zero fetch calls", async () => {
     const fetchSpy = vi.fn();
     globalThis.fetch = fetchSpy as unknown as typeof fetch;
 
     recordEvent(SAMPLE_EVENT);
-    await flushTelemetry({ env: {} });
+    await flushTelemetry({ env: { AIRECEIPTS_TELEMETRY_CONNECTION: "" } });
 
     expect(fetchSpy).not.toHaveBeenCalled();
   });
