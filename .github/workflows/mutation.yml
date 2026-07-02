@@ -22,19 +22,19 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm install
+      - run: npm ci
 
-      - name: mutation score (placeholder — no src/pricing/ yet)
+      - name: mutation score
         run: |
           if [ ! -d src/pricing ] || [ -z "$(ls -A src/pricing 2>/dev/null)" ]; then
             echo "src/pricing/ is empty — nothing to mutate yet (Tier 0 harness). Skipping."
             exit 0
           fi
           if [ ! -f stryker.config.json ] && [ ! -f stryker.conf.json ]; then
-            echo "No Stryker config yet — add one before this workflow can gate real code."
-            exit 0
+            echo "FAIL: src/pricing/ exists but no Stryker config does." >&2
+            echo "Pricing code requires mutation testing (AGENTS.md gates) — add a" >&2
+            echo "Stryker config in the same PR that introduces src/pricing/." >&2
+            exit 1
           fi
           npx stryker run
-        # TODO(M1+): once src/pricing/ and a Stryker config land, replace the
-        # placeholder body with a real run that fails the job if the mutation
-        # score has decreased vs. the baseline on main (score-not-decreased).
+        # TODO(M1+): extend to score-not-decreased vs. the baseline on main.

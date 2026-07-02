@@ -53,7 +53,8 @@ tests must survive Stryker mutation, not just hit coverage.
 ## 6. Walk acceptance criteria live
 
 Run the built CLI against real behavior (not just unit tests) for each Success criteria
-checkbox. Mark the spec `status: shipped` and check the boxes only once verified.
+checkbox. Check the boxes once verified and set `status: building` while the PR is open —
+`shipped` is flipped only after the human merges (release/archive step).
 
 ## 7. Commit + PR
 

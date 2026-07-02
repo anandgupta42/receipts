@@ -19,16 +19,45 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - name: typecheck
-        run: npx tsc --noEmit; echo "tsc=$?"
+        run: npx tsc --noEmit
 
       - name: lint
-        run: npx eslint . --max-warnings 0; echo "eslint=$?"
+        run: npx eslint . --max-warnings 0
 
       - name: test
-        run: npx vitest run; echo "vitest=$?"
+        run: npx vitest run
 
       - name: goldens
-        run: node scripts/verify-goldens.mjs; echo "goldens=$?"
+        run: node scripts/verify-goldens.mjs
+
+  prices:
+    # Mechanical enforcement of I2/I3: any PR touching data/prices/** must pass
+    # cite-check (schema + non-empty cited sources). The Claude Code hook is UX;
+    # this job is the source of truth.
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: detect price changes
+        id: changed
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          files=$(git diff --name-only "$base"...HEAD -- 'data/prices/*.json' | tr '\n' ' ')
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: cite-check
+        if: steps.changed.outputs.files != ''
+        run: node --experimental-strip-types scripts/cite-check.ts ${{ steps.changed.outputs.files }}

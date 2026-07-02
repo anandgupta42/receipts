@@ -1,6 +1,6 @@
 # AGENTS.md — aireceipts constitution
 
-*This file is the operating manual. It is the only doc agents must read. ≤150 lines,
+*This file is the operating manual. Reading order when documents disagree: AGENTS.md (process + invariants) → specs/SPEC-0000 (product) → the active spec → the matching skill. ≤150 lines,
 enforced by CI — if you're adding to it, cut something first.*
 
 ## Mission

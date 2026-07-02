@@ -49,7 +49,8 @@ spec. Reuse existing primitives.
 
 ## 4. LAND
 
-Mark the spec `status: shipped`, merge the feature branch into `loop/integration`,
+Keep the spec at `status: building` (`shipped` is flipped only after the human merges),
+merge the feature branch into `loop/integration`,
 refresh the rolling draft PR's description, then stop.
 
 ## Stop & surface

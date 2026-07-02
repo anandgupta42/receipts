@@ -25,13 +25,21 @@ Generate the changelog entry from commits since the last tag, grouped by type (`
 `fix`, `chore`, ...). Don't hand-write marketing copy here — this is a factual log (I6:
 facts, not rankings, applies to the project's own changelog too).
 
-## 4. Update AGENTS.md's current-state inventory
+## 4. Flip shipped specs from `building` to `shipped`
+
+For every spec under `specs/` at `status: building` whose PR merged into `main` as part
+of this release, flip it to `status: shipped` and check its acceptance boxes. This is the
+only point in the lifecycle where `shipped` gets written — `build-spec` and `improve`
+both stop at `building` on purpose, so a spec can never claim "shipped" before a human
+has actually merged it.
+
+## 5. Update AGENTS.md's current-state inventory
 
 This is the **only** skill allowed to edit that section. Move whatever shipped from "not
 started" to its real tier, and update the "updated by" note if the format changed.
 Nothing else in this file changes.
 
-## 5. Human clicks publish
+## 6. Human clicks publish
 
 Prepare the release (tag, changelog, `AGENTS.md` update) as a PR or a tagged commit, but
 **npm publish is the founder's button** (AGENTS.md, button 4) — this skill never runs

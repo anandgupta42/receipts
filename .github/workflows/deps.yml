@@ -16,10 +16,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - name: audit
-        run: npm audit --audit-level=high; echo "audit=$?"
+        run: npm audit --audit-level=high
 
       - name: outdated (informational — never fails the job)
         run: npm outdated || true
