@@ -1,0 +1,2 @@
+{"type":"user","uuid":"u0","timestamp":"2026-06-26T09:00:00.000Z","sessionId":"nocwd000-1111-2222-3333-444455556666","message":{"role":"user","content":"A session whose transcript never recorded a cwd."}}
+{"type":"assistant","uuid":"a0","timestamp":"2026-06-26T09:00:20.000Z","sessionId":"nocwd000-1111-2222-3333-444455556666","message":{"role":"assistant","model":"claude-opus-4-8","content":[{"type":"text","text":"done"}],"usage":{"input_tokens":100,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":10}}}

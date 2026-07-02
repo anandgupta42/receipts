@@ -74,6 +74,49 @@ export interface ReceiptModel {
   unpriceable: boolean;
 }
 
+/**
+ * SPEC-0019 R1e(g) — recompute a session's totals/timestamps/tool counts over a
+ * contiguous turn range `[startTurn, endTurn]` (0-based, inclusive) so a
+ * PR-scoped receipt reflects only the work in that slice. Returns a new
+ * `Session` — the input is never mutated. The sliced turns are re-indexed
+ * 0..k so downstream attribution/waste stay self-consistent; the caller keeps
+ * the ORIGINAL turn count for the `turns A–B of N` header (N is not derivable
+ * from the returned session). `unpriceable` and identity fields carry through.
+ */
+export function sliceSessionForReceipt(session: Session, range: { startTurn: number; endTurn: number }): Session {
+  const start = Math.max(0, range.startTurn);
+  const end = Math.min(session.turns.length - 1, range.endTurn);
+  const slice = session.turns.slice(start, end + 1).map((turn, i) => ({ ...turn, index: i }));
+
+  let tokens = emptyUsage();
+  let toolCallCount = 0;
+  let startedAt: number | undefined;
+  let endedAt: number | undefined;
+  for (const turn of slice) {
+    if (turn.usage) {
+      tokens = addUsage(tokens, turn.usage);
+    }
+    toolCallCount += turn.toolCalls.length;
+    if (turn.timestamp !== undefined) {
+      startedAt = startedAt === undefined ? turn.timestamp : Math.min(startedAt, turn.timestamp);
+      endedAt = endedAt === undefined ? turn.timestamp : Math.max(endedAt, turn.timestamp);
+    }
+  }
+
+  return {
+    ...session,
+    startedAt,
+    endedAt,
+    totals: {
+      tokens,
+      durationMs: startedAt !== undefined && endedAt !== undefined ? endedAt - startedAt : undefined,
+      turnCount: slice.length,
+      toolCallCount,
+    },
+    turns: slice,
+  };
+}
+
 async function buildModelMix(session: Session): Promise<ModelMixEntry[]> {
   const mixMap = new Map<string, TokenUsage>();
   for (const turn of session.turns) {

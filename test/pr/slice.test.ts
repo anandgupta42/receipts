@@ -1,0 +1,86 @@
+// SPEC-0019 R1e — end-to-end slicing over adapter-parsed fixtures: classification
+// (own/foreign/input-only/no-SHA), the foreign-anchor window (multi-PR cut), and
+// the fallbacks (no anchor; push-only rebase; codex-exec wrapper not claimed).
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+import { loadById } from "../../src/parse/load.js";
+import type { Session, ToolCall } from "../../src/parse/types.js";
+import { computeSlice, FULL_FALLBACK_LABEL } from "../../src/pr/slice.js";
+import { hexRuns, matchesBranchSha, toolCallGitVerb } from "../../src/pr/gitWrite.js";
+
+const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
+
+// Branch B's commit + push heads — "ours" for claude-anchors.jsonl.
+const OUR_SHAS = ["b1c2d3e4f5061728394a5b6c7d8e9f0011223344", "c9d8e7f6a5b4c3d2e1f00918273645546372819a"];
+
+function gitCall(session: Session, turnIndex: number): ToolCall {
+  const call = session.turns[turnIndex].toolCalls.find((c) => toolCallGitVerb(c) !== null);
+  if (!call) {
+    throw new Error(`no git-write call in turn ${turnIndex}`);
+  }
+  return call;
+}
+
+/** own iff a hex in OUTPUT matches ours; foreign iff hexes present but none ours; null iff no hex. */
+function classify(call: ToolCall): "own" | "foreign" | "none" {
+  const runs = hexRuns(String(call.output ?? ""));
+  if (runs.length === 0) {
+    return "none";
+  }
+  return runs.some((r) => matchesBranchSha(r, OUR_SHAS)) ? "own" : "foreign";
+}
+
+describe("R1e classification over adapter-parsed output", () => {
+  it("classifies each commit/push span per (b)-(d)", async () => {
+    const session = (await loadById("claude-code", path.join(FIX, "claude-anchors.jsonl")))!;
+    expect(session).toBeTruthy();
+    expect(classify(gitCall(session, 0))).toBe("foreign"); // commit A — SHA not ours
+    expect(classify(gitCall(session, 2))).toBe("own"); // commit B — b1c2d3e
+    expect(classify(gitCall(session, 3))).toBe("own"); // push — b1c2d3e..c9d8e7f
+    // push whose INPUT carries our full SHA but OUTPUT carries only foreign hexes:
+    // authorship is output-only, so this is foreign, never own.
+    expect(classify(gitCall(session, 4))).toBe("foreign");
+    expect(classify(gitCall(session, 5))).toBe("none"); // empty commit — no SHA in output
+  });
+});
+
+describe("R1e slice + foreign window", () => {
+  it("slices from after the sibling's anchor through our last own anchor", async () => {
+    const session = (await loadById("claude-code", path.join(FIX, "claude-anchors.jsonl")))!;
+    const slice = computeSlice(session.turns, OUR_SHAS);
+    // foreign commit A at turn 0 → start at 1; last own anchor is the push at turn 3.
+    expect(slice).toEqual({ kind: "slice", startTurn: 1, endTurn: 3, turnCount: 6 });
+  });
+
+  it("with no foreign anchor before, slices from the session start", async () => {
+    const session = (await loadById("claude-code", path.join(FIX, "claude-anchors.jsonl")))!;
+    // Treat A's SHA as ours too → no foreign anchor before the first own.
+    const slice = computeSlice(session.turns, [...OUR_SHAS, "a1a1a1a0000000000000000000000000000000f"]);
+    expect(slice.kind).toBe("slice");
+    expect(slice.startTurn).toBe(0);
+    expect(slice.endTurn).toBe(3);
+  });
+});
+
+describe("R1e fallbacks (ambiguity → labeled full session)", () => {
+  it("no own anchor at all → full session", async () => {
+    const session = (await loadById("claude-code", path.join(FIX, "claude-anchors.jsonl")))!;
+    const slice = computeSlice(session.turns, ["deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"]);
+    expect(slice.kind).toBe("full");
+    expect(slice.label).toBe(FULL_FALLBACK_LABEL);
+  });
+
+  it("push-only own anchor after a rebase → full session (stale-anchor rule)", async () => {
+    const session = (await loadById("claude-code", path.join(FIX, "claude-pushonly-rebase.jsonl")))!;
+    const slice = computeSlice(session.turns, ["ffee5670123456789abcdef0123456789abcdef0"]);
+    expect(slice.kind).toBe("full");
+    expect(slice.label).toBe(FULL_FALLBACK_LABEL);
+  });
+
+  it("`codex exec \"…git push…\"` is not claimed even when the output SHA is ours", async () => {
+    const session = (await loadById("codex", path.join(FIX, "codex-exec-instruction.jsonl")))!;
+    const slice = computeSlice(session.turns, ["d4d4d4d4e5e5e5e5f6f6f6f60000000000000000"]);
+    expect(slice.kind).toBe("full");
+  });
+});

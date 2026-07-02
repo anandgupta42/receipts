@@ -104,6 +104,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let firstUserText: string | undefined;
   let startedAt: number | undefined;
   let endedAt: number | undefined;
+  let cwd: string | undefined;
   let cumulativeUsage: TokenUsage | undefined;
   let perTurnUsage = emptyUsage();
   let sawCumulative = false;
@@ -135,6 +136,10 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     const type = String(item.type ?? top.type ?? "");
     if (typeof item.model === "string") {
       model ??= item.model;
+    }
+    // R1a: first-seen cwd (attribution-only), reported on session_meta/turn_context.
+    if (cwd === undefined && typeof item.cwd === "string" && item.cwd) {
+      cwd = item.cwd;
     }
 
     // Cumulative-usage envelopes (Codex ≥0.137): `total_token_usage` is a
@@ -235,6 +240,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     endedAt,
     totals,
     filePath,
+    cwd,
   };
 
   return withTurns ? { summary, turns } : { summary, turns: [] as Turn[] };

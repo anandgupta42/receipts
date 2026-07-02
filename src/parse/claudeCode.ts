@@ -1,4 +1,5 @@
 import type { AgentSource, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
+import { isChildPath, parseChildPath } from "./children.js";
 import {
   addUsage,
   emptyUsage,
@@ -52,6 +53,12 @@ interface RawRecord {
   aiTitle?: string;
   isMeta?: boolean;
   message?: RawMessage;
+  /** SPEC-0019 R1a — attribution-only working directory / branch, present on
+   * every user/assistant record; captured first-seen. */
+  cwd?: string;
+  gitBranch?: string;
+  /** SPEC-0019 R1c — the raw child marker. */
+  isSidechain?: boolean;
 }
 
 // command-echo wrapper tags injected into the transcript by the CLI itself — not
@@ -119,6 +126,9 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let firstUserText: string | undefined;
   let startedAt: number | undefined;
   let endedAt: number | undefined;
+  let cwd: string | undefined;
+  let gitBranch: string | undefined;
+  let rawSidechain = false;
   let totalUsage = emptyUsage();
   let turnCount = 0;
   let toolCallCount = 0;
@@ -127,6 +137,17 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
 
   await readJsonl(filePath, (raw) => {
     const r = raw as RawRecord;
+
+    // R1a: first-seen cwd/gitBranch (attribution-only). Absent in raw → absent in model.
+    if (cwd === undefined && typeof r.cwd === "string" && r.cwd) {
+      cwd = r.cwd;
+    }
+    if (gitBranch === undefined && typeof r.gitBranch === "string" && r.gitBranch) {
+      gitBranch = r.gitBranch;
+    }
+    if (r.isSidechain === true) {
+      rawSidechain = true;
+    }
 
     if (r.type === "ai-title" && typeof r.aiTitle === "string") {
       aiTitle = r.aiTitle;
@@ -223,6 +244,10 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     toolCallCount,
   };
 
+  // R1c: a subagent transcript is a child either by disk layout or by the raw
+  // `isSidechain` marker; child linkage comes from the path (the disk layout is
+  // the discovery contract).
+  const childRef = parseChildPath(filePath);
   const summary: SessionSummary = {
     id: filePath,
     source: "claude-code",
@@ -232,6 +257,12 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     endedAt,
     totals,
     filePath,
+    cwd,
+    gitBranch,
+    isSidechain: rawSidechain || childRef !== null ? true : undefined,
+    parentSessionId: childRef?.parentSessionId,
+    agentId: childRef?.agentId,
+    parentFilePath: childRef?.parentFilePath,
   };
 
   return withTurns ? { summary, turns } : { summary, turns: [] as Turn[] };
@@ -252,7 +283,10 @@ export class ClaudeCodeAdapter implements SessionAdapter {
   }
 
   async listSessions(): Promise<SessionSummary[]> {
-    const files = await listFiles(expandHome(ROOT), (name) => name.endsWith(".jsonl"));
+    const all = await listFiles(expandHome(ROOT), (name) => name.endsWith(".jsonl"));
+    // R1c: subagent transcripts are excluded from top-level selection — they roll
+    // up into their parent's receipt, never appear as standalone sessions.
+    const files = all.filter((file) => !isChildPath(file));
     const results = await mapWithConcurrency(files, 16, async (file) => {
       try {
         const stat = await fs.promises.stat(file);

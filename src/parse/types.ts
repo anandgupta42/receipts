@@ -106,6 +106,27 @@ export interface SessionSummary {
    * Pricing/attribution/waste code must skip sessions with this flag set and
    * the receipt renders a tokens-only note instead (I2). */
   unpriceable?: boolean;
+  /**
+   * SPEC-0019 R1a — attribution-only. The raw session's working directory and
+   * git branch (first seen in the transcript). Used solely to match a session
+   * to the current repo/worktree for `aireceipts pr`. Absent in the raw
+   * transcript → absent here (a session without `cwd` is never auto-attributed).
+   * **Privacy rule:** these NEVER enter export schemas (`--json`/`--csv`),
+   * rendered receipts, or telemetry — the strict-schema parity tests assert
+   * their absence.
+   */
+  cwd?: string;
+  gitBranch?: string;
+  /**
+   * SPEC-0019 R1c — child (subagent) index, attribution-only. `isSidechain` is
+   * true for a subagent transcript at `<parentSessionId>/subagents/**` (excluded
+   * from top-level selection); the remaining fields link a child back to the
+   * parent it rolls up into. Same privacy rule as `cwd`/`gitBranch`.
+   */
+  isSidechain?: boolean;
+  parentSessionId?: string;
+  agentId?: string;
+  parentFilePath?: string;
 }
 
 export interface Session extends SessionSummary {
