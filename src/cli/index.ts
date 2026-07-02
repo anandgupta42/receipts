@@ -22,6 +22,7 @@ import {
   recordCliRun,
   showTelemetryPayload,
 } from "../telemetry/index.js";
+import { buildBenchmarkPayload, confirmPrompt, BENCHMARK_UNAVAILABLE_MESSAGE } from "../benchmark/index.js";
 import { parseArgs } from "./args.js";
 import { runQuota } from "./quota.js";
 
@@ -40,6 +41,8 @@ Usage:
                                         trailing-7-day digest across sessions
   aireceipts --check-budget             exit 1 if ~/.aireceipts/budget.json's cap is
                                          exceeded (advisory; see docs)
+  aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
+                                         contract only, sends disabled)
   aireceipts --help                     show this help
 
 flags: --svg renders an SVG file; --theme light|dark picks the palette (default light);
@@ -227,6 +230,43 @@ async function runWeek(args: ReturnType<typeof parseArgs>): Promise<number> {
   return 0;
 }
 
+/**
+ * SPEC-0015 v1: client contract only, sends disabled.
+ * `--dry-run` builds+prints the exact payload and returns without prompting
+ * (R3). Otherwise every call re-prompts `[y/N]` (R1, no persisted
+ * "always allow") — declining makes no network call and exits 0; accepting
+ * also makes no network call in v1, since no server endpoint exists yet
+ * (`isBenchmarkServiceAvailable()` is always `false` — see src/benchmark/send.ts).
+ */
+async function runBenchmark(selector: string | undefined, dryRun: boolean): Promise<number> {
+  const resolved = await resolveSelector(selector);
+  if ("error" in resolved) {
+    process.stderr.write(`${resolved.error}\n`);
+    return 1;
+  }
+  const session = await loadSession(resolved.summary);
+  if (!session) {
+    process.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
+    return 1;
+  }
+  const model = await buildReceiptModel(session);
+  const payload = buildBenchmarkPayload(model, session.totals.turnCount);
+
+  if (dryRun) {
+    process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+    return 0;
+  }
+
+  const consented = await confirmPrompt("Send anonymous benchmark data for this session?");
+  if (!consented) {
+    return 0;
+  }
+
+  process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
+  process.stdout.write(`${BENCHMARK_UNAVAILABLE_MESSAGE}\n`);
+  return 0;
+}
+
 async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
   const svgOut: SvgOut = { svg: args.svg, theme: args.theme, output: args.output };
   switch (args.command) {
@@ -251,6 +291,8 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runWeek(args);
     case "check-budget":
       return runCheckBudget();
+    case "benchmark":
+      return runBenchmark(args.selector, args.dryRun);
     case "receipt":
     default:
       return runReceipt(args.selector, args.json, svgOut);
