@@ -45,8 +45,12 @@ doubt, this file wins.
 - **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
   its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
   and no line ever claims another model would have completed the task.
-- **I4 — Local-first, zero telemetry, ever.** The only network use is the opt-in
-  benchmark command, if it ever ships — and it says so out loud.
+- **I4 — Local-first; diagnostics-only telemetry, disclosed and escapable.** Offline-
+  complete product; anonymous diagnostics to App Insights (perf + error + parse-failure
+  signals only — the format-drift sensor). Never content/paths/repos/prompts/$ amounts.
+  First-run notice, payload inspectable, `AIRECEIPTS_TELEMETRY=off` / `DO_NOT_TRACK=1`.
+  Details + schema: SPEC-0002.
+
 - **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.
 - **I6 — Facts, not rankings.** Report what a session cost; never rank models or agents
   as better/worse.
@@ -64,7 +68,7 @@ doubt, this file wins.
 
 aireceipts is built in the open by one person, as OSS, MIT-licensed. It is not a company
 product and is not gated behind a signup. It never phones home: no analytics, no crash
-reporting, no update pings, by default and permanently (I4). If a future opt-in feature
+reporting beyond the I4 diagnostics contract. If a future opt-in feature
 needs the network (e.g. a hosted benchmark corpus), it is off by default, named clearly,
 and documented as the one exception. Price tables are maintained in the open via cited
 PRs (`data/prices/`, the `update-prices` skill) — anyone can audit where a number came
@@ -73,5 +77,5 @@ from.
 ## Success criteria
 
 - [ ] This spec is read and honored by every other spec and skill in the repo.
-- [ ] No spec introduces a network call in the product path without amending I4 here
+- [ ] No spec introduces a network call beyond the I4 diagnostics contract without amending I4 here
       first, with the founder's explicit approval.
