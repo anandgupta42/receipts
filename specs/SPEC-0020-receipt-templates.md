@@ -1,7 +1,7 @@
 ---
 id: SPEC-0020
 title: "Receipt templates — user-selectable receipt styles (--template)"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0003]
 ---
