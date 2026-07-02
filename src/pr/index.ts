@@ -5,12 +5,11 @@
 // failed post can never eat the receipt. Selection errors (no/many matches)
 // happen before there's anything to render and exit 1 with a stderr message.
 import * as path from "node:path";
-import { selectSummary } from "../parse/load.js";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { branchCommits, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
-import { selectCandidates } from "./select.js";
+import { selectCandidates, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
 import { renderPrBody } from "./body.js";
@@ -54,7 +53,7 @@ async function resolveSession(
 ): Promise<{ summary: SessionSummary } | { error: string }> {
   const sessions = await deps.listSessions();
   if (opts.session) {
-    const summary = selectSummary(sessions, opts.session);
+    const summary = await selectExplicitSession(sessions, opts.session);
     return summary ? { summary } : { error: `no session matched "${opts.session}"` };
   }
   if (sessions.length === 0) {

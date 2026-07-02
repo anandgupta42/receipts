@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import type { SessionSummary } from "../../src/parse/types.js";
 import { cwdInsideRoots } from "../../src/pr/git.js";
-import { OVERLAP_SLACK_MS, selectCandidates } from "../../src/pr/select.js";
+import { OVERLAP_SLACK_MS, selectCandidates, selectExplicitSession } from "../../src/pr/select.js";
 
 const emptyTotals = { tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 }, turnCount: 0, toolCallCount: 0 };
 
@@ -76,5 +76,34 @@ describe("R1d overlap + selection", () => {
       isSidechain: true,
     });
     expect(selectCandidates([s], roots, commitMs)).toEqual({ kind: "none" });
+  });
+});
+
+describe("R1c explicit --session child selection", () => {
+  const parent = summary({ id: "/tmp/parent.jsonl", filePath: "/tmp/parent.jsonl" });
+  const childPath = "/tmp/parent/subagents/agent-child1.jsonl";
+  const child = summary({
+    id: childPath,
+    filePath: childPath,
+    isSidechain: true,
+    parentSessionId: "parent",
+    agentId: "child1",
+    parentFilePath: parent.filePath,
+  });
+  const deps = {
+    discoverChildren: async () => [childPath],
+    loadChildSummary: async () => child,
+  };
+
+  it("matches a subagent transcript by id stem", async () => {
+    await expect(selectExplicitSession([parent], "agent-child1", deps)).resolves.toBe(child);
+  });
+
+  it("matches a subagent transcript by absolute path", async () => {
+    await expect(selectExplicitSession([parent], childPath, deps)).resolves.toBe(child);
+  });
+
+  it("returns null for a bogus explicit id", async () => {
+    await expect(selectExplicitSession([parent], "missing-child", deps)).resolves.toBeNull();
   });
 });
