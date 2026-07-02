@@ -361,7 +361,13 @@ function getExcerpt(markdown) {
     paragraph.push(stripInlineMarkdown(trimmed));
   }
 
-  return paragraph.join(" ").slice(0, 180);
+  const joined = paragraph.join(" ");
+  if (joined.length <= 180) return joined;
+  const cut = joined.slice(0, 180);
+  // Prefer a whole sentence; fall back to a word boundary. Never cut mid-word.
+  const sentence = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
+  if (sentence > 60) return cut.slice(0, sentence + 1);
+  return `${cut.slice(0, cut.lastIndexOf(" "))}…`;
 }
 
 function css() {
@@ -649,7 +655,7 @@ function barcodeSvg() {
 
 function wrapPage({ title, sourcePath, body, docs }) {
   const sourceLine = sourcePath === undefined
-    ? "Static contents for the public docs set."
+    ? "Every page below is generated from the markdown in docs/ — each one names the source it wraps."
     : `Rendered from <code>${escapeHtml(sourcePath)}</code>.`;
   const navItems = docs
     .map((doc) => `<li><a href="${escapeAttr(doc.href)}">${escapeHtml(doc.title)}</a></li>`)
@@ -760,7 +766,7 @@ function main() {
     writeHtml(join(OUT_DIR, doc.href), html);
   }
 
-  const indexBody = `<h1 id="docs">Docs</h1>
+  const indexBody = `
 <p>Root repository docs rendered as static pages for GitHub Pages. Source paths are shown so the generated site remains traceable to the markdown it wraps.</p>
 <ul class="doc-index-list">
 ${docs.map((doc) => `  <li>
