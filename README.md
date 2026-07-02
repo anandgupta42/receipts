@@ -1,17 +1,99 @@
-# aireceipts
+# aireceipts 🧾
 
-**Your AI coding agent says it's done. What did that actually cost?**
+**Your AI coding agent just worked for 33 minutes. Here's the receipt.**
 
-`aireceipts` reads an agent transcript off disk (Claude Code, Codex, more coming) and
-prints a cost receipt: per-tool breakdown, waste lines, a counterfactual re-price, and a
-block you can paste into a PR.
+```
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS
+ Claude Code · Jul 02 2026 14:57:39 UTC · 33m 31s
+               claude-sonnet-5 100%
+         cache served 94% of input tokens
 
-I'm building this in the open, as one person, not released yet — no npm install that
-does anything useful today. Follow along or poke at the code; it'll get sharper fast.
+(thinking/reply)................$5.36  (101 turns)
+Bash.............................$3.93  (76 calls)
+Read.............................$1.88  (35 calls)
+Write............................$0.66  (10 calls)
+Edit..............................$0.38  (6 calls)
 
-Offline-complete, zero accounts, with opt-out diagnostics telemetry (never your
-code, prompts, paths, or costs — schema in docs/telemetry.md; kill with
-`AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1`) — I
-don't want your transcripts and I built this so I never see them.
+≈ re-priced eligible trivial spans...........$2.68
+  (101 tiny turns, priced at claude-haiku-4-5)
+--------------------------------------------------
+TOTAL.......................................$12.30
+same tokens on claude-haiku-4-5..............$6.15
+  (arithmetic, not a prediction)
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟
+- - - - - - - - - - - - - - - - - - - - - - - - -
+```
 
-MIT licensed. If we ever meet in person, I owe you a samosa.
+One command. No account, no API key, no upload — it reads the transcripts your
+agent already writes to disk and prices them against cited, dated price tables.
+
+```sh
+npx aireceipts          # receipt for your newest session
+```
+
+> **Status**: source-first pre-release. Until the npm package is published:
+> `git clone … && npm install && npm run build && node dist/cli.js`
+
+## What you get
+
+| Command | What it does |
+|---|---|
+| `aireceipts` | Receipt for the newest session (`--list` to pick another) |
+| `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio |
+| `aireceipts --svg -o r.svg` | The receipt as a shareable image, light/dark themes |
+| `aireceipts week` | Trailing-7-day digest: totals, per-agent split, top waste, honest deltas |
+| `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time |
+| `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt |
+| `aireceipts statusline` | Live cost line in Claude Code's status bar |
+| `aireceipts --quota` | Your official rate-limit window state (subscribers) |
+| `aireceipts --check-budget` | Exit 1 when `~/.aireceipts/budget.json`'s cap is exceeded — advisory, composable |
+| `aireceipts --json` / `--csv` | Versioned schema / RFC 4180 rows for scripts and spreadsheets |
+
+Waste detection is deliberately conservative: stuck tool loops, trivial spans that a
+cheaper model could run, each shown with its cost — precision-gated so a flagged line
+is worth reading (a false positive fails our CI).
+
+## The honesty rules
+
+The receipt is only useful if you can trust every character on it:
+
+- **No fabricated dollars, ever.** A model without a cited, dated price row renders
+  tokens-only — never a guess.
+- **Every price is cited.** Each row in `data/prices/` carries the vendor page URL, the
+  date observed, and a quoted excerpt. CI checks the citations and their liveness.
+- **Comparisons are arithmetic, not predictions.** "Same tokens on X" re-prices the
+  identical token counts — it never claims another model would have done the job.
+- **Deterministic.** Same transcript in, byte-identical receipt out — golden-tested on
+  every commit, 10× under a frozen environment.
+
+Full methodology: `aireceipts --methodology`.
+
+## Supported agents
+
+| Agent | Depth |
+|---|---|
+| Claude Code | Full: per-turn models, tools, cache tiers |
+| Codex CLI | Full per-turn parsing |
+| Cursor | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
+
+## Telemetry, disclosed
+
+Anonymous diagnostics only — error classes, duration buckets, parse-failure signatures.
+Never code, prompts, paths, titles, or dollar amounts. See exactly what a run would
+send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
+`DO_NOT_TRACK=1`. Schema and rationale: [docs/telemetry.md](docs/telemetry.md).
+
+## How this repo works
+
+aireceipts is designed and largely built by AI agents under a spec-driven harness —
+adversarially validated specs, mutation-tested gates, byte-golden outputs, and PRs
+that carry the receipt of the agent session that built them. The design and the
+motivation: [docs/harness.md](docs/harness.md).
+
+More docs: [JSON schema](docs/json-schema.md) · [statusline setup](docs/statusline.md)
+
+## License
+
+Apache-2.0. If we ever meet in person, I owe you a samosa. 🥟
