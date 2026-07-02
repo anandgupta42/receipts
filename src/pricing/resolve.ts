@@ -146,6 +146,9 @@ export function vendorForModel(modelId: string): string | undefined {
   if (modelId.startsWith("gemini-")) {
     return "google";
   }
+  if (modelId.startsWith("deepseek-")) {
+    return "deepseek";
+  }
   return undefined;
 }
 
