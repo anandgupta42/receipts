@@ -6,7 +6,7 @@
 // `compare` commands to SVG output; `-o`/`--output` names the file and
 // `--theme light|dark` picks the palette.
 export interface ParsedArgs {
-  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week";
+  command: "receipt" | "list" | "compare" | "handoff" | "help" | "methodology" | "telemetry-show" | "quota" | "week" | "check-budget";
   selector?: string;
   compareA?: string;
   compareB?: string;
@@ -21,6 +21,8 @@ export interface ParsedArgs {
   byProject: boolean;
   /** SPEC-0008: re-anchor the trailing window at this YYYY-MM-DD date. */
   since?: string;
+  /** SPEC-0009 R4: evaluate the budget and exit 1 if any configured cap is exceeded. */
+  checkBudget: boolean;
 }
 
 /** Value-consuming flags: `--theme dark`, `-o out.svg`. Anything else is a boolean flag or positional. */
@@ -32,6 +34,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   let methodology = false;
   let telemetryShow = false;
   let quota = false;
+  let checkBudget = false;
   let byProject = false;
   let since: string | undefined;
   let svg = false;
@@ -53,6 +56,8 @@ export function parseArgs(argv: string[]): ParsedArgs {
       methodology = true;
     } else if (arg === "--quota") {
       quota = true;
+    } else if (arg === "--check-budget") {
+      checkBudget = true;
     } else if (arg === "--by-project") {
       byProject = true;
     } else if (arg === "--since") {
@@ -73,36 +78,40 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (help) {
-    return { command: "help", json, svg, theme, output, byProject, since };
+    return { command: "help", json, svg, theme, output, byProject, since, checkBudget };
   }
 
   if (methodology) {
-    return { command: "methodology", json, svg, theme, output, byProject, since };
+    return { command: "methodology", json, svg, theme, output, byProject, since, checkBudget };
   }
 
   if (telemetryShow) {
-    return { command: "telemetry-show", json, svg, theme, output, byProject, since };
+    return { command: "telemetry-show", json, svg, theme, output, byProject, since, checkBudget };
+  }
+
+  if (checkBudget) {
+    return { command: "check-budget", json, svg, theme, output, byProject, since, checkBudget };
   }
 
   if (quota) {
-    return { command: "quota", json, svg, theme, output, byProject, since };
+    return { command: "quota", json, svg, theme, output, byProject, since, checkBudget };
   }
 
   if (positional[0] === "compare") {
-    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, theme, output, byProject, since };
+    return { command: "compare", compareA: positional[1], compareB: positional[2], json, svg, theme, output, byProject, since, checkBudget };
   }
 
   if (positional[0] === "week") {
-    return { command: "week", json, svg, theme, output, byProject, since };
+    return { command: "week", json, svg, theme, output, byProject, since, checkBudget };
   }
 
   if (list) {
-    return { command: "list", json, svg, theme, output, byProject, since };
+    return { command: "list", json, svg, theme, output, byProject, since, checkBudget };
   }
 
   if (handoff) {
-    return { command: "handoff", selector: positional[0], json, svg, theme, output, byProject, since };
+    return { command: "handoff", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget };
   }
 
-  return { command: "receipt", selector: positional[0], json, svg, theme, output, byProject, since };
+  return { command: "receipt", selector: positional[0], json, svg, theme, output, byProject, since, checkBudget };
 }
