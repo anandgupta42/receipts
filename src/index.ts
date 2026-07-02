@@ -15,6 +15,7 @@ export { SOURCE_LABELS } from "./parse/types.js";
 export { ClaudeCodeAdapter } from "./parse/claudeCode.js";
 export { CodexAdapter } from "./parse/codex.js";
 export { CursorAdapter } from "./parse/cursor.js";
+export { GeminiAdapter } from "./parse/gemini.js";
 
 export { adapterFor, adapters, agentIds, detectedAdapters } from "./parse/registry.js";
 export { anyDetected, listSessions, listFullSessions, loadById, loadSession, newestSession, rootsHint, selectSummary } from "./parse/load.js";

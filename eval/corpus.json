@@ -35,6 +35,21 @@
       "source": "claude-code",
       "path": "test/fixtures/claude-code/unpriced-unknown-model.jsonl",
       "expected": []
+    },
+    {
+      "source": "gemini",
+      "path": "test/fixtures/gemini/clean-session.jsonl",
+      "expected": []
+    },
+    {
+      "source": "gemini",
+      "path": "test/fixtures/gemini/unpriced-pro-model.jsonl",
+      "expected": []
+    },
+    {
+      "source": "gemini",
+      "path": "test/fixtures/gemini/rewind-dedupe.jsonl",
+      "expected": []
     }
   ]
 }
