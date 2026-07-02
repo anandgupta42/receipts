@@ -21,7 +21,7 @@ describe("cache line display honesty", () => {
     const { buildReceiptModel } = await import("../../src/receipt/model.js");
     const m = await buildReceiptModel((await loadById("claude-code", "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl"))!);
     const tweaked = { ...m, totalTokens: { ...m.totalTokens, input: 1, cacheRead: 10000, cacheCreation: 0 } };
-    const view = buildReceiptView(tweaked) as any;
+    const view: unknown = buildReceiptView(tweaked);
     const all = JSON.stringify(view);
     expect(all).toContain("cache served >99% of input tokens");
     expect(all).not.toContain("cache served 100%");
