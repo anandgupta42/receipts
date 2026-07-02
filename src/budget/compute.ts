@@ -2,7 +2,7 @@
 // pricing-attribution primitives (SPEC-0008's dependency requirement) — no
 // duplicated windowing/aggregation logic of its own beyond `window.ts`'s
 // bounds math.
-import { listSessions, loadSession } from "../parse/load.js";
+import { listFullSessions, loadSession } from "../parse/load.js";
 import { attributeByTool } from "../pricing/attribution.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
 import type { BudgetPeriod, BudgetPeriodConfig } from "./types.js";
@@ -44,7 +44,7 @@ export async function computeBudgetSum(
   dataDir: string = defaultDataDir(),
 ): Promise<BudgetSum> {
   const bounds = windowFor(period, now);
-  const all = await listSessions();
+  const all = await listFullSessions();
   const inWindowSummaries = all.filter((s) => inWindow(s.endedAt, bounds));
 
   if (periodConfig.tokens !== undefined) {

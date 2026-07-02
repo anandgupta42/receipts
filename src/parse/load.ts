@@ -1,11 +1,47 @@
 import { adapterFor, adapters, detectedAdapters } from "./registry.js";
 import type { AgentSource, Session, SessionSummary } from "./types.js";
+import { SummaryCache, completeSummariesWithCache } from "./summaryCache.js";
+import * as fs from "node:fs";
 
-/** All sessions across every adapter, most-recent-first. Per-adapter failures are isolated (never abort the whole list). */
+function sortMostRecentFirst(sessions: SessionSummary[]): SessionSummary[] {
+  return sessions.sort((a, b) => (b.endedAt ?? b.startedAt ?? 0) - (a.endedAt ?? a.startedAt ?? 0));
+}
+
+/** Lazy sessions across every adapter, most-recent-first. Per-adapter failures are isolated (never abort the whole list). */
 export async function listSessions(agent?: AgentSource): Promise<SessionSummary[]> {
   const pool = agent ? adapters().filter((a) => a.id === agent) : adapters();
   const lists = await Promise.all(pool.map((a) => a.listSessions().catch(() => [] as SessionSummary[])));
-  return lists.flat().sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0));
+  return sortMostRecentFirst(lists.flat());
+}
+
+/** Full summaries across every adapter, most-recent-first, with an incremental file-summary cache for JSONL transcripts. */
+export async function listFullSessions(agent?: AgentSource): Promise<SessionSummary[]> {
+  const pool = agent ? adapters().filter((a) => a.id === agent) : adapters();
+  const cache = await SummaryCache.load();
+  const lists = await Promise.all(
+    pool.map(async (adapter) => {
+      try {
+        if (adapter.id === "cursor") {
+          return adapter.listSessions({ full: true });
+        }
+        const lazy = await adapter.listSessions();
+        return completeSummariesWithCache(lazy, {
+          cache,
+          stat: (filePath) => fs.promises.stat(filePath),
+          load: (summary) => loadById(summary.source, summary.id),
+        });
+      } catch {
+        return [] as SessionSummary[];
+      }
+    }),
+  );
+  await cache.save();
+  return sortMostRecentFirst(lists.flat());
+}
+
+/** The mtime-newest lazy summary, used before full-parsing exactly one default receipt session. */
+export async function newestSession(agent?: AgentSource): Promise<SessionSummary | null> {
+  return (await listSessions(agent))[0] ?? null;
 }
 
 /** Load one full session by its adapter source + id. */

@@ -17,7 +17,7 @@ export { CodexAdapter } from "./parse/codex.js";
 export { CursorAdapter } from "./parse/cursor.js";
 
 export { adapterFor, adapters, agentIds, detectedAdapters } from "./parse/registry.js";
-export { anyDetected, listSessions, loadById, loadSession, rootsHint, selectSummary } from "./parse/load.js";
+export { anyDetected, listSessions, listFullSessions, loadById, loadSession, newestSession, rootsHint, selectSummary } from "./parse/load.js";
 
 export type { PriceRow, PriceSource, PriceTable, ResolvedPrice } from "./pricing/types.js";
 export { defaultDataDir, loadPriceTable } from "./pricing/priceTable.js";

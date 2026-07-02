@@ -133,6 +133,16 @@ export interface Session extends SessionSummary {
   turns: Turn[];
 }
 
+export interface ListSessionsOptions {
+  /**
+   * `false` (default) returns lazy discovery rows built from path metadata and
+   * the transcript's first line only. `true` asks an adapter to run its full
+   * summary parser; callers that need full totals should normally go through
+   * `listFullSessions()` so unchanged files hit the summary cache first.
+   */
+  full?: boolean;
+}
+
 export interface SessionAdapter {
   readonly id: AgentSource;
   /** human label, e.g. "Claude Code" */
@@ -142,7 +152,7 @@ export interface SessionAdapter {
   /** true when any session data is present on disk */
   detect(): Promise<boolean>;
   /** session rows for the list; should be cheap-ish and resilient to bad data */
-  listSessions(): Promise<SessionSummary[]>;
+  listSessions(options?: ListSessionsOptions): Promise<SessionSummary[]>;
   /** full session (with turns) by its adapter-local id */
   loadSession(id: string): Promise<Session | null>;
 }

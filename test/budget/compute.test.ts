@@ -1,5 +1,5 @@
 // R2/R6 tests for `src/budget/compute.ts`. `computeBudgetSum` depends on
-// `listSessions`/`loadSession` from `src/parse/load.ts`, which always scan
+// `listFullSessions`/`loadSession` from `src/parse/load.ts`, which always scan
 // real on-disk adapter roots (no fixture-injection param exists) — so this
 // file mocks that module to inject deterministic `SessionSummary`/`Session`
 // fixtures, per the context-safety rule against touching real transcripts.
@@ -12,16 +12,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Session, SessionSummary, SessionTotals, TokenUsage, Turn } from "../../src/parse/types.js";
 
 vi.mock("../../src/parse/load.js", () => ({
-  listSessions: vi.fn(),
+  listFullSessions: vi.fn(),
   loadSession: vi.fn(),
 }));
 
-const { listSessions, loadSession } = await import("../../src/parse/load.js");
+const { listFullSessions, loadSession } = await import("../../src/parse/load.js");
 const { computeBudgetSum } = await import("../../src/budget/compute.js");
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
 
-const listSessionsMock = vi.mocked(listSessions);
+const listSessionsMock = vi.mocked(listFullSessions);
 const loadSessionMock = vi.mocked(loadSession);
 
 function usage(overrides: Partial<TokenUsage> & Pick<TokenUsage, "input" | "output" | "cacheRead" | "cacheCreation">): TokenUsage {

@@ -33,7 +33,7 @@ export interface PrDeps {
 
 export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
   return {
-    listSessions: async () => (await import("../parse/load.js")).listSessions(),
+    listSessions: async () => (await import("../parse/load.js")).listFullSessions(),
     loadSession: async (summary) => (await import("../parse/load.js")).loadSession(summary),
     runGit: defaultRunner,
     runGh: defaultRunner,
