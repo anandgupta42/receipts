@@ -19,6 +19,11 @@ interface RawUsage {
   output_tokens?: number;
   cache_read_input_tokens?: number;
   cache_creation_input_tokens?: number;
+  /** Newer Claude Code sessions split the flat `cache_creation_input_tokens` total by ephemeral TTL tier. Older sessions omit this object entirely. */
+  cache_creation?: {
+    ephemeral_5m_input_tokens?: number;
+    ephemeral_1h_input_tokens?: number;
+  };
 }
 
 interface RawContentBlock {
@@ -74,22 +79,36 @@ function stringifyToolResult(content: unknown): string {
 }
 
 /**
- * Map Claude Code's raw usage onto our 4-component `TokenUsage`.
+ * Map Claude Code's raw usage onto our `TokenUsage`.
  * `cache_creation_input_tokens` is carried as its own `cacheCreation` field
  * rather than folded into `input` — `src/pricing/resolve.ts`'s `costOf`
  * prices it against the vendor's cited cache-write rate (I2: pricing
  * cache-writes at the base input rate would understate cost on
  * cache-write-heavy sessions, our flagship case).
+ *
+ * When the transcript's nested `cache_creation` object is present, its
+ * `ephemeral_5m_input_tokens`/`ephemeral_1h_input_tokens` become
+ * `cacheCreation5m`/`cacheCreation1h` so `costOf` can price each tier at its
+ * own cited rate rather than assuming one. The flat `cache_creation_input_tokens`
+ * field is always present when there's any cache-write activity and is used
+ * as the `cacheCreation` total when set; the split-tier sum is only used as
+ * a fallback for sessions where the flat field itself is missing.
  */
 function mapUsage(usage: RawUsage | undefined) {
   if (!usage) {
     return undefined;
   }
+  const split = usage.cache_creation;
+  const has5m = split?.ephemeral_5m_input_tokens !== undefined;
+  const has1h = split?.ephemeral_1h_input_tokens !== undefined;
+  const splitSum = (split?.ephemeral_5m_input_tokens ?? 0) + (split?.ephemeral_1h_input_tokens ?? 0);
   return withTotal({
     input: usage.input_tokens ?? 0,
     output: usage.output_tokens ?? 0,
     cacheRead: usage.cache_read_input_tokens ?? 0,
-    cacheCreation: usage.cache_creation_input_tokens ?? 0,
+    cacheCreation: usage.cache_creation_input_tokens ?? (has5m || has1h ? splitSum : 0),
+    cacheCreation5m: has5m ? split.ephemeral_5m_input_tokens : undefined,
+    cacheCreation1h: has1h ? split.ephemeral_1h_input_tokens : undefined,
     total: 0,
   });
 }

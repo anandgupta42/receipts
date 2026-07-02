@@ -34,29 +34,53 @@ function rate(perMillion: number, tokens: number): number {
 }
 
 /**
+ * Cache-write portion of `costOf`: prices whatever tier breakdown `usage`
+ * actually has, rather than assuming one tier for the whole total.
+ *
+ * When `usage.cacheCreation5m`/`cacheCreation1h` are present (newer Claude
+ * Code transcripts split the write by ephemeral TTL), each priced at its own
+ * cited rate — `input_cache_write_5m ?? input` / `input_cache_write_1h ??
+ * input` — a conservative fallback to the base input rate when the row
+ * doesn't cite that tier (never under-charges, I2).
+ *
+ * Any part of `cacheCreation` not covered by a known tier (either because
+ * the transcript never split it, or a partial split leaves a remainder) is
+ * priced under the documented assumption that it's 5-minute-tier — Claude
+ * Code's default cache TTL — at `input_cache_write_5m ?? input`. This does
+ * *not* fall through to the 1-hour rate for the unsplit remainder: an
+ * unsplit write is an assumed 5m write, not an unknown-tier write, so it
+ * gets the 5m-or-base fallback chain, never the more expensive 1h rate
+ * (I2: never *over*-charge on a guess either — state the assumption instead).
+ */
+function cacheWriteCost(usage: TokenUsage, row: PriceRow): number {
+  const known5m = usage.cacheCreation5m ?? 0;
+  const known1h = usage.cacheCreation1h ?? 0;
+  const unsplit = usage.cacheCreation - known5m - known1h;
+  const write5mRate = row.input_cache_write_5m ?? row.input;
+  const write1hRate = row.input_cache_write_1h ?? row.input;
+  return rate(write5mRate, known5m) + rate(write1hRate, known1h) + rate(write5mRate, unsplit);
+}
+
+/**
  * Dollar cost of `usage` at `row`'s rates.
  *
  * Cached-read tokens use `input_cached` when the row cites one, otherwise
  * the plain `input` rate — a conservative fallback (never under-charges)
  * rather than inventing an uncited discount (I2).
  *
- * Cache-write tokens (`cacheCreation`) use `input_cache_write_5m` when the
- * row cites one — Claude Code's default cache TTL is 5 minutes, so that's
- * the rate a write is billed at unless the caller opted into the 1-hour
- * cache — else `input_cache_write_1h` when only that's cited, else the base
- * `input` rate. No transcript we parse records which TTL tier a given write
- * used, so this is a documented default-tier choice, not a guess at the
- * actual tier; the base-input fallback (when the row cites neither field)
- * mirrors the cached-read fallback above and likewise never under-charges,
- * since Anthropic always bills a cache write at a multiple of the input
- * rate (I2).
+ * Cache-write tokens (`cacheCreation`) are priced by `cacheWriteCost`: known
+ * 5-minute/1-hour tier tokens at their own cited rate, and any unsplit
+ * remainder under the documented assumption that it's 5-minute-tier —
+ * Claude Code's default cache TTL. If a row cites neither cache-write rate,
+ * writes fall back to the base `input` rate (never under-charges, I2). See
+ * `cacheWriteCost` for the exact fallback chain.
  */
 export function costOf(usage: TokenUsage, row: PriceRow): number {
   return (
     rate(row.input, usage.input) +
     rate(row.output, usage.output) +
     rate(row.input_cached ?? row.input, usage.cacheRead) +
-    rate(row.input_cache_write_5m ?? row.input_cache_write_1h ?? row.input, usage.cacheCreation)
+    cacheWriteCost(usage, row)
   );
 }
 

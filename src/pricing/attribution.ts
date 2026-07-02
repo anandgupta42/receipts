@@ -1,5 +1,5 @@
 import type { Session, TokenUsage } from "../parse/types.js";
-import { addUsage, emptyUsage } from "../parse/util.js";
+import { addUsage, emptyUsage, scaleUsage } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
 import { isoDateOf, priceTurn, vendorForSource } from "./resolve.js";
 
@@ -11,9 +11,11 @@ export const METHODOLOGY =
   "dated price row matching its model and date) is split evenly across the tool(s) " +
   'it called; a turn with no tool calls is attributed to "(thinking/reply)". Turns ' +
   "whose model has no matching price row contribute tokens only — never a guessed " +
-  "dollar amount. Cache-write tokens are priced at the row's 5-minute cache-write " +
-  "rate when cited, else its 1-hour rate, else the plain input rate — never a " +
-  "guessed discount.";
+  "dollar amount. Cache-write tokens are priced per known TTL tier when the " +
+  "transcript splits them (5-minute and 1-hour rates); any unsplit cache-write " +
+  "tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and " +
+  "priced at that rate, or the plain input rate if the price row cites neither — " +
+  "never a guessed discount.";
 
 export interface ToolAttribution {
   tool: string;
@@ -56,15 +58,7 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
     const turnUsd = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
-    const tokenShare: TokenUsage = turn.usage
-      ? {
-          input: turn.usage.input * share,
-          output: turn.usage.output * share,
-          cacheRead: turn.usage.cacheRead * share,
-          cacheCreation: turn.usage.cacheCreation * share,
-          total: turn.usage.total * share,
-        }
-      : emptyUsage();
+    const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
 
     for (const tool of units) {
       const entry = acc.get(tool) ?? { usd: 0, priced: false, tokens: emptyUsage(), callCount: 0 };

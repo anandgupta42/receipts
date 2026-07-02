@@ -1,5 +1,5 @@
 import type { Session, TokenUsage } from "../parse/types.js";
-import { addUsage, emptyUsage } from "../parse/util.js";
+import { addUsage, emptyUsage, scaleUsage } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
 import { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForSource } from "./resolve.js";
 
@@ -56,15 +56,7 @@ async function flattenCalls(session: Session, vendor: string | undefined, dataDi
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
     const turnUsd = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const share = 1 / turn.toolCalls.length;
-    const tokenShare: TokenUsage = turn.usage
-      ? {
-          input: turn.usage.input * share,
-          output: turn.usage.output * share,
-          cacheRead: turn.usage.cacheRead * share,
-          cacheCreation: turn.usage.cacheCreation * share,
-          total: turn.usage.total * share,
-        }
-      : emptyUsage();
+    const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
     for (const call of turn.toolCalls) {
       out.push({
         tool: call.name,

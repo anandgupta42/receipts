@@ -24,17 +24,28 @@ export const SOURCE_LABELS: Record<AgentSource, string> = {
  * (`data/prices/<vendor>.json`) may cite distinct cache-write rates
  * (`input_cache_write_5m`/`_1h`) that are more expensive than a plain input
  * token — folding writes into `input` would understate cost on cache-write-
- * heavy sessions (I2: never under-report spend). No adapter transcript
- * records which TTL tier a given write used, so `src/pricing/resolve.ts`'s
- * `costOf` picks a documented default tier when a row cites more than one,
- * falling back to the base `input` rate when the row cites none. See each
- * adapter's `mapUsage` for the exact per-vendor mapping.
+ * heavy sessions (I2: never under-report spend).
+ *
+ * `cacheCreation` is the always-present total; `cacheCreation5m`/
+ * `cacheCreation1h` are the optional split of that total by ephemeral TTL
+ * tier. Claude Code's transcript exposes the split (`cache_creation.
+ * ephemeral_5m_input_tokens`/`ephemeral_1h_input_tokens`) in newer sessions
+ * but only the flat total in older ones — the split fields are `undefined`,
+ * not `0`, whenever the transcript didn't report a tier breakdown, so
+ * `src/pricing/resolve.ts`'s `costOf` can tell "zero writes at this tier"
+ * apart from "tier unknown" and price the unsplit remainder under its
+ * documented 5-minute-tier assumption rather than silently treating unknown
+ * as zero. See each adapter's `mapUsage` for the exact per-vendor mapping.
  */
 export interface TokenUsage {
   input: number;
   output: number;
   cacheRead: number;
   cacheCreation: number;
+  /** Subset of `cacheCreation` billed at the 5-minute ephemeral TTL, when the transcript splits it out. */
+  cacheCreation5m?: number;
+  /** Subset of `cacheCreation` billed at the 1-hour ephemeral TTL, when the transcript splits it out. */
+  cacheCreation1h?: number;
   total: number;
 }
 

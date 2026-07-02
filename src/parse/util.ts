@@ -19,19 +19,50 @@ export function emptyUsage(): TokenUsage {
   return { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 };
 }
 
+/**
+ * Sum two optional split-tier fields. `undefined` means "this contributor
+ * has no tier breakdown", not zero, so the sum only stays `undefined` when
+ * *both* sides lack one — combining a turn with a known split and a turn
+ * without one must not fabricate a false "0 tokens at this tier" for the
+ * turn that never reported it.
+ */
+function addOptional(a: number | undefined, b: number | undefined): number | undefined {
+  return a === undefined && b === undefined ? undefined : (a ?? 0) + (b ?? 0);
+}
+
 export function addUsage(a: TokenUsage, b: Partial<TokenUsage>): TokenUsage {
   return {
     input: a.input + (b.input ?? 0),
     output: a.output + (b.output ?? 0),
     cacheRead: a.cacheRead + (b.cacheRead ?? 0),
     cacheCreation: a.cacheCreation + (b.cacheCreation ?? 0),
+    cacheCreation5m: addOptional(a.cacheCreation5m, b.cacheCreation5m),
+    cacheCreation1h: addOptional(a.cacheCreation1h, b.cacheCreation1h),
     total: a.total + (b.total ?? 0),
   };
 }
 
-/** Recompute `total` from the component fields. */
+/** Recompute `total` from the component fields. Split tier fields are a breakdown of `cacheCreation`, not additional tokens, so they don't add to `total`. */
 export function withTotal(u: TokenUsage): TokenUsage {
   return { ...u, total: u.input + u.output + u.cacheRead + u.cacheCreation };
+}
+
+/**
+ * Scale every component of `usage` by `factor` (e.g. `1 / toolCallCount` to
+ * split a turn's cost evenly across the tools it called). Split-tier fields
+ * scale like `cacheCreation` itself — proportionally, staying `undefined`
+ * when the source usage never reported a tier breakdown.
+ */
+export function scaleUsage(usage: TokenUsage, factor: number): TokenUsage {
+  return {
+    input: usage.input * factor,
+    output: usage.output * factor,
+    cacheRead: usage.cacheRead * factor,
+    cacheCreation: usage.cacheCreation * factor,
+    cacheCreation5m: usage.cacheCreation5m === undefined ? undefined : usage.cacheCreation5m * factor,
+    cacheCreation1h: usage.cacheCreation1h === undefined ? undefined : usage.cacheCreation1h * factor,
+    total: usage.total * factor,
+  };
 }
 
 /** Parse a timestamp that may be ISO-8601, epoch ms, or epoch seconds. */
