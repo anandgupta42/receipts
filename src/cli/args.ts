@@ -159,7 +159,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   }
 
   if (positional[0] === "pr") {
-    return { command: "pr", post, prSession, json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode };
+    return { command: "pr", post, prSession, json, svg, theme, output, byProject, since, checkBudget, dryRun, csvMode, png };
   }
 
   if (list) {
