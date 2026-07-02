@@ -60,8 +60,8 @@ doubt, this file wins.
 | Milestone | Delivers | Status |
 |---|---|---|
 | M1 | Receipt engine: parse adapters, price tables, per-tool attribution, waste lines, price-delta + routable-spend lines, compare, handoff, goldens | not started |
-| M2 | Compare + handoff polish | not started |
-| M3 | PNG export | not started |
+| M2 | SVG receipt export + price vendor breadth + launch surface (SPEC-0003/0005/0004) | specs drafted |
+| M3 | PNG rasterization (renderer-dependency decision) + statusline snippet | not started |
 | M4 | Opt-in benchmark (explicit opt-in, separate from the I4 diagnostics contract) | not started |
 
 ## OSS / indie / zero-telemetry stance
