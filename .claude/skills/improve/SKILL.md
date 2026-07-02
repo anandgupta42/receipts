@@ -12,7 +12,7 @@ increment. Default to **not** building — activity is not progress, shipped val
 ## Non-negotiables
 
 - **Never touch `main`.** Accumulate on `loop/integration` (branched off `origin/main`,
-  rebased when main moves). One rolling draft PR `loop/integration → main`; the founder
+  rebased when main moves). One rolling draft PR `loop/integration → main`; the maintainer
   merges it.
 - Every capability passes a go/no-go before coding and a value gate after. Killing a
   noisy waste-check counts as progress.
@@ -56,5 +56,5 @@ refresh the rolling draft PR's description, then stop.
 ## Stop & surface
 
 Explicit user stop · a cost/iteration ceiling · an idea failing the value gate twice ·
-`loop/integration` CI red you can't fix · a load-bearing ambiguity needing the founder's
+`loop/integration` CI red you can't fix · a load-bearing ambiguity needing the maintainer's
 call. Never merge to `main` to unblock any of these.

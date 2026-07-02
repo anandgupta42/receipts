@@ -63,12 +63,12 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 - **I6 — Facts, not rankings.** Report what a session cost; never rank models or agents
   as better/worse.
 
-## The founder's four buttons
+## The maintainer's four buttons
 
 1. Approve/reject spec proposals (drafts never self-approve).
 2. One-click cited price-table PRs.
 3. Curate the skill surface (agents cannot add or modify skills).
-4. Cut release tags (npm publish never happens without the founder).
+4. Cut release tags (npm publish never happens without the maintainer).
 
 ## Current-state inventory
 

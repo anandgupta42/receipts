@@ -10,6 +10,7 @@
   },
   "files": [
     "dist",
+    "data/prices",
     "README.md",
     "LICENSE"
   ],
@@ -23,8 +24,11 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@stryker-mutator/core": "^8.7.1",
+    "@stryker-mutator/vitest-runner": "^8.7.1",
     "@types/node": "^22.19.19",
     "eslint": "^9.17.0",
+    "fast-check": "^3.23.2",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "typescript-eslint": "^8.19.1",

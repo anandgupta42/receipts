@@ -1,0 +1,35 @@
+{
+  "$schema": "corpus entries map a fixture (source + path) to the exact set of waste classes the detectors must fire for it. Used by test/eval.test.ts to assert precision 1.0 (no unexpected firings) and recall (every expected class fires). Verified against real detector output, not hand-guessed — see SPEC-0001.",
+  "entries": [
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl",
+      "expected": []
+    },
+    {
+      "source": "codex",
+      "path": "test/fixtures/codex/clean-session.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/loop-bash-5x.jsonl",
+      "expected": ["stuck-loop"]
+    },
+    {
+      "source": "codex",
+      "path": "test/fixtures/codex/loop-exec-3x.jsonl",
+      "expected": ["stuck-loop"]
+    },
+    {
+      "source": "codex",
+      "path": "test/fixtures/codex/trivial-spans-r4b.jsonl",
+      "expected": ["trivial-spans"]
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/trivial-spans-quick-qa.jsonl",
+      "expected": ["trivial-spans"]
+    }
+  ]
+}

@@ -46,7 +46,7 @@ directory ownership, dependency waves, critical path, team prompt.
 
 ## 5. Discipline
 
-- Status stays `draft`. This skill never sets `approved` — that's the founder's button.
+- Status stays `draft`. This skill never sets `approved` — that's the maintainer's button.
   Drafts never self-approve.
 - If this is research-derived, link the source.
 - Keep it as tight as the reference specs — no restating AGENTS.md, no type definitions
@@ -54,4 +54,4 @@ directory ownership, dependency waves, critical path, team prompt.
 
 When done: write the file, print the path, and a 2-line summary of what's still open —
 then run `/validate-spec` on it. A draft without a `## Validation` record never reaches
-the founder.
+the maintainer.

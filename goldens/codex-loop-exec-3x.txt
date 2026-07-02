@@ -1,0 +1,21 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+    Codex · Jun 23 2026 09:00:00 UTC · 1m 12s     
+                gpt-5.3-codex 100%                
+
+exec_command......................$0.01  (3 calls)
+
+⚠ exec_command loop ×3.................$0.01 (30s)
+--------------------------------------------------
+TOTAL........................................$0.01
+
+arithmetic, not a prediction: same tokens on
+gpt-5.4-mini would cost $0.00 (actual: $0.01)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

@@ -1,0 +1,22 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s  
+               claude-opus-4-8 100%               
+
+Bash..............................$0.08  (5 calls)
+(thinking/reply)...................$0.02  (1 turn)
+
+⚠ Bash loop ×5......................$0.08 (3m 45s)
+--------------------------------------------------
+TOTAL........................................$0.09
+
+arithmetic, not a prediction: same tokens on
+claude-haiku-4-5 would cost $0.02 (actual: $0.09)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -

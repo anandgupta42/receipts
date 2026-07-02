@@ -22,7 +22,7 @@ everything later builds on the primitives this milestone lands.
 ## Requirements
 
 - **R1 — Adapters.** Discover and parse local transcripts into one normalized `Session`
-  model. Extract from the private altimate-receipts repo (founder owns both; re-license
+  model. Extract from the private altimate-receipts repo (maintainer owns both; re-license
   MIT): `src/trace/types.ts`, `load.ts`, `registry.ts`, `claudeCode.ts` + `anthropic.ts`,
   `codex.ts` — stripped of receipt/attestation/store code. **Cursor is a degraded-mode
   adapter in M1**: its source (`cursor.ts`) exposes no model id and total-only tokens, so
@@ -110,7 +110,7 @@ everything later builds on the primitives this milestone lands.
 
 ## Success criteria
 
-- [ ] `npm run build && node dist/cli.js` prints a real receipt from the founder's live
+- [ ] `npm run build && node dist/cli.js` prints a real receipt from the maintainer's live
       `~/.claude/projects` (acceptance run recorded in the PR).
 - [ ] Unmasked gate green: `tsc`, `eslint --max-warnings 0`, `vitest run`, goldens,
       spec-lint — each with visible exit codes.

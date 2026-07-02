@@ -29,7 +29,7 @@ maintenance loop).
 - **R2 — Events.** Exactly three: `cli_run` {cliVersion, os, nodeMajor, commandClass,
   agentType, durationBucket, ok} where `commandClass` is the enum {receipt, compare,
   other} — not the raw command line. `cli_run` on success is deliberately kept (S2
-  finding 12 considered): the founder's directive is performance improvement, and
+  finding 12 considered): the maintainer's directive is performance improvement, and
   latency regressions are invisible without success-run durations; the payload is
   minimized to make it useless as usage analytics; `cli_error` {errorClass, command, agentType,
   inPackage: boolean} — whether the top stack frame is inside the aireceipts package;
@@ -98,7 +98,7 @@ day. Accepted: bounded `flushTelemetry` replaces fire-and-forget (R1); `inPackag
 boolean replaces stack-frame text (R2); public contract phrase aligned across README /
 SPEC-0000 / I4 ("offline-complete with opt-out diagnostics telemetry"); denylist
 replaced with strict allowlist zod schemas + leakage fixtures (R3); 7 matrix rows added.
-**Partially accepted (finding 12):** success-run `cli_run` kept — founder's directive is
+**Partially accepted (finding 12):** success-run `cli_run` kept — maintainer's directive is
 performance improvement and latency regressions need success durations — but payload
 minimized (commandClass enum {receipt, compare, other}, no raw commands) to be useless
 as usage analytics. **S3 (value):** parse_failure is the format-drift sensor the

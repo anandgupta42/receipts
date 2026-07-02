@@ -1,0 +1,285 @@
+import type { AgentSource, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
+import {
+  addUsage,
+  emptyUsage,
+  expandHome,
+  listFiles,
+  mapWithConcurrency,
+  parseTimestamp,
+  pathExists,
+  readJsonl,
+  truncate,
+  withTotal,
+} from "./util.js";
+import * as fs from "node:fs";
+
+/** Raw usage shape from a Codex `rollout-*.jsonl` `token_count` event. */
+interface CodexUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  cached_input_tokens?: number;
+  reasoning_output_tokens?: number;
+}
+
+/**
+ * Map Codex's raw usage onto our 4-component `TokenUsage`. Unlike the private
+ * reference implementation, we do NOT subtract `reasoning_output_tokens` from
+ * `output` — our `TokenUsage` has no separate reasoning bucket to absorb those
+ * tokens into, so subtracting them would silently drop billed spend from the
+ * total (I2: never under-report). Reasoning tokens stay folded into `output`.
+ * `cacheCreation` is always 0 here: OpenAI's usage payload has no cache-write
+ * counterpart to `cached_input_tokens` — prompt caching is automatic and its
+ * pricing only ever discounts cached reads (per team-lead: "OpenAI publishes
+ * cached-read only"), so `openai.json` price rows carry no
+ * `input_cache_write_*` fields for `costOf` to price against.
+ */
+function mapUsage(usage: CodexUsage | undefined) {
+  if (!usage) {
+    return undefined;
+  }
+  const input = Math.max(0, (usage.input_tokens ?? 0) - (usage.cached_input_tokens ?? 0));
+  return withTotal({
+    input,
+    output: usage.output_tokens ?? 0,
+    cacheRead: usage.cached_input_tokens ?? 0,
+    cacheCreation: 0,
+    total: 0,
+  });
+}
+
+/** Codex nests the interesting payload under one of a few keys depending on event type. */
+function unwrap(top: Record<string, unknown>): Record<string, unknown> {
+  const candidates = ["payload", "item", "response"];
+  for (const key of candidates) {
+    const v = top[key];
+    if (v && typeof v === "object") {
+      return v as Record<string, unknown>;
+    }
+  }
+  return top;
+}
+
+function extractText(content: unknown): string | undefined {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const parts = content
+      .map((part) => {
+        if (part && typeof part === "object" && "text" in part && typeof (part as { text?: unknown }).text === "string") {
+          return (part as { text: string }).text;
+        }
+        return typeof part === "string" ? part : undefined;
+      })
+      .filter((p): p is string => typeof p === "string");
+    return parts.length > 0 ? parts.join("") : undefined;
+  }
+  return undefined;
+}
+
+function parseMaybeJson(raw: unknown): unknown {
+  if (typeof raw !== "string") {
+    return raw;
+  }
+  if (!/^\s*[[{]/.test(raw)) {
+    return raw;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+/**
+ * One generic `ToolCall` per invocation, including `apply_patch` (a
+ * `custom_tool_call`). We deliberately don't decompose `apply_patch` into a
+ * `ToolCall` per touched file the way the private reference does — the raw
+ * patch text is preserved as `input`/`output` and that's enough for R4a/R4b,
+ * which reason about call count and duration, not per-file diffs.
+ */
+async function parseTranscript(filePath: string, withTurns: boolean) {
+  let model: string | undefined;
+  let userPrompt: string | undefined;
+  let firstUserText: string | undefined;
+  let startedAt: number | undefined;
+  let endedAt: number | undefined;
+  let cumulativeUsage: TokenUsage | undefined;
+  let perTurnUsage = emptyUsage();
+  let sawCumulative = false;
+  let toolCallCount = 0;
+  const turns: Turn[] = [];
+  const toolCallById = new Map<string, ToolCall>();
+  let current: Turn | null = null;
+
+  function ensureTurn(ts?: number): Turn {
+    if (!current) {
+      current = { index: turns.length, timestamp: ts, toolCalls: [] };
+      turns.push(current);
+    }
+    return current;
+  }
+
+  await readJsonl(filePath, (record) => {
+    if (!record || typeof record !== "object") {
+      return;
+    }
+    const top = record as Record<string, unknown>;
+    const ts = parseTimestamp(top.timestamp ?? top.created_at ?? top.time);
+    if (ts !== undefined) {
+      startedAt = startedAt === undefined ? ts : Math.min(startedAt, ts);
+      endedAt = endedAt === undefined ? ts : Math.max(endedAt, ts);
+    }
+
+    const item = unwrap(top);
+    const type = String(item.type ?? top.type ?? "");
+    if (typeof item.model === "string") {
+      model ??= item.model;
+    }
+
+    // Cumulative-usage envelopes (Codex ≥0.137): `total_token_usage` is a
+    // last-wins snapshot that already sums prior turns; `last_token_usage` is
+    // the delta billed to the turn that just completed.
+    const info = item.info as Record<string, unknown> | undefined;
+    if (info) {
+      const total = mapUsage(info.total_token_usage as CodexUsage);
+      if (total && total.total > 0) {
+        cumulativeUsage = total;
+        sawCumulative = true;
+        const delta = mapUsage(info.last_token_usage as CodexUsage);
+        if (delta && delta.total > 0) {
+          const t = ensureTurn(ts);
+          t.usage = addUsage(t.usage ?? emptyUsage(), delta);
+          t.outputTokens = t.usage.output;
+          t.model ??= model;
+        }
+      }
+    }
+    if (!sawCumulative) {
+      const perMsg = mapUsage((item.usage as CodexUsage) ?? (top.usage as CodexUsage));
+      if (perMsg && perMsg.total > 0) {
+        perTurnUsage = addUsage(perTurnUsage, perMsg);
+        const t = ensureTurn(ts);
+        if (!t.usage) {
+          t.usage = perMsg;
+          t.outputTokens = perMsg.output;
+          t.model ??= model;
+        }
+      }
+    }
+
+    if (type === "user_message" && typeof item.message === "string") {
+      userPrompt ??= item.message;
+      current = null; // a real user message ends the prior turn
+      return;
+    }
+
+    if (type === "message") {
+      const role = item.role;
+      if (role === "user") {
+        firstUserText ??= extractText(item.content);
+        current = null;
+        return;
+      }
+      if (role === "assistant") {
+        const t = ensureTurn(ts);
+        t.model ??= model;
+      }
+      return;
+    }
+
+    if (type === "function_call" || type === "tool_call" || type === "custom_tool_call") {
+      toolCallCount++;
+      const callId = String(item.call_id ?? item.id ?? "");
+      const call: ToolCall = {
+        name: String(item.name ?? "tool"),
+        input: parseMaybeJson(item.arguments ?? item.input),
+        status: "running",
+        startedAt: ts,
+      };
+      if (callId) {
+        toolCallById.set(callId, call);
+      }
+      ensureTurn(ts).toolCalls.push(call);
+      return;
+    }
+
+    if (type === "function_call_output" || type === "tool_result" || type === "patch_apply_end") {
+      const callId = String(item.call_id ?? item.id ?? "");
+      const existing = toolCallById.get(callId);
+      if (existing) {
+        existing.output = extractText(item.output ?? item.content) ?? existing.output;
+        existing.status = item.success === false ? "error" : "ok";
+        existing.endedAt = ts;
+      }
+      return;
+    }
+  });
+
+  const totalUsage = sawCumulative ? (cumulativeUsage ?? emptyUsage()) : perTurnUsage;
+
+  const totals = {
+    tokens: totalUsage,
+    durationMs: startedAt !== undefined && endedAt !== undefined ? endedAt - startedAt : undefined,
+    turnCount: turns.length,
+    toolCallCount,
+  };
+
+  const title = userPrompt ?? firstUserText;
+  const summary: SessionSummary = {
+    id: filePath,
+    source: "codex",
+    title: title ? truncate(title) : undefined,
+    model,
+    startedAt,
+    endedAt,
+    totals,
+    filePath,
+  };
+
+  return withTurns ? { summary, turns } : { summary, turns: [] as Turn[] };
+}
+
+const ROOT = "~/.codex/sessions";
+
+export class CodexAdapter implements SessionAdapter {
+  readonly id: AgentSource = "codex";
+  readonly label = "Codex";
+
+  roots(): string[] {
+    return [expandHome(ROOT)];
+  }
+
+  async detect(): Promise<boolean> {
+    return pathExists(expandHome(ROOT));
+  }
+
+  async listSessions(): Promise<SessionSummary[]> {
+    const files = await listFiles(expandHome(ROOT), (name) => name.startsWith("rollout-") && name.endsWith(".jsonl"));
+    const results = await mapWithConcurrency(files, 16, async (file) => {
+      try {
+        const stat = await fs.promises.stat(file);
+        if (stat.size === 0) {
+          return null;
+        }
+        const { summary } = await parseTranscript(file, false);
+        return summary;
+      } catch {
+        return null;
+      }
+    });
+    return results.filter((s): s is SessionSummary => s !== null);
+  }
+
+  async loadSession(id: string): Promise<Session | null> {
+    try {
+      if (!(await pathExists(id))) {
+        return null;
+      }
+      const { summary, turns } = await parseTranscript(id, true);
+      return { ...summary, turns };
+    } catch {
+      return null;
+    }
+  }
+}
