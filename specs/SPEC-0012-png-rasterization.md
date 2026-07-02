@@ -86,3 +86,13 @@ determinism across platforms (R4); GIF/animated formats; a from-scratch PNG enco
 **2026-07-02 · S2 (Codex): PASS-WITH-FIXES → applied.** Numeric gate bounds baked in
 (≤12 MB unpacked, ≤2.5 s cold-install, prebuilt-binaries-only); dev-only spike with
 explicit runtime-promotion decision step; `compare --png` deferred out of v1. **S4:** green.
+
+**2026-07-02 · R1 spike run, R2 gate PASS, R3 blocked.** Measured numbers in
+`docs/spikes/spec-0012-png.md`: install-size delta ≈3.5–4.4 MB/platform (≤12 MB), cold-
+install time delta ≈0.4s isolated marginal cost (≤2.5s), 12/12 platform prebuilt
+binaries with no C toolchain — all three R2 criteria pass. R3 ("same shared
+`ReceiptModel`... rasterized") depends on SPEC-0003's SVG renderer, which is not yet on
+`main` (still in progress in a concurrent work stream). Per instructed scope, this PR
+stops after the spike: `@resvg/resvg-js` stays a devDependency (spike artifact only,
+unused by shipped code); `--png` is not implemented; not promoted to a runtime
+dependency. Follow-up once SPEC-0003 lands: implement R3–R5 and promote the dependency.
