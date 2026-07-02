@@ -25,3 +25,7 @@ jobs:
         with: { path: site }
       - id: d
         uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: retry once on transient deploy failure
+        if: steps.d.outcome == 'failure'
+        uses: actions/deploy-pages@v4
