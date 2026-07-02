@@ -64,24 +64,32 @@ export async function loadFromDisk(
   return loadSessionFn(summary);
 }
 
-/** R3/R4: statusline one-liner. stdin mode first, then disk fallback, then a neutral no-session placeholder (never an error, always exit 0). */
+/**
+ * R3/R4: statusline one-liner. stdin mode first, then disk fallback, then a
+ * neutral no-session placeholder (never an error, always exit 0). `write` is the
+ * output seam — the command passes `ctx.stdout` so output routes through the
+ * context (R3); it defaults to `process.stdout` for the direct-call tests.
+ */
 export async function runStatusline(
   stdin: NodeJS.ReadStream = process.stdin,
   loadFromDiskFn: () => Promise<Session | null> = loadFromDisk,
+  write: (s: string) => void = (s) => {
+    process.stdout.write(s);
+  },
 ): Promise<number> {
   const raw = await readStdin(stdin);
   const session = (await loadFromStdinPayload(raw)) ?? (await loadFromDiskFn());
   if (!session) {
-    process.stdout.write("aireceipts: no sessions detected\n");
+    write("aireceipts: no sessions detected\n");
     return 0;
   }
   const model = await buildReceiptModel(session);
-  process.stdout.write(`${renderStatusline(model)}\n`);
+  write(`${renderStatusline(model)}\n`);
   return 0;
 }
 
 function run(ctx: CommandContext): Promise<number> {
-  return runStatusline(ctx.stdin);
+  return runStatusline(ctx.stdin, loadFromDisk, (s) => ctx.stdout.write(s));
 }
 
 export const command: CommandDef = {

@@ -6,7 +6,7 @@ import { runQuota } from "../quota.js";
 import type { CommandContext, CommandDef } from "../types.js";
 
 function run(ctx: CommandContext): Promise<number> {
-  return runQuota(ctx.stdin);
+  return runQuota(ctx.stdin, (s) => ctx.stdout.write(s));
 }
 
 export const command: CommandDef = {

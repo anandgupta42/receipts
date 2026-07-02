@@ -80,11 +80,16 @@ export async function readStdinPayload(stdin: NodeJS.ReadStream = process.stdin)
  * was piped in. R4: no surface / malformed / stale → prints nothing, always
  * exits 0 (an absent quota is never an error).
  */
-export async function runQuota(stdin: NodeJS.ReadStream = process.stdin): Promise<number> {
+export async function runQuota(
+  stdin: NodeJS.ReadStream = process.stdin,
+  write: (s: string) => void = (s) => {
+    process.stdout.write(s);
+  },
+): Promise<number> {
   const payload = await readStdinPayload(stdin);
   const lines = renderQuotaLines(payload);
   if (lines.length > 0) {
-    process.stdout.write(`${lines.join("\n")}\n`);
+    write(`${lines.join("\n")}\n`);
   }
   return 0;
 }
