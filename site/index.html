@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aireceipts — receipts for your AI coding agent</title>
+<meta name="description" content="See what your AI coding agent actually cost. One command, no account, no upload — it reads the transcripts already on your disk and prints an itemized receipt.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="aireceipts — receipts for your AI coding agent">
+<meta property="og:description" content="See what your AI coding agent actually cost. One command, no account, no upload — it reads the transcripts already on your disk.">
+<meta property="og:image" content="assets/hero-receipt.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="assets/hero-receipt.png">
+<style>
+  :root{
+    --paper:#f4ede0;
+    --desk:#e7ddc9;
+    --ink:#1b1e22;
+    --muted:#5a6068;
+    --rule:#c9bca4;
+    --accent:#3947c2;
+    --flag:#b3372e;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    background:var(--desk);
+    color:var(--ink);
+    font-family:var(--mono);
+    font-size:16px;
+    line-height:1.55;
+    padding:28px 16px 56px;
+  }
+  a{color:var(--accent);text-underline-offset:2px}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* The single receipt column. Paper with a scalloped top and bottom edge; the
+     darker desk shows through the notches, exactly like the perforation in the
+     product's own SVG. */
+  .receipt{
+    position:relative;
+    width:100%;
+    max-width:640px;
+    margin:0 auto;
+    background:var(--paper);
+    /* faint grain: two offset low-alpha dot grids, no external request */
+    background-image:
+      radial-gradient(rgba(60,45,20,.020) .5px,transparent .6px),
+      radial-gradient(rgba(60,45,20,.018) .5px,transparent .6px);
+    background-size:3px 3px,7px 7px;
+    background-position:0 0,1px 2px;
+    padding:34px clamp(18px,5vw,40px) 30px;
+    box-shadow:0 1px 0 rgba(0,0,0,.04),0 18px 40px -28px rgba(40,30,10,.5);
+  }
+  .receipt::before,.receipt::after{
+    content:"";
+    position:absolute;left:0;right:0;height:11px;
+    background:radial-gradient(circle at 7px 0,var(--desk) 5.5px,transparent 6px);
+    background-size:14px 11px;
+    background-repeat:repeat-x;
+  }
+  .receipt::before{top:0;transform:translateY(-5px)}
+  .receipt::after{bottom:0;transform:translateY(5px) scaleY(-1)}
+
+  section{padding:22px 0}
+  section+section{border-top:1.5px dashed var(--rule)}
+
+  /* Masthead */
+  header.mast{text-align:center;padding-top:6px}
+  .wordmark{
+    font-size:15px;font-weight:700;letter-spacing:.34em;
+    margin:0 0 18px;padding-left:.34em;color:var(--ink);
+  }
+  h1{
+    font-size:clamp(22px,5.2vw,30px);
+    line-height:1.28;font-weight:700;letter-spacing:-.01em;
+    margin:0 auto;max-width:20ch;
+  }
+  .sub{
+    color:var(--muted);font-size:clamp(13px,3.4vw,15px);
+    max-width:52ch;margin:16px auto 0;line-height:1.6;
+  }
+  .cta{
+    display:flex;align-items:stretch;justify-content:center;gap:0;
+    margin:24px auto 10px;max-width:340px;
+    border:1.5px solid var(--ink);border-radius:6px;overflow:hidden;
+  }
+  .cta code{
+    flex:1;font-family:var(--mono);font-size:15px;
+    padding:11px 14px;text-align:left;white-space:nowrap;
+    display:flex;align-items:center;gap:.55ch;
+  }
+  .cta code .prompt{color:var(--muted)}
+  .cta button{
+    font-family:var(--mono);font-size:13px;
+    border:0;border-left:1.5px solid var(--ink);
+    background:var(--ink);color:var(--paper);
+    padding:0 16px;cursor:pointer;letter-spacing:.02em;
+  }
+  .methodology{display:block;text-align:center;font-size:13px;color:var(--muted);margin-top:4px}
+  .methodology a{color:var(--muted)}
+
+  /* Band headings, in the receipt's own rule style */
+  .band-head{
+    text-align:center;font-size:12px;font-weight:700;
+    letter-spacing:.18em;color:var(--muted);
+    margin:0 0 20px;
+  }
+
+  /* Hero receipt */
+  figure{margin:0;text-align:center}
+  figure img{
+    display:block;width:100%;height:auto;margin:0 auto;
+    border-radius:6px;box-shadow:0 10px 30px -18px rgba(20,20,25,.7);
+  }
+  figcaption{color:var(--muted);font-size:12.5px;margin-top:14px;line-height:1.5}
+
+  /* Value line-items with dotted leaders */
+  ul.items{list-style:none;margin:0;padding:0}
+  ul.items li{
+    display:flex;align-items:baseline;gap:.6ch;
+    padding:7px 0;font-size:14px;
+  }
+  ul.items .k{color:var(--ink);white-space:nowrap;display:flex;align-items:baseline;gap:.6ch}
+  ul.items .lead{flex:1 1 auto;min-width:14px;border-bottom:1.6px dotted var(--muted);transform:translateY(-.28em)}
+  ul.items .v{color:var(--muted);white-space:nowrap;text-align:right}
+  /* the one and only flag-red mark: the waste triangle, drawn (not a glyph) */
+  .warn{
+    width:0;height:0;align-self:center;
+    border-left:5px solid transparent;border-right:5px solid transparent;
+    border-bottom:9px solid var(--flag);
+  }
+
+  .story{color:var(--ink);font-size:14.5px;line-height:1.68;margin:22px 0 0;max-width:60ch}
+  .story .n{white-space:nowrap}
+
+  /* Honesty rules */
+  ul.rules{list-style:none;margin:0;padding:0}
+  ul.rules li{padding:10px 0;font-size:14px;line-height:1.6}
+  ul.rules li+li{border-top:1px dashed var(--rule)}
+  ul.rules b{color:var(--ink);font-weight:700}
+  ul.rules span{color:var(--muted);display:block;margin-top:3px}
+  .telemetry{color:var(--muted);font-size:13.5px;line-height:1.6;margin:18px 0 0}
+
+  /* Menu — the other surfaces, as real text renders */
+  .menu{display:grid;gap:26px}
+  .menu figure{text-align:left}
+  .menu figcaption{margin:0 0 8px;font-size:12.5px;color:var(--muted)}
+  pre.render{
+    margin:0;overflow-x:auto;
+    background:#fbf7ee;border:1px solid var(--rule);border-radius:6px;
+    padding:14px 16px;
+    font-family:var(--mono);font-size:11px;line-height:1.35;color:var(--ink);
+    -webkit-overflow-scrolling:touch;
+  }
+  pre.render.one{font-size:13px;white-space:pre-wrap;word-break:break-word}
+
+  /* Footer */
+  footer{text-align:center;padding-top:24px}
+  .cardholder{display:flex;justify-content:space-between;color:var(--muted);font-size:12px;letter-spacing:.04em;margin-bottom:18px}
+  .thanks{font-size:13px;font-weight:700;letter-spacing:.22em;color:var(--ink);margin:0 0 16px}
+  .barcode{color:var(--muted);height:34px;margin:0 auto 6px;display:block}
+  .barnum{font-size:11px;letter-spacing:.42em;color:var(--muted);padding-left:.42em;margin:0 0 20px}
+  .flinks{font-size:13px;color:var(--muted);line-height:2}
+  .flinks a{color:var(--accent)}
+  .flinks .sep{color:var(--rule);padding:0 .5ch}
+  .samosa{color:var(--muted);margin-top:12px;font-size:13px}
+
+  @media (max-width:460px){
+    ul.items li{flex-wrap:wrap}
+    ul.items .lead{display:none}
+    ul.items .v{width:100%;text-align:left;padding-left:calc(.6ch);opacity:.9}
+    .cardholder{font-size:11px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;animation:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="receipt">
+
+  <header class="mast">
+    <p class="wordmark">AIRECEIPTS</p>
+    <h1>Your AI coding agent just worked for 33 minutes. Here's the receipt.</h1>
+    <p class="sub">One command. No account, no API key, no upload — it reads the transcripts your agent already writes to disk.</p>
+    <div class="cta">
+      <code id="cmd"><span class="prompt" aria-hidden="true">$</span>npx aireceipts</code>
+      <button type="button" id="copy" data-cmd="npx aireceipts" aria-label="Copy the command npx aireceipts to the clipboard">copy</button>
+    </div>
+    <small class="methodology">or <a href="https://github.com/aireceipts/aireceipts#the-honesty-rules">read the methodology first</a></small>
+  </header>
+
+  <main>
+
+  <section aria-label="A real receipt">
+    <figure>
+      <img src="assets/hero-receipt.png" width="1280" height="812"
+           alt="A dark aireceipts receipt for a real Claude Code session titled 'Can you fix the flaky login test in src/auth/…', run 4m 35s. Bash cost $0.08 across 5 calls; a flagged Bash loop ×5 wasted $0.08 and 3m 45s. TOTAL $0.09; the same tokens on claude-haiku-4-5 would be $0.02.">
+      <figcaption>A real session. Every number priced from cited, dated vendor tables.</figcaption>
+    </figure>
+  </section>
+
+  <section aria-label="Why you'd want this">
+    <h2 class="band-head" aria-label="Why you'd want this">--- WHY YOU'D WANT THIS ---</h2>
+    <ul class="items">
+      <li><span class="k">Know the cost before the invoice does</span><span class="lead" aria-hidden="true"></span><span class="v">every session, priced</span></li>
+      <li><span class="k"><span class="warn" aria-hidden="true"></span>Catch the waste</span><span class="lead" aria-hidden="true"></span><span class="v">stuck loops &amp; tiny turns, in $</span></li>
+      <li><span class="k">Fix it permanently</span><span class="lead" aria-hidden="true"></span><span class="v">paste-ready CLAUDE.md standing rules</span></li>
+      <li><span class="k">Put receipts on your PRs</span><span class="lead" aria-hidden="true"></span><span class="v">what the change cost to produce</span></li>
+      <li><span class="k">See the week</span><span class="lead" aria-hidden="true"></span><span class="v">totals, per-agent split, honest deltas</span></li>
+    </ul>
+    <p class="story">Metered AI coding is the new cloud bill: invisible while you work, shocking at month-end. aireceipts turns the transcripts already sitting on your disk into itemized receipts — so you learn which habits burn money <span class="n">(re-running a failing command five times: $0.08 and 3m45s)</span>, which model your trivial turns actually need, and what each PR cost to produce. Then it helps you fix it: every receipt ends with a paste-ready handoff that tells your agent what to do cheaper next time.</p>
+  </section>
+
+  <section aria-label="Why you can believe it">
+    <h2 class="band-head" aria-label="Why you can believe it">--- WHY YOU CAN BELIEVE IT ---</h2>
+    <ul class="rules">
+      <li><b>No fabricated dollars, ever.</b><span>A model without a cited, dated price row renders tokens-only — never a guess.</span></li>
+      <li><b>Every price cited with URL + date + excerpt.</b><span>CI checks the citations and that each one is still live.</span></li>
+      <li><b>Comparisons are arithmetic, not predictions.</b><span>“Same tokens on X” re-prices the identical token counts — it never claims another model would have done the job.</span></li>
+      <li><b>Deterministic: same transcript in, byte-identical receipt out.</b><span>Golden-tested on every commit, 10× under a frozen environment.</span></li>
+    </ul>
+    <p class="telemetry">Diagnostics-only telemetry, fully disclosed, one env var to kill — and your transcripts never leave your machine.</p>
+  </section>
+
+  <section aria-label="Also on the menu">
+    <h2 class="band-head" aria-label="Also on the menu">--- ALSO ON THE MENU ---</h2>
+    <div class="menu">
+      <figure>
+        <figcaption>receipts compare — two sessions at the same scale, with the factual ratio.</figcaption>
+        <pre class="render" tabindex="0" aria-label="Terminal output: two receipts side by side comparing a clean session at $0.18 against a stuck-loop session at $0.09, ending with the line that the first cost 1.9× the second.">- - - - - - - - - - - - - - - - - - - - - - - - -  │ - - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                     │                     AIRECEIPTS                    
+ “Add email format validation to the signup for…”  │  “Can you fix the flaky login test in src/auth/…” 
+ Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s  │  Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s  
+    claude-opus-4-8 87% · claude-sonnet-5 13%      │                claude-opus-4-8 100%               
+         cache served 85% of input tokens          │          cache served 88% of input tokens         
+                                                   │ 
+Bash..............................$0.05  (3 calls) │ Bash..............................$0.08  (5 calls)
+Edit..............................$0.05  (2 calls) │ (thinking/reply)...................$0.02  (1 turn)
+(thinking/reply)..................$0.03  (2 turns) │ 
+Write.............................$0.03  (2 calls) │ ⚠ Bash loop ×5......................$0.08 (3m 45s)
+Read...............................$0.02  (1 call) │ --------------------------------------------------
+-------------------------------------------------- │ TOTAL........................................$0.09
+TOTAL........................................$0.18 │ same tokens on claude-haiku-4-5..............$0.02
+same tokens on claude-haiku-4-5..............$0.04 │   (arithmetic, not a prediction)
+  (arithmetic, not a prediction)                   │ 
+                                                   │ Per-turn cost split evenly across that turn's tool
+Per-turn cost split evenly across that turn's tool │ calls; unpriced models show tokens only, never
+calls; unpriced models show tokens only, never     │ guessed dollars. Full method: aireceipts
+guessed dollars. Full method: aireceipts           │ --methodology
+--methodology                                      │ - - - - - - - - - - - - - - - - - - - - - - - - -
+- - - - - - - - - - - - - - - - - - - - - - - - -  │       aireceipts · local · buy me a samosa 🥟      
+      aireceipts · local · buy me a samosa 🥟       │ - - - - - - - - - - - - - - - - - - - - - - - - -
+- - - - - - - - - - - - - - - - - - - - - - - - -  │ 
+
+Add email format validation to the signup form and add a unit test for it. The signup form is in src/components/SignupF… cost 1.9× Can you fix the flaky login test in src/auth/login.test.ts? It's failing intermittently in CI. ($0.18 vs $0.09)</pre>
+      </figure>
+      <figure>
+        <figcaption>receipts week — the trailing seven days, with honest deltas.</figcaption>
+        <pre class="render" tabindex="0" aria-label="Terminal output: a weekly digest for Jun 13 to Jun 20 2026 — 2 sessions, priced total $0.27, 219,515 tokens, one stuck-loop worth $0.08, and no prior data to compare against.">                  WEEKLY DIGEST                   
+   Jun 13 2026 → Jun 20 2026 · trailing 7 days    
+
+Sessions.........................................2
+Priced total (2 of 2)........................$0.27
+Tokens (all sessions)..................219,515 tok
+
+By agent
+  Claude Code.......................$0.27 · 2 sess
+
+Top waste
+  stuck-loop.....................$0.08 · 1 session
+
+vs. prior 7 days (Jun 06 2026 → Jun 13 2026)
+  no prior data
+--------------------------------------------------
+      aireceipts · local · buy me a samosa 🥟      </pre>
+      </figure>
+      <figure>
+        <figcaption>the statusline — always on, one line, the running cost as you work.</figcaption>
+        <pre class="render one" tabindex="0" aria-label="Statusline output: Claude Code, $0.09, 73k tokens, with a flagged Bash loop ×5.">[Claude Code] $0.09 · 73k tok · ⚠ Bash loop ×5</pre>
+      </figure>
+    </div>
+  </section>
+
+  </main>
+
+  <footer>
+    <div class="cardholder"><span>CARDHOLDER: you</span><span>NO REFUNDS</span></div>
+    <p class="thanks">THANK YOU FOR YOUR TOKENS</p>
+    <svg class="barcode" viewBox="0 0 90 34" width="180" height="34" fill="currentColor" role="img" aria-label="Barcode encoding the word aireceipts.">
+      <rect x="0" y="0" width="3" height="34"/><rect x="4" y="0" width="2" height="34"/><rect x="8" y="0" width="3" height="34"/><rect x="12" y="0" width="2" height="34"/><rect x="16" y="0" width="4" height="34"/><rect x="21" y="0" width="3" height="34"/><rect x="26" y="0" width="3" height="34"/><rect x="31" y="0" width="2" height="34"/><rect x="35" y="0" width="3" height="34"/><rect x="39" y="0" width="4" height="34"/><rect x="45" y="0" width="3" height="34"/><rect x="50" y="0" width="2" height="34"/><rect x="54" y="0" width="3" height="34"/><rect x="58" y="0" width="2" height="34"/><rect x="62" y="0" width="4" height="34"/><rect x="67" y="0" width="1" height="34"/><rect x="70" y="0" width="4" height="34"/><rect x="76" y="0" width="1" height="34"/><rect x="79" y="0" width="4" height="34"/><rect x="84" y="0" width="4" height="34"/>
+    </svg>
+    <p class="barnum">AIRECEIPTS</p>
+    <p class="flinks">
+      <a href="https://github.com/aireceipts/aireceipts">GitHub</a><span class="sep" aria-hidden="true">·</span><a href="https://github.com/aireceipts/aireceipts#readme">docs</a><span class="sep" aria-hidden="true">·</span><a href="https://github.com/aireceipts/aireceipts/blob/main/LICENSE">Apache-2.0</a>
+    </p>
+    <p class="samosa">buy me a samosa 🥟</p>
+  </footer>
+
+</div>
+<script>
+  (function () {
+    var b = document.getElementById("copy");
+    if (!b) return;
+    if (!navigator.clipboard || !navigator.clipboard.writeText) { b.hidden = true; return; }
+    b.addEventListener("click", function () {
+      navigator.clipboard.writeText(b.getAttribute("data-cmd")).then(function () {
+        var prev = b.textContent;
+        b.textContent = "copied";
+        setTimeout(function () { b.textContent = prev; }, 1200);
+      }).catch(function () {});
+    });
+  })();
+</script>
+</body>
+</html>
