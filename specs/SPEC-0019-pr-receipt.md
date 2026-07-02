@@ -29,7 +29,9 @@ only.
 - **R1a — Parse-model extension (prerequisite).** Adapters currently DROP the raw
   `cwd` — extend the parse model with `cwd?: string` and `gitBranch?: string`
   (claude-code + codex extraction, fixture rows for both; absent in the raw → absent
-  in the model). Sessions without `cwd` are never auto-attributed.
+  in the model). Sessions without `cwd` are never auto-attributed. **Privacy rule:**
+  `cwd`/`gitBranch` are attribution-only — they never enter export schemas (--json/--csv),
+  rendered receipts, or telemetry; the strict-schema parity tests assert their absence.
 - **R1b — Repo identity.** The reference is the *worktree root of the current
   process*; sibling worktrees of the same repo (the dogfood shape:
   `../aireceipts-specNNNN`) are included via `git worktree list --porcelain`
