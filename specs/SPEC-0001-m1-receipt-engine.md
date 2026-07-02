@@ -1,7 +1,7 @@
 ---
 id: SPEC-0001
 title: "M1 — the receipt engine: parse, price, attribute, render, compare, handoff"
-status: draft
+status: approved
 milestone: M1
 depends: []
 ---

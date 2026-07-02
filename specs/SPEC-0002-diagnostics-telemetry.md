@@ -1,7 +1,7 @@
 ---
 id: SPEC-0002
 title: "Diagnostics telemetry — performance + issue signals via Azure App Insights"
-status: draft
+status: approved
 milestone: M1
 depends: [SPEC-0001]
 ---
