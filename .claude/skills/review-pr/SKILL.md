@@ -49,7 +49,9 @@ I6 (no ranking language snuck into receipt copy).
 
 Does the diff match the spec it claims to implement — nothing more? Flag unrelated
 refactors, drive-by renames, or scope creep as separate findings, not blockers unless
-they're risky.
+they're risky. **Docs staleness is a finding**: if the diff changes user-visible
+behavior (flags, commands, output) and no README/docs/help update rides in the PR,
+flag it (build-spec 6.5 requires docs in the same PR).
 
 ## 5. Post the review
 

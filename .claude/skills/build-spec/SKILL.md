@@ -57,6 +57,14 @@ Run the built CLI against real behavior (not just unit tests) for each Success c
 checkbox. Check the boxes once verified and set `status: building` while the PR is open —
 `shipped` is flipped only after the human merges (release/archive step).
 
+## 6.5 Docs ride with the feature
+
+Any user-visible change (new flag/command, changed output, new behavior) updates the
+affected docs — README, docs/**, `--help` text — **in the same PR**, never "in a
+follow-up." Then run `/review-docs` on the touched docs (advisory at PR time, but the
+release gate re-runs it as blocking, so fix now). A feature PR with stale docs is an
+incomplete PR.
+
 ## 7. Commit + PR
 
 Conventional commit subject, backticked code terms, bullets for multiple changes. Open
