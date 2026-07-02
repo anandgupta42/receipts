@@ -15,19 +15,27 @@ own byte-goldens), I2/I3/I6 unchanged in every template (honesty is not a style)
 
 Different receipts serve different moments: the daily receipt wants density, the
 social-share wants the grocery-store joke (Receiptify's viral engine), a screenshot in
-a cost report wants a bar chart. One layout can't be all of them. v1 ships **four
-maintainer-designed templates** behind `--template <name>`; a "receipts designer"
-(user-composed templates) is explicitly deferred until the preset set proves demand.
-**Kill criterion:** goldens ×4 templates must not slow receipt-touching PRs by >2×
-golden churn — if it does, cut to `classic` + `grocery` (the two with distinct jobs).
+a cost report wants a bar chart. One layout can't be all of them. v1 ships **three
+maintainer-designed templates** behind `--template <name>` (`minimal` was cut in
+validation: it duplicated the existing `--mini` surface and could not carry the I3
+methodology text inside its line budget); a "receipts designer" is explicitly deferred.
+**Kill criterion (measurable):** total golden artifacts stay ≤ 26 and
+`verify-goldens.mjs` wall time stays ≤ 2× the pre-spec baseline recorded in the PR —
+exceed either and `datavis` is cut first.
 
-## Architecture (binding)
+## Architecture (binding — corrected in validation)
 
-A template is a **pure function at the view layer**: `buildReceiptView(model,
-template)` returns the same `ReceiptView` shape with different rows/sections. The
-terminal and SVG renderers stay untouched and template-agnostic — structural parity
-(R4 of SPEC-0003) is preserved by construction. No template may re-derive a number;
-they select and arrange what the model already computed.
+The current `ReceiptView` is flat and both renderers hardcode its sequence, so this
+spec includes a **one-time view refactor**: `ReceiptView` becomes an ordered
+`blocks: Block[]` list (`masthead | meta | columnHeader | row | wasteRow | rule |
+total | note | footnote | barcode | footer`), and BOTH renderers become block
+interpreters (each block type has one terminal and one SVG layout). After that,
+a template is a pure function `buildReceiptView(model, template)` emitting a block
+list — adding a template touches no renderer. Classic's block list must reproduce
+today's output byte-identically (the refactor's no-regression proof). **Per-template
+parity test:** terminal and SVG are asserted to consume the identical block list per
+template (structure parity, not just model-field parity). No template re-derives a
+number.
 
 ## Design (lead-authored, binding — implementers execute, don't invent)
 
@@ -38,17 +46,14 @@ Element sources: the Receipt Design Element Inventory (vault, 2026-07). ASCII on
 
 **`grocery`** — the shareable meme (Receiptify mechanics: incommensurate columns are
 the joke). Masthead + `TXN #<sessionId-prefix-8>`; column header
-`ITEM                          QTY        AMT`; tool rows: name / call-count / cost;
+`ITEM                           QTY        AMT` — exact 50-char column math: ITEM
+left-aligned cols 1–28 (truncate with `…` at 27), QTY right-aligned cols 30–37, AMT
+right-aligned cols 39–50; every emitted line is asserted ≤50 chars in tests;
 ALL-CAPS section labels bracketed by `---`; `CARDHOLDER: <dominant-model>`;
 `THANK YOU FOR VIBING WITH <agent>` footer; final line a pipe-barcode
 (`| || ||| | |||| ||`) derived deterministically from the sessionId (8 groups, widths
 = id bytes mod 4 + 1). Waste lines render as `RETURN/REFUND` section — same numbers,
 grocery framing.
-
-**`minimal`** — Monzo discipline (discard, don't add). Max 9 lines: wordmark; title;
-one meta line (agent · duration); hero TOTAL (the row, value flush right); the single
-largest cost row; the first waste line if any; the same-tokens compare row; footer.
-Nothing else — no methodology, no price rows (`--methodology` still exists).
 
 **`datavis`** — Susie Lu's heirs (bars yes, bubbles no). Rows grouped into two
 ALL-CAPS categories (`--- MODEL OUTPUT ---`, `--- TOOL CALLS ---`), each ordered by
@@ -63,21 +68,21 @@ full bar = the most expensive row, axis legend printed once above:
   existing receipts must remain byte-identical — the no-regression proof).
 - **R2 — `aireceipts templates`** lists the four with a 6-line preview each (rendered
   from a built-in fixture model, not prose descriptions).
-- **R3 — Honesty invariants hold per template.** Tokens-only mode, `≈` labels, waste
-  semantics, and the arithmetic-not-prediction note appear (or are cut whole — never
-  reworded) per the Design section; a grep battery asserts zero `$` bytes in unpriced
-  renders across ALL templates.
+- **R3 — Honesty invariants hold per template (exact-wording battery).** Priced
+  renders in EVERY template must contain the exact `METHODOLOGY_BRIEF` string and the
+  exact price-delta note wording (byte-equal substrings, no paraphrase); unpriced
+  renders contain zero `$` bytes; waste `≈` labels are byte-equal to the constants.
+  A section may be absent only where this spec's Design section says so explicitly.
 - **R4 — Goldens per template.** The priced fixture renders byte-golden in all four
   templates × terminal + SVG light (10 new goldens); determinism ×10 covers them.
-- **R5 — Config default.** `~/.aireceipts/config.json` `{"template": "grocery"}` sets
-  the default; flag beats config; malformed config → stderr note + classic (mirrors
-  SPEC-0009's degradation pattern).
+- **R5 — Goldens matrix (exact).** New goldens: {grocery, datavis} × {terminal, SVG
+  light} on the priced fixture = 4 new artifacts (classic's existing goldens are the
+  refactor regression gate; SVG dark stays classic-only). Determinism ×10 covers all.
 
 ## Scenarios
 
 - **Given** `--template grocery` on a priced session, **then** TXN#, QTY/AMT columns,
   CARDHOLDER, and the pipe-barcode render; numbers equal classic's to the cent.
-- **Given** `--template minimal` on a session with no waste, **then** ≤8 lines.
 - **Given** an unpriced session in every template, **then** zero `$` bytes (R3).
 - **Given** no flag and no config, **then** output is byte-identical to pre-spec
   goldens.
@@ -86,7 +91,9 @@ full bar = the most expensive row, axis legend printed once above:
 
 User-composed/custom templates and any "receipts designer" (future spec, explicitly
 deferred); per-template color schemes (SVG themes stay orthogonal); template-specific
-new data derivations.
+new data derivations; a config-file default template (`~/.aireceipts/config.json`
+needs its own shared-config spec — SPEC-0009's budget.json rejects extra keys, and
+two ad-hoc config files is how config stories rot; flag-only in v1).
 
 ## Test matrix
 
@@ -98,7 +105,9 @@ new data derivations.
 | R3 unpriced battery | unpriced fixture × 4 templates | zero `$` bytes each |
 | R3 numbers equal | priced fixture, classic vs grocery totals | identical to the cent |
 | R4 goldens | 4 templates × term + SVG | byte-stable, determinism ×10 |
-| R5 config | config template=grocery, no flag | grocery; flag overrides; malformed → classic + stderr |
+| R5 goldens | grocery+datavis × term+svg-light | 4 artifacts byte-stable ×10 |
+| grocery width | every grocery line, long tool names | ≤50 chars, `…` truncation |
+| block parity | per template | terminal + SVG consume identical block lists |
 | barcode determinism | same sessionId twice | identical pipe pattern |
 
 ## Success criteria
@@ -109,4 +118,11 @@ new data derivations.
 
 ## Validation
 
-*(pending /validate-spec)*
+**2026-07-02 · S2 (Codex): REWORK → reworked same day, all 7 applied.** Blockers: the
+"renderers untouched" architecture claim was FALSE (flat ReceiptView; both renderers
+hardcode the sequence) → replaced with an explicit block-AST refactor + per-template
+block parity tests; `minimal` violated I3 (numbers without methodology) and duplicated
+`--mini` → CUT (3 templates). Also: exact grocery column math + ≤50-char assertions;
+R3 upgraded to an exact-wording battery; config-file default cut to non-goals (no
+second ad-hoc config file); goldens matrix made exact with a measurable kill
+criterion. **S4:** spec-lint green.
