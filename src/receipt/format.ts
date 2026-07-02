@@ -63,9 +63,16 @@ export function formatUsd(n: number): string {
 }
 
 /** `label` left-aligned, `value` right-aligned, `.` leaders filling the gap — the till-receipt line style. Falls back to a single-space gap if `label`+`value` already meet/exceed `width`. */
+const MIN_LEADER = 3;
+
+/** Fixed-grid row: label left, dotted leader, value flush right. A label too long
+ * for the grid is truncated with `…` — the value column NEVER moves (anti-pattern
+ * A4: width drift breaks every row below it; long MCP tool names hit this live). */
 export function dottedLine(label: string, value: string, width: number): string {
-  const dotsLen = Math.max(1, width - label.length - value.length);
-  return `${label}${".".repeat(dotsLen)}${value}`;
+  const maxLabel = width - value.length - MIN_LEADER;
+  const l = label.length > maxLabel ? `${label.slice(0, Math.max(1, maxLabel - 1)).trimEnd()}…` : label;
+  const dotsLen = Math.max(1, width - l.length - value.length);
+  return `${l}${".".repeat(dotsLen)}${value}`;
 }
 
 /** Center `text` within `width`, extra padding column going right. Counts Unicode code points (not UTF-16 code units), so a single emoji doesn't get double-counted and thrown off-center. */
