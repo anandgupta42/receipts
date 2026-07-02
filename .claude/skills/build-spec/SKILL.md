@@ -78,6 +78,16 @@ Run the built CLI against real behavior (not just unit tests) for each Success c
 checkbox. Check the boxes once verified and set `status: building` while the PR is open —
 `shipped` is flipped only after the human merges (release/archive step).
 
+## 6.2 Reuse first, then simplify (no redundant code ships)
+
+BEFORE writing any module: search src/ for an existing primitive that already does
+the job (grep the exports; the repo deliberately builds shared seams — present.ts
+blocks, aggregateWaste, exporters, mini). Building a parallel version of something
+that exists is a defect, not a style choice (we shipped two mini.ts twins once —
+the dedupe cost a merge cycle). AFTER the matrix passes, do one simplification pass
+over your own diff: inline single-use helpers, delete dead branches and unused
+exports, collapse needless abstraction (YAGNI). Smaller diff, same green matrix.
+
 ## 6.3 Tests catch real issues, not coverage
 
 Every test must assert behavior a user could observe breaking. Forbidden: tests that

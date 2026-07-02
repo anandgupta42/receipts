@@ -53,6 +53,13 @@ they're risky. **Docs staleness is a finding**: if the diff changes user-visible
 behavior (flags, commands, output) and no README/docs/help update rides in the PR,
 flag it (build-spec 6.5 requires docs in the same PR).
 
+## 4.5 Redundancy audit
+
+Does the diff duplicate an existing primitive (search before you approve — same
+logic under a new name is the tell)? Single-use helpers, dead code, speculative
+abstraction = findings. The question is always: could this diff be smaller and
+reuse more?
+
 ## 4.6 Description conformance
 
 The PR description must follow the template: missing "What to review" ordering,
