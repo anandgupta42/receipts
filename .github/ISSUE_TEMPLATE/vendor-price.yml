@@ -1,0 +1,47 @@
+name: Vendor price correction
+description: A price in data/prices/ is wrong, stale, or a vendor/model is missing.
+title: "price: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every price row needs a cited, dated source (invariant I2 — no fabricated or
+        inferred prices). The more of this you fill in, the faster it can land; see
+        `.claude/skills/update-prices/` for the exact recipe this issue feeds.
+  - type: input
+    id: vendor
+    attributes:
+      label: Vendor and model
+      description: e.g. "Anthropic, claude-sonnet-5"
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source URL
+      description: The vendor's own pricing page or API pricing docs — not an aggregator.
+    validations:
+      required: true
+  - type: input
+    id: observed
+    attributes:
+      label: Date observed
+      description: The date you read the source (YYYY-MM-DD).
+    validations:
+      required: true
+  - type: textarea
+    id: quote
+    attributes:
+      label: Relevant quote
+      description: >
+        Quote the exact line(s) stating the price, especially if the page needs
+        interpretation (tiered rates, cache pricing, etc).
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: What's wrong with the current row (if any)
+    validations:
+      required: false

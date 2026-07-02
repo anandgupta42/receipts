@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in aireceipts is wrong — a miscount, a crash, a bad parse.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Never paste a raw transcript file or its contents here** — it can contain
+        prompts, file paths, or anything else that was in your session. Use
+        `aireceipts --json` output instead; it's the same facts with none of that.
+  - type: input
+    id: version
+    attributes:
+      label: aireceipts version
+      description: Output of `aireceipts --version`.
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        - Claude Code
+        - Codex CLI
+        - Cursor
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: json
+    attributes:
+      label: aireceipts --json output
+      description: >
+        Run `aireceipts --json` (or `--json` on the failing command) and paste the
+        output. If it's large, trim to the smallest reproducing slice.
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: false
