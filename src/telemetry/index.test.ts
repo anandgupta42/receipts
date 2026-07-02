@@ -94,8 +94,8 @@ describe("R2: exactly three event names, exhaustively, via the public recorder f
 });
 
 describe("showTelemetryPayload: R5 --telemetry-show backing function", () => {
-  it("reports disabled with an empty queue when no connection string is configured", () => {
-    const result = showTelemetryPayload({});
+  it("reports disabled with an empty queue when the connection string is explicitly empty", () => {
+    const result = showTelemetryPayload({ AIRECEIPTS_TELEMETRY_CONNECTION: "" });
     expect(result).toEqual({ enabled: false, events: [] });
   });
 
