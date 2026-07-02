@@ -237,7 +237,7 @@ function buildGrocery(model: ReceiptModel): Block[] {
 
 // --- datavis (Susie Lu's heirs; bars yes, bubbles no) ------------------------
 
-const DATAVIS_LEGEND = "bar = share of priciest line";
+const DATAVIS_LEGEND = "[##########] = priciest line; others in proportion";
 
 function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number): Block {
   const amt = rowAmount(row, model);

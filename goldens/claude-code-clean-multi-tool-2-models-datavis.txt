@@ -5,7 +5,7 @@
     claude-opus-4-8 87% · claude-sonnet-5 13%     
          cache served 85% of input tokens         
 
-bar = share of priciest line
+[##########] = priciest line; others in proportion
 
 --- MODEL OUTPUT ---
 (thinking/reply)................$0.03 [######----]
