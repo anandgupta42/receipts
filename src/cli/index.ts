@@ -18,6 +18,7 @@ import {
   showTelemetryPayload,
 } from "../telemetry/index.js";
 import { parseArgs } from "./args.js";
+import { runQuota } from "./quota.js";
 
 const HELP_TEXT = `aireceipts — local, deterministic cost receipts for AI coding-agent sessions
 
@@ -26,6 +27,8 @@ Usage:
   aireceipts --list [--json]            list sessions, newest first
   aireceipts compare <a> <b> [--json]   side-by-side (or stacked) comparison
   aireceipts --handoff [selector]       paste-ready block of fired waste lines
+  aireceipts --quota                    current Claude Code rate-limit window usage
+                                         (statusline stdin mode only; silent if unavailable)
   aireceipts --help                     show this help
 
 selector: a 1-based index into --list, a session id, or a title substring.`;
@@ -162,6 +165,8 @@ async function dispatch(args: ReturnType<typeof parseArgs>): Promise<number> {
       return runCompare(args.compareA, args.compareB, args.json);
     case "handoff":
       return runHandoff(args.selector);
+    case "quota":
+      return runQuota();
     case "receipt":
     default:
       return runReceipt(args.selector, args.json);
