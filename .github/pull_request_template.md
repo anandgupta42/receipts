@@ -6,9 +6,10 @@
      Delete this section for internal/infra changes. -->
 
 ## See it
-<!-- MANDATORY for any user-visible change: paste the actual output — a terminal
-     capture in a code block (the receipt IS the screenshot), or reference the
-     committed SVG/PNG under its files-changed path. No output = not reviewable. -->
+<!-- MANDATORY for any user-visible change: paste the actual output VERBATIM — a
+     full terminal capture in a code block (the receipt IS the screenshot), or the
+     committed SVG/PNG files-changed path. NEVER hand-type, abbreviate, or elide
+     (no "..." rows): a mangled sample reads as a broken product. -->
 
 ## What changed
 <!-- Grouped bullets, one line each: module → what happened to it. -->
