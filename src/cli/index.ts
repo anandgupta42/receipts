@@ -304,9 +304,9 @@ async function runCompare(
  * window definition, reused so there's one notion of "recent"). Feeds the
  * distinct-session recurrence check for standing-rule suggestions.
  */
-async function recentWasteAggregates(now: number = Date.now()): Promise<WasteClassAggregate[]> {
+export async function recentWasteAggregates(now: number = Date.now()): Promise<WasteClassAggregate[]> {
   const bounds = windowBounds(now);
-  const summaries = await listSessions();
+  const summaries = await listFullSessions();
   const { current } = partitionWindows(summaries, bounds);
   const loaded = await Promise.all(current.map((s) => loadSession(s)));
   return aggregateWaste(loaded.filter((s): s is Session => s !== null));

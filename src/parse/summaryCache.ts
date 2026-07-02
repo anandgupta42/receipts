@@ -27,6 +27,18 @@ function finiteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function optionalFiniteNumber(value: unknown): boolean {
+  return value === undefined || finiteNumber(value);
+}
+
+function optionalString(value: unknown): boolean {
+  return value === undefined || typeof value === "string";
+}
+
+function optionalBoolean(value: unknown): boolean {
+  return value === undefined || typeof value === "boolean";
+}
+
 function tokenUsage(value: unknown): value is TokenUsage {
   if (!value || typeof value !== "object") {
     return false;
@@ -53,7 +65,18 @@ function sessionSummary(value: unknown): value is SessionSummary {
     typeof summary.id === "string" &&
     typeof summary.source === "string" &&
     SOURCES.has(summary.source as AgentSource) &&
+    optionalString(summary.title) &&
+    optionalString(summary.model) &&
+    optionalFiniteNumber(summary.startedAt) &&
+    optionalFiniteNumber(summary.endedAt) &&
     typeof summary.filePath === "string" &&
+    optionalBoolean(summary.unpriceable) &&
+    optionalString(summary.cwd) &&
+    optionalString(summary.gitBranch) &&
+    optionalBoolean(summary.isSidechain) &&
+    optionalString(summary.parentSessionId) &&
+    optionalString(summary.agentId) &&
+    optionalString(summary.parentFilePath) &&
     typeof totals === "object" &&
     totals !== null &&
     tokenUsage(totals.tokens) &&

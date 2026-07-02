@@ -37,23 +37,33 @@ async function modelFor(source: string, path: string): Promise<ReceiptModel> {
   return buildReceiptModel(session);
 }
 
-/** Short display strings a block puts on both renderers verbatim (skips wrapped/centered/chrome that the layouts reflow). */
-function checkableLabels(b: Block): string[] {
+function footnoteTokens(text: string): string[] {
+  return text.split(/\s+/).filter((token) => token.length >= 8);
+}
+
+/** Value-bearing display strings a block puts on both renderers; wrapped footnotes are checked token-wise because terminal/SVG line widths differ. */
+function checkableValues(b: Block): string[] {
   switch (b.kind) {
     case "masthead":
       return [b.text];
+    case "meta":
+      return b.lines;
     case "columnHeader":
       return [b.item, b.qty, b.amt];
     case "row":
-      return b.columns ? [b.label] : [b.label, b.value];
+      return b.columns ? [b.label, b.value, b.columns.qty, b.columns.amt] : [b.label, b.value];
     case "wasteRow":
-      return [b.label];
+      return b.detail === undefined ? [b.label, b.value] : [b.label, b.value, b.detail];
     case "total":
-      return [b.label];
+      return b.columns ? [b.label, b.value, b.columns.qty, b.columns.amt] : [b.label, b.value];
     case "note":
       return [b.text];
     case "barcode":
       return [b.pattern];
+    case "footnote":
+      return footnoteTokens(b.text);
+    case "footer":
+      return [b.text];
     default:
       return [];
   }
@@ -88,6 +98,12 @@ describe("SPEC-0020 R3 — exact-wording honesty battery holds in every template
     const unpriced = await modelFor(UNPRICED.source, UNPRICED.path);
     const leaked = [...buildReceiptView(unpriced, "classic").blocks, { kind: "note", text: "sneaky $9.99" } as Block];
     expect(validateReceiptBlocks(leaked, unpriced).map((v) => v.code)).toContain("dollar-in-unpriced");
+
+    const withFakeDollar = [
+      ...buildReceiptView(priced, "classic").blocks,
+      { kind: "row", label: "fake surcharge", value: "$123,456.78" },
+    ] as Block[];
+    expect(validateReceiptBlocks(withFakeDollar, priced).map((v) => v.code)).toContain("untraced-dollar");
   });
 });
 
@@ -147,9 +163,9 @@ describe("SPEC-0020 — block parity: terminal and SVG consume the identical blo
     const terminal = renderReceipt(model, { color: false, template });
     const svg = renderReceiptSvg(model, { template });
     for (const block of blocks) {
-      for (const label of checkableLabels(block)) {
-        expect(terminal).toContain(label);
-        expect(svg).toContain(label);
+      for (const value of checkableValues(block).filter((s) => s !== "")) {
+        expect(terminal).toContain(value);
+        expect(svg).toContain(value);
       }
     }
   });
