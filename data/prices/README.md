@@ -17,6 +17,8 @@ at the rate that was live on the day it ran (I3, `AGENTS.md`).
           "input": 3.0,
           "output": 15.0,
           "input_cached": 0.3,
+          "input_cache_write_5m": 3.75,
+          "input_cache_write_1h": 6.0,
           "from_date": "2026-05-01",
           "to_date": null,
           "sources": [{ "url": "https://www.anthropic.com/pricing", "observed_at": "2026-07-01" }]
@@ -28,8 +30,12 @@ at the rate that was live on the day it ran (I3, `AGENTS.md`).
 ```
 
 - `input` / `output` — USD per million tokens.
-- `input_cached` — USD per million cached-input tokens, if the vendor prices it
-  separately; omit the field if not applicable (never guess a value).
+- `input_cached` — USD per million cached-input (cache-read) tokens, if the vendor
+  prices it separately; omit the field if not applicable (never guess a value).
+- `input_cache_write_5m` / `input_cache_write_1h` — USD per million tokens for writing
+  to the prompt cache at the vendor's 5-minute / 1-hour TTL tiers, if the vendor prices
+  cache writes separately from cache reads; omit either or both fields if the vendor
+  doesn't publish that tier (never guess a value).
 - `from_date` / `to_date` — ISO date the rate took effect / was superseded. `to_date:
   null` means the row is currently active.
 - `sources` — **required**, non-empty array of objects, each with a `url` (http/https) actually fetched and read, plus optional `observed_at` (YYYY-MM-DD) and `excerpt`. This is

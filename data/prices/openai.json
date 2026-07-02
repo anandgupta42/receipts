@@ -1,0 +1,41 @@
+{
+  "vendor": "openai",
+  "models": {
+    "gpt-5.3-codex": {
+      "price_history": [
+        {
+          "input": 1.75,
+          "output": 14.0,
+          "input_cached": 0.175,
+          "from_date": "2026-01-01",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/pricing",
+              "observed_at": "2026-07-01",
+              "excerpt": "gpt-5.3-codex — Standard tier: Input $1.75 / 1M tokens, Cached input $0.175 / 1M tokens, Output $14.00 / 1M tokens"
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-5.4-mini": {
+      "price_history": [
+        {
+          "input": 0.75,
+          "output": 4.5,
+          "input_cached": 0.075,
+          "from_date": "2026-01-01",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/pricing",
+              "observed_at": "2026-07-01",
+              "excerpt": "gpt-5.4-mini — Standard tier: Input $0.75 / 1M tokens, Cached input $0.075 / 1M tokens, Output $4.50 / 1M tokens"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

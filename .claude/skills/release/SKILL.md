@@ -42,5 +42,5 @@ Nothing else in this file changes.
 ## 6. Human clicks publish
 
 Prepare the release (tag, changelog, `AGENTS.md` update) as a PR or a tagged commit, but
-**npm publish is the founder's button** (AGENTS.md, button 4) — this skill never runs
+**npm publish is the maintainer's button** (AGENTS.md, button 4) — this skill never runs
 `npm publish` itself. Stop and hand off once the tag and changelog are ready.

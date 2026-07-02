@@ -78,4 +78,4 @@ from.
 
 - [ ] This spec is read and honored by every other spec and skill in the repo.
 - [ ] No spec introduces a network call beyond the I4 diagnostics contract without amending I4 here
-      first, with the founder's explicit approval.
+      first, with the maintainer's explicit approval.

@@ -1,6 +1,6 @@
 ---
 name: validate-spec
-description: "Adversarially validate a draft spec BEFORE the founder sees it. Use after write-spec finishes, or when the user asks to validate/review a spec. A draft without a validation record cannot be approved or built."
+description: "Adversarially validate a draft spec BEFORE the maintainer sees it. Use after write-spec finishes, or when the user asks to validate/review a spec. A draft without a validation record cannot be approved or built."
 trigger: /validate-spec
 ---
 
@@ -9,7 +9,7 @@ trigger: /validate-spec
 Code has gates L0–L8; this is the spec-side gate (S1–S4). Motivating incident
 (2026-07-02): a spec promised "on Haiku this'd be ≈ $7.40" — unmeasurable, since a
 cheaper model might not have managed the task. Machines and one reviewer missed it;
-the founder caught it. This skill exists so the pipeline catches the next one.
+the maintainer caught it. This skill exists so the pipeline catches the next one.
 
 ## S1 — Invariant audit (self)
 
@@ -44,5 +44,5 @@ appears in the Test matrix, required sections present, no inline type definition
 
 Append a `## Validation` section to the spec: date, S1 outcome, S2 findings (accepted /
 rejected, one line each), S3 evidence, S4 pass. Fixes go into the draft first. Only then
-does the spec go to the founder — approval (button 1) means approving a spec that has
+does the spec go to the maintainer — approval (button 1) means approving a spec that has
 already survived attack, with the record attached. This skill never sets `approved`.

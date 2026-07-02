@@ -11,7 +11,7 @@ trigger: /build-spec
 Read the spec's frontmatter. If `status` is not `approved`, stop and say so — drafts do
 not get built. The spec must also carry a `## Validation` record (from /validate-spec);
 an approved spec without one means the gate was skipped — stop and run it. This skill
-never edits a spec's status to `approved`; that's the founder's button (AGENTS.md, button 1).
+never edits a spec's status to `approved`; that's the maintainer's button (AGENTS.md, button 1).
 
 ## 1. Branch — never touch main
 

@@ -43,6 +43,6 @@ from step 1 if still red — counting against the cap in step 0.
 
 ## 5. Stop conditions
 
-Cap reached · the failure needs a founder call (e.g. a flaky test that should be
+Cap reached · the failure needs a maintainer call (e.g. a flaky test that should be
 deleted, a real invariant conflict) · fixing it would require touching `main` directly
 (never do that — open a PR instead).
