@@ -1,7 +1,7 @@
 ---
 id: SPEC-0017
 title: "Context-thrash waste detector — compaction churn as a priced waste line"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001]
 ---

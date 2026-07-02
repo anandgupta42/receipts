@@ -1,7 +1,7 @@
 ---
 id: SPEC-0018
 title: "CLI command registry — kill the shared-file merge funnel"
-status: draft
+status: approved
 milestone: M3
 depends: [SPEC-0001]
 ---
