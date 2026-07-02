@@ -30,6 +30,7 @@ export const ROOT_ALLOWLIST = Object.freeze([
   "README.md",
   "data",
   "docs",
+  "site",
   "eslint.config.js",
   "eval",
   "goldens",
