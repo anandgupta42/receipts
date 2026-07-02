@@ -1,17 +1,18 @@
 - - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
+ “What does the --frozen-lockfile flag do in pn…” 
     Codex · Jun 22 2026 16:00:06 UTC · 1m 12s     
                 gpt-5.3-codex 100%                
+         cache served 54% of input tokens         
 
 (thinking/reply)..................$0.00  (3 turns)
 
 ≈ re-priced eligible trivial spans...........$0.00
-  (3 turns → gpt-5.4-mini)
+  (3 tiny turns, priced at gpt-5.4-mini)
 --------------------------------------------------
 TOTAL........................................$0.00
-
-arithmetic, not a prediction: same tokens on
-gpt-5.4-mini would cost $0.00 (actual: $0.00)
+same tokens on gpt-5.4-mini..................$0.00
+  (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
 calls; unpriced models show tokens only, never

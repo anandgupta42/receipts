@@ -10,6 +10,7 @@ import type { ReceiptModel, ToolRow } from "../../src/receipt/model.js";
 import type { TokenUsage } from "../../src/parse/types.js";
 import { renderReceiptLines } from "../../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg, rowGeometry, THEMES } from "../../src/receipt/svg.js";
+import { buildReceiptView } from "../../src/receipt/present.js";
 import type { ThemeName } from "../../src/receipt/svg.js";
 
 const PRICED = { source: "claude-code", path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
@@ -279,5 +280,19 @@ describe("R4 — field-set parity between the terminal and SVG renderers", () =>
     const terminal = fieldsRead(model, (m) => renderReceiptLines(m, { color: false }));
     const svg = fieldsRead(model, (m) => renderReceiptSvg(m));
     expect([...svg].sort()).toEqual([...terminal].sort());
+  });
+});
+
+describe("titleLine — masthead honesty", () => {
+  it("renders a truncated quoted title for a real session title", async () => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    const titled = buildReceiptView(model).metaLines.filter((l) => l.startsWith("\u201C"));
+    expect(titled).toHaveLength(1);
+    expect(titled[0].length).toBeLessThanOrEqual(48);
+  });
+
+  it("renders NO title when the session title is markup-shaped (agent-injected XML is machine noise)", async () => {
+    const model = { ...(await modelFor(PRICED.source, PRICED.path)), title: '<teammate-message teammate_id="x">hi</teammate-message>' };
+    expect(buildReceiptView(model).metaLines.some((l) => l.startsWith("\u201C"))).toBe(false);
   });
 });

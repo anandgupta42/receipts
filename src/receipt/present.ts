@@ -38,20 +38,61 @@ export interface ReceiptView {
   total: RowView;
   /** Plain note rendered under TOTAL in the degraded modes (Cursor totals-only, or no price table matched). `undefined` when the session priced. */
   totalNote?: string;
-  /** The price-delta footnote sentence (unwrapped). `undefined` in tokens-only mode. */
-  priceDelta?: string;
+  /** The same-tokens comparison as a receipt row (label/value, renders right under TOTAL). `undefined` in tokens-only mode. */
+  priceDeltaRow?: RowView;
+  /** The fixed honesty note rendered small under the delta row. Present iff `priceDeltaRow` is. */
+  priceDeltaNote?: string;
   /** The methodology brief (constant), rendered as a wrapped muted footnote. */
   methodologyBrief: string;
 }
 
 const WORDMARK = "AIRECEIPTS";
 
+const TITLE_MAX = 46;
+
+/** One-line session title: newlines collapsed, truncated with an ellipsis. The receipt must say WHAT the work was, not just what it cost. */
+function titleLine(model: ReceiptModel): string | undefined {
+  if (model.title === undefined || model.title.trim() === "") {
+    return undefined;
+  }
+  const flat = model.title.replace(/\s+/g, " ").trim();
+  // A markup-shaped title (agent-injected XML, system tags) is machine noise, not a
+  // work description — render nothing rather than garbage on the masthead.
+  if (flat.startsWith("<")) {
+    return undefined;
+  }
+  const cut = flat.length > TITLE_MAX ? `${flat.slice(0, TITLE_MAX - 1).trimEnd()}…` : flat;
+  return `“${cut}”`;
+}
+
+/** Share of prompt-side tokens served from cache — the single most explanatory cost fact a session has. `undefined` when there is no per-turn usage (Cursor) or no prompt tokens at all. */
+function cacheLine(model: ReceiptModel): string | undefined {
+  if (model.unpriceable) {
+    return undefined;
+  }
+  const t = model.totalTokens;
+  const promptSide = t.input + t.cacheRead + t.cacheCreation;
+  if (promptSide <= 0 || t.cacheRead <= 0) {
+    return undefined;
+  }
+  return `cache served ${Math.round((t.cacheRead / promptSide) * 100)}% of input tokens`;
+}
+
 function metaLines(model: ReceiptModel): string[] {
   const startLabel = model.startedAtMs !== undefined ? formatAbsoluteUtc(model.startedAtMs) : "start time unknown";
   const durationLabel = model.durationMs !== undefined ? formatDuration(model.durationMs) : "duration unknown";
-  const lines = [`${model.agentLabel} · ${startLabel} · ${durationLabel}`];
+  const lines: string[] = [];
+  const title = titleLine(model);
+  if (title !== undefined) {
+    lines.push(title);
+  }
+  lines.push(`${model.agentLabel} · ${startLabel} · ${durationLabel}`);
   if (model.modelMix.length > 0) {
     lines.push(model.modelMix.map((m) => `${m.model} ${Math.round(m.tokenShare * 100)}%`).join(" · "));
+  }
+  const cache = cacheLine(model);
+  if (cache !== undefined) {
+    lines.push(cache);
   }
   return lines;
 }
@@ -81,7 +122,7 @@ function wasteRow(waste: WasteLine): WasteView {
     kind: "trivial-spans",
     label: TRIVIAL_SPANS_LABEL,
     value: `$${formatUsd(waste.usd)}`,
-    detail: `(${waste.eligibleTurnCount} turns → ${waste.cheaperModel})`,
+    detail: `(${waste.eligibleTurnCount} tiny turns, priced at ${waste.cheaperModel})`,
   };
 }
 
@@ -95,14 +136,13 @@ function totalRow(model: ReceiptModel): { total: RowView; totalNote?: string } {
   return { total: { label: "TOTAL", value: `${formatInt(model.totalTokens.total)} tok` }, totalNote: NO_PRICE_MATCH_NOTE };
 }
 
-function priceDeltaSentence(model: ReceiptModel): string | undefined {
+export const PRICE_DELTA_NOTE = "(arithmetic, not a prediction)";
+
+function priceDeltaRow(model: ReceiptModel): RowView | undefined {
   if (!model.priceDelta) {
     return undefined;
   }
-  return (
-    `arithmetic, not a prediction: same tokens on ${model.priceDelta.cheaperModel} would cost ` +
-    `$${formatUsd(model.priceDelta.usd)} (actual: $${formatUsd(model.priceDelta.actualUsd)})`
-  );
+  return { label: `same tokens on ${model.priceDelta.cheaperModel}`, value: `$${formatUsd(model.priceDelta.usd)}` };
 }
 
 /** Build the shared, layout-agnostic view every renderer formats. Pure over the already-priced {@link ReceiptModel} — no pricing/attribution here. */
@@ -115,7 +155,8 @@ export function buildReceiptView(model: ReceiptModel): ReceiptView {
     wasteRows: model.wasteLines.map(wasteRow),
     total,
     totalNote,
-    priceDelta: priceDeltaSentence(model),
+    priceDeltaRow: priceDeltaRow(model),
+    priceDeltaNote: model.priceDelta ? PRICE_DELTA_NOTE : undefined,
     methodologyBrief: METHODOLOGY_BRIEF,
   };
 }

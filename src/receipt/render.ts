@@ -58,9 +58,11 @@ export function renderReceiptLines(model: ReceiptModel, opts: RenderOptions = {}
     lines.push(view.totalNote);
   }
 
-  if (view.priceDelta) {
-    lines.push("");
-    lines.push(...wrapText(view.priceDelta, width).map((l) => dim(l)));
+  if (view.priceDeltaRow) {
+    lines.push(dim(dottedLine(view.priceDeltaRow.label, view.priceDeltaRow.value, width)));
+    if (view.priceDeltaNote) {
+      lines.push(dim(`  ${view.priceDeltaNote}`));
+    }
   }
 
   lines.push("");

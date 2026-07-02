@@ -1,15 +1,16 @@
 - - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
+ “The build fails because of a broken import in…” 
       Codex · Jun 20 2026 11:00:04 UTC · 56s      
                 gpt-5.3-codex 100%                
+         cache served 62% of input tokens         
 
 exec_command......................$0.01  (2 calls)
 apply_patch........................$0.01  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.02
-
-arithmetic, not a prediction: same tokens on
-gpt-5.4-mini would cost $0.01 (actual: $0.02)
+same tokens on gpt-5.4-mini..................$0.01
+  (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
 calls; unpriced models show tokens only, never
