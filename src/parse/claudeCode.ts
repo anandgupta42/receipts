@@ -74,20 +74,22 @@ function stringifyToolResult(content: unknown): string {
 }
 
 /**
- * Map Claude Code's raw usage onto our 3-component `TokenUsage`. The price schema
- * has no cache-write rate, so `cache_creation_input_tokens` is folded into `input`
- * (a defensible cited-rate proxy — Anthropic bills cache writes at a multiple of
- * the input rate, so treating them as input tokens for costing purposes never
- * under-reports spend) rather than dropped or invented a fourth bucket (I2).
+ * Map Claude Code's raw usage onto our 4-component `TokenUsage`.
+ * `cache_creation_input_tokens` is carried as its own `cacheCreation` field
+ * rather than folded into `input` — `src/pricing/resolve.ts`'s `costOf`
+ * prices it against the vendor's cited cache-write rate (I2: pricing
+ * cache-writes at the base input rate would understate cost on
+ * cache-write-heavy sessions, our flagship case).
  */
 function mapUsage(usage: RawUsage | undefined) {
   if (!usage) {
     return undefined;
   }
   return withTotal({
-    input: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0),
+    input: usage.input_tokens ?? 0,
     output: usage.output_tokens ?? 0,
     cacheRead: usage.cache_read_input_tokens ?? 0,
+    cacheCreation: usage.cache_creation_input_tokens ?? 0,
     total: 0,
   });
 }
@@ -130,7 +132,6 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
       turnCount++;
 
       const toolCalls: ToolCall[] = [];
-      let outputTokens: number | undefined;
 
       if (typeof msg.content === "string") {
         if (COMMAND_ECHO_RE.test(msg.content)) {
@@ -154,14 +155,12 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         }
       }
 
-      outputTokens = usage?.output;
-
       turns.push({
         index: turns.length,
         timestamp: ts,
         model: msg.model,
         usage,
-        outputTokens,
+        outputTokens: usage?.output,
         toolCalls,
       });
       return;

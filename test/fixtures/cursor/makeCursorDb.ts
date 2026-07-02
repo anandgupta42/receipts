@@ -51,6 +51,11 @@ export function makeCursorDb({ dbPath }: MakeCursorDbOptions): string {
     })),
     createdAt: Date.parse("2026-06-27T10:00:00.000Z"),
     lastUpdatedAt: Date.parse("2026-06-27T10:04:30.000Z"),
+    // Session-level totals-only token count — the only shape
+    // src/parse/cursor.ts's mapTokens actually reads (composerData.tokenCount
+    // .{inputTokens,outputTokens}); per-bubble tokenCount below is never
+    // consulted for session totals, only kept as realistic per-turn noise.
+    tokenCount: { inputTokens: 1900, outputTokens: 268 },
   };
   insert.run(`composerData:${composerId}`, JSON.stringify(composerData));
 

@@ -22,11 +22,16 @@ interface CodexUsage {
 }
 
 /**
- * Map Codex's raw usage onto our 3-component `TokenUsage`. Unlike the private
+ * Map Codex's raw usage onto our 4-component `TokenUsage`. Unlike the private
  * reference implementation, we do NOT subtract `reasoning_output_tokens` from
  * `output` — our `TokenUsage` has no separate reasoning bucket to absorb those
  * tokens into, so subtracting them would silently drop billed spend from the
  * total (I2: never under-report). Reasoning tokens stay folded into `output`.
+ * `cacheCreation` is always 0 here: OpenAI's usage payload has no cache-write
+ * counterpart to `cached_input_tokens` — prompt caching is automatic and its
+ * pricing only ever discounts cached reads (per team-lead: "OpenAI publishes
+ * cached-read only"), so `openai.json` price rows carry no
+ * `input_cache_write_*` fields for `costOf` to price against.
  */
 function mapUsage(usage: CodexUsage | undefined) {
   if (!usage) {
@@ -37,6 +42,7 @@ function mapUsage(usage: CodexUsage | undefined) {
     input,
     output: usage.output_tokens ?? 0,
     cacheRead: usage.cached_input_tokens ?? 0,
+    cacheCreation: 0,
     total: 0,
   });
 }

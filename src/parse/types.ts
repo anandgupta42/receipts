@@ -19,16 +19,22 @@ export const SOURCE_LABELS: Record<AgentSource, string> = {
 };
 
 /**
- * input/output/cacheRead only — the price schema (`data/prices/<vendor>.json`)
- * carries no cache-write rate, so adapters fold any cache-write tokens into
- * `input` at parse time (a defensible cited-rate proxy) rather than inventing a
- * fourth bucket nothing can price (I2). See each adapter's `mapUsage` for the
- * exact per-vendor mapping and rationale.
+ * `cacheCreation` (tokens written to the prompt cache) is tracked separately
+ * from `cacheRead` (tokens served from it) because a vendor's price schema
+ * (`data/prices/<vendor>.json`) may cite distinct cache-write rates
+ * (`input_cache_write_5m`/`_1h`) that are more expensive than a plain input
+ * token — folding writes into `input` would understate cost on cache-write-
+ * heavy sessions (I2: never under-report spend). No adapter transcript
+ * records which TTL tier a given write used, so `src/pricing/resolve.ts`'s
+ * `costOf` picks a documented default tier when a row cites more than one,
+ * falling back to the base `input` rate when the row cites none. See each
+ * adapter's `mapUsage` for the exact per-vendor mapping.
  */
 export interface TokenUsage {
   input: number;
   output: number;
   cacheRead: number;
+  cacheCreation: number;
   total: number;
 }
 

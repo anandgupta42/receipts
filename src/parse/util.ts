@@ -16,7 +16,7 @@ export function expandHome(p: string): string {
 }
 
 export function emptyUsage(): TokenUsage {
-  return { input: 0, output: 0, cacheRead: 0, total: 0 };
+  return { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 };
 }
 
 export function addUsage(a: TokenUsage, b: Partial<TokenUsage>): TokenUsage {
@@ -24,13 +24,14 @@ export function addUsage(a: TokenUsage, b: Partial<TokenUsage>): TokenUsage {
     input: a.input + (b.input ?? 0),
     output: a.output + (b.output ?? 0),
     cacheRead: a.cacheRead + (b.cacheRead ?? 0),
+    cacheCreation: a.cacheCreation + (b.cacheCreation ?? 0),
     total: a.total + (b.total ?? 0),
   };
 }
 
 /** Recompute `total` from the component fields. */
 export function withTotal(u: TokenUsage): TokenUsage {
-  return { ...u, total: u.input + u.output + u.cacheRead };
+  return { ...u, total: u.input + u.output + u.cacheRead + u.cacheCreation };
 }
 
 /** Parse a timestamp that may be ISO-8601, epoch ms, or epoch seconds. */

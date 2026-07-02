@@ -47,8 +47,8 @@ describe.skipIf(!hasLoadById)("claude-code adapter (R1 parse)", () => {
     expect(session).not.toBeNull();
     expect(session.source).toBe("claude-code");
     expect(session.model).toBe("claude-opus-4-8");
-    const bashCalls = session.messages
-      .flatMap((m: { toolCalls?: { name: string }[] }) => m.toolCalls ?? [])
+    const bashCalls = session.turns
+      .flatMap((t: { toolCalls?: { name: string }[] }) => t.toolCalls ?? [])
       .filter((tc: { name: string }) => tc.name === "Bash");
     expect(bashCalls.length).toBe(5);
     expect(session.totals.toolCallCount).toBeGreaterThanOrEqual(5);
@@ -60,16 +60,18 @@ describe.skipIf(!hasLoadById)("claude-code adapter (R1 parse)", () => {
     expect(session).not.toBeNull();
     expect(session.source).toBe("claude-code");
     const modelsUsed = new Set(
-      session.messages
-        .map((m: { model?: string }) => m.model)
+      session.turns
+        .map((t: { model?: string }) => t.model)
         .filter((m: string | undefined): m is string => Boolean(m)),
     );
     expect(modelsUsed.has("claude-opus-4-8")).toBe(true);
     expect(modelsUsed.has("claude-sonnet-5")).toBe(true);
     expect(modelsUsed.size).toBe(2);
-    // isMeta records and slash-command echoes must not surface as messages.
-    const rawTexts = session.messages.map((m: { text?: string }) => m.text ?? "");
-    expect(rawTexts.some((t: string) => t.startsWith("<command-name>"))).toBe(false);
+    // isMeta records and slash-command echoes are filtered before a Turn is
+    // ever created (src/parse/claudeCode.ts), so they can't surface here —
+    // assert the turn count matches exactly the fixture's real assistant
+    // records (10), which only holds if that filtering happened.
+    expect(session.turns.length).toBe(10);
   });
 });
 
@@ -92,9 +94,8 @@ describe.skipIf(!hasLoadById)("codex adapter (R1 parse)", () => {
     // tokens by construction (R4b eligibility) — assert that shape survives
     // parsing so the R4b detector (core-engine, later wave) has something
     // real to fire against.
-    const assistantTurns = session.messages.filter(
-      (m: { role: string; toolCalls?: unknown[] }) =>
-        m.role === "assistant" && (m.toolCalls?.length ?? 0) === 0,
+    const assistantTurns = session.turns.filter(
+      (t: { toolCalls?: unknown[] }) => (t.toolCalls?.length ?? 0) === 0,
     );
     expect(assistantTurns.length).toBeGreaterThan(0);
     for (const turn of assistantTurns) {
@@ -114,7 +115,7 @@ describe.skipIf(!hasLoadById)("corrupt file handling (R1)", () => {
     // note, exit 0" acceptance row; assert whichever this adapter chooses is
     // internally consistent rather than asserting one specific shape.
     if (session !== null) {
-      expect(session.messages.length).toBeGreaterThanOrEqual(0);
+      expect(session.turns.length).toBeGreaterThanOrEqual(0);
     }
   });
 });
@@ -142,11 +143,27 @@ describe.skipIf(!hasLoadById)("cursor adapter (R1 degraded mode)", () => {
     const dbPath = path.join(dir, "state.vscdb");
     const composerId = makeCursorDb({ dbPath });
 
-    // Try the two most plausible id conventions; whichever the real adapter
-    // uses, at least one of these should resolve once the contract lands.
-    const session =
-      (await contracts!.loadById("cursor", dbPath).catch(() => null)) ??
-      (await contracts!.loadById("cursor", composerId).catch(() => null));
+    // CursorAdapter.loadSession always opens `process.env.CURSOR_DB_PATH ||
+    // defaultDbPath()` (src/parse/cursor.ts) — the `id` argument is only used
+    // *after* the db is opened, to look up rows within it. Point the adapter
+    // at this test's temp db, or it will try (and fail) to open the real
+    // machine's default Cursor db path, which doesn't exist in CI.
+    const previousDbPath = process.env.CURSOR_DB_PATH;
+    process.env.CURSOR_DB_PATH = dbPath;
+    let session;
+    try {
+      // Try the two most plausible id conventions; whichever the real adapter
+      // uses, at least one of these should resolve once the contract lands.
+      session =
+        (await contracts!.loadById("cursor", dbPath).catch(() => null)) ??
+        (await contracts!.loadById("cursor", composerId).catch(() => null));
+    } finally {
+      if (previousDbPath === undefined) {
+        delete process.env.CURSOR_DB_PATH;
+      } else {
+        process.env.CURSOR_DB_PATH = previousDbPath;
+      }
+    }
 
     expect(session).not.toBeNull();
     if (session) {
