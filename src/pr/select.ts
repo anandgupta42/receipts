@@ -48,6 +48,26 @@ function overlaps(startedAt: number, endedAt: number, commitMs: readonly number[
 }
 
 /**
+ * The cheap, summary-level candidate predicate shared by SPEC-0019's
+ * `selectCandidates` and SPEC-0023's contributor set: a non-sidechain session
+ * whose `cwd` is inside a repo worktree root (R1b) and whose time window
+ * overlaps a branch commit (R1d). A SHA-anchored contributor always satisfies
+ * this (its own commit instant lies inside its window), so pre-filtering here
+ * never drops a real contributor — it only bounds how many sessions get loaded
+ * for the SPEC-0023 anchor check.
+ */
+export function isBranchCandidate(s: SessionSummary, roots: string[], commitMs: readonly number[]): boolean {
+  return (
+    !s.isSidechain &&
+    typeof s.cwd === "string" &&
+    cwdInsideRoots(s.cwd, roots) &&
+    s.startedAt !== undefined &&
+    s.endedAt !== undefined &&
+    overlaps(s.startedAt, s.endedAt, commitMs)
+  );
+}
+
+/**
  * Auto-select among `sessions` those whose `cwd` is inside a repo worktree root
  * and whose time window overlaps a branch commit. Sessions missing `cwd` or
  * either timestamp are never auto-attributed (R1a/R1d). Subagent transcripts
@@ -58,15 +78,7 @@ export function selectCandidates(
   roots: string[],
   commitMs: readonly number[],
 ): Selection {
-  const matches = sessions.filter(
-    (s) =>
-      !s.isSidechain &&
-      typeof s.cwd === "string" &&
-      cwdInsideRoots(s.cwd, roots) &&
-      s.startedAt !== undefined &&
-      s.endedAt !== undefined &&
-      overlaps(s.startedAt, s.endedAt, commitMs),
-  );
+  const matches = sessions.filter((s) => isBranchCandidate(s, roots, commitMs));
   if (matches.length === 0) {
     return { kind: "none" };
   }

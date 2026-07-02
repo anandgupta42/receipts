@@ -53,6 +53,28 @@ function classifyAnchors(turns: Turn[], branchShas: readonly string[]): GitAncho
   return anchors;
 }
 
+/** SPEC-0023 R1 — a session's branch-SHA anchor summary, the contributor gate.
+ * `hasOwn`: a git-write span's OUTPUT prefix-matches a branch SHA (this session
+ * committed/pushed to THIS branch). `hasForeign`: a git-write span carried SHAs
+ * but none on this branch (worked on another branch). `anchorCount`: git-write
+ * spans whose output carried any SHA. A session with `anchorCount === 0` did no
+ * SHA-bearing git writes at all (a pure helper). */
+export interface BranchAnchorSummary {
+  hasOwn: boolean;
+  hasForeign: boolean;
+  anchorCount: number;
+}
+
+/** Classify a session's git-write anchors against the branch SHAs (SPEC-0023 R1). Pure; reuses the slicer's own/foreign logic. */
+export function classifyBranchAnchors(turns: Turn[], branchShas: readonly string[]): BranchAnchorSummary {
+  const anchors = classifyAnchors(turns, branchShas);
+  return {
+    hasOwn: anchors.some((a) => a.own),
+    hasForeign: anchors.some((a) => !a.own),
+    anchorCount: anchors.length,
+  };
+}
+
 /**
  * Compute the PR-scoped turn range. See R1e(d)-(f):
  * - no own anchor → labeled full session.
