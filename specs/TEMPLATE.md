@@ -86,6 +86,8 @@ with it, not the reverse.
 
 ### Team prompt
 
-The exact prompt to paste into Claude Code to spawn the team (roles, model assignment,
+The exact prompt to paste into Claude Code to spawn the team (roles, model assignment —
+**critical-path/core/money-math roles run Opus; mechanical roles (fixtures, boilerplate,
+scaffolds) may run Sonnet** (maintainer directive 2026-07-02),
 what to build first, coordination rule). Keep it self-contained — a fresh lead should be
 able to run it without reading anything else.
