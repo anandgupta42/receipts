@@ -220,9 +220,15 @@ function classicWasteBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" 
 
 // --- Shared tail: rule → total → price-delta → methodology footnote ----------
 
+/** SPEC-0028 R3 — muted time-integrity caveat notes; empty for consistent sessions so existing renders stay byte-identical (I5). */
+function caveatBlocks(model: ReceiptModel): Block[] {
+  return model.caveats.map((c, i): Block => ({ kind: "note", text: c.text, muted: true, spaceBefore: i === 0 }));
+}
+
 /** The rule/total/price-delta/footnote sequence every template ends its body with (honesty invariants live here — I3). */
 function tailBlocks(model: ReceiptModel, footer: Block): Block[] {
   const blocks: Block[] = [];
+  blocks.push(...caveatBlocks(model));
   const total = totalParts(model);
   blocks.push({ kind: "rule" });
   blocks.push({ kind: "total", label: "TOTAL", value: total.value });
@@ -279,6 +285,7 @@ function buildGrocery(model: ReceiptModel): Block[] {
       blocks.push({ ...classicWasteBlock(waste), badge: false });
     });
   }
+  blocks.push(...caveatBlocks(model));
   const total = totalParts(model);
   blocks.push({ kind: "rule" });
   blocks.push({ kind: "total", label: "TOTAL", value: total.value, columns: { qty: "", amt: total.value } });

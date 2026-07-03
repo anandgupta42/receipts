@@ -146,8 +146,9 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     expect(body).toContain("SUBAGENTS (2)");
     expect(body).toContain("tester · claude-opus-4-8...................$0.25");
     expect(body).toContain("(unreadable)");
-    // parent $1.50 + tester $0.25 = $1.75, unreadable child noted as not priced.
-    expect(body).toContain("TOTAL priced.................................$1.75");
+    // parent $1.50 + tester $0.25 = $1.75; the unreadable child makes the
+    // total a FLOOR (SPEC-0028 R1) on top of the not-priced note.
+    expect(body).toContain("TOTAL priced...............................≥ $1.75");
     expect(body).toContain("counted: 1 session + 2 subagents");
     expect(body).toContain("1 unreadable subagent not priced");
   });
@@ -159,6 +160,42 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
   });
 });
 
+describe("SPEC-0028 R1 floor totals (a known-incomplete number says so)", () => {
+  it("renders TOTAL priced as a floor when a candidate was excluded", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 1 });
+    expect(body).toContain("≥ $1.50");
+    expect(body).toContain("candidate session not attributed");
+  });
+
+  it("renders a floor when a subagent is unreadable", () => {
+    const body = renderPrBody({
+      contributors: [builder({ subagents: [{ name: "ghost", usd: null, tokens: tokens(0, 0), unreadable: true, filePath: "g.jsonl" }] })],
+      excludedCount: 0,
+    });
+    expect(body).toContain("≥ $1.50");
+    expect(body).toContain("unreadable subagent");
+  });
+
+  it("keeps complete receipts byte-identical (no floor marker anywhere)", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
+    expect(body).not.toContain("≥");
+  });
+
+  it("floors BOTH subtotals in a mixed priced/tokens-only receipt, never blending them (I2)", () => {
+    const body = renderPrBody({
+      contributors: [builder(), builder({ sessionId: "tok", usd: null, tokens: tokens(700, 40) })],
+      excludedCount: 2,
+    });
+    expect(body).toContain("≥ $1.50");
+    expect(body).toMatch(/TOTAL unpriced[.]+≥ [\d,]+ tokens/);
+    expect(body).toContain("2 candidate sessions not attributed");
+  });
+
+  it("floors the zero-atom fallback when everything was excluded", () => {
+    const body = renderPrBody({ contributors: [], excludedCount: 3 });
+    expect(body).toContain("≥ 0 tokens");
+  });
+});
 
 describe("SPEC-0026 R2 · aggregate cache line", () => {
   const cached = (cacheRead: number, input = 1000) =>

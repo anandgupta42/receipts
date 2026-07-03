@@ -10,6 +10,7 @@ import { defaultDataDir } from "../pricing/priceTable.js";
 import { isoDateOf, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
 import type { ResolvedPrice } from "../pricing/types.js";
 import { detectContextThrash, detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "../pricing/waste.js";
+import { detectTimeCaveats, type CaveatFinding } from "./caveats.js";
 import type { PriceDeltaFootnote } from "../pricing/waste.js";
 
 export interface ModelMixEntry {
@@ -75,6 +76,8 @@ export interface ReceiptModel {
   /** Session-level totals reported by the adapter — the only real number available for Cursor, whose per-turn usage is always absent. */
   sessionTotalTokens: TokenUsage;
   wasteLines: WasteLine[];
+  /** SPEC-0028 R3 — time-integrity caveats; facts, never a `$` change (I2/I3). Empty for consistent sessions. */
+  caveats: CaveatFinding[];
   /** `null` unless the session priced (never rendered in tokens-only mode). */
   priceDelta: PriceDeltaFootnote | null;
   methodology: string;
@@ -242,6 +245,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
   ];
 
   const priceRowsUsed = await collectPriceRowsUsed(session, dataDir);
+  const caveats = detectTimeCaveats(session);
 
   const durationMs =
     session.totals.durationMs ??
@@ -262,6 +266,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     totalTokens: attribution.totalTokens,
     sessionTotalTokens: session.totals.tokens,
     wasteLines,
+    caveats,
     priceDelta,
     methodology: attribution.methodology ?? METHODOLOGY,
     priceRowsUsed,

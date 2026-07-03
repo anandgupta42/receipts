@@ -16,6 +16,7 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     totalTokens: EMPTY_USAGE,
     sessionTotalTokens: EMPTY_USAGE,
     wasteLines: [],
+  caveats: [],
     priceDelta: null,
     methodology: "",
     priceRowsUsed: [],

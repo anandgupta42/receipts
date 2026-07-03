@@ -26,6 +26,7 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     totalTokens: usage(12000),
     sessionTotalTokens: usage(12000),
     wasteLines: [],
+    caveats: [],
     priceDelta: null,
     methodology: "test",
     priceRowsUsed: [],

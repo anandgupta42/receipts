@@ -73,6 +73,7 @@ function unpricedModel(): ReceiptModel {
     totalTokens: zeroTokens,
     sessionTotalTokens: { input: 1900, output: 268, cacheRead: 0, cacheCreation: 0, total: 2168 },
     wasteLines: [],
+    caveats: [],
     priceDelta: null,
     methodology: "tokens-only",
     priceRowsUsed: [],

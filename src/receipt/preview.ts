@@ -34,6 +34,7 @@ export function previewModel(): ReceiptModel {
     totalTokens: usage(10000),
     sessionTotalTokens: usage(10000),
     wasteLines: [],
+    caveats: [],
     priceDelta: { cheaperModel: "claude-haiku-4-5", usd: 0.04, actualUsd: 0.18 },
     methodology: "preview",
     priceRowsUsed: [],
