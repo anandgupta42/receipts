@@ -1,6 +1,26 @@
 {
   "vendor": "anthropic",
   "models": {
+    "claude-fable-5": {
+      "price_history": [
+        {
+          "input": 10.0,
+          "output": 50.0,
+          "input_cached": 1.0,
+          "input_cache_write_5m": 12.5,
+          "input_cache_write_1h": 20.0,
+          "from_date": "2026-07-02",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://platform.claude.com/docs/en/about-claude/pricing",
+              "observed_at": "2026-07-02",
+              "excerpt": "Claude Fable 5 — Base Input Tokens $10 / MTok, 5m Cache Writes $12.50 / MTok, 1h Cache Writes $20 / MTok, Cache Hits & Refreshes $1 / MTok, Output Tokens $50 / MTok"
+            }
+          ]
+        }
+      ]
+    },
     "claude-opus-4-8": {
       "price_history": [
         {

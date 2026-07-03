@@ -1,29 +1,69 @@
 name: Price scan
 
-# Daily freshness check for data/prices/. Placeholder: commented out until
-# ANTHROPIC_API_KEY (or equivalent) secrets exist for claude-code-action to
-# run the update-prices skill unattended. Enabling this without a secret
-# configured would fail every run for the wrong reason (auth, not staleness).
-
 on:
   schedule:
     - cron: "43 7 * * *"
   workflow_dispatch: {}
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
-  update-prices:
-    if: false # flip to `github.repository == github.repository` once secrets exist
+  tripwire:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # - uses: anthropics/claude-code-action@v1
-      #   with:
-      #     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
-      #     prompt: |
-      #       Run the update-prices skill (.claude/skills/update-prices/SKILL.md)
-      #       for one vendor whose price page hasn't been checked in the longest
-      #       time. Open a PR with a cited source; do not merge it yourself.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
-      - name: placeholder (secrets not configured)
-        run: echo "price-scan is disabled until secrets exist — see workflow comments."
+      - run: npm ci
+
+      - name: Run advisory price tripwire
+        id: tripwire
+        shell: bash
+        run: |
+          set +e
+          node scripts/price-tripwire.mjs \
+            --report price-tripwire-report.md \
+            --summary-json price-tripwire-summary.json \
+            > price-tripwire-output.txt 2>&1
+          status=$?
+          set -e
+
+          cat price-tripwire-output.txt
+
+          if [ "$status" -ne 0 ] && [ "$status" -ne 3 ]; then
+            exit "$status"
+          fi
+
+          cat price-tripwire-report.md >> "$GITHUB_STEP_SUMMARY"
+
+          drift_count="$(node -e "const s = JSON.parse(require('node:fs').readFileSync('price-tripwire-summary.json', 'utf8')); console.log(s.driftCount)")"
+          discovery_count="$(node -e "const s = JSON.parse(require('node:fs').readFileSync('price-tripwire-summary.json', 'utf8')); console.log(s.discoveryCount)")"
+
+          {
+            echo "exit_code=$status"
+            echo "drift_count=$drift_count"
+            echo "discovery_count=$discovery_count"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ "$drift_count" -gt 0 ] || [ "$discovery_count" -gt 0 ]; then
+            echo "should_open=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_open=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Open drift/discovery issue
+        if: steps.tripwire.outputs.should_open == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh issue create \
+            --title "prices: drift/discovery report" \
+            --label "enhancement" \
+            --body-file price-tripwire-report.md
