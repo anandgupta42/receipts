@@ -1,17 +1,21 @@
-// SPEC-0023 (widens SPEC-0019) — `aireceipts pr` orchestration. Selects EVERY
-// session that built the current branch (R1: Claude by branch-SHA anchor, Codex
-// by cwd+time), slices each to its own PR turn range (R1e), rolls up each one's
-// subagents (R1c), labels a descriptive role (R3), and renders one body with
-// per-session rows + a single combined total (R4). R3 of SPEC-0019 is still the
-// spine: the full pasteable body is ALWAYS written to stdout BEFORE any `gh`
-// call. `--session <id>` still resolves exactly one session (R5).
+// SPEC-0023 (widens SPEC-0019) + SPEC-0024 — `aireceipts pr` orchestration.
+// Selects EVERY session that built the current branch: the repo pool (cwd in a
+// worktree; Claude by branch-SHA anchor, Codex by cwd+time) plus SPEC-0024's
+// anchor pool (any time-overlapping session — cross-repo leads — credited on
+// an own branch-SHA anchor ONLY). Each contributor is sliced to its PR turn
+// range (R1e), its subagents rolled up (R1c), then orphan SHA-anchored listed
+// sidechains no rollup covers are promoted (SPEC-0024 R2/R3) and the merged
+// set sorts chronologically. R3 of SPEC-0019 is still the spine: the full
+// pasteable body is ALWAYS written to stdout BEFORE any `gh` call.
+// `--session <id>` still resolves exactly one session (R5).
 import * as path from "node:path";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
 import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
-import { isBranchCandidate, selectExplicitSession } from "./select.js";
+import { isBranchCandidate, overlapsBranchWindow, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
-import { deriveRole, selectContributors, type RawContributor } from "./contributors.js";
+import { deriveRole, selectContributors, type PoolCandidate, type RawContributor } from "./contributors.js";
+import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
 import { renderPrBody, type ContributorView } from "./body.js";
 import { upsertPrComment } from "./comment.js";
@@ -52,13 +56,26 @@ function stemOf(filePath: string): string {
   return path.basename(filePath).replace(/\.jsonl$/, "");
 }
 
-/** Resolve the contributor set: explicit --session → exactly one (R5); else the conservative auto-selected set (R1). */
+interface Resolved {
+  contributors: RawContributor[];
+  excludedCount: number;
+  /** Time-overlapping listed sidechains — SPEC-0024 R2 promotion candidates, judged after rollups. */
+  sidechains: SessionSummary[];
+}
+
+/**
+ * Resolve the contributor set: explicit --session → exactly one (R5); else the
+ * conservative auto-selected union of the repo pool and SPEC-0024's anchor
+ * pool (R1). Sidechain candidates are returned for the post-rollup promotion
+ * pass, so an empty contributor list here is not yet a NO_MATCH — `runPr`
+ * decides after promotion (SPEC-0024 R4).
+ */
 async function resolveContributors(
   opts: PrOptions,
   deps: PrDeps,
   shas: readonly string[],
   commitMs: readonly number[],
-): Promise<{ contributors: RawContributor[]; excludedCount: number } | { error: string }> {
+): Promise<Resolved | { error: string }> {
   const sessions = await deps.listSessions();
 
   if (opts.session) {
@@ -70,25 +87,41 @@ async function resolveContributors(
     if (!session) {
       return { error: `failed to load session "${summary.id}"` };
     }
-    return { contributors: [{ summary, session, slice: computeSlice(session.turns, shas) }], excludedCount: 0 };
+    return {
+      contributors: [{ summary, session, slice: computeSlice(session.turns, shas) }],
+      excludedCount: 0,
+      sidechains: [],
+    };
   }
 
   if (sessions.length === 0) {
     return { error: "no agent sessions found on disk" };
   }
   const roots = worktreeRoots(deps.runGit, deps.cwd);
-  const candidates = sessions.filter((s) => isBranchCandidate(s, roots, commitMs));
-  if (candidates.length === 0) {
+  const candidates: PoolCandidate[] = [];
+  const sidechains: SessionSummary[] = [];
+  for (const s of sessions) {
+    if (isBranchCandidate(s, roots, commitMs)) {
+      candidates.push({ summary: s, pool: "repo" });
+    } else if (overlapsBranchWindow(s, commitMs)) {
+      // SPEC-0024 R1/R2 — time-overlapping but outside the repo pool: flagged
+      // sidechains queue for promotion; everything else (cross-repo leads,
+      // no-cwd sessions) joins the anchor pool, credited on SHA proof only.
+      if (s.isSidechain === true) {
+        sidechains.push(s);
+      } else {
+        candidates.push({ summary: s, pool: "anchor" });
+      }
+    }
+  }
+  if (candidates.length === 0 && sidechains.length === 0) {
     return { error: NO_MATCH };
   }
   const selection = await selectContributors(candidates, shas, {
     loadSession: deps.loadSession,
     currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
   });
-  if (selection.contributors.length === 0) {
-    return { error: NO_MATCH };
-  }
-  return selection;
+  return { ...selection, sidechains };
 }
 
 /** Slice → price → roll up → role each contributor into what the comment renders (R2/R3). */
@@ -122,10 +155,29 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     return 1;
   }
 
-  const views: ContributorView[] = [];
+  // SPEC-0024 R3 ordering: base views first (their rollups define what is
+  // already counted), then promotion of uncovered anchored sidechains, then
+  // one chronological sort across both (startedAt, then id — SPEC-0023 order).
+  const entries: { view: ContributorView; startedAt: number; id: string }[] = [];
+  const covered = new Set<string>();
   for (const raw of resolved.contributors) {
-    views.push(await buildContributorView(raw, deps));
+    const view = await buildContributorView(raw, deps);
+    covered.add(raw.summary.filePath);
+    for (const row of view.subagents) {
+      covered.add(row.filePath);
+    }
+    entries.push({ view, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
   }
+  const promoted = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
+  for (const raw of promoted) {
+    entries.push({ view: await buildContributorView(raw, deps), startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
+  }
+  if (entries.length === 0) {
+    deps.err(NO_MATCH);
+    return 1;
+  }
+  entries.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
+  const views = entries.map((e) => e.view);
   const body = renderPrBody({ contributors: views, excludedCount: resolved.excludedCount });
 
   // R3 (SPEC-0019): render first, unconditionally — before any gh call.

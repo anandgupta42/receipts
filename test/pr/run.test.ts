@@ -138,10 +138,17 @@ describe("R3 render-first ordering", () => {
 
 describe("R1d selection outcomes", () => {
   it("zero matches → stderr message, exit 1, nothing rendered", async () => {
-    // Worktree root does not contain the fixture session's cwd (/home/dev/repo).
+    // Worktree root does not contain the fixture session's cwd, AND the session
+    // carries no branch-SHA anchor — since SPEC-0024, cwd alone no longer
+    // excludes an anchored session, so a true zero-match needs both.
     const gitElsewhere: CommandRunner = (_cmd, args) =>
       args[0] === "worktree" ? ok("worktree /other/root\n") : gitOk(_cmd, args);
-    const { deps, out, err } = await makeDeps({ runGit: gitElsewhere });
+    const anchorless = { ...(await loadById("claude-code", ANCHORS))!, turns: [] };
+    const { deps, out, err } = await makeDeps({
+      runGit: gitElsewhere,
+      listSessions: async () => [anchorless],
+      loadSession: async () => anchorless,
+    });
     const code = await runPr({ post: false }, deps);
     expect(code).toBe(1);
     expect(out).toHaveLength(0);
@@ -197,5 +204,105 @@ describe("R1d selection outcomes", () => {
     expect(code).toBe(1);
     expect(out).toHaveLength(0);
     expect(err.join("\n")).toContain('no session matched "missing-child"');
+  });
+});
+
+describe("SPEC-0024 attribution widening (e2e)", () => {
+  const otherRepo = "/home/dev/OTHER-repo";
+
+  async function crossRepoLead() {
+    const session = (await loadById("claude-code", ANCHORS))!;
+    // Recorded under another repo's project dir: cwd outside every worktree root.
+    return { ...session, id: "lead", filePath: "lead.jsonl", cwd: otherRepo };
+  }
+
+  it("credits a cross-repo lead on its branch-SHA anchor and rolls up its children", async () => {
+    const lead = await crossRepoLead();
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [lead],
+      loadSession: async (summary) => (summary.id === "lead" ? lead : null),
+      rollup: async (parentFilePath) =>
+        parentFilePath === "lead.jsonl"
+          ? [{ name: "designer", model: "claude-opus-4-8", usd: null, tokens: lead.totals.tokens, unreadable: false, filePath: "lead/subagents/agent-designer.jsonl" }]
+          : [],
+    });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(0);
+    expect(out[0]).toContain("1 session behind this PR");
+    expect(out[0]).toContain("orchestrator · ");
+    expect(out[0]).toContain("lead · session slice");
+    expect(out[0]).toContain("SUBAGENTS (1)");
+    expect(out[0]).toContain("counted: 1 session + 1 subagent");
+  });
+
+  it("does NOT credit a cross-repo session whose window misses every branch commit (overlap bound)", async () => {
+    const lead = await crossRepoLead();
+    // Shift the window a day before the only branch commit (2026-06-28T10:02Z ± 15 min).
+    const stale = { ...lead, startedAt: Date.parse("2026-06-27T00:00:00.000Z"), endedAt: Date.parse("2026-06-27T01:00:00.000Z") };
+    let loads = 0;
+    const { deps, out, err } = await makeDeps({
+      listSessions: async () => [stale],
+      loadSession: async () => {
+        loads++;
+        return stale;
+      },
+    });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(1);
+    expect(out).toHaveLength(0);
+    expect(loads).toBe(0); // outside the bound → never even loaded
+    expect(err.join("\n")).toContain("no session matches");
+  });
+
+  it("promotes an anchored teammate sidechain to a top-level row, sorted chronologically with the builder", async () => {
+    const builder = (await loadById("claude-code", ANCHORS))!;
+    // The teammate started BEFORE the builder and is a flagged sidechain under the lead's (other) repo.
+    const teammate = { ...builder, id: "team-1", filePath: "team-1.jsonl", cwd: otherRepo, isSidechain: true, startedAt: (builder.startedAt ?? 0) - 60_000 };
+    const byId = new Map([[builder.id, builder], ["team-1", teammate]]);
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [builder, teammate],
+      loadSession: async (summary) => byId.get(summary.id) ?? null,
+    });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(0);
+    expect(out[0]).toContain("2 sessions behind this PR");
+    // Chronological across pools: the promoted teammate row renders before the builder row.
+    expect(out[0].indexOf("team-1 · ")).toBeLessThan(out[0].indexOf("claude-anchors · "));
+    expect(out[0].indexOf("team-1 · ")).toBeGreaterThan(-1);
+    expect(out[0]).toContain("counted: 2 sessions");
+  });
+
+  it("does NOT promote a sidechain already covered by a contributor's rollup (dedup guard, counted once)", async () => {
+    const builder = (await loadById("claude-code", ANCHORS))!;
+    const teammate = { ...builder, id: "team-1", filePath: "team-1.jsonl", cwd: otherRepo, isSidechain: true };
+    const byId = new Map([[builder.id, builder], ["team-1", teammate]]);
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [builder, teammate],
+      loadSession: async (summary) => byId.get(summary.id) ?? null,
+      // The builder's rollup already lists the teammate transcript by filePath.
+      rollup: async (parentFilePath) =>
+        parentFilePath === builder.filePath
+          ? [{ name: "team-1", model: "claude-opus-4-8", usd: null, tokens: teammate.totals.tokens, unreadable: false, filePath: "team-1.jsonl" }]
+          : [],
+    });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(0);
+    expect(out[0]).toContain("1 session behind this PR");
+    expect(out[0]).toContain("counted: 1 session + 1 subagent");
+  });
+
+  it("renders byte-identically across repeated runs with promotion in play (I1)", async () => {
+    const builder = (await loadById("claude-code", ANCHORS))!;
+    const teammate = { ...builder, id: "team-1", filePath: "team-1.jsonl", cwd: otherRepo, isSidechain: true, startedAt: (builder.startedAt ?? 0) - 60_000 };
+    const byId = new Map([[builder.id, builder], ["team-1", teammate]]);
+    const render = async () => {
+      const { deps, out } = await makeDeps({
+        listSessions: async () => [builder, teammate],
+        loadSession: async (summary) => byId.get(summary.id) ?? null,
+      });
+      expect(await runPr({ post: false }, deps)).toBe(0);
+      return out[0];
+    };
+    expect(await render()).toBe(await render());
   });
 });
