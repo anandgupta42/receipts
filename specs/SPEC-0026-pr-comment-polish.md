@@ -128,6 +128,44 @@ that made a git write, that is an honesty bug — R3 reverts to
 - **Comment pagination / multiple comments.** One marked comment remains the
   contract (SPEC-0019 R2); size pressure is handled by omission, not spam.
 
+## Design (lead-authored — implementers execute, never invent)
+
+Rendered mockups: https://claude.ai/code/artifact/6067cce8-25fa-467e-a36d-42190f15e003
+(before/after pairs built from PR #58's real numbers). The normative line
+design, in render order inside the fenced block:
+
+```
+            3 sessions behind this PR          ← unchanged (R1: N=1 drops role on the row only)
+<role> · <mix>........................$X       ← N≥2 rows unchanged
+<mix>.................................$X       ← N=1 row, no role prefix (R1)
+  session: <id>                                ← unchanged muted provenance
+  entire session (no git writes)               ← R3, helper-credited only
+  entire session (slice unavailable)           ← unchanged for anchored fallbacks
+--------------------------------------------------
+TOTAL priced..........................$X       ← unchanged
+  counted: N sessions [+ M subagents]          ← unchanged
+  cache served N% of input tokens              ← R2, muted, only when cacheRead > 0
+  <existing excluded-candidates note>          ← unchanged, stays above the hint
+  details: npx aireceipts --session <id>       ← R4, muted, always last note
+```
+
+After the fenced block (R5):
+
+```
+<details><summary>full receipts (N sessions)</summary>
+
+<one fenced full receipt per contributor, row order — the renderer's exact
+bytes for the sliced model (color off, RECEIPT_WIDTH); an omitted receipt
+renders as one line: full receipt omitted (comment size limit)>
+
+</details>
+```
+
+Copy rules: `no git writes` (not "helper" — name the observable fact, not our
+jargon); the hint says `npx aireceipts` (the README's canonical invocation);
+the summary line always carries the count so the collapsed state is
+informative.
+
 ## Test matrix
 
 | Case | Input | Expected |
