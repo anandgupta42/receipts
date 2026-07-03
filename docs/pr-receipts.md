@@ -46,17 +46,32 @@ blocked.
 
 - A marker line (`<!-- aireceipts-dogfood -->`) so the upsert and the CI check can find
   exactly one comment to keep current.
-- A `🧾 aireceipts — session <id>` header and a fenced receipt.
-- A slice header: `session slice: turns A–B of N` when the PR's work is isolated to a
-  commit window, or `entire session (slice unavailable)` when it can't be cut cleanly
-  (ambiguity is labeled, never presented as PR cost).
-- A `SUBAGENTS` section rolling up any subagent sessions the PR's work launched, with a
-  combined total.
+- A fenced receipt headed `N sessions behind this PR`: one row per contributing
+  session (`<role> · <model mix> · <cost>`), a muted provenance line under each
+  (session id + `session slice: turns A–B of N`, or `entire session (slice
+  unavailable)` when the work can't be cut cleanly — ambiguity is labeled, never
+  presented as PR cost), and indented `SUBAGENTS` sub-rows for any subagent
+  sessions a contributor launched.
+- One combined total. Priced and unpriced sessions are never blended: dollars and
+  tokens total separately.
+- An honest note counting any plausible-but-unproven sessions that were **not**
+  attributed.
 
-## How a session is matched to a PR
+## How sessions are matched to a PR
 
-Auto-selection (no `--session`) picks the session whose working directory is inside one
-of this repo's worktrees **and** whose time window overlaps the branch's commit window.
-Zero matches or more than one → `aireceipts pr` refuses to guess and asks for
-`--session <id>`. The `cwd`/branch used for matching are attribution-only: they never
-enter the rendered receipt, `--json`/`--csv`, or telemetry.
+Auto-selection (no `--session`) credits every session that can be tied to the branch,
+conservatively:
+
+- A session whose recorded git output contains one of the **branch's commit SHAs** is
+  credited wherever it ran — another checkout, another repo's working directory, or an
+  agent-team sidechain. The commit SHA is the primary attribution key; a sidechain is
+  promoted to its own row only when no other credited session already counts it.
+- A session inside one of this repo's worktrees that time-overlaps the branch's commit
+  window gets the softer rules: a Codex session there with **no** git writes at all is
+  credited as a helper on cwd+time.
+- Everything else is excluded. Sessions without SHA proof outside the repo are never
+  credited — and never guessed in.
+
+Zero credited sessions → `aireceipts pr` refuses to guess and asks for `--session <id>`.
+The `cwd`/branch/SHA signals used for matching are attribution-only: they never enter
+the rendered receipt, `--json`/`--csv`, or telemetry.

@@ -15,6 +15,21 @@ import { isCodexExec, toolCallInvocations } from "./gitWrite.js";
 
 export type Role = "orchestrator" | "builder" | "codex";
 
+/**
+ * SPEC-0024 R1 — which pool admitted a candidate decides its credit rules:
+ * `repo` (cwd in a repo worktree, non-sidechain — SPEC-0023's set) keeps the
+ * SHA-less Codex helper rule and the honest excluded count; `anchor` (any
+ * other time-overlapping session, any cwd) is credited on an own branch-SHA
+ * anchor ONLY, and its misses are silently ignored — another repo's work is
+ * not "plausibly ours" noise.
+ */
+export type CandidatePool = "repo" | "anchor";
+
+export interface PoolCandidate {
+  summary: SessionSummary;
+  pool: CandidatePool;
+}
+
 /** One session credited to the PR: the loaded session and its own PR-scoped slice. */
 export interface RawContributor {
   summary: SessionSummary;
@@ -40,26 +55,26 @@ function inCurrentWorktree(summary: SessionSummary, currentRoot: string | null):
 }
 
 /**
- * Select the contributing sessions from pre-filtered candidates (R1). Loads each
- * candidate to inspect its git-write anchors — the summary-level filter has
- * already bounded this to cwd-in-repo, time-overlapping, non-sidechain sessions.
- * A branch-SHA anchor credits any session regardless of worktree (SHA proof);
- * the SHA-less Codex helper rule is scoped to THIS worktree so unrelated
- * concurrent Codex work in sibling worktrees is not credited. Only plausible
- * (this-worktree) exclusions are counted — a sibling-worktree candidate that
- * only passed the repo-wide filter is silently ignored, not reported as noise.
- * Deterministic order: chronological by start, then session id.
+ * Select the contributing sessions from pre-filtered, pool-tagged candidates
+ * (R1; SPEC-0024 widens). Loads each candidate to inspect its git-write
+ * anchors. A branch-SHA anchor credits any session regardless of pool or
+ * worktree (SHA proof); the SHA-less Codex helper rule and the honest excluded
+ * count apply to the repo pool only — an anchor-pool candidate (cross-repo cwd
+ * or none) is credited on its own anchor or silently ignored. Deterministic
+ * order: chronological by start, then session id.
  */
 export async function selectContributors(
-  candidates: SessionSummary[],
+  candidates: PoolCandidate[],
   branchShas: readonly string[],
   deps: ContributorDeps,
 ): Promise<ContributorSelection> {
   const contributors: RawContributor[] = [];
   let excludedCount = 0;
 
-  for (const summary of candidates) {
-    const here = inCurrentWorktree(summary, deps.currentWorktreeRoot);
+  for (const { summary, pool } of candidates) {
+    // `here` gates both softeners (helper rule, excluded count) — always false
+    // for the anchor pool, where the SHA anchor is the only key (SPEC-0024 R1).
+    const here = pool === "repo" && inCurrentWorktree(summary, deps.currentWorktreeRoot);
     const session = await deps.loadSession(summary);
     if (!session) {
       // A candidate we can't load can't be proven — count it only if it's plausibly ours.
@@ -70,10 +85,11 @@ export async function selectContributors(
     }
     const anchors = classifyBranchAnchors(session.turns, branchShas);
     const isCodex = summary.source === "codex";
-    // Own branch SHA → contributes (any source, SHA-proven). Codex that made NO
-    // git writes at all AND ran in this worktree → a pure helper (cwd+time). A
-    // session that committed/pushed but produced no branch SHA, or a SHA-less
-    // Codex session from a sibling worktree, is not proven ours (R1).
+    // Own branch SHA → contributes (any source, any pool, SHA-proven). Codex
+    // that made NO git writes at all AND ran in this worktree → a pure helper
+    // (cwd+time, repo pool only). A session that committed/pushed but produced
+    // no branch SHA, or a SHA-less Codex session from a sibling worktree or
+    // the anchor pool, is not proven ours (R1).
     const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0 && here);
     if (include) {
       contributors.push({ summary, session, slice: computeSlice(session.turns, branchShas) });
@@ -81,7 +97,7 @@ export async function selectContributors(
       // Plausibly ours (this worktree) but unproven — surface it in the honest note.
       excludedCount++;
     }
-    // else: a sibling-worktree candidate with no branch-SHA proof — another branch's work, ignored.
+    // else: a sibling-worktree or anchor-pool candidate with no branch-SHA proof — not ours, ignored.
   }
 
   contributors.sort(

@@ -48,6 +48,16 @@ function overlaps(startedAt: number, endedAt: number, commitMs: readonly number[
 }
 
 /**
+ * SPEC-0024 R1 — the anchor pool's summary-level bound: a timestamped session
+ * whose window overlaps a branch commit (±15 min). `cwd` and sidechain status
+ * are deliberately not consulted — an anchor-pool session is only ever credited
+ * on an own branch-SHA anchor, so the time bound is all the pre-filter needs.
+ */
+export function overlapsBranchWindow(s: SessionSummary, commitMs: readonly number[]): boolean {
+  return s.startedAt !== undefined && s.endedAt !== undefined && overlaps(s.startedAt, s.endedAt, commitMs);
+}
+
+/**
  * The cheap, summary-level candidate predicate shared by SPEC-0019's
  * `selectCandidates` and SPEC-0023's contributor set: a non-sidechain session
  * whose `cwd` is inside a repo worktree root (R1b) and whose time window
@@ -58,12 +68,7 @@ function overlaps(startedAt: number, endedAt: number, commitMs: readonly number[
  */
 export function isBranchCandidate(s: SessionSummary, roots: string[], commitMs: readonly number[]): boolean {
   return (
-    !s.isSidechain &&
-    typeof s.cwd === "string" &&
-    cwdInsideRoots(s.cwd, roots) &&
-    s.startedAt !== undefined &&
-    s.endedAt !== undefined &&
-    overlaps(s.startedAt, s.endedAt, commitMs)
+    !s.isSidechain && typeof s.cwd === "string" && cwdInsideRoots(s.cwd, roots) && overlapsBranchWindow(s, commitMs)
   );
 }
 

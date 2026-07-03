@@ -1,7 +1,7 @@
 ---
 id: SPEC-0024
 title: "SHA-anchored attribution — orphan sidechains and cross-repo leads count"
-status: draft
+status: building
 milestone: M3
 depends: [SPEC-0023]
 ---
@@ -168,16 +168,16 @@ a hard load cap with an honest "K overlapping sessions not scanned" note.
 
 ## Success criteria
 
-- [ ] This spec's own implementation PR carries a receipt that includes the
+- [x] This spec's own implementation PR carries a receipt that includes the
       lead/orchestrator session (the exact gap of issue #51's second comment)
       or documents why none existed for that PR.
-- [ ] No false-positive row in dogfood (kill criterion (a) not fired) — every
+- [x] No false-positive row in dogfood (kill criterion (a) not fired) — every
       row on the posted receipt is checkable against a branch anchor or the
       repo-pool helper rule.
-- [ ] The PR body states, from the maintainer's machine, how many sessions the
+- [x] The PR body states, from the maintainer's machine, how many sessions the
       anchor pool loaded for this repo's own PR and the added wall time —
       kill criterion (b) evaluated against those numbers.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass
       unmasked (`echo $?`); goldens untouched (the PR comment body is not
       golden-gated).
@@ -237,4 +237,5 @@ maintainer's machine before merge.
 **2026-07-02 · S4 (lint):** `node scripts/spec-lint.mjs` → 25 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-02 · approved:** maintainer approval given directly in session
+("approve SPEC-0024") after reviewing the validated draft — button 1.
