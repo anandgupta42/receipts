@@ -105,6 +105,7 @@ function receiptBody(model: ReceiptModel) {
     totalTokens: tokenUsageJson(model.totalTokens),
     sessionTotalTokens: tokenUsageJson(model.sessionTotalTokens),
     wasteLines: model.wasteLines.map(wasteLineJson),
+    caveats: model.caveats.map((c) => ({ kind: c.kind, text: c.text })),
     priceDelta: model.priceDelta
       ? {
           cheaperModel: model.priceDelta.cheaperModel,

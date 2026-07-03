@@ -174,18 +174,25 @@ function countLine(sessionCount: number, totals: Totals): string {
   return `counted: ${parts.join(" + ")}`;
 }
 
-/** Separate total rows (R4). Priced dollars and tokens-only counts are never blended into one line (I2/I3). */
+/**
+ * Separate total rows (R4). Priced dollars and tokens-only counts are never
+ * blended into one line (I2/I3). SPEC-0028 R1: when the receipt KNOWS it is
+ * incomplete — excluded candidates or unreadable subagents — every total is
+ * an explicit floor (`≥`); a known-partial number must say so in the number,
+ * never only in a note below it.
+ */
 function totalBlocks(input: PrBodyInput): Block[] {
   const totals = totalsFor(input.contributors);
+  const floor = input.excludedCount > 0 || totals.unreadableCount > 0 ? "≥ " : "";
   const blocks: Block[] = [{ kind: "rule" }];
   if (totals.pricedCount > 0) {
-    blocks.push({ kind: "total", label: "TOTAL priced", value: `$${formatUsd(totals.pricedSubtotal)}` });
+    blocks.push({ kind: "total", label: "TOTAL priced", value: `${floor}$${formatUsd(totals.pricedSubtotal)}` });
   }
   if (totals.tokensOnlyCount > 0) {
-    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${formatInt(totals.tokenSubtotal)} tokens` });
+    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${floor}${formatInt(totals.tokenSubtotal)} tokens` });
   }
   if (totals.pricedCount === 0 && totals.tokensOnlyCount === 0) {
-    blocks.push({ kind: "total", label: "TOTAL unpriced", value: "0 tokens" });
+    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${floor}0 tokens` });
   }
   blocks.push(mutedNote(countLine(input.contributors.length, totals)));
   if (totals.unreadableCount > 0) {

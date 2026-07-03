@@ -1,0 +1,56 @@
+# What a receipt proves — and what it can't
+
+aireceipts is local-first: it reads agent transcripts off your disk and prints
+a receipt. That design is why it needs no accounts or servers — and it is also
+the exact boundary of what a receipt can claim. This page states both sides
+plainly. (SPEC-0028.)
+
+## What a receipt proves
+
+- **The records existed on the author's machine.** Every number is computed
+  from transcript files found locally at render time — never from a guess, a
+  prediction, or a remote service.
+- **The dollars come from cited, dated price tables.** A `$` renders only when
+  a `data/prices/<vendor>.json` row — carrying its `sources:` citations —
+  matches the session's model and date. No matching row means tokens are shown
+  instead. A receipt's prices can be audited back to the vendor page they were
+  copied from.
+- **The rendering is deterministic.** The same transcript and price tables
+  produce a byte-identical receipt, on any machine (`--methodology` describes
+  the attribution; goldens and a determinism gate enforce it in CI).
+- **Incompleteness is labeled.** A PR receipt that could not attribute every
+  candidate session renders its totals as a floor (`TOTAL priced ≥ $X`) and
+  counts the sessions it left out. A number that might understate says so in
+  the number.
+
+## What a receipt cannot prove
+
+- **That the transcript is untouched.** Transcripts are plain JSONL on the
+  author's disk. The author can edit them, and no local-first tool can detect
+  every edit — a tool that could would need attestation infrastructure and a
+  server, which aireceipts refuses by design. A PR receipt is therefore the
+  **author's disclosure**, like a changelog entry: normally honest, verifiable
+  in its arithmetic, but not cryptographic evidence.
+- **That nothing is missing.** A session that never touched the branch — or
+  hid its tracks (no commits) — may be absent. Absent sessions make totals
+  *under*state, which is why known gaps render as floors, never as bare
+  numbers.
+
+## What makes fabrication visible
+
+- **Reconciliation** (`node scripts/cost-reconcile.mjs`): each adapter that
+  registers a fidelity validator is checked against its agent's own
+  accounting — Codex sessions must sum exactly to the rollout's cumulative
+  token envelope; Claude Code sessions must satisfy usage-shape invariants.
+  Drift is printed, named, and fails the gate.
+- **Time-integrity caveats**: a receipt whose turns claim timestamps after the
+  transcript file's own modification time, or whose span is non-positive while
+  carrying usage, renders a `caveat:` line and a `caveats` entry in `--json`.
+  Caveats never change a `$` — they are facts attached to the number.
+- **Determinism**: anyone with the transcript can re-render the receipt and
+  compare bytes.
+
+If you need a stronger guarantee than an author's disclosure — billing-grade
+attribution across a team — use your vendor's console. aireceipts will not
+pretend to be that, and a receipt that pretended would be worth less than one
+that tells you exactly what it knows.

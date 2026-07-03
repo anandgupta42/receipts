@@ -255,6 +255,7 @@ const ROOT = "~/.gemini/tmp";
 export class GeminiAdapter implements SessionAdapter {
   readonly id: AgentSource = "gemini";
   readonly label = "Gemini CLI";
+  readonly vendor = "google";
 
   private readonly root: string;
   private readonly discoveryFs: DiscoveryFs;

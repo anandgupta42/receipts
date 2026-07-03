@@ -97,7 +97,7 @@ motivation: [docs/internal/harness.md](docs/internal/harness.md).
 
 **[User guide](docs/guide/01-getting-started.md)** — get started, every command, pricing, and troubleshooting.
 
-More docs: [the hosted guide](https://anandgupta42.github.io/aireceipts/docs/) · [JSON schema](docs/json-schema.md) · [statusline setup](docs/statusline.md)
+More docs: [the hosted guide](https://anandgupta42.github.io/aireceipts/docs/) · [JSON schema](docs/json-schema.md) · [what a receipt proves](docs/trust.md) · [statusline setup](docs/statusline.md)
 
 ## License
 

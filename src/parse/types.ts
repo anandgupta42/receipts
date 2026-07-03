@@ -163,10 +163,34 @@ export interface ListSessionsOptions {
   full?: boolean;
 }
 
+/** One fidelity failure: which named check tripped and the one-line evidence (SPEC-0028 R2). */
+export interface FidelityFinding {
+  check: string;
+  detail: string;
+}
+
+/**
+ * SPEC-0028 R2 — an adapter's optional fidelity surface. Validators are
+ * per-agent registry modules (one file per agent, registered on the adapter);
+ * shared code never branches on agent type. `validate` inspects one loaded
+ * session and returns findings — an empty array means reconciled/clean.
+ */
+export interface AdapterFidelity {
+  validate(session: Session): FidelityFinding[];
+}
+
 export interface SessionAdapter {
   readonly id: AgentSource;
   /** human label, e.g. "Claude Code" */
   readonly label: string;
+  /**
+   * SPEC-0028 — the vendor whose price table backs this agent's sessions when
+   * a turn's model id doesn't resolve one (`vendorForModel` stays primary).
+   * Absent for multi-vendor agents (Cursor, OpenCode) — never guessed (I2).
+   */
+  readonly vendor?: string;
+  /** SPEC-0028 R2 — optional per-agent fidelity validators; absent = "no validator registered". */
+  readonly fidelity?: AdapterFidelity;
   /** directories this adapter reads — used for detection */
   roots(): string[];
   /** true when any session data is present on disk */

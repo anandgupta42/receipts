@@ -1,4 +1,5 @@
 import type { AgentSource, Compaction, ListSessionsOptions, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
+import { claudeCodeFidelity } from "./fidelity/claudeCode.js";
 import { isChildPath, parseChildPath } from "./children.js";
 import { lazyClaudeCodeSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import {
@@ -341,6 +342,8 @@ const ROOT = "~/.claude/projects";
 export class ClaudeCodeAdapter implements SessionAdapter {
   readonly id: AgentSource = "claude-code";
   readonly label = "Claude Code";
+  readonly vendor = "anthropic";
+  readonly fidelity = claudeCodeFidelity;
 
   private readonly root: string;
   private readonly discoveryFs: DiscoveryFs;

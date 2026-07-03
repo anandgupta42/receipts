@@ -1,4 +1,5 @@
 import type { AgentSource, ListSessionsOptions, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
+import { codexFidelity } from "./fidelity/codex.js";
 import { lazyCodexSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import {
   addUsage,
@@ -251,6 +252,8 @@ const ROOT = "~/.codex/sessions";
 export class CodexAdapter implements SessionAdapter {
   readonly id: AgentSource = "codex";
   readonly label = "Codex";
+  readonly vendor = "openai";
+  readonly fidelity = codexFidelity;
 
   private readonly root: string;
   private readonly discoveryFs: DiscoveryFs;

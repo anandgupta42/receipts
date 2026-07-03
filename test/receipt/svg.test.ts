@@ -49,6 +49,7 @@ function fakeModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     totalTokens: usage(1800),
     sessionTotalTokens: usage(1800),
     wasteLines: [],
+    caveats: [],
     priceDelta: null,
     methodology: "method",
     priceRowsUsed: [],

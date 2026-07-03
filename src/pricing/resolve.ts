@@ -1,4 +1,5 @@
 import type { AgentSource, TokenUsage } from "../parse/types.js";
+import { adapterFor } from "../parse/registry.js";
 import { defaultDataDir, loadPriceTable } from "./priceTable.js";
 import type { PriceRow, ResolvedPrice } from "./types.js";
 
@@ -113,24 +114,13 @@ export async function cheapestCurrentRow(
 }
 
 /**
- * Vendor id for a given adapter source. Cursor sessions never resolve a
- * price (R1: `unpriceable`, no per-turn model id or usage), so it maps to
- * `undefined` rather than a guessed vendor.
+ * Vendor id for a given adapter source — the adapter's own registry row
+ * (SPEC-0028: per-agent facts live on the adapter, not in shared switches).
+ * Multi-vendor agents (Cursor, OpenCode) register no vendor and resolve to
+ * `undefined` rather than a guessed one.
  */
 export function vendorForSource(source: AgentSource): string | undefined {
-  switch (source) {
-    case "claude-code":
-      return "anthropic";
-    case "codex":
-      return "openai";
-    case "gemini":
-      // Gemini CLI is single-vendor (Google only); per-turn model ids select
-      // the row within google.json. (SPEC-0010 R3.)
-      return "google";
-    case "cursor":
-    case "opencode":
-      return undefined;
-  }
+  return adapterFor(source)?.vendor;
 }
 
 /**

@@ -44,6 +44,7 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     totalTokens: usage(0),
     sessionTotalTokens: usage(0),
     wasteLines: [],
+    caveats: [],
     priceDelta: null,
     methodology: "test",
     priceRowsUsed: [],

@@ -1,7 +1,7 @@
 ---
 id: SPEC-0028
 title: "Cost fidelity — floor totals, per-adapter reconciliation, plausibility tripwires, trust doc"
-status: draft
+status: building
 milestone: M4
 depends: [SPEC-0023]
 ---
@@ -232,4 +232,21 @@ real sessions and its per-adapter output ship in the implementation PR.
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 26 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-03 · approved → building:** maintainer's in-session standing
+instruction to proceed ("also start working on spec-28", "start clearing the
+queue") — button 1 exercised; the final gate remains PR review.
+
+**2026-07-03 · S5 (Codex implementation review): PASS.** Six audit
+dimensions, all clean: (1) `totalBlocks`'s single floor predicate provably
+covers every branch — a complete total can never render as a floor and an
+incomplete one can never render bare; (2) the one changed expectation in
+`test/pr/body.test.ts` is the specced behavior (unreadable subagent → floor),
+not a weakened test; (3) no agent-type branch remains in shared fidelity/
+vendor code — `vendorForSource` delegates to the registry, validators hang
+off `SessionAdapter.fidelity`, `vendorForModel` stays primary as specced;
+(4) caveats are text-only facts computed after pricing — no `$` path, no
+golden movement (all committed fixtures silent); (5) the codex envelope
+contract matches parser reality and the claude invariants are provable from
+the normalized surface; (6) harness exit codes match the header contract,
+including the wrapper mapping compile failures to 1. Live smoke: 5 real
+codex sessions reconciled with zero drift.
