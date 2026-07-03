@@ -72,7 +72,19 @@ function formatModelMix(modelMix: ModelMixEntry[]): string {
   if (modelMix.length === 1) {
     return modelMix[0].model;
   }
-  return modelMix.map((m) => `${m.model} ${Math.round(m.tokenShare * 100)}%`).join(" · ");
+  // Display honesty (same rule as the cache line): a real mix never rounds a
+  // partial share up to 100% or down to 0%.
+  const sharePct = (share: number): string => {
+    const pct = Math.round(share * 100);
+    if (pct >= 100 && share < 1) {
+      return ">99%";
+    }
+    if (pct <= 0 && share > 0) {
+      return "<1%";
+    }
+    return `${pct}%`;
+  };
+  return modelMix.map((m) => `${m.model} ${sharePct(m.tokenShare)}`).join(" · ");
 }
 
 /** A priced atom renders `$`; an unpriced one falls back to tokens (I2). */

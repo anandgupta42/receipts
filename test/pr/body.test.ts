@@ -75,6 +75,14 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
     expect(body).toMatch(/^claude-opus-4-8 80% · claude-haiku-4-5 20%\.*\$1\.50$/m);
   });
 
+  it("a real mix never rounds to 100%/0% (>99%/<1%, the cache line's rule)", () => {
+    const view = builder({ modelMix: [mix("claude-opus-4-8", 0.996), mix("claude-haiku-4-5", 0.004)] });
+    const body = renderPrBody({ contributors: [view], excludedCount: 0 });
+    expect(body).toContain(">99%");
+    expect(body).not.toContain("100%");
+    expect(body).not.toContain(" 0%");
+  });
+
   it("carries no session ids in the fence (round 2) and every line fits 50 columns", () => {
     const body = renderPrBody({
       contributors: [builder({ sessionId: "rollout-2026-07-02T18-06-36-019f2583-6862-71c3-9abf-0eb4244ae5b0" })],

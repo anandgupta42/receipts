@@ -179,8 +179,8 @@ final grammar, maintainer-accepted ("this looks good"):
   N≥2, model mix, cost; their `session slice: turns A–B of N` line stays —
   a sliced cost means something different). The supporting cast indents:
   `SUBAGENTS (N)` as before, and helper-credited sessions under
-  `CODEX HELPERS (N) — no commits`, one muted row each with ONE fact:
-  `<model> · <duration>` (a receipt is not a dashboard — time, token
+  `CODEX HELPERS (N) — no commits`, one muted row each carrying its cost
+  plus ONE fact beside it: `<model> · <duration>` (a receipt is not a dashboard — time, token
   triples, and labeled token facts were each tried and rejected as busy
   or legend-dependent).
 - **No session ids in the fence.** Ids and full-session explainers move to
@@ -193,7 +193,11 @@ final grammar, maintainer-accepted ("this looks good"):
   below`) and falls back to the command hint whenever no section follows
   (`--no-details`, or the size floor dropped it — a hint must never point
   at nothing).
-- **`100%` never renders** — a share earns ink only for a real mix.
+- **`100%` never renders** — a share earns ink only for a real mix, and a
+  real mix never rounds a partial share to `100%`/`0%` (`>99%`/`<1%`, the
+  cache line's own honesty rule).
+- **Details/artifact order mirrors the fence** (authors first, helpers
+  after), so the size-cap's drop-from-END sheds helpers before authors.
 - **Subagent names sanitized** — a markup-shaped child title (fork
   boilerplate) falls back to `agent-<id>`, the masthead's own rule.
 - **Not configurable, deliberately**: one canonical comment shape is the

@@ -252,6 +252,10 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     return 1;
   }
   entries.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
+  // Round 2: the fence renders authors first, helpers grouped after — the
+  // details section and the artifact page must show the SAME order, so the
+  // size-cap's drop-from-END sheds helpers before authors.
+  const fenceOrdered = [...entries.filter((e) => e.view.basis !== "helper"), ...entries.filter((e) => e.view.basis === "helper")];
   const views = entries.map((e) => e.view);
   const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount };
 
@@ -261,14 +265,14 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   let artifactFailed = false;
   let link: { fileName: string; url: string } | null = null;
   if (opts.artifact) {
-    const sessions: ArtifactSession[] = entries.map((e) => ({ label: `${e.view.role} · ${e.view.sessionId}`, model: e.model }));
+    const sessions: ArtifactSession[] = fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), model: e.model }));
     link = publishAndLink(bodyInput, sessions, deps);
     artifactFailed = link === null;
   }
   // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
   // --no-details. The label is the stat line: everything the fence dropped
   // (id, slice reason) plus the session's anatomy, in one place.
-  const details = opts.details === false ? undefined : entries.map((e) => ({ label: detailLabel(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
+  const details = opts.details === false ? undefined : fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
   const body = renderPrBody(bodyInput, { artifactLink: link ?? undefined, details });
 
   // R3 (SPEC-0019): render before the comment upsert, unconditionally.
