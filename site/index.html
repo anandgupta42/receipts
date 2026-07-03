@@ -285,6 +285,14 @@
 .prmock .prname{font-size:12.5px;font-weight:600}
 .prmock .prname em{font-style:normal;font-weight:400;color:#5a6068;border:1px solid #d8dbd6;border-radius:4px;padding:0 4px;font-size:10.5px;margin-left:4px}
 .prmock .cardart{margin-top:0}
+.aglist2{list-style:none;margin:0;padding:0;font:14px/1.5 ui-monospace,Menlo,monospace;color:#c8d0d4}
+.aglist2 li{display:flex;align-items:baseline;gap:10px;padding:9px 0}
+.agtile{flex:none;width:26px;height:26px;border-radius:7px;background:#232a31;color:#e8e4da;font-size:11px;display:inline-flex;align-items:center;justify-content:center;align-self:center}
+.agtile.agdim{background:transparent;border:1px dashed #3a424a}
+.agname{color:#fff}
+.lead{flex:1;border-bottom:1px dotted #3a424a;transform:translateY(-4px);min-width:16px}
+.agval{color:#9aa4ac;font-size:12.5px;text-align:right}
+.agfoot{display:block;color:#6b747c;font-size:11px}
 </style>
 </head>
 <body>
@@ -393,7 +401,8 @@ TOTAL ················· $0.09</pre>
         <div class="step">
           <span class="k">03</span>
           <p>Paste the handoff <span class="grow">— your agent works cheaper tomorrow.</span></p>
-          <pre class="art" aria-label="Handoff excerpt">handoff:
+          <pre class="art" aria-label="Handoff excerpt"><span class="dim"># every receipt ends with this block
+# paste it into CLAUDE.md</span>
 - Bash loop ×5: change the input
   before a 3rd retry.</pre>
         </div>
@@ -409,12 +418,13 @@ TOTAL ················· $0.09</pre>
         <h2 class="lede">Works with the agents you already run.</h2>
         <div class="agwrap">
         <div class="agleft">
-<pre class="aglist" aria-label="Supported agents and their fidelity, styled as receipt lines">Claude Code ······· full per-turn, cache tiers
-Codex ····················· full per-turn
-Gemini CLI ············ full per-turn, priced
-opencode ·················· full per-turn
-Cursor ··· totals only — its logs stop there,
-           so we do too</pre>
+<ul class="aglist2" aria-label="Supported agents and their fidelity">
+          <li><span class="agtile">❯_</span><span class="agname">Claude Code</span><span class="lead"></span><span class="agval">full per-turn, cache tiers</span></li>
+          <li><span class="agtile">◆</span><span class="agname">Codex</span><span class="lead"></span><span class="agval">full per-turn</span></li>
+          <li><span class="agtile">✦</span><span class="agname">Gemini CLI</span><span class="lead"></span><span class="agval">full per-turn, priced</span></li>
+          <li><span class="agtile">⌘</span><span class="agname">opencode</span><span class="lead"></span><span class="agval">full per-turn</span></li>
+          <li><span class="agtile agdim">▢</span><span class="agname">Cursor</span><span class="lead"></span><span class="agval">totals only<span class="agfoot"> — its logs stop there, so we do too</span></span></li>
+        </ul>
 </div>
         <div class="proof-term agterm">
           <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts</span></div>
