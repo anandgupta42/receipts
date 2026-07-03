@@ -3,333 +3,452 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>aireceipts — receipts for your AI coding agent</title>
-<meta name="description" content="See what your AI coding agent actually cost. One command, no account, no upload — it reads the transcripts already on your disk and prints an itemized receipt.">
-<meta name="theme-color" content="#e9edf0">
+<title>aireceipts — your agent works, you get the receipt</title>
+<meta name="description" content="Local, deterministic cost receipts for AI coding agents. One command, no account, no upload — it reads the transcripts already on your disk.">
+<meta name="theme-color" content="#0e1417">
 <meta property="og:type" content="website">
-<meta property="og:title" content="aireceipts — receipts for your AI coding agent">
-<meta property="og:description" content="See what your AI coding agent actually cost. One command, no account, no upload — it reads the transcripts already on your disk.">
+<meta property="og:title" content="aireceipts — your agent works, you get the receipt">
+<meta property="og:description" content="Every session, itemized and priced — locally. No account. Nothing uploaded.">
 <meta property="og:image" content="assets/hero-receipt.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="assets/hero-receipt.png">
 <style>
   :root{
-    --field:#e7ecef;      /* cool desk the certificate rests on */
-    --sheet:#ffffff;      /* the certificate sheet */
-    --ink:#14181c;        /* near-black, cool */
-    --muted:#586570;      /* cool gray body */
+    --stage:#0e1417;      /* near-black stage: the object rests here */
+    --stage-2:#0b1013;    /* deeper black for the closing bookend */
+    --paper:#eceff1;      /* cool light field */
+    --sheet:#ffffff;      /* the sheet */
+    --ink:#12171b;        /* near-black ink, cool */
+    --muted:#5a6771;      /* cool gray body */
     --faint:#8a949c;      /* fainter labels */
-    --rule:#e3e8eb;       /* hairline */
-    --rule-strong:#c2cbd1;/* structural rule / sheet edge */
-    --seal:#b23a3a;       /* vermillion: the hanko + the single waste mark */
-    --ledger:#2f5d3a;     /* forest green: totals & affirmative numerals */
-    /* terminal chrome — the product output, shown as it prints */
+    --rule:#e2e7ea;       /* hairline */
+    --rule-strong:#c4cdd3;/* structural rule */
+    --seal:#bb392f;       /* vermillion: the single waste mark */
+    --ledger:#2f5d3a;     /* forest green: totals */
+    /* on the dark stage */
+    --stage-fg:#eef2f5;
+    --stage-muted:#9aa8b1;
+    --stage-faint:#66757f;
+    --stage-line:#233037;
+    /* terminal chrome, as it prints */
     --term-bg:#0f1518;
     --term-fg:#d6dde2;
     --term-dim:#84939c;
-    --term-green:#7fd08a; /* totals / affirmative dollars */
-    --term-red:#f0897d;   /* the waste mark */
-    --term-head:#9fb1bc;  /* masthead + rules inside the receipt */
-    --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+    --term-green:#7fd08a;
+    --term-red:#f0897d;
+    --term-head:#9fb1bc;
     --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
   }
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
   body{
-    margin:0;
-    background:var(--field);
-    color:var(--ink);
-    font-family:var(--sans);
-    font-size:16px;
-    line-height:1.55;
-    padding:clamp(16px,3.5vw,40px) 16px clamp(40px,6vw,72px);
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
   }
-  a{color:var(--ledger);text-underline-offset:2px;text-decoration-thickness:1px}
-  a:focus-visible,button:focus-visible{outline:2px solid var(--ledger);outline-offset:2px;border-radius:2px}
+  a{color:inherit}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--ledger);outline-offset:3px;border-radius:3px}
 
-  /* The certificate: a clean rectangular sheet on a cool desk. Wider than an
-     editorial column so the product sits big and the surfaces read two-up. */
-  .sheet{
-    width:100%;
-    max-width:1040px;
-    margin:0 auto;
-    background:var(--sheet);
-    border:1px solid var(--rule-strong);
-    border-radius:3px;
-    padding:clamp(20px,3.6vw,44px) clamp(18px,4vw,52px) clamp(28px,4vw,44px);
-    box-shadow:0 1px 0 #fff inset,0 30px 64px -42px rgba(20,32,44,.42);
+  .wrap{width:100%;max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,40px)}
+
+  /* ---- masthead ---- */
+  .mast{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:clamp(20px,3vw,30px) 0;gap:16px;
   }
-
-  section{padding:clamp(26px,4vw,40px) 0}
-  section+section{border-top:1px solid var(--rule)}
-
-  /* Section eyebrow — statement divider */
-  .eyebrow{
-    display:flex;align-items:center;gap:14px;
-    margin:0 0 clamp(16px,2.4vw,22px);
-    font-family:var(--sans);
-    font-size:11.5px;font-weight:700;letter-spacing:.22em;
-    text-transform:uppercase;color:var(--faint);
+  .brand{
+    font-family:var(--sans);font-weight:800;font-size:14px;
+    letter-spacing:.30em;color:var(--ink);text-transform:uppercase;
   }
-  .eyebrow::after{content:"";flex:1 1 auto;height:1px;background:var(--rule-strong)}
+  .mnav{display:flex;gap:22px;font-size:12.5px;font-weight:600;letter-spacing:.10em;text-transform:uppercase}
+  .mnav a{color:var(--faint);text-decoration:none}
+  .mnav a:hover{color:var(--ink)}
 
-  /* ---- Masthead ---- */
-  header.mast{padding-top:2px}
-  .masthead-row{
-    display:flex;justify-content:space-between;align-items:baseline;
-    gap:12px;font-family:var(--sans);
-    font-size:11.5px;font-weight:700;letter-spacing:.26em;
-    text-transform:uppercase;color:var(--faint);
+  /* ---- the stage: near-black, the object rests on it ---- */
+  .stage{background:var(--stage);color:var(--stage-fg)}
+  .stage-in{
+    max-width:1080px;margin:0 auto;
+    padding:clamp(56px,9vw,120px) clamp(20px,5vw,40px) clamp(40px,7vw,84px);
+    text-align:center;
   }
-  .masthead-row .brand{color:var(--ink);letter-spacing:.30em}
-  .masthead-row .mlink{color:var(--muted);letter-spacing:.12em;text-decoration:none}
-  .masthead-row .mlink:hover{color:var(--ink)}
-  .rule2{
-    margin:12px 0 0;height:0;
-    border-top:3px solid var(--ink);
-    box-shadow:0 5px 0 -4px var(--ink);
+  .display{
+    font-family:var(--sans);font-weight:800;
+    font-size:clamp(38px,8.6vw,72px);line-height:1.02;
+    letter-spacing:-.032em;margin:0 auto;max-width:15ch;
+    color:var(--stage-fg);
+  }
+  .display .soft{color:var(--stage-muted)}
+  .stage-sub{
+    margin:clamp(20px,3vw,28px) auto 0;max-width:52ch;
+    font-size:clamp(15px,2.2vw,19px);line-height:1.55;color:var(--stage-muted);
   }
 
-  /* ---- Hero: H1 + command, the product big beside it ---- */
-  .hero{
-    display:grid;grid-template-columns:minmax(0,1fr);
-    gap:clamp(24px,4vw,46px);align-items:center;
-    margin-top:clamp(22px,3.4vw,30px);
+  /* ---- copybox: the one CTA, reused verbatim ---- */
+  .cta-hold{display:flex;justify-content:center;margin:clamp(26px,3.4vw,34px) 0 0}
+  .copybox{
+    display:inline-flex;align-items:stretch;
+    border:1.5px solid var(--ink);border-radius:9px;overflow:hidden;
+    background:var(--sheet);box-shadow:0 10px 30px -18px rgba(0,0,0,.55);
   }
-  @media (min-width:900px){
-    .hero{grid-template-columns:minmax(0,0.9fr) minmax(0,1.1fr)}
+  .copybox code{
+    font-family:var(--mono);font-size:clamp(14px,2vw,16px);color:var(--ink);
+    padding:13px clamp(14px,2vw,20px);white-space:nowrap;
+    display:inline-flex;align-items:center;gap:.6ch;
   }
-  h1{
-    font-family:var(--serif);
-    font-size:clamp(28px,4.6vw,46px);
-    line-height:1.12;font-weight:600;letter-spacing:-.014em;
-    margin:0;max-width:15ch;
-  }
-  .sub{
-    color:var(--muted);font-size:clamp(15px,2.2vw,17.5px);
-    max-width:46ch;margin:15px 0 0;line-height:1.55;
-  }
-  .cta{
-    display:flex;align-items:stretch;gap:0;
-    margin:clamp(18px,2.6vw,24px) 0 0;max-width:340px;
-    border:1.5px solid var(--ink);border-radius:6px;overflow:hidden;
-    background:var(--sheet);
-  }
-  .cta code{
-    flex:1;font-family:var(--mono);font-size:15px;
-    padding:12px 14px;text-align:left;white-space:nowrap;
-    display:flex;align-items:center;gap:.55ch;color:var(--ink);
-  }
-  .cta code .prompt{color:var(--faint)}
-  .cta button{
-    font-family:var(--sans);font-size:12px;font-weight:600;
-    text-transform:uppercase;letter-spacing:.08em;
+  .copybox code .p{color:var(--faint)}
+  .copybox button{
+    font-family:var(--sans);font-size:12px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.09em;
     border:0;border-left:1.5px solid var(--ink);
-    background:var(--ink);color:#fff;
-    padding:0 18px;cursor:pointer;
+    background:var(--ink);color:#fff;padding:0 clamp(16px,2.2vw,22px);cursor:pointer;
   }
-  .herofoot{
-    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
-    margin-top:14px;
-  }
-  .star{
-    display:inline-flex;align-items:center;gap:.5ch;
-    font-family:var(--sans);font-size:13.5px;font-weight:600;
-    color:var(--ink);text-decoration:none;
-    border:1px solid var(--rule-strong);border-radius:6px;
-    padding:9px 14px;background:var(--sheet);
-  }
-  .star:hover{border-color:var(--ink)}
-  .trustline{color:var(--faint);font-size:12.5px;letter-spacing:.01em}
-  .trustline b{color:var(--muted);font-weight:600}
+  .copybox button:hover{background:#000}
 
-  /* the product shot */
-  .shot{margin:0}
-  .shot img{
-    display:block;width:100%;height:auto;
-    border-radius:10px;border:1px solid #1c272d;
-    box-shadow:0 26px 54px -30px rgba(9,14,18,.85);
+  /* ---- the object ---- */
+  .object{
+    margin:clamp(46px,7vw,84px) auto 0;max-width:640px;
+    perspective:1700px;
   }
-  .shot figcaption{
-    color:var(--muted);font-family:var(--serif);font-style:italic;
-    font-size:14px;margin-top:12px;line-height:1.5;
+  .object img{
+    display:block;width:100%;height:auto;border-radius:14px;
+    border:1px solid #05090b;
+    transform:rotateX(3deg) rotateY(-3deg) rotate(-.4deg);
+    box-shadow:
+      0 2px 0 rgba(255,255,255,.04) inset,
+      0 60px 90px -48px rgba(0,0,0,.85),
+      0 30px 60px -40px rgba(0,0,0,.7);
   }
 
-  /* ---- Terminal cards: the surfaces, as they actually print ---- */
-  .grid{display:grid;grid-template-columns:minmax(0,1fr);gap:22px}
-  @media (min-width:940px){.grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
-  .card{min-width:0;display:flex;flex-direction:column;gap:12px}
-  .card.wide{grid-column:1/-1}
-  .card h3{
-    margin:0;font-family:var(--serif);font-weight:600;
-    font-size:clamp(18px,2.4vw,21px);letter-spacing:-.01em;color:var(--ink);
+  /* ---- light sections ---- */
+  section{padding:clamp(56px,9vw,110px) 0}
+  .lede{
+    font-family:var(--sans);font-weight:800;
+    font-size:clamp(26px,4.4vw,44px);line-height:1.06;letter-spacing:-.028em;
+    margin:0 0 clamp(30px,5vw,52px);max-width:20ch;color:var(--ink);
   }
-  .card h3 .lede{color:var(--muted);font-weight:400;font-style:italic;font-size:.82em}
-  .term{
-    min-width:0;background:var(--term-bg);
-    border:1px solid #1c272d;border-radius:9px;overflow:hidden;
-    box-shadow:0 20px 44px -34px rgba(9,14,18,.9);
+
+  /* three scenarios */
+  .scenarios{
+    display:grid;grid-template-columns:minmax(0,1fr);
+    gap:clamp(28px,3vw,36px);
+  }
+  @media (min-width:820px){.scenarios{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  .scn{min-width:0;border-top:2px solid var(--ink);padding-top:20px}
+  .scn h3{
+    font-family:var(--sans);font-weight:700;
+    font-size:clamp(20px,2.6vw,25px);line-height:1.14;letter-spacing:-.016em;
+    margin:0 0 12px;color:var(--ink);
+  }
+  .scn p{margin:0;font-size:16px;line-height:1.55;color:var(--muted);max-width:34ch}
+  .scn .n{font-family:var(--mono);font-size:.92em;color:var(--ink)}
+  .scn .flag{color:var(--seal);font-weight:600}
+
+  /* rules */
+  .band{background:var(--sheet);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+  .rules{
+    display:grid;grid-template-columns:minmax(0,1fr);
+    gap:0;margin:0;padding:0;list-style:none;counter-reset:clause;
+  }
+  @media (min-width:720px){.rules{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:clamp(32px,5vw,64px)}}
+  .rules li{
+    position:relative;padding:22px 0 22px 58px;
+    border-top:1px solid var(--rule);
+    font-family:var(--sans);font-weight:600;
+    font-size:clamp(16px,2.1vw,19px);line-height:1.4;color:var(--ink);
+    letter-spacing:-.008em;
+  }
+  .rules li::before{
+    counter-increment:clause;content:"§" counter(clause,decimal-leading-zero);
+    position:absolute;left:0;top:24px;
+    font-family:var(--mono);font-size:13px;font-weight:600;
+    color:var(--ledger);letter-spacing:.02em;
+  }
+
+  /* stepper */
+  .steps{
+    display:grid;grid-template-columns:minmax(0,1fr);
+    gap:clamp(24px,3vw,32px);counter-reset:step;
+  }
+  @media (min-width:820px){.steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  .step{min-width:0}
+  .step .k{
+    font-family:var(--mono);font-size:13px;font-weight:600;
+    color:var(--faint);letter-spacing:.14em;display:block;margin:0 0 12px;
+  }
+  .step p{
+    margin:0;font-family:var(--sans);font-weight:600;
+    font-size:clamp(17px,2.2vw,20px);line-height:1.34;letter-spacing:-.012em;color:var(--ink);
+  }
+  .step code{font-family:var(--mono);font-weight:600;font-size:.9em;color:var(--ledger);white-space:nowrap}
+  .step .grow{color:var(--muted);font-weight:400}
+
+  /* proof */
+  .agents{
+    display:flex;flex-wrap:wrap;align-items:baseline;gap:0 clamp(14px,2vw,22px);
+    margin:0 0 clamp(28px,4vw,40px);
+    font-family:var(--sans);font-weight:700;font-size:clamp(16px,2.2vw,20px);
+    letter-spacing:-.01em;color:var(--ink);
+  }
+  .agents .sep{color:var(--rule-strong);font-weight:400}
+  .agents .deg{color:var(--faint);font-weight:400;font-size:.8em;font-style:italic;letter-spacing:0}
+  .proof-term{
+    background:var(--term-bg);border:1px solid #1c272d;border-radius:11px;overflow:hidden;
+    box-shadow:0 30px 60px -44px rgba(9,14,18,.9);max-width:560px;
   }
   .bar{
-    display:flex;align-items:center;gap:9px;
-    padding:9px 13px;background:#141c21;border-bottom:1px solid #1f2b31;
+    display:flex;align-items:center;gap:9px;padding:10px 14px;
+    background:#141c21;border-bottom:1px solid #1f2b31;
     font-family:var(--mono);font-size:11.5px;color:var(--term-dim);
   }
   .dots{display:inline-flex;gap:5px;flex:0 0 auto}
   .dots i{width:9px;height:9px;border-radius:50%;background:#37454c;display:block}
-  .bar .cmd{color:var(--term-head);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bar .cmd{color:var(--term-head)}
   .bar .cmd .p{color:var(--term-dim)}
   pre.render{
     margin:0;min-width:0;overflow-x:auto;max-width:100%;
-    padding:14px 16px;background:var(--term-bg);
-    font-family:var(--mono);font-size:11.5px;line-height:1.42;color:var(--term-fg);
+    padding:16px 18px;background:var(--term-bg);
+    font-family:var(--mono);font-size:11.5px;line-height:1.46;color:var(--term-fg);
     -webkit-overflow-scrolling:touch;
   }
-  pre.render.wide{font-size:10px;line-height:1.5}
-  pre.render.one{font-size:14px;white-space:pre-wrap;word-break:break-word;padding:16px}
   .render .g{color:var(--term-green)}
-  .render .r{color:var(--term-red)}
   .render .d{color:var(--term-dim)}
   .render .h{color:var(--term-head)}
 
-  /* ---- Honesty: the rules no competitor prints ---- */
-  ol.terms{
-    list-style:none;margin:0;padding:0;counter-reset:clause;
-    display:grid;grid-template-columns:minmax(0,1fr);gap:0;
+  /* ---- closing bookend ---- */
+  .closing{background:var(--stage-2);color:var(--stage-fg)}
+  .closing-in{
+    max-width:1080px;margin:0 auto;text-align:center;
+    padding:clamp(64px,10vw,120px) clamp(20px,5vw,40px);
   }
-  @media (min-width:760px){ol.terms{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:38px}}
-  ol.terms li{
-    position:relative;padding:14px 0 14px 46px;font-size:14.5px;line-height:1.5;
-    border-top:1px solid var(--rule);
+  .closing .display{max-width:16ch}
+  .closing-note{
+    margin:clamp(26px,3.4vw,34px) 0 0;
+    font-size:14px;color:var(--stage-muted);letter-spacing:.01em;
   }
-  ol.terms li::before{
-    counter-increment:clause;content:"§" counter(clause,decimal-leading-zero);
-    position:absolute;left:0;top:15px;
-    font-family:var(--mono);font-size:12.5px;font-weight:600;
-    color:var(--ledger);letter-spacing:.02em;
+  .closing-note b{color:var(--stage-fg);font-weight:600}
+  .foot{
+    display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
+    gap:0 clamp(14px,2vw,20px);
+    margin:clamp(40px,6vw,60px) 0 0;
+    font-size:13.5px;color:var(--stage-muted);
   }
-  ol.terms b{color:var(--ink);font-weight:700;display:block}
-  ol.terms span{color:var(--muted);display:block;margin-top:3px}
-  .telemetry{color:var(--muted);font-size:13.5px;line-height:1.6;margin:18px 0 0}
+  .foot a{color:var(--stage-muted);text-decoration:none}
+  .foot a:hover{color:var(--stage-fg)}
+  .foot .sep{color:var(--stage-line)}
 
-  /* ---- Why: two sentences, then done ---- */
-  .story{
-    color:var(--ink);font-family:var(--serif);
-    font-size:clamp(17px,2.3vw,20px);line-height:1.6;
-    margin:0;max-width:62ch;
-  }
-  .story .n{font-family:var(--mono);font-size:.86em;color:var(--ledger);white-space:nowrap}
-
-  /* ---- Closer: the cardholder band, the certificate seal + the star ---- */
-  .cardholder{
-    display:flex;align-items:center;justify-content:space-between;
-    gap:20px;flex-wrap:wrap;
-    margin:0 0 clamp(24px,3.4vw,32px);
-    padding:18px 22px;border:1.5px solid var(--ink);border-radius:8px;
-    background:linear-gradient(#fff,#fbfcfd);
-  }
-  .cardholder .ch-l{font-family:var(--serif);font-size:clamp(19px,2.6vw,24px);font-weight:600;color:var(--ink);letter-spacing:.01em}
-  .cardholder .ch-l b{letter-spacing:.14em}
-  .starbig{
-    display:inline-flex;align-items:center;gap:.55ch;flex:0 0 auto;
-    font-family:var(--sans);font-size:14.5px;font-weight:700;letter-spacing:.02em;
-    color:#fff;background:var(--ink);text-decoration:none;
-    border-radius:7px;padding:12px 20px;
-  }
-  .starbig:hover{background:#000}
-  .close{
-    display:flex;justify-content:space-between;align-items:flex-end;
-    gap:20px;flex-wrap:wrap;
-  }
-  .close-copy{max-width:34ch}
-  .issued{
-    font-family:var(--sans);font-size:11px;font-weight:700;
-    letter-spacing:.16em;text-transform:uppercase;color:var(--faint);
-    display:flex;gap:18px;flex-wrap:wrap;margin:0 0 14px;
-  }
-  .thanks{
-    font-family:var(--serif);font-size:19px;font-weight:600;
-    color:var(--ink);margin:0 0 10px;letter-spacing:.01em;
-  }
-  .serial{
-    font-family:var(--mono);font-size:10.5px;letter-spacing:.34em;
-    color:var(--faint);margin:0;padding-left:.34em;
-  }
-  .seal{
-    flex:0 0 auto;width:clamp(104px,17vw,128px);height:auto;
-    color:var(--seal);transform:rotate(-5deg);
-    animation:settle .5s ease-out both;
-  }
-  @keyframes settle{
-    from{opacity:0;transform:rotate(-5deg) scale(1.06)}
-    to{opacity:1;transform:rotate(-5deg) scale(1)}
-  }
-  .barcode{color:var(--rule-strong);height:30px;display:block;margin:24px 0 8px}
-  .flinks{font-size:14px;color:var(--muted);line-height:2}
-  .flinks a{color:var(--ledger)}
-  .flinks .sep{color:var(--rule-strong);padding:0 .6ch}
-  .samosa{color:var(--muted);margin:10px 0 0;font-size:13.5px}
-
-  @media (max-width:480px){
-    .close{flex-direction:column-reverse;align-items:flex-start}
-    .masthead-row{letter-spacing:.16em}
-    .cardholder{flex-direction:column;align-items:flex-start}
-  }
   @media (prefers-reduced-motion:reduce){
     *{transition:none!important;animation:none!important}
-    .seal{opacity:1}
+    .object img{transform:none}
   }
+.scnic{display:block;margin-bottom:12px;color:#14181c;opacity:.85}
+@media (prefers-color-scheme: dark){}
+.art{margin-top:14px;background:#14181c;color:#c8d0d4;border-radius:10px;padding:12px 14px;font:11px/1.6 ui-monospace,Menlo,monospace;overflow-x:auto;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.stepbox{margin-top:14px}
+.ruleswrap{display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
+@media (min-width:900px){.ruleswrap{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);align-items:start}}
+.proof{max-width:480px}
+.proofcard{font-size:12px;line-height:1.7}
+.proofcap{font-size:13.5px;color:#5a6068;margin:10px 0 0}
+.agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;margin:22px 0 28px}
+.ag{border:1px solid #d8dbd6;border-radius:12px;padding:14px 16px;background:#fff}
+.ag strong{display:block;font-size:15px;margin-bottom:4px}
+.ag span{font-size:12.5px;color:#5a6068;line-height:1.45}
+.agq{border-style:dashed}
+.darkstage{background:#14181c;color:#e8eaec;padding-top:72px;padding-bottom:72px;margin-inline:calc(50% - 50vw);padding-inline:calc(50vw - 50%)}
+.darkstage .lede{color:#fff}
+.agwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:32px;align-items:center}
+@media (min-width:960px){.agwrap{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+.aglist{font:14px/2.1 ui-monospace,Menlo,monospace;color:#c8d0d4;margin:0;overflow-x:auto}
+.aglist{background:transparent;border:0;padding:0}
+.agterm{margin:0;box-shadow:0 24px 64px rgba(0,0,0,.5);border:1px solid #2a3138;border-radius:12px}
+.scnimg{border-radius:16px;margin-bottom:14px;box-shadow:0 10px 28px rgba(0,0,0,.25)}
+.cardart{margin-top:14px;font-size:11.5px;padding:10px 12px}
+.bignum{margin-top:12px;font-weight:800;font-size:34px;letter-spacing:-.02em;color:#14181c}
+.bignum .cents{font-size:20px;color:#5a6068}
+.numcap{display:block;font-weight:400;font-size:12px;color:#5a6068;margin-top:2px}
+.prmock{margin-top:14px;border:1px solid #d8dbd6;border-radius:10px;padding:10px 12px;background:#fff}
+.prmock .prav{display:inline-block;width:18px;height:18px;border-radius:50%;background:#14181c;vertical-align:middle;margin-right:7px}
+.prmock .prname{font-size:12.5px;font-weight:600}
+.prmock .prname em{font-style:normal;font-weight:400;color:#5a6068;border:1px solid #d8dbd6;border-radius:4px;padding:0 4px;font-size:10.5px;margin-left:4px}
+.prmock .cardart{margin-top:8px}
+.scn{display:flex;flex-direction:column}
+.scn .cardart,.scn .bignum{margin-top:auto}
+.cardart .dim{color:#7a838a}
+.cardart .redl{color:#e0705f}
+.cardart .grnl{color:#5bbd8b}
+.stageline{font-size:14px;color:#c8d0d4;margin:18px 0 0}
+.stageline strong{color:#fff}
+.prmock{margin-top:auto;border:1px solid #d8dbd6;border-radius:10px;padding:10px 12px;background:#fff}
+.prhead{margin-bottom:8px}
+.prmock .prav{display:inline-block;width:18px;height:18px;border-radius:50%;background:#14181c;vertical-align:middle;margin-right:7px}
+.prmock .prname{font-size:12.5px;font-weight:600}
+.prmock .prname em{font-style:normal;font-weight:400;color:#5a6068;border:1px solid #d8dbd6;border-radius:4px;padding:0 4px;font-size:10.5px;margin-left:4px}
+.prmock .cardart{margin-top:0}
+.aglist2{list-style:none;margin:0;padding:0;font:14px/1.5 ui-monospace,Menlo,monospace;color:#c8d0d4}
+.aglist2 li{display:flex;align-items:baseline;gap:10px;padding:9px 0}
+.agtile{flex:none;width:26px;height:26px;border-radius:7px;background:#232a31;color:#e8e4da;font-size:11px;display:inline-flex;align-items:center;justify-content:center;align-self:center}
+.agtile.agdim{background:transparent;border:1px dashed #3a424a}
+.agname{color:#fff}
+.lead{flex:1;border-bottom:1px dotted #3a424a;transform:translateY(-4px);min-width:16px}
+.agval{color:#9aa4ac;font-size:12.5px;text-align:right}
+.agfoot{display:block;color:#6b747c;font-size:11px}
+.agtx{font-size:10px;letter-spacing:.5px}
+.agmark{display:block}
+.scnimg{border-radius:18px}
+.scnrow{align-items:stretch}
+.scn>p{margin-bottom:18px}
+.steps{position:relative}
+.step{position:relative}
+@media (min-width:720px){
+  .step:not(:last-child)::after{content:"→";position:absolute;right:-9%;top:44px;font-size:22px;color:#b6bdc3}
+}
+.step .art,.step .copybox.stepbox{margin-top:16px}
+.payoff{font:12.5px/1.5 ui-monospace,Menlo,monospace;color:#5a6068;margin:10px 0 0}
+.grn2{color:#3d8f68;font-weight:600;white-space:nowrap}
+.agterm{width:fit-content;max-width:100%;justify-self:center}
+.agterm pre{padding-right:28px}
 </style>
 </head>
 <body>
-<div class="sheet">
 
-  <header class="mast">
-    <div class="masthead-row">
-      <span class="brand">AIRECEIPTS</span>
-      <a class="mlink" href="docs/index.html">DOCS</a> <a class="mlink" href="https://github.com/anandgupta42/aireceipts">GITHUB</a>
-    </div>
-    <div class="rule2" aria-hidden="true"></div>
+  <div class="wrap">
+    <header class="mast">
+      <span class="brand">Aireceipts</span>
+      <nav class="mnav">
+        <a href="docs/index.html">Docs</a>
+        <a href="https://github.com/anandgupta42/aireceipts">GitHub</a>
+      </nav>
+    </header>
+  </div>
 
-    <div class="hero">
-      <div class="hero-copy">
-        <h1>Your AI coding agent just worked for 33 minutes. Here's the receipt.</h1>
-        <p class="sub">One command. No account, no API key, no upload — it reads the transcripts your agent already writes to disk.</p>
-        <div class="cta">
-          <code id="cmd"><span class="prompt" aria-hidden="true">$</span>npx aireceipts</code>
-          <button type="button" id="copy" data-cmd="npx aireceipts" aria-label="Copy the command npx aireceipts to the clipboard">Copy</button>
-        </div>
-        <div class="herofoot">
-          <a class="star" href="https://github.com/anandgupta42/aireceipts">★ Star on GitHub</a>
-          <span class="trustline"><b>Local.</b> Nothing uploaded · Apache-2.0</span>
+  <!-- ============ HERO STAGE ============ -->
+  <div class="stage">
+    <div class="stage-in">
+      <h1 class="display">Your agent works. <span class="soft">You get the receipt.</span></h1>
+      <p class="stage-sub">Every session, itemized and priced — locally. No account. Nothing uploaded.</p>
+      <div class="cta-hold">
+        <div class="copybox">
+          <code><span class="p" aria-hidden="true">$</span>npx aireceipts</code>
+          <button type="button" class="copy-btn" data-cmd="npx aireceipts" aria-label="Copy the command npx aireceipts to the clipboard">Copy</button>
         </div>
       </div>
-      <figure class="shot">
-        <img src="assets/hero-receipt.png" width="1280" height="812"
-             alt="A dark aireceipts receipt for a real Claude Code session titled 'Can you fix the flaky login test in src/auth/…', run 4m 35s. Bash cost $0.08 across 5 calls; a flagged Bash loop ×5 wasted $0.08 and 3m 45s. TOTAL $0.09; the same tokens on claude-haiku-4-5 would be $0.02.">
-        <figcaption>One real session. Every number priced from cited, dated vendor tables — the waste flagged in red.</figcaption>
+      <figure class="object">
+        <img src="assets/hero-receipt.png" width="1280" height="1028"
+             alt="A dark aireceipts receipt for a real Claude Code session on claude-sonnet-5, run 33m 31s on Jul 02 2026. Itemized: thinking/reply $5.36, Bash $3.93, Read $1.88, Write $0.66, Edit $0.38, TaskList $0.05, SendMessage $0.04. A red line notes $2.68 recoverable by re-pricing 101 trivial turns to claude-haiku-4-5. TOTAL $12.30; the same tokens on claude-haiku-4-5 would be $6.15. Stamped LOCAL · DETERMINISTIC.">
       </figure>
     </div>
-  </header>
+  </div>
 
-  <main>
+  <!-- ============ THREE SCENARIOS ============ -->
+  <div class="wrap">
+    <section aria-label="What a receipt catches">
+      <div class="scenarios">
+        <div class="scn">
+          <img class="scnimg" src="assets/scn-loop.png" alt="" width="76" height="76">
+          <h3>The waste you didn't see</h3>
+          <p>Agents get stuck — retrying failed commands, re-reading context. The receipt flags every loop, in dollars.</p>
+          <pre class="art cardart">⚠ re-ran failing command ×5 · <span class="redl">wasted</span>
+<span class="redl">$156.28</span> caught in one day · 45 sessions</pre>
+        </div>
+        <div class="scn">
+          <img class="scnimg" src="assets/scn-week.png" alt="" width="76" height="76">
+          <h3>The week, in one number</h3>
+          <p>Totals, per-agent split, honest deltas.</p>
+          <div class="bignum">$10,056<span class="cents">.63</span><span class="numcap">one real week · 319 sessions</span></div>
+        </div>
+        <div class="scn">
+          <img class="scnimg" src="assets/scn-pr.png" alt="" width="76" height="76">
+          <h3>Receipts on your PRs</h3>
+          <p>What the change cost to make — every agent counted.</p>
+          <div class="prmock"><div class="prhead"><span class="prav"></span><span class="prname">aireceipts <em>bot</em> commented</span></div><pre class="art cardart">orchestrator · fable ······ $12.30
+builder · opus ············ $43.80
+TOTAL ····················· <span class="grnl">$56.10</span></pre></div>
+        </div>
+      </div>
+    </section>
+  </div>
 
-  <section aria-label="What aireceipts prints">
-    <h2 class="eyebrow">What it prints · real output, every surface</h2>
-    <div class="grid">
+  <!-- ============ HONESTY RULES ============ -->
+  <div class="band">
+    <div class="wrap">
+      <section aria-label="Your numbers, your rules">
+        <h2 class="lede">Your numbers, your rules.</h2>
+        <div class="ruleswrap">
+        <ol class="rules">
+          <li>No fabricated dollars, ever.</li>
+          <li>Every price cited: URL, date, excerpt.</li>
+          <li>Comparisons are arithmetic, not predictions.</li>
+          <li>Same transcript in, byte-identical receipt out.</li>
+        </ol>
+        <div class="proof">
+          <pre class="art proofcard" aria-label="A real cited price-table row">"claude-fable-5": {
+  "input": 10.0, "output": 50.0,
+  "sources": [{
+    "url": "platform.claude.com/…/pricing",
+    "observed_at": "2026-07-02",
+    "excerpt": "Base Input $10 / MTok …"
+  }]
+}</pre>
+          <p class="proofcap">A real row from the price table. Every dollar on every receipt traces to one — checked and live-verified in CI.</p>
+        </div>
+        </div>
+      </section>
+    </div>
+  </div>
 
-      <div class="card">
-        <h3>Itemize any session. <span class="lede">what each tool and turn cost.</span></h3>
-        <div class="term">
+  <!-- ============ STEPPER + CTA ============ -->
+  <div class="wrap">
+    <section aria-label="Three steps">
+        <h2 class="lede">Sixty seconds to your first receipt.</h2>
+      <div class="steps">
+        <div class="step">
+          <span class="k">01</span>
+          <p>Run <code>npx aireceipts</code></p>
+          <div class="copybox stepbox"><span class="ps">$</span><input type="text" value="npx aireceipts" readonly><button class="copy" data-copy="npx aireceipts">COPY</button></div>
+        </div>
+        <div class="step">
+          <span class="k">02</span>
+          <p>Read the receipt</p>
+          <pre class="art" aria-label="Receipt excerpt">⚠ re-ran failing command ×5 · <span class="redl">$0.08</span>
+──────────────────────────────
+TOTAL ····················· $0.09</pre>
+        </div>
+        <div class="step">
+          <span class="k">03</span>
+          <p>Paste the handoff <span class="grow">— your agent works cheaper tomorrow.</span></p>
+          <pre class="art" aria-label="Handoff excerpt"><span class="dim"># every receipt ends with this block
+# paste it into CLAUDE.md</span>
+- Bash loop ×5: change the input
+  before a 3rd retry.</pre>
+          <p class="payoff">→ tomorrow's receipt: <span class="grn2">no retries · $0.00</span></p>
+        </div>
+      </div>
+      
+    </section>
+  </div>
+
+  <!-- ============ PROOF ============ -->
+  <div class="band">
+    <div class="wrap">
+      <section class="darkstage" aria-label="Works with the agents you already run">
+        <h2 class="lede">Works with the agents you already run.</h2>
+        <div class="agwrap">
+        <div class="agleft">
+<ul class="aglist2" aria-label="Supported agents and their fidelity">
+          <li><span class="agtile"><img class="agmark" src="assets/agents/claudecode.svg" alt="" width="14" height="14"></span><span class="agname">Claude Code</span><span class="lead"></span><span class="agval">full per-turn, cache tiers</span></li>
+          <li><span class="agtile agtx">cx</span><span class="agname">Codex</span><span class="lead"></span><span class="agval">full per-turn</span></li>
+          <li><span class="agtile"><img class="agmark" src="assets/agents/gemini.svg" alt="" width="14" height="14"></span><span class="agname">Gemini CLI</span><span class="lead"></span><span class="agval">full per-turn, priced</span></li>
+          <li><span class="agtile"><img class="agmark" src="assets/agents/opencode.svg" alt="" width="14" height="14"></span><span class="agname">opencode</span><span class="lead"></span><span class="agval">full per-turn</span></li>
+          <li><span class="agtile agdim"><img class="agmark" src="assets/agents/cursor.svg" alt="" width="14" height="14"></span><span class="agname">Cursor</span><span class="lead"></span><span class="agval">totals only<span class="agfoot"> — its logs stop there, so we do too</span></span></li>
+        </ul>
+</div>
+        <div class="proof-term agterm">
           <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts</span></div>
 <pre class="render" tabindex="0" aria-label="An itemized receipt for a 10m 30s Claude Code session: Bash $0.05, Edit $0.05, thinking $0.03, Write $0.03, Read $0.02, total $0.18; the same tokens on claude-haiku-4-5 would be $0.04."><span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -</span>
 <span class="h">                    AIRECEIPTS                    </span>
  “Add email format validation to the signup for…”
  Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s
-    claude-opus-4-8 87% · claude-sonnet-5 13%
-         cache served 85% of input tokens
-
 Bash..............................$0.05  (3 calls)
 Edit..............................$0.05  (2 calls)
 (thinking/reply)..................$0.03  (2 turns)
@@ -337,197 +456,47 @@ Write.............................$0.03  (2 calls)
 Read...............................$0.02  (1 call)
 <span class="d">--------------------------------------------------</span>
 <span class="g">TOTAL........................................$0.18</span>
-<span class="d">same tokens on claude-haiku-4-5..............$0.04</span>
-<span class="d">  (arithmetic, not a prediction)</span></pre>
+<span class="d">same tokens on claude-haiku-4-5..............$0.04</span></pre>
         </div>
       </div>
-
-      <div class="card">
-        <h3>See the whole week. <span class="lede">totals, per-agent split, honest deltas.</span></h3>
-        <div class="term">
-          <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts week</span></div>
-<pre class="render" tabindex="0" aria-label="A weekly digest for Jun 13 to Jun 20 2026: 2 sessions, priced total $0.27, 219,515 tokens, top waste stuck-loop $0.08, no prior data to compare."><span class="h">                  WEEKLY DIGEST                   </span>
-   Jun 13 2026 → Jun 20 2026 · trailing 7 days
-
-Sessions.........................................2
-<span class="g">Priced total (2 of 2)........................$0.27</span>
-Tokens (all sessions)..................219,515 tok
-
-By agent
-  Claude Code.......................$0.27 · 2 sess
-
-Top waste
-  <span class="r">stuck-loop.....................$0.08 · 1 session</span>
-
-vs. prior 7 days (Jun 06 2026 → Jun 13 2026)
-  no prior data
-<span class="d">--------------------------------------------------</span></pre>
-        </div>
-      </div>
-
-      <div class="card wide">
-        <h3>Put two runs side by side. <span class="lede">the factual ratio — never a prediction.</span></h3>
-        <div class="term">
-          <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts compare a b</span></div>
-<pre class="render wide" tabindex="0" aria-label="Two receipts side by side: a clean session at $0.18 against a stuck-loop session at $0.09 with a flagged Bash loop, ending with the line that the first cost 1.9× the second."><span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -  │ - - - - - - - - - - - - - - - - - - - - - - - - -</span>
-<span class="h">                    AIRECEIPTS                     │                     AIRECEIPTS</span>
- “Add email format validation to the signup for…”  │  “Can you fix the flaky login test in src/auth/…”
- Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s  │  Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s
-    claude-opus-4-8 87% · claude-sonnet-5 13%      │                claude-opus-4-8 100%
-         cache served 85% of input tokens          │          cache served 88% of input tokens
-                                                   │
-Bash..............................$0.05  (3 calls) │ Bash..............................$0.08  (5 calls)
-Edit..............................$0.05  (2 calls) │ (thinking/reply)...................$0.02  (1 turn)
-(thinking/reply)..................$0.03  (2 turns) │
-Write.............................$0.03  (2 calls) │ <span class="r">⚠ Bash loop ×5......................$0.08 (3m 45s)</span>
-Read...............................$0.02  (1 call) │ <span class="d">--------------------------------------------------</span>
-<span class="d">--------------------------------------------------</span> │ <span class="g">TOTAL........................................$0.09</span>
-<span class="g">TOTAL........................................$0.18</span> │ same tokens on claude-haiku-4-5..............$0.02
-same tokens on claude-haiku-4-5..............$0.04 │   (arithmetic, not a prediction)
-  (arithmetic, not a prediction)                   │
-                                                   │
-<span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -  │ - - - - - - - - - - - - - - - - - - - - - - - - -</span>
-
-Add email format validation to the signup form… <span class="g">cost 1.9×</span> Can you fix the flaky login test… ($0.18 vs $0.09)</pre>
-        </div>
-      </div>
-
-      <div class="card wide">
-        <h3>Watch it live. <span class="lede">the running cost, one line, always on.</span></h3>
-        <div class="term">
-          <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts statusline <span class="p">· wired into Claude Code's status line</span></span></div>
-<pre class="render one" tabindex="0" aria-label="Statusline output: Claude Code, $0.09, 73k tokens, with a flagged Bash loop times 5.">[Claude Code] <span class="g">$0.09</span> · 73k tok · <span class="r">⚠ Bash loop ×5</span></pre>
-        </div>
-      </div>
-
-      <div class="card wide">
-        <h3>Receipt every pull request. <span class="lede">what the change cost — subagents rolled up.</span></h3>
-        <div class="term">
-          <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts pr <span class="p">· posts one comment, always current</span></span></div>
-<pre class="render" tabindex="0" aria-label="A pull-request receipt: the parent session cost $0.02, two subagents (unit tests and diff review) cost $0.01 each, combined total $0.04."><span class="d">🧾 aireceipts — session parent-with-subagents</span>
-
-<span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -</span>
-<span class="h">                    AIRECEIPTS                    </span>
- “Build the feature; delegate the tests to a su…”
- Claude Code · Jun 27 2026 12:00:00 UTC · 3m 10s
-               claude-opus-4-8 100%
-
-Task...............................$0.01  (1 call)
-Bash...............................$0.01  (1 call)
-<span class="d">--------------------------------------------------</span>
-<span class="g">TOTAL........................................$0.02</span>
-
-SUBAGENTS · 2 sessions
-  Write unit tests for the feature. · claude-opus-4-8 — $0.01
-  Review the diff for the feature. · claude-opus-4-8 — $0.01
-
-<span class="g">TOTAL (session slice + subagents) — $0.04</span></pre>
-        </div>
-      </div>
-
-      <div class="card wide">
-        <h3>Or print it your way. <span class="lede">a grocery slip, data-viz bars, your own template.</span></h3>
-        <div class="term">
-          <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts --template grocery</span></div>
-<pre class="render" tabindex="0" aria-label="The same $0.18 session in the grocery template: a transaction number, an ITEM/QTY/AMT table, a CARDHOLDER line, and a THANK YOU FOR VIBING barcode footer."><span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -</span>
-<span class="h">                    AIRECEIPTS                    </span>
- “Add email format validation to the signup for…”
- Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s
-
-<span class="d">TXN #E336964E</span>
-ITEM                              QTY          AMT
-Bash                                3        $0.05
-Edit                                2        $0.05
-(thinking/reply)                    2        $0.03
-Write                               2        $0.03
-Read                                1        $0.02
-<span class="d">--------------------------------------------------</span>
-<span class="g">TOTAL                                        $0.18</span>
-
-<span class="h">CARDHOLDER: claude-opus-4-8</span>
-<span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -</span>
-<span class="d">      THANK YOU FOR VIBING WITH Claude Code       </span>
-<span class="d">           || |||| |||| ||| || ||| | ||           </span></pre>
-        </div>
-      </div>
-
+      </section>
     </div>
-  </section>
+  </div>
 
-  <section aria-label="Why you can believe every number">
-    <h2 class="eyebrow">Why you can believe every number</h2>
-    <ol class="terms">
-      <li><b>No fabricated dollars, ever.</b><span>A model without a cited, dated price row renders tokens-only — never a guess.</span></li>
-      <li><b>Every price cited with URL + date + excerpt.</b><span>CI checks the citations and that each one is still live.</span></li>
-      <li><b>Comparisons are arithmetic, not predictions.</b><span>“Same tokens on X” re-prices the identical token counts — it never claims another model would have done the job.</span></li>
-      <li><b>Deterministic: same transcript in, byte-identical receipt out.</b><span>Golden-tested on every commit, 10× under a frozen environment.</span></li>
-    </ol>
-    <p class="telemetry">Diagnostics-only telemetry, fully disclosed, one env var to kill — and your transcripts never leave your machine.</p>
-  </section>
-
-  <section aria-label="Why you'd want this">
-    <h2 class="eyebrow">The short version</h2>
-    <p class="story">Metered AI coding is the new cloud bill: invisible while you work, shocking at month-end. aireceipts turns the transcripts already on your disk into itemized receipts — so you catch the habits that burn money <span class="n">(a failing command re-run five times: $0.08 and 3m45s)</span> and fix them before the invoice does.</p>
-  </section>
-
-  </main>
-
-  <footer>
-    <div class="cardholder">
-      <span class="ch-l">Cardholder: <b>YOU</b>.</span>
-      <a class="starbig" href="https://github.com/anandgupta42/aireceipts">★ Star it on GitHub</a>
-    </div>
-    <div class="close">
-      <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>No refunds</span></p>
-        <p class="thanks">Thank you for your tokens.</p>
-        <p class="serial">AIRECEIPTS · NO. 0001</p>
+  <!-- ============ CLOSING BOOKEND ============ -->
+  <div class="closing">
+    <div class="closing-in">
+      <h2 class="display">Your agent works. <span class="soft">You get the receipt.</span></h2>
+      <div class="cta-hold">
+        <div class="copybox">
+          <code><span class="p" aria-hidden="true">$</span>npx aireceipts</code>
+          <button type="button" class="copy-btn" data-cmd="npx aireceipts" aria-label="Copy the command npx aireceipts to the clipboard">Copy</button>
+        </div>
       </div>
-      <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="A round vermillion seal reading RECEIPTED, SETTLED, and NO FABRICATED DOLLARS.">
-        <defs>
-          <path id="ring-top" d="M 30 100 A 70 70 0 0 1 170 100"/>
-          <path id="ring-bot" d="M 34 100 A 66 66 0 0 0 166 100"/>
-        </defs>
-        <circle cx="100" cy="100" r="95" fill="none" stroke="currentColor" stroke-width="2.5"/>
-        <circle cx="100" cy="100" r="83" fill="none" stroke="currentColor" stroke-width="1.5"/>
-        <g fill="currentColor" font-family="system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-weight="700">
-          <text font-size="14.5" letter-spacing="3.5" text-anchor="middle">
-            <textPath href="#ring-top" startOffset="50%">RECEIPTED</textPath>
-          </text>
-          <text font-size="14.5" letter-spacing="3.5" text-anchor="middle">
-            <textPath href="#ring-bot" startOffset="50%">SETTLED</textPath>
-          </text>
-        </g>
-        <line x1="66" y1="70" x2="134" y2="70" stroke="currentColor" stroke-width="1.5"/>
-        <line x1="66" y1="130" x2="134" y2="130" stroke="currentColor" stroke-width="1.5"/>
-        <g fill="currentColor" font-family="system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-weight="700" text-anchor="middle" letter-spacing="1.5">
-          <text x="100" y="91" font-size="15">NO</text>
-          <text x="100" y="106" font-size="13">FABRICATED</text>
-          <text x="100" y="121" font-size="15">DOLLARS</text>
-        </g>
-      </svg>
+      <p class="closing-note"><b>Apache-2.0</b> · your transcripts never leave your machine.</p>
+      <nav class="foot">
+        <a href="https://github.com/anandgupta42/aireceipts">GitHub</a><span class="sep" aria-hidden="true">·</span>
+        <a href="docs/index.html">docs</a><span class="sep" aria-hidden="true">·</span>
+        <a href="https://github.com/anandgupta42/aireceipts">buy me a samosa 🥟</a>
+      </nav>
     </div>
-    <svg class="barcode" viewBox="0 0 90 34" width="180" height="30" fill="currentColor" role="img" aria-label="Barcode encoding the word aireceipts.">
-      <rect x="0" y="0" width="3" height="34"/><rect x="4" y="0" width="2" height="34"/><rect x="8" y="0" width="3" height="34"/><rect x="12" y="0" width="2" height="34"/><rect x="16" y="0" width="4" height="34"/><rect x="21" y="0" width="3" height="34"/><rect x="26" y="0" width="3" height="34"/><rect x="31" y="0" width="2" height="34"/><rect x="35" y="0" width="3" height="34"/><rect x="39" y="0" width="4" height="34"/><rect x="45" y="0" width="3" height="34"/><rect x="50" y="0" width="2" height="34"/><rect x="54" y="0" width="3" height="34"/><rect x="58" y="0" width="2" height="34"/><rect x="62" y="0" width="4" height="34"/><rect x="67" y="0" width="1" height="34"/><rect x="70" y="0" width="4" height="34"/><rect x="76" y="0" width="1" height="34"/><rect x="79" y="0" width="4" height="34"/><rect x="84" y="0" width="4" height="34"/>
-    </svg>
-    <p class="flinks">
-      <a href="https://github.com/anandgupta42/aireceipts">GitHub</a><span class="sep" aria-hidden="true">·</span><a href="docs/index.html">docs</a><span class="sep" aria-hidden="true">·</span><a href="https://github.com/anandgupta42/aireceipts/blob/main/LICENSE">Apache-2.0</a>
-    </p>
-    <p class="samosa">buy me a samosa 🥟</p>
-  </footer>
+  </div>
 
-</div>
 <script>
   (function () {
-    var b = document.getElementById("copy");
-    if (!b) return;
-    if (!navigator.clipboard || !navigator.clipboard.writeText) { b.hidden = true; return; }
-    b.addEventListener("click", function () {
-      navigator.clipboard.writeText(b.getAttribute("data-cmd")).then(function () {
-        var prev = b.textContent;
-        b.textContent = "Copied";
-        setTimeout(function () { b.textContent = prev; }, 1200);
-      }).catch(function () {});
+    var btns = document.querySelectorAll(".copy-btn");
+    if (!navigator.clipboard || !navigator.clipboard.writeText) {
+      for (var i = 0; i < btns.length; i++) btns[i].hidden = true;
+      return;
+    }
+    btns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        navigator.clipboard.writeText(b.getAttribute("data-cmd")).then(function () {
+          var prev = b.textContent;
+          b.textContent = "Copied";
+          setTimeout(function () { b.textContent = prev; }, 1200);
+        }).catch(function () {});
+      });
     });
   })();
 </script>
