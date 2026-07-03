@@ -15,7 +15,7 @@ Usage:
   aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
   aireceipts week [--by-project] [--since <date>] [--json]
                                         trailing-7-day digest across sessions
-  aireceipts pr [--post] [--session <id>] [--artifact]
+  aireceipts pr [--post] [--session <id>] [--artifact] [--no-details]
                                         attach the building session's receipt to
                                          the current PR (dry-run prints the body;
                                          --post upserts it via gh; --artifact also

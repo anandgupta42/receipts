@@ -5,7 +5,12 @@ import { runPr } from "../../pr/index.js";
 import type { CommandContext, CommandDef } from "../types.js";
 
 function run(ctx: CommandContext): Promise<number> {
-  return runPr({ post: ctx.options.post, session: ctx.options.prSession, artifact: ctx.options.artifact });
+  return runPr({
+    post: ctx.options.post,
+    session: ctx.options.prSession,
+    artifact: ctx.options.artifact,
+    details: !ctx.options.noDetails,
+  });
 }
 
 export const command: CommandDef = {
@@ -16,7 +21,7 @@ export const command: CommandDef = {
   help: {
     order: 100,
     lines: [
-      "  aireceipts pr [--post] [--session <id>] [--artifact]",
+      "  aireceipts pr [--post] [--session <id>] [--artifact] [--no-details]",
       "                                        attach the building session's receipt to",
       "                                         the current PR (dry-run prints the body;",
       "                                         --post upserts it via gh; --artifact also",

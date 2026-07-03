@@ -37,6 +37,8 @@ export interface CliOptions {
   readonly prSession?: string;
   /** SPEC-0027: `aireceipts pr --post --artifact` publishes the HTML receipt artifact. */
   readonly artifact: boolean;
+  /** SPEC-0026 R5: `aireceipts pr --no-details` omits the collapsed full-receipts section. */
+  readonly noDetails: boolean;
   // Command-selecting boolean flags (consumed by the registry, not the commands):
   readonly help: boolean;
   readonly methodology: boolean;
@@ -72,6 +74,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let post = false;
   let prSession: string | undefined;
   let artifact = false;
+  let noDetails = false;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -116,6 +119,8 @@ export function parseOptions(argv: string[]): CliOptions {
       post = true;
     } else if (arg === "--artifact") {
       artifact = true;
+    } else if (arg === "--no-details") {
+      noDetails = true;
     } else if (arg === "--session") {
       prSession = argv[++i];
     } else if (arg.startsWith("--session=")) {
@@ -151,6 +156,7 @@ export function parseOptions(argv: string[]): CliOptions {
     post,
     prSession,
     artifact,
+    noDetails,
     help,
     methodology,
     telemetryShow,
