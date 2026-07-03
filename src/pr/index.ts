@@ -21,7 +21,7 @@ import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js
 import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
 import { resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
-import { ARTIFACT_BRANCH, publishArtifact } from "./publish.js";
+import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
 import type { ReceiptModel } from "../receipt/model.js";
 
 export interface PrOptions {
@@ -185,7 +185,7 @@ function publishAndLink(
     deps.err(outcome.error);
     return null;
   }
-  return { fileName, url: `https://github.com/${pr.ownerRepo}/blob/${ARTIFACT_BRANCH}/${fileName}` };
+  return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName) };
 }
 
 /** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns the process exit code. */

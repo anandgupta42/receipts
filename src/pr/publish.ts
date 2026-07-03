@@ -10,6 +10,20 @@ import type { CommandRunner } from "./git.js";
 export const ARTIFACT_BRANCH = "aireceipts/artifacts";
 const ARTIFACT_REF = `refs/heads/${ARTIFACT_BRANCH}`;
 
+/**
+ * The product-hosted viewer that renders a raw artifact URL (kill criterion
+ * (b) fired on PR #63 — a blob link opens as source; the maintainer-proposed
+ * remedy is this static viewer on the aireceipts site). Works for ANY repo's
+ * artifacts with zero setup on their side.
+ */
+export const VIEWER_URL = "https://anandgupta42.github.io/aireceipts/view.html";
+
+/** The viewer link for one artifact: the raw URL (canonical refs/heads form — the branch name contains a slash) passed as ?src=. */
+export function artifactViewUrl(ownerRepo: string, fileName: string): string {
+  const raw = `https://raw.githubusercontent.com/${ownerRepo}/${ARTIFACT_REF}/${fileName}`;
+  return `${VIEWER_URL}?src=${encodeURIComponent(raw)}`;
+}
+
 export type PublishOutcome = { ok: true } | { ok: false; error: string };
 
 export interface PublishRequest {

@@ -216,6 +216,24 @@ the simpler implementation. (4) LOW: R4's dispatch test only exercised
 test added. R3 honesty and sibling preservation confirmed clean by the
 reviewer.
 
+**2026-07-03 · kill criterion (b) FIRED → maintainer-directed remedy.** On PR
+#63's live dogfood the maintainer rejected the link landing ("opens a github
+link with raw code, which is not readable") and proposed the remedy himself:
+a static viewer page on the product's own Pages site that takes the raw
+artifact URL as a parameter and renders it. Shipped as `site/view.html`
+(host-allowlisted to GitHub raw/blob URLs, fully sandboxed iframe, provenance
+banner) with the comment link now pointing at
+`view.html?src=<raw refs/heads URL>` — works for any adopter's repo with
+zero setup. Verified: raw serves slashed branch refs on public repos (both
+plain and `refs/heads/` forms, tested against microsoft/vscode `BV/1.114`);
+this repo is currently PRIVATE, so raw 404s anonymously until the OSS flip —
+the viewer's error path (direct GitHub fallback link) covers the interim,
+and the diagnosis that "blob renders as source" also traced partly to
+private-repo semantics. Two related fixes in the same round: a missing blank
+line after `</details>` let GFM swallow the link line as raw HTML (regression
+test added), and the tombstone path was NOT taken — recorded here instead of
+tombstoning because the maintainer chose repair over demotion (button 1).
+
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 27 spec(s) OK,
 exit 0.
 

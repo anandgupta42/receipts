@@ -43,11 +43,16 @@ and appends one `full receipt:` link to the comment. The link only appears
 after the push is confirmed; if you lack push rights the comment still posts,
 just without the link.
 
-Honest note on rendering: GitHub shows a branch-hosted HTML file as *source*.
-It renders as a real page only if the repo points GitHub Pages at the
-`aireceipts/artifacts` branch (repos that deploy Pages from a workflow, like
-this one, can't do both). The file is a durable, self-contained artifact
-either way. Publishing writes nothing to your working tree, index, or current
+The comment link opens the artifact through the **aireceipts viewer**
+(`view.html` on the project site): a static page that fetches the raw file
+from GitHub in the reader's browser and renders it in a fully sandboxed
+frame — no server, no third party, works for any repo's artifacts with zero
+setup. Two honest limits: the viewer only accepts `raw.githubusercontent.com`
+/ `github.com` blob URLs (anything else is refused — your receipt page must
+never become a generic HTML renderer), and **private repos can't render**:
+anonymous raw fetches 404 there, so the viewer shows its error with a direct
+GitHub link (readable as source by anyone with access) until the repo is
+public. Publishing writes nothing to your working tree, index, or current
 branch, and each PR's file is overwritten in place — other PRs' artifacts are
 never touched.
 
