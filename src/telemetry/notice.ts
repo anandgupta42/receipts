@@ -22,9 +22,16 @@ interface NoticeState {
   shown: boolean;
 }
 
-/** Resolved at call time (not module load) so a test's `homeOverride` or a changed `HOME` is always honored. */
+/**
+ * Resolved at call time (not module load). `AIRECEIPTS_HOME` redirects the
+ * config dir exactly like the budget and summary-cache paths do
+ * (src/budget/config.ts:16, src/parse/summaryCache.ts:23) — the notice was
+ * the one `.aireceipts` file that ignored it, which also broke test
+ * isolation under worker threads, where `os.homedir()` cannot see a
+ * worker-local `HOME` mutation but a call-time `process.env` read can.
+ */
 function noticeStatePath(homeOverride?: string): string {
-  return join(homeOverride ?? homedir(), ".aireceipts", "telemetry.json");
+  return join(homeOverride ?? process.env.AIRECEIPTS_HOME ?? homedir(), ".aireceipts", "telemetry.json");
 }
 
 async function readNoticeState(path: string): Promise<NoticeState> {

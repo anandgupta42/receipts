@@ -250,3 +250,16 @@ contract matches parser reality and the claude invariants are provable from
 the normalized surface; (6) harness exit codes match the header contract,
 including the wrapper mapping compile failures to 1. Live smoke: 5 real
 codex sessions reconciled with zero drift.
+
+**2026-07-03 · CI mutation-job failure → root cause fixed.** PR #65's first
+`mutation` run failed in Stryker's DRY RUN: the telemetry first-run notice
+leaked onto stderr in CLI tests (opposite symptom locally — notice missing
+where expected). Root cause: `noticeStatePath` resolved home via
+`os.homedir()` only — under Stryker's worker-thread pool a test's
+worker-local `HOME`/`AIRECEIPTS_HOME` mutation is invisible to `homedir()`
+(plain vitest forks write env through, hence green outside Stryker). It was
+also a real product inconsistency: the notice was the one `.aireceipts`
+file ignoring `AIRECEIPTS_HOME`, unlike budget and summary-cache. Fix: the
+path now honors `homeOverride ?? AIRECEIPTS_HOME ?? homedir()` at call
+time (src/telemetry/notice.ts). Not an assertion change — the failing
+tests were right.
