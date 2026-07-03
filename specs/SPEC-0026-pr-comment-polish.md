@@ -66,7 +66,7 @@ that made a git write, that is an honesty bug — R3 reverts to
   helper rule (own anchor absent, `writeCount === 0` — computed and currently discarded
   by `selectContributors`, `src/pr/contributors.ts:95`, so retaining it is
   part of this change) renders
-  its provenance line as `entire session (no git writes)` instead of
+  its provenance line as `entire session (no commits to slice by)` instead of
   `entire session (slice unavailable)`. The attribution basis travels on
   `RawContributor` → `ContributorView`; every other full-session fallback
   (anchored session whose slice can't be cut) keeps `FULL_FALLBACK_LABEL`
@@ -105,7 +105,7 @@ that made a git write, that is an honesty bug — R3 reverts to
   totals render, **then** one muted `cache served N% of input tokens` line
   appears under `counted:`; **given** zero `cacheRead`, no line.
 - **Given** a Codex helper with no git writes, **then** its provenance reads
-  `entire session (no git writes)`; **given** an anchored session whose slice
+  `entire session (no commits to slice by)`; **given** an anchored session whose slice
   falls back, **then** it still reads `entire session (slice unavailable)`.
 - **Given** `--no-details`, **then** the comment is the fenced receipt only
   (plus marker), byte-identical to today's body apart from R1–R4.
@@ -139,7 +139,7 @@ design, in render order inside the fenced block:
 <role> · <mix>........................$X       ← N≥2 rows unchanged
 <mix>.................................$X       ← N=1 row, no role prefix (R1)
   session: <id>                                ← unchanged muted provenance
-  entire session (no git writes)               ← R3, helper-credited only
+  entire session (no commits to slice by)      ← R3, helper-credited only
   entire session (slice unavailable)           ← unchanged for anchored fallbacks
 --------------------------------------------------
 TOTAL priced..........................$X       ← unchanged
@@ -161,8 +161,9 @@ renders as one line: full receipt omitted (comment size limit)>
 </details>
 ```
 
-Copy rules: `no git writes` (not "helper" — name the observable fact, not our
-jargon); the hint says `npx aireceipts` (the README's canonical invocation);
+Copy rules: `no commits to slice by` (maintainer pushed back on "(no git
+writes)" as attribution-internal jargon, 2026-07-03 — the label must name the
+user-visible fact and the reason there is no turn range); the hint says `npx aireceipts` (the README's canonical invocation);
 the summary line always carries the count so the collapsed state is
 informative.
 
@@ -177,7 +178,7 @@ informative.
 | R2 parity | same TokenUsage sum | PR-body percentage equals the receipt masthead's for identical usage |
 | R2 subagents counted | cacheRead only on a subagent atom | cache line present, reflects the subagent's tokens |
 | R2 >99 boundary | summed ratio 0.995..0.999 | renders `>99`, never `100` |
-| R3 helper label | helper-credited codex (writeCount 0) | `entire session (no git writes)` |
+| R3 helper label | helper-credited codex (writeCount 0) | `entire session (no commits to slice by)` |
 | R3 anchored fallback | anchored session, slice falls back | `entire session (slice unavailable)` unchanged |
 | R4 hint | any body | muted `details: npx aireceipts --session <id>` line present |
 | R4 terminal untouched | terminal receipt render | no hint line; goldens byte-identical |
