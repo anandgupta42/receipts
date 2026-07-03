@@ -24,11 +24,11 @@ footer{font-size:11px;color:var(--muted);text-align:center;margin-top:36px}</sty
                     AIRECEIPTS                    
             6 sessions behind this PR             
 
-orchestrator · claude-fable-5 100%..........$89.06
+orchestrator · claude-fable-5 100%.........$168.23
   session: df374859-7920-40f3-88e0-a613ae74b101
-  session slice: turns 433–587 of 691
+  session slice: turns 433–708 of 710
   SUBAGENTS (1)
-  &lt;fork-boilerplate&gt; You are a worker f…...$122.64
+  &lt;fork-boilerplate&gt; You are a worker f…...$145.36
 codex · gpt-5.5 100%.........................$1.74
   session: rollout-2026-07-02T22-34-30-019f2678-a…
   entire session (no commits to slice by)
@@ -45,7 +45,7 @@ codex · gpt-5.5 100%.........................$1.70
   session: rollout-2026-07-03T13-37-49-019f29b3-a…
   entire session (no commits to slice by)
 --------------------------------------------------
-TOTAL priced...............................$218.25
+TOTAL priced...............................$320.14
   counted: 6 sessions + 1 subagent
   cache served 98% of input tokens
   details: npx aireceipts --session &lt;id&gt;
@@ -55,21 +55,22 @@ TOTAL priced...............................$218.25
 <section><h2>orchestrator · df374859-7920-40f3-88e0-a613ae74b101</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
           “Fix aireceipts GitHub issues”          
- Claude Code · Jul 03 2026 19:44:42 UTC · 41m 02s 
+   Claude Code · Jul 03 2026 19:44 UTC · 1h 33m   
                claude-fable-5 100%                
         cache served &gt;99% of input tokens         
 
-(thinking/reply)................$40.86  (69 turns)
-Bash............................$32.18  (59 calls)
-Write............................$7.38  (12 calls)
-Edit..............................$4.69  (8 calls)
-Read..............................$2.07  (4 calls)
+(thinking/reply)...............$77.64  (124 turns)
+Bash...........................$64.96  (110 calls)
+Write............................$8.03  (13 calls)
+Edit.............................$8.01  (13 calls)
+Read..............................$3.30  (6 calls)
+TaskUpdate........................$2.48  (4 calls)
+SendMessage.......................$1.98  (3 calls)
+TaskCreate........................$1.17  (2 calls)
 Agent..............................$0.66  (1 call)
-TaskUpdate.........................$0.61  (1 call)
-TaskCreate.........................$0.60  (1 call)
 --------------------------------------------------
-TOTAL.......................................$89.06
-same tokens on claude-haiku-4-5..............$8.91
+TOTAL......................................$168.23
+same tokens on claude-haiku-4-5.............$16.82
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
