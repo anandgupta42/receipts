@@ -168,6 +168,8 @@ describe("detectStuckLoops", () => {
     expect(finding.usd).toBeNull();
     // Tokens accumulate regardless of pricing: 1e6 (priced turn, split 2 ways) x2 + 1e6 (unpriced turn) = 3e6.
     expect(finding.tokens.input).toBe(3_000_000);
+    // SPEC-0017 R6 — the run spans both turns; turnIndices are distinct and sorted.
+    expect(finding.turnIndices).toEqual([0, 1]);
   });
 
   it("detects loop structure with usd always null for an unpriceable/cursor session", async () => {
@@ -337,6 +339,8 @@ describe("detectTrivialSpans guard chain", () => {
     expect(result).not.toBeNull();
     expect(result?.eligibleTurnCount).toBe(2);
     expect(result?.cheaperModel).toBe("claude-haiku-4-5");
+    // SPEC-0017 R6 — only the two eligible tool-free turns' indices, in order.
+    expect(result?.turnIndices).toEqual([0, 5]);
     // input: 200+300=500, output: 100+120=220, cacheRead/cacheCreation: 0.
     expect(result?.tokens).toMatchObject({ input: 500, output: 220, cacheRead: 0, cacheCreation: 0, total: 720 });
     // costOf at haiku's row (input 1.0, output 5.0): rate(1,500)=0.0005 + rate(5,220)=0.0011 = 0.0016.

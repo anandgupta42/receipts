@@ -1,0 +1,9 @@
+{"type":"user","timestamp":"2026-06-15T14:00:30.000Z","message":{"role":"user","content":"Two compactions close together but the context never refills."}}
+{"type":"assistant","timestamp":"2026-06-15T14:01:00.000Z","message":{"role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"working"}],"usage":{"input_tokens":200000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":500}}}
+{"type":"assistant","timestamp":"2026-06-15T14:01:30.000Z","message":{"role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"working"}],"usage":{"input_tokens":180000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":500}}}
+{"type":"system","isCompactSummary":true,"timestamp":"2026-06-15T14:02:00.000Z"}
+{"type":"assistant","timestamp":"2026-06-15T14:02:30.000Z","message":{"role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"working"}],"usage":{"input_tokens":50000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":500}}}
+{"type":"assistant","timestamp":"2026-06-15T14:03:00.000Z","message":{"role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"working"}],"usage":{"input_tokens":40000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":500}}}
+{"type":"system","isCompactSummary":true,"timestamp":"2026-06-15T14:03:30.000Z"}
+{"type":"assistant","timestamp":"2026-06-15T14:04:00.000Z","message":{"role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"working"}],"usage":{"input_tokens":45000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":500}}}
+{"type":"assistant","timestamp":"2026-06-15T14:04:30.000Z","message":{"role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"working"}],"usage":{"input_tokens":30000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"output_tokens":500}}}

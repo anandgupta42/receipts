@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Claude Code · claude-unknown-model-zzz · 5m 30s
+total  1,354,000 tok
+top    (thinking/reply) · 1,354,000 tok (8 turns)
+⚠ context thrash ×3 compactions · 700,000 tok
+run  aireceipts  for the full receipt

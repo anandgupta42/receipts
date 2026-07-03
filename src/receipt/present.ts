@@ -11,6 +11,7 @@
 // dollar/token figure comes from the already-priced {@link ReceiptModel}.
 import { METHODOLOGY_BRIEF } from "../pricing/attribution.js";
 import {
+  CONTEXT_THRASH_NOTE,
   PRICE_DELTA_NOTE,
   TRIVIAL_SPANS_LABEL,
   barcodePattern,
@@ -151,6 +152,19 @@ function classicWasteBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" 
     const valuePart = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
     const clockPart = waste.wallClockMs !== null ? ` (${formatDuration(waste.wallClockMs)})` : "";
     return { kind: "wasteRow", label: `${waste.tool} loop ×${waste.runLength}`, value: valuePart + clockPart, badge: true };
+  }
+  if (waste.kind === "context-thrash") {
+    // R7: `≈ context thrash: N compactions in M turns` + a methodology sub-line.
+    // Value is $ when priced, tokens otherwise (I2 — a tokens-only line when any
+    // contributing turn is unpriced or the session never priced).
+    const value = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
+    return {
+      kind: "wasteRow",
+      label: `≈ context thrash: ${waste.compactionCount} compactions in ${waste.turnSpan} turns`,
+      value,
+      detail: CONTEXT_THRASH_NOTE,
+      badge: false,
+    };
   }
   return {
     kind: "wasteRow",

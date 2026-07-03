@@ -51,6 +51,16 @@ function wasteLineJson(waste: WasteLine) {
       wallClockMs: waste.wallClockMs,
     };
   }
+  if (waste.kind === "context-thrash") {
+    return {
+      kind: waste.kind,
+      compactionCount: waste.compactionCount,
+      turnSpan: waste.turnSpan,
+      turnIndices: waste.turnIndices,
+      tokens: tokenUsageJson(waste.tokens),
+      usd: waste.usd,
+    };
+  }
   return {
     kind: waste.kind,
     eligibleTurnCount: waste.eligibleTurnCount,

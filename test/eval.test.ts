@@ -19,12 +19,13 @@ const contracts = await import("../src/index.js").catch(() => null);
 const hasDetectors =
   typeof contracts?.loadById === "function" &&
   typeof contracts?.detectStuckLoops === "function" &&
-  typeof contracts?.detectTrivialSpans === "function";
+  typeof contracts?.detectTrivialSpans === "function" &&
+  typeof contracts?.detectContextThrash === "function";
 
 if (!hasDetectors) {
   console.warn(
     "[BLOCKED] eval-corpus tests skipped: src/index.ts has not exported " +
-      "loadById/detectStuckLoops/detectTrivialSpans yet.",
+      "loadById/detectStuckLoops/detectTrivialSpans/detectContextThrash yet.",
   );
 }
 
@@ -48,6 +49,17 @@ describe.skipIf(!hasDetectors)("eval corpus (FP battery)", () => {
     expect(cleanCount).toBeGreaterThanOrEqual(2);
   });
 
+  it("locks SPEC-0017's committed precision corpus: a thrash positive plus three labeled-clean thrash negatives", () => {
+    const byPath = new Map(corpus.entries.map((e) => [e.path, e.expected]));
+    // The true positive must be labeled context-thrash (recall).
+    expect(byPath.get("test/fixtures/claude-code/context-thrash-3x.jsonl")).toEqual(["context-thrash"]);
+    // The three tricky true-negatives must be labeled clean (precision): two tight
+    // compactions without refill, far-apart compactions, and an after-final compaction.
+    for (const neg of ["context-thrash-no-refill", "context-thrash-far-apart", "context-thrash-after-final"]) {
+      expect(byPath.get(`test/fixtures/claude-code/${neg}.jsonl`)).toEqual([]);
+    }
+  });
+
   for (const entry of corpus.entries) {
     it(`${entry.path} fires exactly ${JSON.stringify(entry.expected)} (precision + recall)`, async () => {
       const filePath = path.join(repoRoot, entry.path);
@@ -62,6 +74,14 @@ describe.skipIf(!hasDetectors)("eval corpus (FP battery)", () => {
       const trivial = await contracts!.detectTrivialSpans(session);
       if (trivial) {
         actual.add("trivial-spans");
+      }
+      // SPEC-0017 R8 — context-thrash extends the precision battery automatically:
+      // its true-negative fixtures (two tight compactions without refill, far-apart
+      // compactions, an after-final compaction) must stay silent alongside the
+      // existing clean corpus.
+      const thrash = await contracts!.detectContextThrash(session);
+      if (thrash.length > 0) {
+        actual.add("context-thrash");
       }
 
       const expected = new Set(entry.expected);

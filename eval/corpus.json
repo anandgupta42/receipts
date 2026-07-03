@@ -37,6 +37,31 @@
       "expected": []
     },
     {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/context-thrash-3x.jsonl",
+      "expected": ["context-thrash"]
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/context-thrash-unpriced.jsonl",
+      "expected": ["context-thrash"]
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/context-thrash-no-refill.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/context-thrash-far-apart.jsonl",
+      "expected": []
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/context-thrash-after-final.jsonl",
+      "expected": []
+    },
+    {
       "source": "gemini",
       "path": "test/fixtures/gemini/clean-session.jsonl",
       "expected": []

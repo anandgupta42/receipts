@@ -26,8 +26,8 @@ export { defaultDataDir, loadPriceTable } from "./pricing/priceTable.js";
 export { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForModel, vendorForSource, vendorForTurn } from "./pricing/resolve.js";
 export type { AttributionResult, ToolAttribution } from "./pricing/attribution.js";
 export { attributeByTool, METHODOLOGY } from "./pricing/attribution.js";
-export type { PriceDeltaFootnote, StuckLoopFinding, TrivialSpansFinding } from "./pricing/waste.js";
-export { detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "./pricing/waste.js";
+export type { ContextThrashFinding, PriceDeltaFootnote, StuckLoopFinding, TrivialSpansFinding } from "./pricing/waste.js";
+export { detectContextThrash, detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "./pricing/waste.js";
 
 // SPEC-0008 weekly digest + the shared waste-aggregation primitive (also consumed by SPEC-0013).
 export type { WasteClassAggregate } from "./aggregate/waste.js";

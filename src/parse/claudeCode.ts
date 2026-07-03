@@ -1,4 +1,4 @@
-import type { AgentSource, ListSessionsOptions, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
+import type { AgentSource, Compaction, ListSessionsOptions, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
 import { isChildPath, parseChildPath } from "./children.js";
 import { lazyClaudeCodeSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import {
@@ -52,6 +52,8 @@ interface RawRecord {
   sessionId?: string;
   aiTitle?: string;
   isMeta?: boolean;
+  /** SPEC-0017 R1 — newer Claude Code sessions flag a compact-summary record directly. */
+  isCompactSummary?: boolean;
   message?: RawMessage;
   /** SPEC-0019 R1a — attribution-only working directory / branch, present on
    * every user/assistant record; captured first-seen. */
@@ -64,6 +66,55 @@ interface RawRecord {
 // command-echo wrapper tags injected into the transcript by the CLI itself — not
 // real user/assistant content.
 const COMMAND_ECHO_RE = /^\s*<(command-name|command-message|command-args|local-command-stdout|local-command-caveat)>/;
+
+// SPEC-0017 R1 — the finite, named set of raw compaction shapes. Boundary/summary
+// record `type`s (shape 2):
+const COMPACT_BOUNDARY_TYPES = new Set(["compact-summary", "compact_boundary", "compact-boundary"]);
+// The compact-summary wording carried by the `isMeta: true` user record (shape 3);
+// anchored on "context compacted" so ordinary user text mentioning "compact" never
+// matches (it isn't a meta record and doesn't carry this exact phrasing).
+const COMPACT_SUMMARY_TEXT_RE = /\bcontext (?:was |has been )?compacted\b/i;
+// The `/compact` command echo (shape 4): corroborating only — see `collectCompactions`.
+const COMPACT_COMMAND_ECHO_RE = /<command-name>\s*compact\s*<\/command-name>/i;
+
+/** Flatten a raw message `content` (string or content-block array) to its text, for compaction-shape matching only. */
+function rawContentText(content: unknown): string {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((block) => (block && typeof block === "object" && typeof (block as { text?: unknown }).text === "string" ? (block as { text: string }).text : ""))
+      .join("");
+  }
+  return "";
+}
+
+/**
+ * SPEC-0017 R1 — classify a raw record as a compaction signal. `"summary"` is a
+ * definitive compaction (shapes 1–3: `isCompactSummary`, a boundary `type`, or
+ * the `isMeta` compact-summary text). `"echo"` is a bare `/compact` command echo
+ * (shape 4): recognized here but never counted on its own, because a real
+ * compaction always emits a summary/boundary record at the same position — so the
+ * summary already records the event and a lone echo (no adjacent summary) is
+ * correctly ignored (R1's "only when adjacent" reduces to counting summaries).
+ */
+function compactSignal(r: RawRecord): "summary" | "echo" | null {
+  if (r.isCompactSummary === true) {
+    return "summary";
+  }
+  if (typeof r.type === "string" && COMPACT_BOUNDARY_TYPES.has(r.type)) {
+    return "summary";
+  }
+  const text = rawContentText(r.message?.content);
+  if (r.isMeta === true && r.type === "user" && COMPACT_SUMMARY_TEXT_RE.test(text)) {
+    return "summary";
+  }
+  if (COMPACT_COMMAND_ECHO_RE.test(text)) {
+    return "echo";
+  }
+  return null;
+}
 
 function stringifyToolResult(content: unknown): string {
   if (content == null) {
@@ -134,9 +185,21 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let toolCallCount = 0;
   const turns: Turn[] = [];
   const toolCallById = new Map<string, ToolCall>();
+  // SPEC-0017 R1/R2 — one entry per distinct next-assistant-turn index that a
+  // compact summary/boundary record precedes. Keyed by `turnIndex` so an echo +
+  // summary (or two summary shapes) at the same position collapse to one event.
+  const compactionByTurn = new Map<number, number | undefined>();
 
   await readJsonl(filePath, (raw) => {
     const r = raw as RawRecord;
+
+    // SPEC-0017 R1 — extract compactions BEFORE the isMeta/command-echo filters
+    // below drop these records. `turns.length` is the index the next assistant
+    // turn will receive (R2); an echo alone never records (its position has no
+    // summary), and after-final compactions land at `turnIndex = turns.length`.
+    if (compactSignal(r) === "summary" && !compactionByTurn.has(turns.length)) {
+      compactionByTurn.set(turns.length, parseTimestamp(r.timestamp));
+    }
 
     // R1a: first-seen cwd/gitBranch (attribution-only). Absent in raw → absent in model.
     if (cwd === undefined && typeof r.cwd === "string" && r.cwd) {
@@ -265,7 +328,12 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     parentFilePath: childRef?.parentFilePath,
   };
 
-  return withTurns ? { summary, turns } : { summary, turns: [] as Turn[] };
+  // SPEC-0017 R2 — one deduped compaction per next-assistant-turn index, ordered.
+  const compactions: Compaction[] = [...compactionByTurn.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([turnIndex, atMs]) => (atMs === undefined ? { turnIndex } : { turnIndex, atMs }));
+
+  return withTurns ? { summary, turns, compactions } : { summary, turns: [] as Turn[], compactions: [] as Compaction[] };
 }
 
 const ROOT = "~/.claude/projects";
@@ -325,8 +393,8 @@ export class ClaudeCodeAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns } = await parseTranscript(id, true);
-      return { ...summary, turns };
+      const { summary, turns, compactions } = await parseTranscript(id, true);
+      return { ...summary, turns, compactions };
     } catch {
       return null;
     }

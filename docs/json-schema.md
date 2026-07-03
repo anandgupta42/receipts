@@ -89,13 +89,18 @@ JSON export.
 
 | Field | Type | Notes |
 |---|---|---|
-| `kind` | enum | `stuck-loop` or `trivial-spans`. |
+| `kind` | enum | `stuck-loop`, `trivial-spans`, or `context-thrash`. |
 | `runLength` | number | (stuck-loop) Consecutive identical calls. |
 | `wallClockMs` | number \| null | (stuck-loop) Wall-clock spent in the loop, or null. |
 | `eligibleTurnCount` | number | (trivial-spans) Turns that could have used a cheaper model. |
 | `cheaperModel` | string | (trivial-spans) The cheaper model the arithmetic used. |
+| `compactionCount` | number | (context-thrash) Refill-positive compactions clustered in the window. |
+| `turnSpan` | number | (context-thrash) Assistant-turn span from the window's first to last compaction. |
+| `turnIndices` | array | (context-thrash) The contributing post-compaction turn indices (the cost basis). |
 
-Each variant also carries a `tool`/`usd`/`tokens` field as documented above.
+Each variant also carries a `tool`/`usd`/`tokens` field as documented above. The
+`context-thrash` variant omits `tool`, carries a nullable `usd` (tokens-only when
+any contributing turn is unpriced, I2), and reports prompt-only `tokens`.
 
 ### PriceDelta
 

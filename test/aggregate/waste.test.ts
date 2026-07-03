@@ -113,3 +113,49 @@ describe("aggregateWaste (R5)", () => {
     expect(await aggregateWaste([clean], dataDir)).toEqual([]);
   });
 });
+
+describe("aggregateWaste — SPEC-0017 R6 (context-thrash + non-additive overlap)", () => {
+  function thrashTurn(index: number, pS: number, calls: ToolCall[] = []): Turn {
+    return { index, timestamp: TS, model: "claude-haiku-4-5", usage: usage(pS), toolCalls: calls };
+  }
+
+  it("emits a context-thrash class row that is additive when it shares no turn with another class", async () => {
+    const turns = [
+      thrashTurn(0, 100_000),
+      thrashTurn(1, 200_000),
+      thrashTurn(2, 180_000),
+      thrashTurn(3, 170_000),
+      thrashTurn(4, 175_000),
+      thrashTurn(5, 165_000),
+      thrashTurn(6, 190_000),
+    ];
+    const s = session("thrash-only", turns, { compactions: [{ turnIndex: 2 }, { turnIndex: 4 }] });
+    const agg = await aggregateWaste([s], dataDir);
+    const ct = agg.find((a) => a.class === "context-thrash");
+    expect(ct).toBeDefined();
+    expect(ct?.distinctSessionCount).toBe(1);
+    expect(ct?.nonAdditive).toBeUndefined();
+    expect(ct?.overlapsWith).toBeUndefined();
+  });
+
+  it("marks both classes non-additive when a context-thrash turn is also a stuck-loop turn", async () => {
+    const loop: ToolCall[] = [call("bash", { cmd: "x" }), call("bash", { cmd: "x" }), call("bash", { cmd: "x" })];
+    const turns = [
+      thrashTurn(0, 200_000),
+      thrashTurn(1, 180_000),
+      thrashTurn(2, 185_000),
+      thrashTurn(3, 170_000),
+      thrashTurn(4, 175_000, loop), // contributing thrash turn AND a stuck-loop run
+      thrashTurn(5, 165_000),
+      thrashTurn(6, 190_000),
+    ];
+    const s = session("overlap", turns, { compactions: [{ turnIndex: 2 }, { turnIndex: 4 }] });
+    const agg = await aggregateWaste([s], dataDir);
+    const ct = agg.find((a) => a.class === "context-thrash");
+    const sl = agg.find((a) => a.class === "stuck-loop");
+    expect(ct?.nonAdditive).toBe(true);
+    expect(ct?.overlapsWith).toEqual(["stuck-loop"]);
+    expect(sl?.nonAdditive).toBe(true);
+    expect(sl?.overlapsWith).toEqual(["context-thrash"]);
+  });
+});
