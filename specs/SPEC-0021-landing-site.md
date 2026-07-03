@@ -1,7 +1,7 @@
 ---
 id: SPEC-0021
 title: "Launch site — the landing page IS a receipt (GitHub Pages)"
-status: draft
+status: shipped
 milestone: M4
 depends: [SPEC-0003, SPEC-0012]
 ---
@@ -117,4 +117,11 @@ PNG is dark; the paper page is the light); pricing/SaaS pages.
 
 ## Validation
 
-*(pending /validate-spec)*
+**2026-07-03 · spec-ledger cleanup (maintainer-directed, 2026-07-03):** status set to `shipped`, recording decisions the
+maintainer already made by merging: the landing site shipped and iterated to
+v4 across merged PRs (latest #54, `feat: landing v4 — word economy, receipt
+as object`; the v4 polish commit is explicitly "maintainer-approved
+direction"). The button-1 approval was exercised through those merges; this
+entry records it rather than granting it. Historical note: the draft never
+went through /validate-spec before building — recorded here honestly, not
+backfilled.

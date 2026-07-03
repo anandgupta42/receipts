@@ -1,7 +1,7 @@
 ---
 id: SPEC-0022
 title: "Make transcript discovery lazy and cache full summaries"
-status: building
+status: shipped
 milestone: M1
 depends: [SPEC-0001, SPEC-0008, SPEC-0009, SPEC-0019]
 ---
@@ -69,3 +69,9 @@ cache for Cursor's SQLite rows because multiple sessions share one database path
       `node scripts/verify-goldens.mjs`; determinism, spec-lint, and hygiene all pass
       unmasked with `echo $?`.
 - [ ] Commit message: `perf: lazy session discovery + incremental summary cache (fixes #13)`.
+
+## Validation
+
+**2026-07-03 · spec-ledger cleanup (maintainer-directed, 2026-07-03):** status set to `shipped` — implementation merged in
+PR #29 (`perf: lazy session discovery + incremental summary cache (fixes
+#13)`); the status had been left at `building` after the merge.
