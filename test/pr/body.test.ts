@@ -5,7 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
 import type { ModelMixEntry } from "../../src/receipt/model.js";
-import { DOGFOOD_MARKER, renderPrBody, sliceHeaderLine, type ContributorView } from "../../src/pr/body.js";
+import { DOGFOOD_MARKER, HELPER_FULL_LABEL, renderPrBody, renderPrReceiptText, sliceHeaderLine, type ContributorView } from "../../src/pr/body.js";
+import { cacheServedText } from "../../src/receipt/present.js";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 import { FULL_FALLBACK_LABEL } from "../../src/pr/slice.js";
 
@@ -52,19 +53,25 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
     expect(body.match(/```/g)).toHaveLength(2);
   });
 
-  it("renders a role · model-mix dotted row with the slice as a muted provenance line under it", () => {
+  it("suppresses the role at N=1 (SPEC-0026 R1) — the row is the model mix alone", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
-    expect(body).toContain("builder · claude-opus-4-8 100%...............$1.50");
+    expect(body).not.toContain("builder ·");
+    expect(body).toMatch(/^claude-opus-4-8 100%\.+\$1\.50$/m);
     // provenance line: session id + slice header, demoted below the row.
     expect(body).toContain("abc123 · session slice: turns 2–4 of 6");
     // the slice line is NOT a markdown headline.
     expect(body).not.toContain("🧾 **aireceipts**");
   });
 
-  it("shows each model with its rounded share for a multi-model session", () => {
+  it("keeps the role prefix whenever rows need telling apart (N≥2)", () => {
+    const body = renderPrBody({ contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 });
+    expect(body).toContain("builder · claude-opus-4-8 100%");
+  });
+
+  it("shows each model with its rounded share for a multi-model session (no role at N=1)", () => {
     const view = builder({ modelMix: [mix("claude-opus-4-8", 0.8), mix("claude-haiku-4-5", 0.2)] });
     const body = renderPrBody({ contributors: [view], excludedCount: 0 });
-    expect(body).toContain("builder · claude-opus-4-8 80% · claude-ha…...$1.50");
+    expect(body).toMatch(/^claude-opus-4-8 80% · claude-haiku-4-5 20%\.*\$1\.50$/m);
   });
 
   it("keeps long provenance inside the 50-column receipt", () => {
@@ -140,5 +147,124 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 2 });
     expect(body).toContain("2 candidate sessions not attributed");
     expect(body).toContain("(in repo + branch window, no branch commit)");
+  });
+});
+
+
+describe("SPEC-0026 R2 · aggregate cache line", () => {
+  const cached = (cacheRead: number, input = 1000) =>
+    withTotal({ ...emptyUsage(), input, cacheRead });
+
+  it("renders one muted cache line over the counted atoms, under counted:", () => {
+    const view = builder({ tokens: cached(600, 400) });
+    const lines = fencedLines(renderPrBody({ contributors: [view], excludedCount: 0 }));
+    const counted = lines.findIndex((l) => l.includes("counted: 1 session"));
+    expect(lines[counted + 1]).toContain("cache served 60% of input tokens");
+  });
+
+  it("stays absent when no counted atom read cache", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
+    expect(body).not.toContain("cache served");
+  });
+
+  it("counts subagent tokens in the aggregate (a child's cache reads are real spend)", () => {
+    const sub: SubagentRow = { name: "kid", usd: null, tokens: cached(500, 500), unreadable: false, filePath: "kid.jsonl" };
+    const body = renderPrBody({ contributors: [builder({ subagents: [sub] })], excludedCount: 0 });
+    expect(body).toContain("cache served");
+  });
+
+  it("matches the receipt masthead formatter exactly (one implementation, I3)", () => {
+    const usage = cached(600, 400);
+    const view = builder({ tokens: usage });
+    const body = renderPrBody({ contributors: [view], excludedCount: 0 });
+    expect(body).toContain(cacheServedText(usage)!);
+  });
+
+  it("never rounds a partial ratio up to 100 (>99 boundary preserved)", () => {
+    const usage = cached(9990, 10);
+    expect(cacheServedText(usage)).toBe("cache served >99% of input tokens");
+    const body = renderPrBody({ contributors: [builder({ tokens: usage })], excludedCount: 0 });
+    expect(body).toContain(">99% of input tokens");
+    expect(body).not.toContain("cache served 100%");
+  });
+});
+
+describe("SPEC-0026 R3 · honest helper label", () => {
+  const fullSlice = { kind: "full" as const, startTurn: 0, endTurn: 5, turnCount: 6, label: FULL_FALLBACK_LABEL };
+
+  it("relabels a helper-credited full session: no commits to slice by", () => {
+    const body = renderPrBody({ contributors: [builder({ slice: fullSlice, basis: "helper" })], excludedCount: 0 });
+    expect(body).toContain(HELPER_FULL_LABEL);
+    expect(body).not.toContain(FULL_FALLBACK_LABEL);
+  });
+
+  it("keeps the anchored fallback label byte-for-byte", () => {
+    const body = renderPrBody({ contributors: [builder({ slice: fullSlice, basis: "anchor" })], excludedCount: 0 });
+    expect(body).toContain(FULL_FALLBACK_LABEL);
+    expect(body).not.toContain(HELPER_FULL_LABEL);
+  });
+});
+
+describe("SPEC-0026 R4 · footer hint", () => {
+  it("is the last muted note of the fenced receipt", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 1 });
+    const lines = fencedLines(body);
+    const hint = lines.findIndex((l) => l.includes("details: npx aireceipts --session <id>"));
+    expect(hint).toBeGreaterThan(-1);
+    // After the hint: only the rule/footer decoration, never another note.
+    expect(lines.slice(hint + 1).every((l) => !l.trim().startsWith("(") && !l.includes("not attributed"))).toBe(true);
+  });
+});
+
+describe("SPEC-0026 R5 · collapsed full receipts", () => {
+  const detail = (label: string, text = "RECEIPT-TEXT") => ({ label, text });
+
+  it("appends the details section after the fence, receipts in row order, marker still first", () => {
+    const body = renderPrBody(
+      { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
+      { details: [detail("builder · abc123", "AAA"), detail("builder · def456", "BBB")] },
+    );
+    expect(body.startsWith(DOGFOOD_MARKER)).toBe(true);
+    expect(body).toContain("<details><summary>full receipts (2 sessions)</summary>");
+    expect(body.indexOf("</details>")).toBeGreaterThan(body.indexOf("AAA"));
+    expect(body.indexOf("AAA")).toBeLessThan(body.indexOf("BBB"));
+    expect(body.indexOf("<details>")).toBeGreaterThan(body.indexOf("```"));
+  });
+
+  it("places the SPEC-0027 artifact link under the details section, after a BLANK line (GFM HTML-block rule)", () => {
+    const body = renderPrBody(
+      { contributors: [builder()], excludedCount: 0 },
+      { details: [detail("builder · abc123")], artifactLink: { fileName: "pr-9.html", url: "https://x/pr-9.html" } },
+    );
+    expect(body.indexOf("full receipt: [pr-9.html]")).toBeGreaterThan(body.indexOf("</details>"));
+    // Without the blank line GitHub swallows the link into the HTML block and
+    // renders it as raw text (maintainer catch on PR #63, 2026-07-03).
+    expect(body).toContain("</details>\n\nfull receipt: [pr-9.html]");
+  });
+
+  it("omits the section entirely without details (--no-details path)", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
+    expect(body).not.toContain("<details>");
+  });
+
+  it("drops trailing receipts to omission notes under the size cap — never mid-receipt truncation", () => {
+    const big = "X".repeat(40_000);
+    const body = renderPrBody(
+      { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
+      { details: [detail("builder · abc123", big), detail("builder · def456", big)] },
+    );
+    expect([...body].length).toBeLessThanOrEqual(65_000);
+    expect(body).toContain("builder · def456 — full receipt omitted (comment size limit)");
+    // The kept receipt is intact, not truncated.
+    expect(body).toContain(big);
+  });
+
+  it("drops the whole section when even omission notes cannot fit", () => {
+    const rollup = renderPrReceiptText({ contributors: [builder()], excludedCount: 0 });
+    // 800 sessions × ~100-char labels → omission notes alone exceed the cap.
+    const many = Array.from({ length: 800 }, (_, i) => detail(`session-${i}-${"L".repeat(90)}`, "small"));
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 }, { details: many });
+    expect(body).not.toContain("<details>");
+    expect(body).toContain(rollup);
   });
 });

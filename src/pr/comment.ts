@@ -11,6 +11,39 @@ export type UpsertOutcome =
   | { ok: true; action: "created" | "updated"; prNumber: number; commentId?: number }
   | { ok: false; error: string; missing?: boolean };
 
+/** SPEC-0027 R3 — the one base-repo resolution the publish URL and blob URL both derive from. */
+export type PrResolution = { ok: true; prNumber: number; ownerRepo: string } | { ok: false; error: string; missing?: boolean };
+
+/**
+ * Resolve the current branch's PR number and base `owner/repo` from a single
+ * `gh pr view` call. The PR's own URL names the base repository (a fork's PR
+ * URL points at the upstream repo), so the artifact push target and the
+ * comment's blob link can never disagree (R3).
+ */
+export function resolvePr(run: CommandRunner): PrResolution {
+  const view = run("gh", ["pr", "view", "--json", "number,url"]);
+  if (view.missing) {
+    return { ok: false, error: "gh not found — copy the receipt above into your PR", missing: true };
+  }
+  if (view.code !== 0) {
+    return { ok: false, error: `no PR for this branch (gh pr view failed): ${view.stderr.trim()}` };
+  }
+  let prNumber: number;
+  let url: string;
+  try {
+    const parsed = JSON.parse(view.stdout) as { number?: unknown; url?: unknown };
+    prNumber = Number(parsed.number);
+    url = String(parsed.url ?? "");
+  } catch {
+    return { ok: false, error: "could not parse gh pr view output" };
+  }
+  const m = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/pull\/\d+$/.exec(url);
+  if (!Number.isInteger(prNumber) || !m) {
+    return { ok: false, error: "gh pr view returned no PR number/url" };
+  }
+  return { ok: true, prNumber, ownerRepo: m[1] };
+}
+
 interface RawComment {
   id?: number;
   body?: string;

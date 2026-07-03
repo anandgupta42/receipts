@@ -37,7 +37,7 @@ export async function promoteOrphanSidechains(
     if (!classifyBranchAnchors(session.turns, branchShas).hasOwn) {
       continue;
     }
-    promoted.push({ summary, session, slice: computeSlice(session.turns, branchShas) });
+    promoted.push({ summary, session, slice: computeSlice(session.turns, branchShas), basis: "anchor" });
   }
   return promoted;
 }

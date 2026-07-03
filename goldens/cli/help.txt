@@ -15,10 +15,12 @@ Usage:
   aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)
   aireceipts week [--by-project] [--since <date>] [--json]
                                         trailing-7-day digest across sessions
-  aireceipts pr [--post] [--session <id>]
+  aireceipts pr [--post] [--session <id>] [--artifact] [--no-details]
                                         attach the building session's receipt to
                                          the current PR (dry-run prints the body;
-                                         --post upserts it via gh)
+                                         --post upserts it via gh; --artifact also
+                                         publishes pr-<n>.html to the
+                                         aireceipts/artifacts branch and links it)
   aireceipts --check-budget             exit 1 if ~/.aireceipts/budget.json's cap is
                                          exceeded (advisory; see docs)
   aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client

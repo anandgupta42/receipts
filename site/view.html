@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>aireceipts · receipt viewer</title>
+<style>
+  :root{--paper:#FAF7F1;--ink:#23262E;--muted:#8B8578;--ground:#EFEAE0;--warn:#B0574E}
+  @media (prefers-color-scheme:dark){:root{--paper:#2D3039;--ink:#E8E6E1;--muted:#9A958C;--ground:#262932}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+       min-height:100vh;display:flex;flex-direction:column}
+  header{padding:14px 18px;font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
+  header .brand{color:var(--ink);font-weight:600;letter-spacing:.1em}
+  header a{color:inherit}
+  main{flex:1;display:flex;flex-direction:column;padding:0 18px 24px;max-width:960px;width:100%;margin:0 auto}
+  iframe{flex:1;width:100%;min-height:80vh;border:0;background:var(--paper);border-radius:2px;
+         box-shadow:0 1px 0 rgba(0,0,0,.25),0 12px 30px -18px rgba(0,0,0,.45)}
+  .msg{padding:28px 0;font-size:14px;max-width:64ch}
+  .msg.error{color:var(--warn)}
+  .msg a{color:inherit}
+</style>
+</head>
+<body>
+<header>
+  <span class="brand">AIRECEIPTS</span>
+  <span id="provenance">receipt viewer</span>
+</header>
+<main>
+  <div id="status" class="msg">loading…</div>
+  <iframe id="frame" sandbox="" hidden title="rendered receipt"></iframe>
+</main>
+<script>
+// Renders a receipt artifact fetched from GitHub — and ONLY from GitHub.
+// The host allowlist is a security boundary: without it this page would
+// render arbitrary attacker HTML under this site's domain. The iframe is
+// fully sandboxed (no scripts, null origin); aireceipts artifacts are
+// script-free by contract, and hostile input still cannot execute here.
+"use strict";
+(function () {
+  var status = document.getElementById("status");
+  var frame = document.getElementById("frame");
+  var provenance = document.getElementById("provenance");
+
+  function fail(text, href) {
+    status.className = "msg error";
+    status.textContent = text + " ";
+    if (href) {
+      var a = document.createElement("a");
+      a.href = href;
+      a.rel = "noopener";
+      a.textContent = "open the file on GitHub instead";
+      status.appendChild(a);
+    }
+  }
+
+  /** Normalize a github.com blob URL or raw URL to a raw.githubusercontent.com URL, or return null. */
+  function normalize(input) {
+    var u;
+    try {
+      u = new URL(input);
+    } catch (e) {
+      return null;
+    }
+    if (u.protocol !== "https:" || u.search !== "" || u.hash !== "") {
+      return null;
+    }
+    if (u.hostname === "raw.githubusercontent.com") {
+      return u;
+    }
+    if (u.hostname === "github.com") {
+      // https://github.com/<owner>/<repo>/blob/<ref…>/<path> → raw form.
+      var parts = u.pathname.split("/");
+      if (parts.length >= 6 && parts[3] === "blob") {
+        return new URL("https://raw.githubusercontent.com/" + parts[1] + "/" + parts[2] + "/" + parts.slice(4).join("/"));
+      }
+    }
+    return null;
+  }
+
+  var src = new URLSearchParams(window.location.search).get("src");
+  if (!src) {
+    fail("No receipt URL. Expected ?src=<raw.githubusercontent.com URL of a receipt artifact>.");
+    return;
+  }
+  var raw = normalize(src);
+  // Beyond the host allowlist: only aireceipts artifact paths render at all.
+  // This page must never become a generic HTML renderer under our domain —
+  // an arbitrary public repo's .html could impersonate content here.
+  var ARTIFACT_PATH = /^\/[^/]+\/[^/]+\/(refs\/heads\/)?aireceipts\/artifacts\/pr-\d+\.html$/;
+  if (raw === null || !ARTIFACT_PATH.test(raw.pathname)) {
+    fail("Refusing to render: only aireceipts receipt artifacts (aireceipts/artifacts branch, pr-<n>.html) hosted on GitHub are accepted.");
+    return;
+  }
+  var segs = raw.pathname.split("/");
+  provenance.textContent = "rendering " + segs[segs.length - 1] + " from " + segs[1] + "/" + segs[2];
+
+  fetch(raw.href)
+    .then(function (res) {
+      if (!res.ok) {
+        throw new Error("GitHub returned " + res.status + " (private repo or deleted artifact?).");
+      }
+      return res.text();
+    })
+    .then(function (html) {
+      status.hidden = true;
+      frame.hidden = false;
+      frame.srcdoc = html;
+    })
+    .catch(function (err) {
+      fail(String(err.message || err), src);
+    });
+})();
+</script>
+</body>
+</html>

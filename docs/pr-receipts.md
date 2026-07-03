@@ -30,6 +30,35 @@ git receipt                  # after pushing your branch
 The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
 copy the body straight into a comment.
 
+### Optional: publish a durable receipt page
+
+```sh
+npx aireceipts pr --post --artifact
+```
+
+`--artifact` (requires `--post`) additionally writes a self-contained
+`pr-<n>.html` — the concise rollup plus every session's full per-tool
+receipt — to a dedicated `aireceipts/artifacts` branch of the PR's base repo,
+and appends one `full receipt:` link to the comment. The link only appears
+after the push is confirmed; if you lack push rights the comment still posts,
+just without the link.
+
+The comment link opens the artifact through the **aireceipts viewer**
+(`view.html` on the project site): a static page that fetches the raw file
+from GitHub in the reader's browser and renders it in a fully sandboxed
+frame — no server, no third party, works for any repo's artifacts with zero
+setup. Two honest limits: the viewer refuses
+everything except aireceipts artifact paths on GitHub raw/blob URLs
+(`…/aireceipts/artifacts/pr-<n>.html` — it must never become a generic HTML
+renderer), and **private repos can't render**:
+anonymous raw fetches 404 there, so the viewer shows its error with a direct
+GitHub link (readable as source by anyone with access) until the repo is
+public. Publishing writes nothing to your working tree, index, or current
+branch, and each PR's file is overwritten in place — other PRs' artifacts are
+never touched. The viewer page itself carries no analytics or beacons and
+never will (I4's spirit): nobody, including the aireceipts project, learns
+who viewed which receipt.
+
 ## For maintainers (repo integration, 5 minutes)
 
 1. Copy one workflow file into your repo: `.github/workflows/pr-receipt-check.yml`

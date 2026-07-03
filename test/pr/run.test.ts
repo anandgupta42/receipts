@@ -306,3 +306,89 @@ describe("SPEC-0024 attribution widening (e2e)", () => {
     expect(await render()).toBe(await render());
   });
 });
+
+describe("SPEC-0027 --artifact (e2e through runPr)", () => {
+  const PLUMBING_OK: Record<string, string> = {
+    "ls-remote": "",
+    "hash-object": "f".repeat(40),
+    mktree: "e".repeat(40),
+    "commit-tree": "d".repeat(40),
+    push: "",
+    fetch: "",
+    "ls-tree": "",
+  };
+
+  /** gitOk plus recording plumbing support; pushFails flips the push result. */
+  function gitWithPlumbing(pushFails = false) {
+    const gitCalls: string[][] = [];
+    const run: CommandRunner = (_cmd, args) => {
+      gitCalls.push(args);
+      if (args[0] in PLUMBING_OK) {
+        if (args[0] === "push" && pushFails) {
+          return { stdout: "", stderr: "remote: Permission denied", code: 1, missing: false };
+        }
+        return ok(PLUMBING_OK[args[0]]);
+      }
+      return gitOk(_cmd, args);
+    };
+    return { run, gitCalls };
+  }
+
+  /** gh mock that answers pr view --json number,url and records upsert payloads. */
+  function ghWithPr(prNumber: number) {
+    const posted: string[] = [];
+    const run: CommandRunner = (_cmd, args, opts) => {
+      if (args[0] === "pr") {
+        return ok(JSON.stringify({ number: prNumber, url: `https://github.com/o/r/pull/${prNumber}` }));
+      }
+      if (opts?.stdin) {
+        posted.push(opts.stdin);
+      }
+      return ok("[]");
+    };
+    return { run, posted };
+  }
+
+  it("rejects --artifact without --post before rendering (R4)", async () => {
+    const { deps, out, err } = await makeDeps();
+    const code = await runPr({ post: false, artifact: true }, deps);
+    expect(code).toBe(1);
+    expect(out).toHaveLength(0);
+    expect(err.join("\n")).toContain("--artifact requires --post");
+  });
+
+  it("publishes, then renders ONE body with the link — stdout equals the posted body (R3)", async () => {
+    const { run: runGit } = gitWithPlumbing();
+    const { run: runGh, posted } = ghWithPr(7);
+    const { deps, out, err } = await makeDeps({ runGit, runGh });
+    const code = await runPr({ post: true, artifact: true }, deps);
+    expect(code).toBe(0);
+    const raw = encodeURIComponent("https://raw.githubusercontent.com/o/r/refs/heads/aireceipts/artifacts/pr-7.html");
+    expect(out[0]).toContain(`full receipt: [pr-7.html](https://anandgupta42.github.io/aireceipts/view.html?src=${raw})`);
+    // Printed body and posted body are byte-identical (render-first spine).
+    expect(posted.some((p) => JSON.parse(p).body === out[0])).toBe(true);
+    // R4 preflight names branch, remote, file before the push.
+    expect(err.join("\n")).toContain("publishing pr-7.html to aireceipts/artifacts on https://github.com/o/r.git");
+  });
+
+  it("failed push: body renders and posts WITHOUT the link, stderr names the push, exit 1 (R3)", async () => {
+    const { run: runGit } = gitWithPlumbing(true);
+    const { run: runGh, posted } = ghWithPr(7);
+    const { deps, out, err } = await makeDeps({ runGit, runGh });
+    const code = await runPr({ post: true, artifact: true }, deps);
+    expect(code).toBe(1);
+    expect(out[0]).not.toContain("full receipt:");
+    expect(posted.some((p) => JSON.parse(p).body === out[0])).toBe(true);
+    expect(err.join("\n")).toContain("Permission denied");
+  });
+
+  it("without --artifact nothing publishes and the body is unchanged", async () => {
+    const { run: runGit, gitCalls } = gitWithPlumbing();
+    const { run: runGh } = ghWithPr(7);
+    const { deps, out } = await makeDeps({ runGit, runGh });
+    const code = await runPr({ post: true }, deps);
+    expect(code).toBe(0);
+    expect(out[0]).not.toContain("full receipt:");
+    expect(gitCalls.some((a) => a[0] === "push" || a[0] === "hash-object")).toBe(false);
+  });
+});
