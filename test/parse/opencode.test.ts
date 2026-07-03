@@ -197,6 +197,67 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     });
   });
 
+  it("falls back to legacy message/part rows when session_message exists but is empty", async () => {
+    const dbPath = path.join(fixturesDir, "legacy-empty-session-message.db");
+    const adapter = new OpenCodeAdapter({ dbPath });
+
+    const summaries = await adapter.listSessions({ full: true });
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      source: "opencode",
+      title: "Legacy rows with empty session_message",
+      model: "big-pickle",
+      cwd: "/tmp/aireceipts-opencode-loop",
+      totals: {
+        turnCount: 3,
+        toolCallCount: 2,
+      },
+    });
+    expect(summaries[0].totals.tokens).toMatchObject({
+      input: 12091,
+      output: 173,
+      cacheRead: 24064,
+      cacheCreation: 0,
+      total: 36328,
+    });
+
+    const session = await adapter.loadSession(`${dbPath}#ses_legacy_empty_current`);
+    expect(session).not.toBeNull();
+    expect(session!.turns).toHaveLength(3);
+    expect(session!.turns.map((turn) => turn.toolCalls.map((call) => call.name))).toEqual([["write"], ["bash"], []]);
+    expect(session!.turns[0].toolCalls[0]).toMatchObject({
+      name: "write",
+      input: {
+        filePath: "/tmp/aireceipts-opencode-loop/opencode-loop.txt",
+        content: "opencode adapter corpus loop",
+      },
+      output: "Wrote file successfully.",
+      status: "ok",
+      startedAt: 1783120106048,
+      endedAt: 1783120106056,
+    });
+    expect(session!.turns[1].toolCalls[0]).toMatchObject({
+      name: "bash",
+      input: { command: "cat opencode-loop.txt" },
+      output: "opencode adapter corpus loop",
+      status: "ok",
+      startedAt: 1783120107688,
+      endedAt: 1783120107691,
+    });
+
+    const model = await buildReceiptModel(session!, dataDir);
+    expect(model.totalTokens).toMatchObject({
+      input: 12091,
+      output: 173,
+      cacheRead: 24064,
+      cacheCreation: 0,
+      total: 36328,
+    });
+    expect(model.totalUsd).toBeNull();
+    expect(model.toolRows.map((row) => row.tool)).toContain("write");
+    expect(model.toolRows.map((row) => row.tool)).toContain("bash");
+  });
+
   it("degrades invalid SQLite files to no sessions and null loads", async () => {
     const dir = tempDir();
     dirs.push(dir);

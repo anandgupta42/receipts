@@ -277,6 +277,18 @@ function tableExists(db: SqliteReader, name: string): boolean {
   }
 }
 
+function hasCurrentRows(db: SqliteReader, sessionId?: string): boolean {
+  if (!tableExists(db, "session_message")) {
+    return false;
+  }
+  try {
+    const where = sessionId ? `WHERE session_id = ${sqlString(sessionId)}` : "";
+    return db.all(`SELECT id FROM session_message ${where} LIMIT 1`).length > 0;
+  } catch {
+    return false;
+  }
+}
+
 async function openOpencodeDb(dbPath: string): Promise<SqliteReader | null> {
   if (!(await pathExists(dbPath))) {
     return null;
@@ -491,7 +503,7 @@ export class OpenCodeAdapter implements SessionAdapter {
         continue;
       }
       try {
-        const sql = tableExists(db, "session_message") ? currentSummarySql() : summarySql();
+        const sql = hasCurrentRows(db) ? currentSummarySql() : summarySql();
         const rows = db.all(sql) as unknown as SessionRow[];
         const summaries = rows.map((row) => summaryFromRow(dbPath, row));
         if (!options.full) {
@@ -590,7 +602,7 @@ export class OpenCodeAdapter implements SessionAdapter {
       return null;
     }
     try {
-      if (tableExists(db, "session_message")) {
+      if (hasCurrentRows(db, sessionId)) {
         return this.loadCurrent(db, dbPath, sessionId);
       }
       const where = sessionId ? `WHERE s.id = ${sqlString(sessionId)}` : "";
