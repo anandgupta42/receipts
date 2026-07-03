@@ -1,14 +1,14 @@
 // SPEC-0023 R4 (supersedes SPEC-0019's single-session body) — assemble the PR
-// comment: the dogfood marker (unchanged, so R5's presence check and the gh
-// upsert still find it), a 🧾 header naming the session COUNT (issue #39 fix 1),
-// then one fenced block of per-session rows and ONE combined total. Each row is
-// role · model-mix · cost, with the slice line demoted to a muted provenance line
-// under it (issue #39 fix 2). The combined total keeps priced dollars and
-// tokens-only counts separate — never blended (I2/I3, SPEC-0008's pattern) — and
-// a final line honestly reports any candidate sessions that were excluded.
+// comment through the receipt block interpreter, not receipt-like string art:
+// marker first (unchanged, so R5's presence check and the gh upsert still find
+// it), then a fenced 50-column receipt with masthead, per-session dotted rows,
+// muted provenance/subagent rows, separate priced/unpriced totals, and the
+// classic samosa footer.
 import type { TokenUsage } from "../parse/types.js";
+import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry } from "../receipt/model.js";
 import { formatInt, formatUsd } from "../receipt/format.js";
+import { RECEIPT_WIDTH, renderBlockLines } from "../receipt/render.js";
 import type { Role } from "./contributors.js";
 import type { SliceResult } from "./slice.js";
 import type { SubagentRow } from "./rollup.js";
@@ -36,6 +36,11 @@ export interface PrBodyInput {
   excludedCount: number;
 }
 
+const WORDMARK = "AIRECEIPTS";
+const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
+const FOOTER_EMOJI = "🥟";
+const NOTE_INDENT = 2;
+
 /** The R1e(e) header line: the turn range, or the honesty label for a full-session fallback. */
 export function sliceHeaderLine(slice: SliceResult): string {
   if (slice.kind === "full") {
@@ -57,25 +62,66 @@ function costText(usd: number | null, tokens: TokenUsage): string {
   return usd !== null ? `$${formatUsd(usd)}` : `${formatInt(tokens.total)} tokens`;
 }
 
-function subagentRowLine(row: SubagentRow): string {
-  const who = row.model ? `${row.name} · ${row.model}` : row.name;
-  if (row.unreadable) {
-    return `    ${who} — (unreadable)`;
-  }
-  return `    ${who} — ${costText(row.usd, row.tokens)}`;
+function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${n} ${n === 1 ? singular : pluralForm}`;
 }
 
-/** One contributor: the role/model/cost headline, a muted provenance line, then any subagent sub-rows. */
-function contributorBlock(view: ContributorView): string[] {
-  const lines = [`${view.role} · ${formatModelMix(view.modelMix)} · ${costText(view.usd, view.tokens)}`];
-  lines.push(`  ${view.sessionId} · ${sliceHeaderLine(view.slice)}`);
+function codepointLength(s: string): number {
+  return [...s].length;
+}
+
+function capText(s: string, width: number): string {
+  const chars = [...s];
+  if (chars.length <= width) {
+    return s;
+  }
+  return `${chars.slice(0, Math.max(1, width - 1)).join("").trimEnd()}…`;
+}
+
+function mutedNote(text: string, indent = NOTE_INDENT): Block {
+  return { kind: "note", text, indent, muted: true };
+}
+
+function provenanceBlocks(view: ContributorView): Block[] {
+  const slice = sliceHeaderLine(view.slice);
+  const joined = `${view.sessionId} · ${slice}`;
+  const capacity = RECEIPT_WIDTH - NOTE_INDENT;
+  if (codepointLength(joined) <= capacity) {
+    return [mutedNote(joined)];
+  }
+  const prefix = "session: ";
+  return [
+    mutedNote(`${prefix}${capText(view.sessionId, capacity - prefix.length)}`),
+    mutedNote(capText(slice, capacity)),
+  ];
+}
+
+function subagentLabel(row: SubagentRow): string {
+  return row.model ? `${row.name} · ${row.model}` : row.name;
+}
+
+function subagentValue(row: SubagentRow): string {
+  return row.unreadable ? "(unreadable)" : costText(row.usd, row.tokens);
+}
+
+/** One contributor: role/model dotted row, muted provenance line, then any SUBAGENTS sub-rows. */
+function contributorBlocks(view: ContributorView, spaceBefore: boolean): Block[] {
+  const blocks: Block[] = [
+    {
+      kind: "row",
+      label: `${view.role} · ${formatModelMix(view.modelMix)}`,
+      value: costText(view.usd, view.tokens),
+      spaceBefore,
+    },
+    ...provenanceBlocks(view),
+  ];
   if (view.subagents.length > 0) {
-    lines.push(`  subagents (${view.subagents.length}):`);
+    blocks.push(mutedNote(`SUBAGENTS (${view.subagents.length})`));
     for (const row of view.subagents) {
-      lines.push(subagentRowLine(row));
+      blocks.push({ kind: "row", label: `  ${subagentLabel(row)}`, value: subagentValue(row), muted: true });
     }
   }
-  return lines;
+  return blocks;
 }
 
 interface Atom {
@@ -97,56 +143,87 @@ function collectAtoms(contributors: ContributorView[]): { atoms: Atom[]; childCo
   return { atoms, childCount };
 }
 
-/** The single combined total (R4). Priced dollars and tokens-only counts stay separate — never one blended number (I2/I3). */
-function combinedTotalLine(input: PrBodyInput): string {
-  const { atoms, childCount } = collectAtoms(input.contributors);
-  const priced = atoms.filter((a) => a.usd !== null);
-  const pricedSubtotal = priced.reduce((sum, a) => sum + (a.usd ?? 0), 0);
-  const tokensOnly = atoms.filter((a) => a.usd === null && !a.unreadable);
-  const tokenSubtotal = tokensOnly.reduce((sum, a) => sum + a.tokens.total, 0);
-  const notPriced = atoms.filter((a) => a.unreadable).length;
-
-  let magnitude: string;
-  if (priced.length > 0 && tokensOnly.length > 0) {
-    magnitude = `$${formatUsd(pricedSubtotal)} priced + ${formatInt(tokenSubtotal)} tokens (${tokensOnly.length} tokens-only)`;
-  } else if (priced.length > 0) {
-    magnitude = `$${formatUsd(pricedSubtotal)}`;
-  } else {
-    magnitude = `${formatInt(tokenSubtotal)} tokens`;
-  }
-  const caveat = notPriced > 0 ? ` (+ ${notPriced} not priced)` : "";
-
-  const sessionCount = input.contributors.length;
-  const scope =
-    childCount > 0
-      ? `${sessionCount} session${sessionCount === 1 ? "" : "s"} + ${childCount} subagent${childCount === 1 ? "" : "s"}`
-      : `${sessionCount} session${sessionCount === 1 ? "" : "s"}`;
-  return `COMBINED — ${magnitude}  ·  ${scope}${caveat}`;
+interface Totals {
+  pricedSubtotal: number;
+  pricedCount: number;
+  tokenSubtotal: number;
+  tokensOnlyCount: number;
+  unreadableCount: number;
+  childCount: number;
 }
 
-/** The complete comment body (R4): marker line, 🧾 header with the session count, fenced rows + combined total. */
-export function renderPrBody(input: PrBodyInput): string {
-  const n = input.contributors.length;
-  const fenced: string[] = [];
-  input.contributors.forEach((view, i) => {
-    if (i > 0) {
-      fenced.push("");
-    }
-    fenced.push(...contributorBlock(view));
-  });
-  fenced.push("", "─".repeat(10), combinedTotalLine(input));
-  if (input.excludedCount > 0) {
-    fenced.push(
-      `${input.excludedCount} candidate session${input.excludedCount === 1 ? "" : "s"} not attributed (in repo + branch window, no branch commit)`,
-    );
-  }
+function totalsFor(contributors: ContributorView[]): Totals {
+  const { atoms, childCount } = collectAtoms(contributors);
+  const priced = atoms.filter((a) => a.usd !== null);
+  const tokensOnly = atoms.filter((a) => a.usd === null && !a.unreadable);
+  return {
+    pricedSubtotal: priced.reduce((sum, a) => sum + (a.usd ?? 0), 0),
+    pricedCount: priced.length,
+    tokenSubtotal: tokensOnly.reduce((sum, a) => sum + a.tokens.total, 0),
+    tokensOnlyCount: tokensOnly.length,
+    unreadableCount: atoms.filter((a) => a.unreadable).length,
+    childCount,
+  };
+}
 
+function countLine(sessionCount: number, totals: Totals): string {
+  const parts = [plural(sessionCount, "session")];
+  if (totals.childCount > 0) {
+    parts.push(plural(totals.childCount, "subagent"));
+  }
+  return `counted: ${parts.join(" + ")}`;
+}
+
+/** Separate total rows (R4). Priced dollars and tokens-only counts are never blended into one line (I2/I3). */
+function totalBlocks(input: PrBodyInput): Block[] {
+  const totals = totalsFor(input.contributors);
+  const blocks: Block[] = [{ kind: "rule" }];
+  if (totals.pricedCount > 0) {
+    blocks.push({ kind: "total", label: "TOTAL priced", value: `$${formatUsd(totals.pricedSubtotal)}` });
+  }
+  if (totals.tokensOnlyCount > 0) {
+    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${formatInt(totals.tokenSubtotal)} tokens` });
+  }
+  if (totals.pricedCount === 0 && totals.tokensOnlyCount === 0) {
+    blocks.push({ kind: "total", label: "TOTAL unpriced", value: "0 tokens" });
+  }
+  blocks.push(mutedNote(countLine(input.contributors.length, totals)));
+  if (totals.unreadableCount > 0) {
+    blocks.push(mutedNote(`${plural(totals.unreadableCount, "unreadable subagent")} not priced`));
+  }
+  if (input.excludedCount > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(input.excludedCount, "candidate session")} not attributed`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(in repo + branch window, no branch commit)", muted: true });
+  }
+  return blocks;
+}
+
+function prBlocks(input: PrBodyInput): Block[] {
+  const n = input.contributors.length;
+  const blocks: Block[] = [
+    { kind: "masthead", text: WORDMARK },
+    { kind: "meta", lines: [`${plural(n, "session")} behind this PR`] },
+  ];
+  input.contributors.forEach((view, i) => {
+    blocks.push(...contributorBlocks(view, i === 0));
+  });
+  blocks.push(...totalBlocks(input));
+  blocks.push({ kind: "footer", text: FOOTER_TEXT, emoji: FOOTER_EMOJI });
+  return blocks;
+}
+
+/** The complete comment body (R4): marker line plus fenced receipt blocks. */
+export function renderPrBody(input: PrBodyInput): string {
+  const receipt = renderBlockLines(prBlocks(input), { color: false, width: RECEIPT_WIDTH }).join("\n");
   return [
     DOGFOOD_MARKER,
-    `🧾 **aireceipts** — ${n} session${n === 1 ? "" : "s"} behind this PR`,
-    "",
     "```",
-    fenced.join("\n"),
+    receipt,
     "```",
     "",
   ].join("\n");

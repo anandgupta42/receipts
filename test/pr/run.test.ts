@@ -94,7 +94,8 @@ describe("R3 render-first ordering", () => {
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
     // Explicit selection renders a single-contributor body; the child stem shows on the provenance line.
     expect(out[0]).toContain("1 session behind this PR");
-    expect(out[0]).toContain("agent-child1 · ");
+    expect(out[0]).toContain("session: agent-child1");
+    expect(out[0]).toContain("entire session (slice unavailable)");
     expect(ghCalls.some((c) => c.includes("issues/26/comments"))).toBe(true);
     expect(err.join("\n")).toContain("posted receipt (created) to PR #26");
   });
@@ -147,7 +148,7 @@ describe("R1d selection outcomes", () => {
     expect(err.join("\n")).toContain("--session");
   });
 
-  it("multiple matching sessions → both contribute (union), one combined total, exit 0 (SPEC-0023 R1)", async () => {
+  it("multiple matching sessions → both contribute (union), one receipt total, exit 0 (SPEC-0023 R1)", async () => {
     const session = (await loadById("claude-code", ANCHORS))!;
     const dupe = { ...session, id: "dupe", filePath: "dupe.jsonl" };
     const { deps, out } = await makeDeps({
@@ -157,10 +158,11 @@ describe("R1d selection outcomes", () => {
     const code = await runPr({ post: false }, deps);
     expect(code).toBe(0);
     expect(out[0]).toContain("2 sessions behind this PR");
-    expect(out[0]).toContain("COMBINED — ");
+    expect(out[0]).toContain("TOTAL priced");
+    expect(out[0]).toContain("counted: 2 sessions");
   });
 
-  it("codex + claude mix → both contribute, one combined total across vendors (SPEC-0023 R1/R6)", async () => {
+  it("codex + claude mix → both contribute, one receipt total across vendors (SPEC-0023 R1/R6)", async () => {
     const claude = (await loadById("claude-code", ANCHORS))!;
     const codexSummary = { id: CODEX_BRANCH, source: "codex" as const, filePath: CODEX_BRANCH };
     const { deps, out } = await makeDeps({
@@ -176,7 +178,8 @@ describe("R1d selection outcomes", () => {
     expect(out[0]).toContain("2 sessions behind this PR");
     expect(out[0]).toContain("codex · ");
     expect(out[0]).toContain("builder · ");
-    expect(out[0]).toContain("COMBINED — ");
+    expect(out[0]).toContain("TOTAL priced");
+    expect(out[0]).toContain("counted: 2 sessions");
   });
 
   it("auto-selection still skips a sidechain transcript", async () => {
