@@ -1,12 +1,12 @@
 ---
-id: SPEC-0022
+id: SPEC-0025
 title: "Docs site from repo markdown"
-status: approved
+status: shipped
 milestone: M4
 depends: [SPEC-0021]
 ---
 
-# SPEC-0022: Docs site from repo markdown
+# SPEC-0025: Docs site from repo markdown
 
 Invariants: I1 (deterministic; zero model calls; zero product-path network), I3
 (claims traceable to repo docs), I5 (generated output is byte-stable), I6 (facts,
@@ -83,3 +83,11 @@ local, deterministic build path.
 - [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, determinism, spec-lint, and hygiene all pass
       unmasked with `echo $?`.
+
+## Validation
+
+**2026-07-03 · spec-ledger cleanup (maintainer-directed, 2026-07-03):** renumbered from SPEC-0022 — that id was already
+taken by the discovery-perf spec (one numbering scheme, AGENTS.md); no code or
+doc outside `specs/` referenced the docs-site spec by number. Status set to
+`shipped`: implementation merged in PR #42 (`feat: [SPEC-0022] docs site on
+the same Pages deploy`) and extended by PR #43's user guide wiring.
