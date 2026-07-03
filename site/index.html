@@ -272,6 +272,13 @@
 .prmock .prname{font-size:12.5px;font-weight:600}
 .prmock .prname em{font-style:normal;font-weight:400;color:#5a6068;border:1px solid #d8dbd6;border-radius:4px;padding:0 4px;font-size:10.5px;margin-left:4px}
 .prmock .cardart{margin-top:8px}
+.scn{display:flex;flex-direction:column}
+.scn .cardart,.scn .bignum{margin-top:auto}
+.cardart .dim{color:#7a838a}
+.cardart .redl{color:#e0705f}
+.cardart .grnl{color:#5bbd8b}
+.stageline{font-size:14px;color:#c8d0d4;margin:18px 0 0}
+.stageline strong{color:#fff}
 </style>
 </head>
 <body>
@@ -322,9 +329,10 @@
         </div>
         <div class="scn">
           <img class="scnimg" src="assets/scn-pr.png" alt="" width="64" height="64">
-          <h3>Receipts on your PRs</h3>
-          <p>Every contributor counted, on the PR itself.</p>
-          <div class="prmock"><span class="prav"></span><span class="prname">aireceipts <em>bot</em></span><pre class="art cardart">🧾 3 sessions ······ TOTAL $42.37</pre></div>
+          <h3>Tomorrow, without the loop</h3>
+          <p>Paste the handoff. The waste doesn't repeat.</p>
+          <pre class="art cardart"><span class="dim">yesterday</span>  ⚠ Bash loop ×5 ··· <span class="redl">$0.08</span>
+<span class="dim">today</span>      no loop ·········· <span class="grnl">$0.00</span></pre>
         </div>
       </div>
     </section>
@@ -398,6 +406,7 @@ Gemini CLI ············ full per-turn, priced
 opencode ·················· full per-turn
 Cursor ··· totals only — its logs stop there,
            so we do too</pre>
+        <p class="stageline">…and every pull request carries its receipt — <strong>every contributor counted.</strong></p>
         <div class="proof-term agterm">
           <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts</span></div>
 <pre class="render" tabindex="0" aria-label="An itemized receipt for a 10m 30s Claude Code session: Bash $0.05, Edit $0.05, thinking $0.03, Write $0.03, Read $0.02, total $0.18; the same tokens on claude-haiku-4-5 would be $0.04."><span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -</span>
