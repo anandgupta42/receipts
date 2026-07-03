@@ -84,8 +84,12 @@
     return;
   }
   var raw = normalize(src);
-  if (raw === null || !raw.pathname.endsWith(".html")) {
-    fail("Refusing to render: only .html files hosted on raw.githubusercontent.com (or github.com blob URLs) are accepted.");
+  // Beyond the host allowlist: only aireceipts artifact paths render at all.
+  // This page must never become a generic HTML renderer under our domain —
+  // an arbitrary public repo's .html could impersonate content here.
+  var ARTIFACT_PATH = /^\/[^/]+\/[^/]+\/(refs\/heads\/)?aireceipts\/artifacts\/pr-\d+\.html$/;
+  if (raw === null || !ARTIFACT_PATH.test(raw.pathname)) {
+    fail("Refusing to render: only aireceipts receipt artifacts (aireceipts/artifacts branch, pr-<n>.html) hosted on GitHub are accepted.");
     return;
   }
   var segs = raw.pathname.split("/");

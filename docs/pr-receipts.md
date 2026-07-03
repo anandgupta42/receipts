@@ -47,14 +47,17 @@ The comment link opens the artifact through the **aireceipts viewer**
 (`view.html` on the project site): a static page that fetches the raw file
 from GitHub in the reader's browser and renders it in a fully sandboxed
 frame — no server, no third party, works for any repo's artifacts with zero
-setup. Two honest limits: the viewer only accepts `raw.githubusercontent.com`
-/ `github.com` blob URLs (anything else is refused — your receipt page must
-never become a generic HTML renderer), and **private repos can't render**:
+setup. Two honest limits: the viewer refuses
+everything except aireceipts artifact paths on GitHub raw/blob URLs
+(`…/aireceipts/artifacts/pr-<n>.html` — it must never become a generic HTML
+renderer), and **private repos can't render**:
 anonymous raw fetches 404 there, so the viewer shows its error with a direct
 GitHub link (readable as source by anyone with access) until the repo is
 public. Publishing writes nothing to your working tree, index, or current
 branch, and each PR's file is overwritten in place — other PRs' artifacts are
-never touched.
+never touched. The viewer page itself carries no analytics or beacons and
+never will (I4's spirit): nobody, including the aireceipts project, learns
+who viewed which receipt.
 
 ## For maintainers (repo integration, 5 minutes)
 
