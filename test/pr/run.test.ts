@@ -92,9 +92,10 @@ describe("R3 render-first ordering", () => {
     const code = await runPr({ post: true, session: "agent-child1" }, deps);
     expect(code).toBe(0);
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
-    // Explicit selection renders a single-contributor body; the child stem shows on the provenance line.
+    // Explicit selection renders a single-contributor body; round 2 moved the
+    // child stem + slice reason to the details section's stat line.
     expect(out[0]).toContain("1 session behind this PR");
-    expect(out[0]).toContain("session: agent-child1");
+    expect(out[0]).toContain("agent-child1");
     expect(out[0]).toContain("entire session (slice unavailable)");
     expect(ghCalls.some((c) => c.includes("issues/26/comments"))).toBe(true);
     expect(err.join("\n")).toContain("posted receipt (created) to PR #26");

@@ -74,8 +74,11 @@ export async function rollupChildren(
       continue;
     }
     const model = await buildReceiptModel(session);
+    // A markup-shaped title (fork boilerplate, injected XML) is machine noise,
+    // not a name — same rule the receipt masthead applies to its title line.
+    const title = session.title?.replace(/\s+/g, " ").trim();
     rows.push({
-      name: session.title ?? agentId,
+      name: title !== undefined && title !== "" && !title.startsWith("<") ? title : `agent-${agentId}`,
       model: session.model,
       usd: model.totalUsd,
       tokens: model.totalTokens,

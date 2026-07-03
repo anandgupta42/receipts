@@ -53,19 +53,20 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
     expect(body.match(/```/g)).toHaveLength(2);
   });
 
-  it("suppresses the role at N=1 (SPEC-0026 R1) — the row is the model mix alone", () => {
+  it("suppresses the role at N=1 and the redundant 100% share (SPEC-0026 R1, round 2)", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
     expect(body).not.toContain("builder ·");
-    expect(body).toMatch(/^claude-opus-4-8 100%\.+\$1\.50$/m);
-    // provenance line: session id + slice header, demoted below the row.
-    expect(body).toContain("abc123 · session slice: turns 2–4 of 6");
-    // the slice line is NOT a markdown headline.
-    expect(body).not.toContain("🧾 **aireceipts**");
+    expect(body).not.toContain("100%");
+    expect(body).toMatch(/^claude-opus-4-8\.+\$1\.50$/m);
+    // Round 2: a real slice keeps its line (it changes the number's meaning); the id does not.
+    expect(body).toContain("session slice: turns 2–4 of 6");
+    expect(body).not.toContain("abc123");
   });
 
   it("keeps the role prefix whenever rows need telling apart (N≥2)", () => {
     const body = renderPrBody({ contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 });
-    expect(body).toContain("builder · claude-opus-4-8 100%");
+    expect(body).toContain("builder · claude-opus-4-8");
+    expect(body).not.toContain("100%");
   });
 
   it("shows each model with its rounded share for a multi-model session (no role at N=1)", () => {
@@ -74,12 +75,12 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
     expect(body).toMatch(/^claude-opus-4-8 80% · claude-haiku-4-5 20%\.*\$1\.50$/m);
   });
 
-  it("keeps long provenance inside the 50-column receipt", () => {
+  it("carries no session ids in the fence (round 2) and every line fits 50 columns", () => {
     const body = renderPrBody({
       contributors: [builder({ sessionId: "rollout-2026-07-02T18-06-36-019f2583-6862-71c3-9abf-0eb4244ae5b0" })],
       excludedCount: 0,
     });
-    expect(body).toContain("session: rollout-2026-07-02T18-06-36-019f2583-6…");
+    expect(body).not.toContain("rollout-2026-07-02T18-06-36");
     for (const line of fencedLines(body)) {
       expect([...line].length).toBeLessThanOrEqual(50);
     }
@@ -93,7 +94,7 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
       ],
       excludedCount: 0,
     });
-    expect(body).toContain("orchestrator · claude-opus-4-8 100%..........$1.50");
+    expect(body).toContain("orchestrator · claude-opus-4-8...............$1.50");
     expect(body).toContain("codex · no model reported.............5,000 tokens");
   });
 });
@@ -189,19 +190,38 @@ describe("SPEC-0026 R2 · aggregate cache line", () => {
   });
 });
 
-describe("SPEC-0026 R3 · honest helper label", () => {
+describe("SPEC-0026 R3 (round 2) · helpers group under one explanatory header", () => {
   const fullSlice = { kind: "full" as const, startTurn: 0, endTurn: 5, turnCount: 6, label: FULL_FALLBACK_LABEL };
+  const helper = (id: string, usd: number, durationMs?: number) =>
+    builder({ sessionId: id, slice: fullSlice, basis: "helper", role: "codex", usd, durationMs, modelMix: [mix("gpt-5.5", 1)] });
 
-  it("relabels a helper-credited full session: no commits to slice by", () => {
-    const body = renderPrBody({ contributors: [builder({ slice: fullSlice, basis: "helper" })], excludedCount: 0 });
-    expect(body).toContain(HELPER_FULL_LABEL);
+  it("renders helpers as muted rows under CODEX HELPERS with duration as the one per-row fact", () => {
+    const body = renderPrBody(
+      { contributors: [builder(), helper("h1", 1.74, 18 * 60_000), helper("h2", 0.3, 4 * 60_000)], excludedCount: 0 },
+    );
+    const lines = fencedLines(body);
+    const header = lines.findIndex((l) => l.includes(`CODEX HELPERS (2) — ${HELPER_FULL_LABEL}`));
+    expect(header).toBeGreaterThan(-1);
+    expect(lines[header + 1]).toMatch(/gpt-5\.5 · 18m\.+\$1\.74/);
+    expect(lines[header + 2]).toMatch(/gpt-5\.5 · 4m\.+\$0\.30/);
+    // The explainer lives once on the header — never per row, never the old long label.
+    expect(body).not.toContain("no commits to slice by");
     expect(body).not.toContain(FULL_FALLBACK_LABEL);
+    // Helpers are grouped after authors; the author row keeps its slice line.
+    expect(body).toContain("session slice: turns 2–4 of 6");
   });
 
-  it("keeps the anchored fallback label byte-for-byte", () => {
+  it("an anchored full-session author renders a bare row — no explainer, no helper header", () => {
     const body = renderPrBody({ contributors: [builder({ slice: fullSlice, basis: "anchor" })], excludedCount: 0 });
-    expect(body).toContain(FULL_FALLBACK_LABEL);
-    expect(body).not.toContain(HELPER_FULL_LABEL);
+    expect(body).not.toContain("CODEX HELPERS");
+    expect(body).not.toContain(FULL_FALLBACK_LABEL);
+    expect(body).toMatch(/^claude-opus-4-8\.+\$1\.50$/m);
+  });
+
+  it("an all-helper receipt still renders the group (header explains the whole set)", () => {
+    const body = renderPrBody({ contributors: [helper("h1", 1.74)], excludedCount: 0 });
+    expect(body).toContain(`CODEX HELPERS (1) — ${HELPER_FULL_LABEL}`);
+    expect(body).toContain("1 session behind this PR");
   });
 });
 
@@ -259,12 +279,15 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     expect(body).toContain(big);
   });
 
-  it("drops the whole section when even omission notes cannot fit", () => {
+  it("drops the whole section when even omission notes cannot fit — and the hint says command, not section", () => {
     const rollup = renderPrReceiptText({ contributors: [builder()], excludedCount: 0 });
     // 800 sessions × ~100-char labels → omission notes alone exceed the cap.
     const many = Array.from({ length: 800 }, (_, i) => detail(`session-${i}-${"L".repeat(90)}`, "small"));
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 }, { details: many });
     expect(body).not.toContain("<details>");
+    // The dropped section must not leave a dangling "section below" hint.
+    expect(body).toContain("details: npx aireceipts --session <id>");
+    expect(body).not.toContain("section below");
     expect(body).toContain(rollup);
   });
 });
