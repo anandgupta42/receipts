@@ -11,6 +11,7 @@
 import * as path from "node:path";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
+import { renderReceipt } from "../receipt/render.js";
 import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
 import { isBranchCandidate, overlapsBranchWindow, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
@@ -28,6 +29,8 @@ export interface PrOptions {
   session?: string;
   /** SPEC-0027: publish the HTML receipt artifact and link it (requires --post). */
   artifact?: boolean;
+  /** SPEC-0026 R5: include the collapsed full-receipts section (default true; `--no-details` clears it). */
+  details?: boolean;
 }
 
 export interface PrDeps {
@@ -93,7 +96,8 @@ async function resolveContributors(
       return { error: `failed to load session "${summary.id}"` };
     }
     return {
-      contributors: [{ summary, session, slice: computeSlice(session.turns, shas) }],
+      // Explicitly-selected sessions are the user's own attribution claim — anchor-grade.
+      contributors: [{ summary, session, slice: computeSlice(session.turns, shas), basis: "anchor" }],
       excludedCount: 0,
       sidechains: [],
     };
@@ -150,6 +154,7 @@ async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<
     usd: model.totalUsd,
     tokens: model.totalTokens,
     subagents,
+    basis: raw.basis,
   };
   return { view, model };
 }
@@ -236,7 +241,15 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     link = publishAndLink(bodyInput, sessions, deps);
     artifactFailed = link === null;
   }
-  const body = renderPrBody(bodyInput, link ?? undefined);
+  // SPEC-0026 R5 — per-session full receipts, collapsed, unless --no-details.
+  const details =
+    opts.details === false
+      ? undefined
+      : entries.map((e) => ({
+          label: `${e.view.role} · ${e.view.sessionId}`,
+          text: renderReceipt(e.model, { color: false }),
+        }));
+  const body = renderPrBody(bodyInput, { artifactLink: link ?? undefined, details });
 
   // R3 (SPEC-0019): render before the comment upsert, unconditionally.
   deps.out(body);

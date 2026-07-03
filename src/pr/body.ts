@@ -8,6 +8,8 @@ import type { TokenUsage } from "../parse/types.js";
 import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry } from "../receipt/model.js";
 import { formatInt, formatUsd } from "../receipt/format.js";
+import { cacheServedText } from "../receipt/present.js";
+import { addUsage, emptyUsage } from "../parse/util.js";
 import { RECEIPT_WIDTH, renderBlockLines } from "../receipt/render.js";
 import type { Role } from "./contributors.js";
 import type { SliceResult } from "./slice.js";
@@ -28,6 +30,8 @@ export interface ContributorView {
   usd: number | null;
   tokens: TokenUsage;
   subagents: SubagentRow[];
+  /** SPEC-0026 R3 — how selection credited this session; `helper` relabels the full-session line honestly. */
+  basis?: "anchor" | "helper";
 }
 
 export interface PrBodyInput {
@@ -35,6 +39,12 @@ export interface PrBodyInput {
   /** Candidates that were in repo + window but not credited (R1) — reported honestly (R4). */
   excludedCount: number;
 }
+
+/** SPEC-0026 R3 — a helper session made no commits, so the whole session IS the correct scope (maintainer wording, 2026-07-03). */
+export const HELPER_FULL_LABEL = "entire session (no commits to slice by)";
+/** SPEC-0026 R5 — GitHub caps issue comments at 65,536 chars; we cap under it. */
+const COMMENT_SIZE_CAP = 65_000;
+const OMITTED_NOTE = "full receipt omitted (comment size limit)";
 
 const WORDMARK = "AIRECEIPTS";
 const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
@@ -83,7 +93,8 @@ function mutedNote(text: string, indent = NOTE_INDENT): Block {
 }
 
 function provenanceBlocks(view: ContributorView): Block[] {
-  const slice = sliceHeaderLine(view.slice);
+  const slice =
+    view.basis === "helper" && view.slice.kind === "full" ? HELPER_FULL_LABEL : sliceHeaderLine(view.slice);
   const joined = `${view.sessionId} · ${slice}`;
   const capacity = RECEIPT_WIDTH - NOTE_INDENT;
   if (codepointLength(joined) <= capacity) {
@@ -104,12 +115,12 @@ function subagentValue(row: SubagentRow): string {
   return row.unreadable ? "(unreadable)" : costText(row.usd, row.tokens);
 }
 
-/** One contributor: role/model dotted row, muted provenance line, then any SUBAGENTS sub-rows. */
-function contributorBlocks(view: ContributorView, spaceBefore: boolean): Block[] {
+/** One contributor: role/model dotted row (role only when rows need telling apart — SPEC-0026 R1), muted provenance line, then any SUBAGENTS sub-rows. */
+function contributorBlocks(view: ContributorView, spaceBefore: boolean, showRole: boolean): Block[] {
   const blocks: Block[] = [
     {
       kind: "row",
-      label: `${view.role} · ${formatModelMix(view.modelMix)}`,
+      label: showRole ? `${view.role} · ${formatModelMix(view.modelMix)}` : formatModelMix(view.modelMix),
       value: costText(view.usd, view.tokens),
       spaceBefore,
     },
@@ -188,6 +199,13 @@ function totalBlocks(input: PrBodyInput): Block[] {
     blocks.push({ kind: "total", label: "TOTAL unpriced", value: "0 tokens" });
   }
   blocks.push(mutedNote(countLine(input.contributors.length, totals)));
+  // SPEC-0026 R2 — one aggregate cache line over exactly the atoms the totals
+  // count, through the receipt masthead's own formatter (one implementation).
+  const summed = collectAtoms(input.contributors).atoms.reduce((acc, a) => addUsage(acc, a.tokens), emptyUsage());
+  const cache = cacheServedText(summed);
+  if (cache !== undefined) {
+    blocks.push(mutedNote(cache));
+  }
   if (totals.unreadableCount > 0) {
     blocks.push(mutedNote(`${plural(totals.unreadableCount, "unreadable subagent")} not priced`));
   }
@@ -200,6 +218,8 @@ function totalBlocks(input: PrBodyInput): Block[] {
     });
     blocks.push({ kind: "note", text: "(in repo + branch window, no branch commit)", muted: true });
   }
+  // SPEC-0026 R4 — the route to the full per-tool story, always the last note.
+  blocks.push(mutedNote("details: npx aireceipts --session <id>"));
   return blocks;
 }
 
@@ -209,8 +229,9 @@ function prBlocks(input: PrBodyInput): Block[] {
     { kind: "masthead", text: WORDMARK },
     { kind: "meta", lines: [`${plural(n, "session")} behind this PR`] },
   ];
+  const showRole = n > 1;
   input.contributors.forEach((view, i) => {
-    blocks.push(...contributorBlocks(view, i === 0));
+    blocks.push(...contributorBlocks(view, i === 0, showRole));
   });
   blocks.push(...totalBlocks(input));
   blocks.push({ kind: "footer", text: FOOTER_TEXT, emoji: FOOTER_EMOJI });
@@ -222,16 +243,73 @@ export function renderPrReceiptText(input: PrBodyInput): string {
   return renderBlockLines(prBlocks(input), { color: false, width: RECEIPT_WIDTH }).join("\n");
 }
 
+/** One pre-rendered per-session full receipt for the R5 details section. */
+export interface DetailReceipt {
+  /** `<role> · <sessionId>` — the same strings the rows already show. */
+  label: string;
+  /** `renderReceipt(model, { color: false })` output for the contributor's sliced model. */
+  text: string;
+}
+
+export interface PrBodyExtras {
+  /** SPEC-0027 R3 — present only after a confirmed artifact push. */
+  artifactLink?: { fileName: string; url: string };
+  /** SPEC-0026 R5 — per-session full receipts, row order; omitted under `--no-details`. */
+  details?: DetailReceipt[];
+}
+
+const FENCE = "```";
+
 /**
- * The complete comment body (R4): marker line plus fenced receipt blocks.
- * SPEC-0027 R3: `artifactLink` (a blob URL, present only after a confirmed
- * push) appends one markdown line after the fence — printed and posted bodies
- * are always identical.
+ * The `<details>` section, size-capped: the largest prefix of receipts that
+ * fits is kept, trailing ones degrade to one-line omission notes; `null` when
+ * even all-omitted cannot fit (the caller drops the section). Computed with
+ * prefix sums — one pass, no quadratic reassembly.
  */
-export function renderPrBody(input: PrBodyInput, artifactLink?: { fileName: string; url: string }): string {
+function detailsSection(details: DetailReceipt[], budget: number): string | null {
+  const kept = details.map((d) => `${d.label}\n\n${FENCE}\n${d.text}\n${FENCE}`);
+  const omitted = details.map((d) => `${d.label} — ${OMITTED_NOTE}`);
+  const header = `<details><summary>full receipts (${plural(details.length, "session")})</summary>`;
+  const frame = [...header].length + [...`\n\n${"\n"}\n</details>`].length + details.length; // header + blank lines + joins
+  const size = (s: string): number => [...s].length + 1; // +1 for its join newline
+
+  const allOmitted = frame + omitted.reduce((sum, s) => sum + size(s), 0);
+  if (allOmitted > budget) {
+    return null;
+  }
+  // Largest keep-prefix that fits: swap omitted→kept from the front while the total holds.
+  let total = allOmitted;
+  let keep = 0;
+  while (keep < details.length && total - size(omitted[keep]) + size(kept[keep]) <= budget) {
+    total = total - size(omitted[keep]) + size(kept[keep]);
+    keep++;
+  }
+  const parts = details.map((_, i) => (i < keep ? kept[i] : omitted[i]));
+  return [header, "", ...parts, "", "</details>"].join("\n");
+}
+
+/**
+ * The complete comment body: marker line, fenced receipt blocks, the R5
+ * details section, then the SPEC-0027 artifact link (present only after a
+ * confirmed push) — printed and posted bodies are always identical.
+ */
+export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): string {
   const lines = [DOGFOOD_MARKER, "```", renderPrReceiptText(input), "```"];
-  if (artifactLink) {
-    lines.push(`full receipt: [${artifactLink.fileName}](${artifactLink.url})`);
+  const linkLine = extras.artifactLink
+    ? `full receipt: [${extras.artifactLink.fileName}](${extras.artifactLink.url})`
+    : undefined;
+  if (extras.details !== undefined && extras.details.length > 0) {
+    // Budget with the EXACT bytes that surround the section: everything
+    // rendered so far, the real link line (never a guess), and the join
+    // newlines each appended line costs.
+    const used = [...lines.join("\n")].length + (linkLine === undefined ? 0 : [...linkLine].length + 1) + 2;
+    const section = detailsSection(extras.details, COMMENT_SIZE_CAP - used);
+    if (section !== null) {
+      lines.push(section);
+    }
+  }
+  if (linkLine !== undefined) {
+    lines.push(linkLine);
   }
   lines.push("");
   return lines.join("\n");

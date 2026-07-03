@@ -1,7 +1,7 @@
 ---
 id: SPEC-0026
 title: "PR comment polish — leaner N=1, cache line, honest helper label, details on demand"
-status: draft
+status: building
 milestone: M3
 depends: [SPEC-0023, SPEC-0024]
 ---
@@ -197,8 +197,8 @@ informative.
 - [ ] This spec's own implementation PR carries the new comment shape: solo
       or multi rows per R1, cache line if applicable, hint line, and a
       working collapsed details section.
-- [ ] Goldens untouched — the terminal receipt surface did not move.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] Goldens untouched — the terminal receipt surface did not move (only `goldens/cli/help.txt` and the SPEC-0027 artifact-page golden regenerated, both deliberate).
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass
       unmasked (`echo $?`).
 
@@ -249,4 +249,15 @@ criteria: this spec's own PR must post the new comment shape.
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 26 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-03 · S5 (implementation review, Codex): REWORK → fixed.** (1) MEDIUM:
+the size-cap budget reserved a hardcoded 200 chars for the artifact link —
+accepted; the budget now counts the exact link line + join newlines. (2) LOW:
+no dispatch-level test for `--no-details` — accepted; registry
+`resolveCommand` assertions added (an empty-HOME `main()` probe was tried and
+dropped: adapter roots snapshot at import, so it cannot isolate). The critic
+confirmed: R1 test rewrites are the specced flip, R3 basis honesty and the
+cache-formatter extraction behaviorally identical, R5 assembly order correct.
+
+**2026-07-03 · approved (button 1):** maintainer, in-session — *"SPEC-0026 -
+approved."* Status → building. Build base: PR #63's branch (SPEC-0027 impl),
+so R5's details section can also give 0027's link line its final home.
