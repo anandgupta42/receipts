@@ -50,6 +50,49 @@ plainly. (SPEC-0028.)
 - **Determinism**: anyone with the transcript can re-render the receipt and
   compare bytes.
 
+## Where the numbers can go wrong
+
+*A living list (maintainer directive, 2026-07-03): every newly discovered
+scenario gets an entry here in the same PR that handles it — the doc test
+pins this section and its minimum size, so removing an entry fails CI.
+Each entry names the scenario, the direction of the error, and the marker
+that makes it visible on the receipt.*
+
+1. **A contributing session leaves no proof.** `git commit --quiet`,
+   cherry-picks, or filtering the SHA out of push output leave no branch SHA
+   in any tool output — the session is excluded and the total renders as a
+   floor (`≥`). Understates; marked by the floor and the
+   "not attributed" note. (Observed live on PR #61 and PR #66.)
+2. **Rows round; the total doesn't.** Each row shows its own rounded cents
+   while TOTAL formats the raw sum, so hand-adding rows can differ from the
+   total by up to about half a cent per priced row. Bounded and enforced by
+   the ledger property test; exact values live in `--json`.
+3. **Unpriced models show tokens, never dollars.** No dated, cited price row →
+   tokens only; a mixed receipt renders `$` and token subtotals separately,
+   never blended.
+4. **Cursor sessions carry totals only.** No per-turn usage exists in the
+   transcript, so per-tool attribution is impossible; the receipt says so
+   verbatim rather than splitting by guesswork.
+5. **Helper crediting is a heuristic.** A no-commit Codex session in the
+   current worktree during the branch window is credited on cwd+time —
+   unrelated concurrent Codex work in the same worktree could over-credit.
+   Grouped under `CODEX HELPERS — no commits`, never presented as an author.
+6. **Slices are anchor-bounded.** Work before a session's first branch commit
+   or after its last may fall outside the counted turn range; the slice line
+   states the exact range so the boundary is inspectable.
+7. **Subagent rollups are window-bounded.** A child straddling the slice
+   window counts if its launch or finish lands inside; a child that cannot be
+   parsed is listed as unreadable, priced at nothing, and floors the total.
+8. **Price tables age.** Rows are dated and cited, with a daily drift
+   tripwire — but a receipt rendered before a price correction reflects the
+   table it cited that day. Re-render to re-price.
+9. **Vendor accounting is only as checkable as the vendor makes it.** Codex
+   sessions reconcile exactly (tolerance 0) against the rollout's own token
+   envelope; Claude Code transcripts carry no independent total, so only
+   shape invariants apply there.
+10. **Transcripts are editable.** See above — time-integrity caveats surface
+    some inconsistencies, not all edits.
+
 If you need a stronger guarantee than an author's disclosure — billing-grade
 attribution across a team — use your vendor's console. aireceipts will not
 pretend to be that, and a receipt that pretended would be worth less than one

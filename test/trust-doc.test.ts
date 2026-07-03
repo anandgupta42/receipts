@@ -21,4 +21,13 @@ describe("docs/trust.md", () => {
     expect(doc).toContain("cannot prove");
     expect(doc).toContain("author's disclosure");
   });
+
+  it("keeps the living failure-scenario list — present, growing, never shrinking below its floor", () => {
+    expect(doc).toContain("## Where the numbers can go wrong");
+    const section = doc.split("## Where the numbers can go wrong")[1];
+    const entries = section.match(/^\d+\. \*\*/gm) ?? [];
+    // 10 scenarios at introduction (2026-07-03). Add entries freely; removing
+    // one must be a conscious act that updates this floor with justification.
+    expect(entries.length).toBeGreaterThanOrEqual(10);
+  });
 });
