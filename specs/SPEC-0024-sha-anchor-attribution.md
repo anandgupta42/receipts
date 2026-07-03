@@ -1,7 +1,7 @@
 ---
 id: SPEC-0024
 title: "SHA-anchored attribution — orphan sidechains and cross-repo leads count"
-status: building
+status: shipped
 milestone: M3
 depends: [SPEC-0023]
 ---
@@ -239,3 +239,6 @@ exit 0.
 
 **2026-07-02 · approved:** maintainer approval given directly in session
 ("approve SPEC-0024") after reviewing the validated draft — button 1.
+
+**2026-07-03 · spec-ledger cleanup (maintainer-directed, 2026-07-03):** status set to `shipped` — implementation merged in
+PR #57 with the build receipt attached; issue #51 closed.
