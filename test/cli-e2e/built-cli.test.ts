@@ -97,16 +97,37 @@ async function stageClaudeSession(home: string, fixtureName: string, destName = 
   return dest;
 }
 
+/** Is this platform-specific package installable HERE? Passing an incompatible one
+ * to `npm install` makes it a direct dep and EBADPLATFORMs the whole install (CI keeps
+ * both musl and glibc variants in node_modules; only one fits the runner). */
+async function platformCompatible(pkgDir: string): Promise<boolean> {
+  try {
+    const pkg = JSON.parse(await readFile(path.join(pkgDir, "package.json"), "utf8")) as {
+      os?: string[]; cpu?: string[]; libc?: string[];
+    };
+    if (pkg.os && !pkg.os.includes(process.platform)) return false;
+    if (pkg.cpu && !pkg.cpu.includes(process.arch)) return false;
+    if (pkg.libc && process.platform === "linux") {
+      const isMusl = process.report?.getReport !== undefined &&
+        !(process.report.getReport() as { header?: { glibcVersionRuntime?: string } }).header?.glibcVersionRuntime;
+      if (!pkg.libc.includes(isMusl ? "musl" : "glibc")) return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function localRuntimePackageDirs(): Promise<string[]> {
   const resvgScope = path.join(repoRoot, "node_modules", "@resvg");
   const resvgPackages = await readdir(resvgScope, { withFileTypes: true }).catch(() => []);
-  return [
-    path.join(repoRoot, "node_modules", "zod"),
-    path.join(resvgScope, "resvg-js"),
-    ...resvgPackages
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith("resvg-js-"))
-      .map((entry) => path.join(resvgScope, entry.name)),
-  ];
+  const platformDirs: string[] = [];
+  for (const entry of resvgPackages) {
+    if (!entry.isDirectory() || !entry.name.startsWith("resvg-js-")) continue;
+    const dir = path.join(resvgScope, entry.name);
+    if (await platformCompatible(dir)) platformDirs.push(dir);
+  }
+  return [path.join(repoRoot, "node_modules", "zod"), path.join(resvgScope, "resvg-js"), ...platformDirs];
 }
 
 beforeAll(async () => {
