@@ -1,7 +1,7 @@
 ---
 id: SPEC-0027
 title: "Published receipt artifact — opt-in HTML page on a dedicated branch, linked from the comment"
-status: draft
+status: building
 milestone: M4
 depends: [SPEC-0023, SPEC-0026]
 ---
@@ -50,9 +50,11 @@ after a confirmed push.
   page (inline CSS, zero external requests, no scripts, light/dark via
   `prefers-color-scheme`) rendering the concise multi-session rollup, each
   contributor's full per-tool receipt, waste lines, and the methodology
-  text. Content parity is a hard bound: no string beyond what the terminal
-  receipt surfaces already print (titles, tool names, counts, costs, labels)
-  may appear. The exporter is a new module `src/pr/html.ts` consuming the
+  text. Content parity is a hard bound on session-derived strings: nothing
+  from a transcript beyond what the terminal receipt surfaces already print
+  (titles, tool names, counts, costs, labels) may appear; the page's fixed
+  chrome (wordmark, `receipt artifact · PR #<n>`, footer) is enumerated in
+  the module and asserted absence-side by test. The exporter is a new module `src/pr/html.ts` consuming the
   per-contributor sliced `ReceiptModel`s that `runPr` already builds and
   currently discards after each view (`src/pr/index.ts:130-144` — retaining
   them alongside `ContributorView` is part of this change; the single-model
@@ -64,9 +66,13 @@ after a confirmed push.
   empty root commit if missing), one commit per publish. The new tree is the
   current branch tip's tree with `pr-<n>.html` upserted — **every other PR's
   artifact is preserved** (an old comment's link must never die to a new
-  publish). Implementation is git plumbing only (`hash-object` → `mktree` →
-  `commit-tree` → `push <url> <sha>:refs/heads/aireceipts/artifacts`); the
-  working tree, index, and current branch are never touched. On a
+  publish); when the branch is absent, the first commit is parentless and
+  carries the artifact directly. Implementation is git plumbing only
+  (`hash-object` → `mktree` → `commit-tree` →
+  `push <url> <sha>:refs/heads/aireceipts/artifacts`; the tip fetch runs
+  `--no-tags --no-write-fetch-head`, so only loose objects enter the odb);
+  the working tree, index, current branch, and every other ref are never
+  touched. On a
   non-fast-forward race: refetch the tip, rebuild the tree, retry once, then
   fail visibly.
 - **R3 — One body, links only after a confirmed push (render-first
@@ -130,7 +136,7 @@ after a confirmed push.
 | R1 scheme | rendered html | one `prefers-color-scheme` media query; both palettes defined inline |
 | R1 content parity | html vs terminal/details renders of same models | no string in html absent from those surfaces |
 | R1 models retained | runPr with N contributors | N sliced `ReceiptModel`s reach the exporter (seam change) |
-| R2 orphan create | no artifact branch | orphan root created; tree contains only `pr-<n>.html` |
+| R2 orphan create | no artifact branch | parentless first commit; tree contains only `pr-<n>.html` |
 | R2 preserve siblings | branch has `pr-58.html`; publish PR 59 | new tip tree contains both files |
 | R2 overwrite | second publish, same PR | same path replaced; one new commit |
 | R2 no-touch | publish with dirty working tree (mocked runner) | no working-tree/index/current-branch commands issued |
@@ -197,7 +203,24 @@ opt-in shape is his. Kill-criterion (b)'s judgment evidence is built into the
 success criteria: the spec's own PR must land the real link and record what
 clicking it is actually like on a repo without branch-Pages.
 
+**2026-07-03 · S5 (implementation review, Codex): REWORK → fixed.** (1) HIGH:
+bare `git fetch` writes FETCH_HEAD and can auto-follow tags into local refs —
+accepted; fetch now runs `--no-tags --no-write-fetch-head` (objects only) and
+the plumbing-sequence test asserts both flags. (2) MEDIUM: page chrome
+exceeded the literal "no string beyond receipt surfaces" bound — accepted as
+a spec-precision fix: the bound is session-derived strings; chrome is
+enumerated and tested absence-side. (3) LOW: "empty orphan root commit"
+wording vs. first-commit-carries-the-file implementation — spec aligned to
+the simpler implementation. (4) LOW: R4's dispatch test only exercised
+`parseOptions` — accepted; a real `main(["pr", "--artifact"])` dispatch
+test added. R3 honesty and sibling preservation confirmed clean by the
+reviewer.
+
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 27 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-03 · approved (button 1):** maintainer, in-session — *"get started
+with spec-27 implementation."* Status → building. Build note: SPEC-0026 is
+still a draft, so the R3 link line lands directly after the fenced receipt
+until 0026 ships its details section (placement-only deviation, flagged in
+the implementation PR).

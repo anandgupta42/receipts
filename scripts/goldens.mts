@@ -12,6 +12,8 @@ import { renderReceipt } from "../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../src/receipt/svg.js";
 import { renderMiniReceipt } from "../src/receipt/mini.js";
 import { TEMPLATE_NAMES } from "../src/receipt/blocks.js";
+import { renderPrArtifactHtml } from "../src/pr/html.js";
+import type { ContributorView } from "../src/pr/body.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 
 const update = process.argv.includes("--update");
@@ -95,6 +97,30 @@ for (const e of hostileCorpus) {
     check(`goldens/svg/${hostileStem}-${template}-light.svg`, renderReceiptSvg(hostileModel, { theme: "light", template }));
   }
 }
+
+// SPEC-0027 R1: the PR receipt artifact page — one two-session golden built
+// from already-loaded fixture models with fixed provenance (I1/I5).
+mkdirSync("goldens/html", { recursive: true });
+function artifactView(role: ContributorView["role"], sessionId: string, model: ReceiptModel): ContributorView {
+  return {
+    role,
+    sessionId,
+    slice: { kind: "full", startTurn: 0, endTurn: 0, turnCount: 1, label: "entire session (slice unavailable)" },
+    modelMix: model.modelMix,
+    usd: model.totalUsd,
+    tokens: model.totalTokens,
+    subagents: [],
+  };
+}
+const artifactViews = [artifactView("builder", "golden-builder", pricedModel), artifactView("builder", "golden-loop", loopModel)];
+check(
+  "goldens/html/pr-artifact.html",
+  renderPrArtifactHtml({
+    prNumber: 42,
+    body: { contributors: artifactViews, excludedCount: 1 },
+    sessions: artifactViews.map((v, i) => ({ label: `${v.role} · ${v.sessionId}`, model: i === 0 ? pricedModel : loopModel })),
+  }),
+);
 
 if (drift > 0) process.exit(1);
 if (!update) console.log(`goldens: ${count} artifacts byte-identical.`);

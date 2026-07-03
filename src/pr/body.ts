@@ -217,14 +217,22 @@ function prBlocks(input: PrBodyInput): Block[] {
   return blocks;
 }
 
-/** The complete comment body (R4): marker line plus fenced receipt blocks. */
-export function renderPrBody(input: PrBodyInput): string {
-  const receipt = renderBlockLines(prBlocks(input), { color: false, width: RECEIPT_WIDTH }).join("\n");
-  return [
-    DOGFOOD_MARKER,
-    "```",
-    receipt,
-    "```",
-    "",
-  ].join("\n");
+/** The bare concise receipt text (no marker, no fence) — shared by the comment body and the SPEC-0027 HTML artifact. */
+export function renderPrReceiptText(input: PrBodyInput): string {
+  return renderBlockLines(prBlocks(input), { color: false, width: RECEIPT_WIDTH }).join("\n");
+}
+
+/**
+ * The complete comment body (R4): marker line plus fenced receipt blocks.
+ * SPEC-0027 R3: `artifactLink` (a blob URL, present only after a confirmed
+ * push) appends one markdown line after the fence — printed and posted bodies
+ * are always identical.
+ */
+export function renderPrBody(input: PrBodyInput, artifactLink?: { fileName: string; url: string }): string {
+  const lines = [DOGFOOD_MARKER, "```", renderPrReceiptText(input), "```"];
+  if (artifactLink) {
+    lines.push(`full receipt: [${artifactLink.fileName}](${artifactLink.url})`);
+  }
+  lines.push("");
+  return lines.join("\n");
 }

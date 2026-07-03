@@ -30,6 +30,27 @@ git receipt                  # after pushing your branch
 The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
 copy the body straight into a comment.
 
+### Optional: publish a durable receipt page
+
+```sh
+npx aireceipts pr --post --artifact
+```
+
+`--artifact` (requires `--post`) additionally writes a self-contained
+`pr-<n>.html` — the concise rollup plus every session's full per-tool
+receipt — to a dedicated `aireceipts/artifacts` branch of the PR's base repo,
+and appends one `full receipt:` link to the comment. The link only appears
+after the push is confirmed; if you lack push rights the comment still posts,
+just without the link.
+
+Honest note on rendering: GitHub shows a branch-hosted HTML file as *source*.
+It renders as a real page only if the repo points GitHub Pages at the
+`aireceipts/artifacts` branch (repos that deploy Pages from a workflow, like
+this one, can't do both). The file is a durable, self-contained artifact
+either way. Publishing writes nothing to your working tree, index, or current
+branch, and each PR's file is overwritten in place — other PRs' artifacts are
+never touched.
+
 ## For maintainers (repo integration, 5 minutes)
 
 1. Copy one workflow file into your repo: `.github/workflows/pr-receipt-check.yml`
