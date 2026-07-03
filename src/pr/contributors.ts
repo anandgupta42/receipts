@@ -30,11 +30,13 @@ export interface PoolCandidate {
   pool: CandidatePool;
 }
 
-/** One session credited to the PR: the loaded session and its own PR-scoped slice. */
+/** One session credited to the PR: the loaded session, its own PR-scoped slice, and how it was credited (SPEC-0026 R3). */
 export interface RawContributor {
   summary: SessionSummary;
   session: Session;
   slice: SliceResult;
+  /** `anchor` = own branch-SHA proof; `helper` = the SHA-less current-worktree Codex rule. */
+  basis: "anchor" | "helper";
 }
 
 export interface ContributorSelection {
@@ -92,7 +94,12 @@ export async function selectContributors(
     // the anchor pool, is not proven ours (R1).
     const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0 && here);
     if (include) {
-      contributors.push({ summary, session, slice: computeSlice(session.turns, branchShas) });
+      contributors.push({
+        summary,
+        session,
+        slice: computeSlice(session.turns, branchShas),
+        basis: anchors.hasOwn ? "anchor" : "helper",
+      });
     } else if (here) {
       // Plausibly ours (this worktree) but unproven — surface it in the honest note.
       excludedCount++;

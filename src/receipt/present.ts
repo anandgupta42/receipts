@@ -21,6 +21,7 @@ import {
 import type { Block, ReceiptView, TemplateName } from "./blocks.js";
 import { formatAbsoluteUtc, formatDuration, formatInt, formatUsd } from "./format.js";
 import type { ReceiptModel, ToolRow, WasteLine } from "./model.js";
+import type { TokenUsage } from "../parse/types.js";
 
 export type { ReceiptView } from "./blocks.js";
 export { PRICE_DELTA_NOTE, TRIVIAL_SPANS_LABEL } from "./blocks.js";
@@ -53,12 +54,13 @@ function titleLine(model: ReceiptModel): string | undefined {
   return `“${cut}”`;
 }
 
-/** Share of prompt-side tokens served from cache — the single most explanatory cost fact a session has. `undefined` when there is no per-turn usage (Cursor) or no prompt tokens at all. */
-function cacheLine(model: ReceiptModel): string | undefined {
-  if (model.unpriceable) {
-    return undefined;
-  }
-  const t = model.totalTokens;
+/**
+ * Share of prompt-side tokens served from cache, over any `TokenUsage` — one
+ * formatter for the receipt masthead AND the PR comment's aggregate line
+ * (SPEC-0026 R2; a duplicated implementation is a review-rejected defect).
+ * `undefined` when there are no prompt tokens or no cache reads.
+ */
+export function cacheServedPct(t: TokenUsage): string | undefined {
   const promptSide = t.input + t.cacheRead + t.cacheCreation;
   if (promptSide <= 0 || t.cacheRead <= 0) {
     return undefined;
@@ -67,8 +69,20 @@ function cacheLine(model: ReceiptModel): string | undefined {
   // Display honesty: never round a partial ratio up to the impossible-sounding
   // "100%" — a real session always has SOME uncached prompt. True 100% (synthetic
   // fixtures) may say it; 99.5%+ says ">99%".
-  const pct = ratio >= 1 ? "100" : Math.round(ratio * 100) >= 100 ? ">99" : String(Math.round(ratio * 100));
-  return `cache served ${pct}% of input tokens`;
+  return ratio >= 1 ? "100" : Math.round(ratio * 100) >= 100 ? ">99" : String(Math.round(ratio * 100));
+}
+
+export function cacheServedText(t: TokenUsage): string | undefined {
+  const pct = cacheServedPct(t);
+  return pct === undefined ? undefined : `cache served ${pct}% of input tokens`;
+}
+
+/** Share of prompt-side tokens served from cache — the single most explanatory cost fact a session has. `undefined` when there is no per-turn usage (Cursor) or no prompt tokens at all. */
+function cacheLine(model: ReceiptModel): string | undefined {
+  if (model.unpriceable) {
+    return undefined;
+  }
+  return cacheServedText(model.totalTokens);
 }
 
 function charCount(s: string): number {
@@ -79,7 +93,8 @@ function withoutSeconds(utc: string): string {
   return utc.replace(/:\d{2} UTC$/u, " UTC");
 }
 
-function compactDuration(duration: string): string {
+/** `15h 53m 20s` → `15h 53m` — a stat line doesn't need seconds. */
+export function compactDuration(duration: string): string {
   return duration.replace(/ \d{2}s$/u, "");
 }
 

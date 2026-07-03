@@ -5,7 +5,8 @@
 import { describe, expect, it } from "vitest";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
 import type { ModelMixEntry } from "../../src/receipt/model.js";
-import { DOGFOOD_MARKER, renderPrBody, sliceHeaderLine, type ContributorView } from "../../src/pr/body.js";
+import { DOGFOOD_MARKER, HELPER_FULL_LABEL, renderPrBody, renderPrReceiptText, sliceHeaderLine, type ContributorView } from "../../src/pr/body.js";
+import { cacheServedText } from "../../src/receipt/present.js";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 import { FULL_FALLBACK_LABEL } from "../../src/pr/slice.js";
 
@@ -52,27 +53,42 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
     expect(body.match(/```/g)).toHaveLength(2);
   });
 
-  it("renders a role · model-mix dotted row with the slice as a muted provenance line under it", () => {
+  it("suppresses the role at N=1 and the redundant 100% share (SPEC-0026 R1, round 2)", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
-    expect(body).toContain("builder · claude-opus-4-8 100%...............$1.50");
-    // provenance line: session id + slice header, demoted below the row.
-    expect(body).toContain("abc123 · session slice: turns 2–4 of 6");
-    // the slice line is NOT a markdown headline.
-    expect(body).not.toContain("🧾 **aireceipts**");
+    expect(body).not.toContain("builder ·");
+    expect(body).not.toContain("100%");
+    expect(body).toMatch(/^claude-opus-4-8\.+\$1\.50$/m);
+    // Round 2: a real slice keeps its line (it changes the number's meaning); the id does not.
+    expect(body).toContain("session slice: turns 2–4 of 6");
+    expect(body).not.toContain("abc123");
   });
 
-  it("shows each model with its rounded share for a multi-model session", () => {
+  it("keeps the role prefix whenever rows need telling apart (N≥2)", () => {
+    const body = renderPrBody({ contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 });
+    expect(body).toContain("builder · claude-opus-4-8");
+    expect(body).not.toContain("100%");
+  });
+
+  it("shows each model with its rounded share for a multi-model session (no role at N=1)", () => {
     const view = builder({ modelMix: [mix("claude-opus-4-8", 0.8), mix("claude-haiku-4-5", 0.2)] });
     const body = renderPrBody({ contributors: [view], excludedCount: 0 });
-    expect(body).toContain("builder · claude-opus-4-8 80% · claude-ha…...$1.50");
+    expect(body).toMatch(/^claude-opus-4-8 80% · claude-haiku-4-5 20%\.*\$1\.50$/m);
   });
 
-  it("keeps long provenance inside the 50-column receipt", () => {
+  it("a real mix never rounds to 100%/0% (>99%/<1%, the cache line's rule)", () => {
+    const view = builder({ modelMix: [mix("claude-opus-4-8", 0.996), mix("claude-haiku-4-5", 0.004)] });
+    const body = renderPrBody({ contributors: [view], excludedCount: 0 });
+    expect(body).toContain(">99%");
+    expect(body).not.toContain("100%");
+    expect(body).not.toContain(" 0%");
+  });
+
+  it("carries no session ids in the fence (round 2) and every line fits 50 columns", () => {
     const body = renderPrBody({
       contributors: [builder({ sessionId: "rollout-2026-07-02T18-06-36-019f2583-6862-71c3-9abf-0eb4244ae5b0" })],
       excludedCount: 0,
     });
-    expect(body).toContain("session: rollout-2026-07-02T18-06-36-019f2583-6…");
+    expect(body).not.toContain("rollout-2026-07-02T18-06-36");
     for (const line of fencedLines(body)) {
       expect([...line].length).toBeLessThanOrEqual(50);
     }
@@ -86,7 +102,7 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
       ],
       excludedCount: 0,
     });
-    expect(body).toContain("orchestrator · claude-opus-4-8 100%..........$1.50");
+    expect(body).toContain("orchestrator · claude-opus-4-8...............$1.50");
     expect(body).toContain("codex · no model reported.............5,000 tokens");
   });
 });
@@ -178,5 +194,145 @@ describe("SPEC-0028 R1 floor totals (a known-incomplete number says so)", () => 
   it("floors the zero-atom fallback when everything was excluded", () => {
     const body = renderPrBody({ contributors: [], excludedCount: 3 });
     expect(body).toContain("≥ 0 tokens");
+  });
+});
+
+describe("SPEC-0026 R2 · aggregate cache line", () => {
+  const cached = (cacheRead: number, input = 1000) =>
+    withTotal({ ...emptyUsage(), input, cacheRead });
+
+  it("renders one muted cache line over the counted atoms, under counted:", () => {
+    const view = builder({ tokens: cached(600, 400) });
+    const lines = fencedLines(renderPrBody({ contributors: [view], excludedCount: 0 }));
+    const counted = lines.findIndex((l) => l.includes("counted: 1 session"));
+    expect(lines[counted + 1]).toContain("cache served 60% of input tokens");
+  });
+
+  it("stays absent when no counted atom read cache", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
+    expect(body).not.toContain("cache served");
+  });
+
+  it("counts subagent tokens in the aggregate (a child's cache reads are real spend)", () => {
+    const sub: SubagentRow = { name: "kid", usd: null, tokens: cached(500, 500), unreadable: false, filePath: "kid.jsonl" };
+    const body = renderPrBody({ contributors: [builder({ subagents: [sub] })], excludedCount: 0 });
+    expect(body).toContain("cache served");
+  });
+
+  it("matches the receipt masthead formatter exactly (one implementation, I3)", () => {
+    const usage = cached(600, 400);
+    const view = builder({ tokens: usage });
+    const body = renderPrBody({ contributors: [view], excludedCount: 0 });
+    expect(body).toContain(cacheServedText(usage)!);
+  });
+
+  it("never rounds a partial ratio up to 100 (>99 boundary preserved)", () => {
+    const usage = cached(9990, 10);
+    expect(cacheServedText(usage)).toBe("cache served >99% of input tokens");
+    const body = renderPrBody({ contributors: [builder({ tokens: usage })], excludedCount: 0 });
+    expect(body).toContain(">99% of input tokens");
+    expect(body).not.toContain("cache served 100%");
+  });
+});
+
+describe("SPEC-0026 R3 (round 2) · helpers group under one explanatory header", () => {
+  const fullSlice = { kind: "full" as const, startTurn: 0, endTurn: 5, turnCount: 6, label: FULL_FALLBACK_LABEL };
+  const helper = (id: string, usd: number, durationMs?: number) =>
+    builder({ sessionId: id, slice: fullSlice, basis: "helper", role: "codex", usd, durationMs, modelMix: [mix("gpt-5.5", 1)] });
+
+  it("renders helpers as muted rows under CODEX HELPERS with duration as the one per-row fact", () => {
+    const body = renderPrBody(
+      { contributors: [builder(), helper("h1", 1.74, 18 * 60_000), helper("h2", 0.3, 4 * 60_000)], excludedCount: 0 },
+    );
+    const lines = fencedLines(body);
+    const header = lines.findIndex((l) => l.includes(`CODEX HELPERS (2) — ${HELPER_FULL_LABEL}`));
+    expect(header).toBeGreaterThan(-1);
+    expect(lines[header + 1]).toMatch(/gpt-5\.5 · 18m\.+\$1\.74/);
+    expect(lines[header + 2]).toMatch(/gpt-5\.5 · 4m\.+\$0\.30/);
+    // The explainer lives once on the header — never per row, never the old long label.
+    expect(body).not.toContain("no commits to slice by");
+    expect(body).not.toContain(FULL_FALLBACK_LABEL);
+    // Helpers are grouped after authors; the author row keeps its slice line.
+    expect(body).toContain("session slice: turns 2–4 of 6");
+  });
+
+  it("an anchored full-session author renders a bare row — no explainer, no helper header", () => {
+    const body = renderPrBody({ contributors: [builder({ slice: fullSlice, basis: "anchor" })], excludedCount: 0 });
+    expect(body).not.toContain("CODEX HELPERS");
+    expect(body).not.toContain(FULL_FALLBACK_LABEL);
+    expect(body).toMatch(/^claude-opus-4-8\.+\$1\.50$/m);
+  });
+
+  it("an all-helper receipt still renders the group (header explains the whole set)", () => {
+    const body = renderPrBody({ contributors: [helper("h1", 1.74)], excludedCount: 0 });
+    expect(body).toContain(`CODEX HELPERS (1) — ${HELPER_FULL_LABEL}`);
+    expect(body).toContain("1 session behind this PR");
+  });
+});
+
+describe("SPEC-0026 R4 · footer hint", () => {
+  it("is the last muted note of the fenced receipt", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 1 });
+    const lines = fencedLines(body);
+    const hint = lines.findIndex((l) => l.includes("details: npx aireceipts --session <id>"));
+    expect(hint).toBeGreaterThan(-1);
+    // After the hint: only the rule/footer decoration, never another note.
+    expect(lines.slice(hint + 1).every((l) => !l.trim().startsWith("(") && !l.includes("not attributed"))).toBe(true);
+  });
+});
+
+describe("SPEC-0026 R5 · collapsed full receipts", () => {
+  const detail = (label: string, text = "RECEIPT-TEXT") => ({ label, text });
+
+  it("appends the details section after the fence, receipts in row order, marker still first", () => {
+    const body = renderPrBody(
+      { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
+      { details: [detail("builder · abc123", "AAA"), detail("builder · def456", "BBB")] },
+    );
+    expect(body.startsWith(DOGFOOD_MARKER)).toBe(true);
+    expect(body).toContain("<details><summary>full receipts (2 sessions)</summary>");
+    expect(body.indexOf("</details>")).toBeGreaterThan(body.indexOf("AAA"));
+    expect(body.indexOf("AAA")).toBeLessThan(body.indexOf("BBB"));
+    expect(body.indexOf("<details>")).toBeGreaterThan(body.indexOf("```"));
+  });
+
+  it("places the SPEC-0027 artifact link under the details section, after a BLANK line (GFM HTML-block rule)", () => {
+    const body = renderPrBody(
+      { contributors: [builder()], excludedCount: 0 },
+      { details: [detail("builder · abc123")], artifactLink: { fileName: "pr-9.html", url: "https://x/pr-9.html" } },
+    );
+    expect(body.indexOf("full receipt: [pr-9.html]")).toBeGreaterThan(body.indexOf("</details>"));
+    // Without the blank line GitHub swallows the link into the HTML block and
+    // renders it as raw text (maintainer catch on PR #63, 2026-07-03).
+    expect(body).toContain("</details>\n\nfull receipt: [pr-9.html]");
+  });
+
+  it("omits the section entirely without details (--no-details path)", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
+    expect(body).not.toContain("<details>");
+  });
+
+  it("drops trailing receipts to omission notes under the size cap — never mid-receipt truncation", () => {
+    const big = "X".repeat(40_000);
+    const body = renderPrBody(
+      { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
+      { details: [detail("builder · abc123", big), detail("builder · def456", big)] },
+    );
+    expect([...body].length).toBeLessThanOrEqual(65_000);
+    expect(body).toContain("builder · def456 — full receipt omitted (comment size limit)");
+    // The kept receipt is intact, not truncated.
+    expect(body).toContain(big);
+  });
+
+  it("drops the whole section when even omission notes cannot fit — and the hint says command, not section", () => {
+    const rollup = renderPrReceiptText({ contributors: [builder()], excludedCount: 0 });
+    // 800 sessions × ~100-char labels → omission notes alone exceed the cap.
+    const many = Array.from({ length: 800 }, (_, i) => detail(`session-${i}-${"L".repeat(90)}`, "small"));
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 }, { details: many });
+    expect(body).not.toContain("<details>");
+    // The dropped section must not leave a dangling "section below" hint.
+    expect(body).toContain("details: npx aireceipts --session <id>");
+    expect(body).not.toContain("section below");
+    expect(body).toContain(rollup);
   });
 });

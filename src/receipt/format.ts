@@ -117,3 +117,17 @@ export function formatRatio(ratio: number): string {
 export function formatTokensK(n: number): string {
   return `${formatInt(Math.round(n / 1000))}k tok`;
 }
+
+/**
+ * SPEC-0026 round 2 — abbreviated token counts for stat lines (`371k`, `1.2M`).
+ * One decimal only while it disambiguates (< 10 of the unit), deterministic
+ * rounding; never truncates a digit mid-value.
+ */
+export function formatShortTokens(n: number): string {
+  if (n < 1000) {
+    return String(n);
+  }
+  const unit = (v: number, suffix: string): string =>
+    `${v < 9.95 ? v.toFixed(1).replace(/\.0$/u, "") : String(Math.round(v))}${suffix}`;
+  return n < 999_500 ? unit(n / 1000, "k") : unit(n / 1_000_000, "M");
+}

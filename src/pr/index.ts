@@ -11,18 +11,29 @@
 import * as path from "node:path";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
+import { renderReceipt } from "../receipt/render.js";
+import { cacheServedPct, compactDuration } from "../receipt/present.js";
+import { formatDuration, formatShortTokens } from "../receipt/format.js";
+import { HELPER_FULL_LABEL, sliceHeaderLine } from "./body.js";
 import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
 import { isBranchCandidate, overlapsBranchWindow, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
 import { deriveRole, selectContributors, type PoolCandidate, type RawContributor } from "./contributors.js";
 import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
-import { renderPrBody, type ContributorView } from "./body.js";
-import { upsertPrComment } from "./comment.js";
+import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
+import { resolvePr, upsertPrComment } from "./comment.js";
+import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
+import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
+import type { ReceiptModel } from "../receipt/model.js";
 
 export interface PrOptions {
   post: boolean;
   session?: string;
+  /** SPEC-0027: publish the HTML receipt artifact and link it (requires --post). */
+  artifact?: boolean;
+  /** SPEC-0026 R5: include the collapsed full-receipts section (default true; `--no-details` clears it). */
+  details?: boolean;
 }
 
 export interface PrDeps {
@@ -88,7 +99,8 @@ async function resolveContributors(
       return { error: `failed to load session "${summary.id}"` };
     }
     return {
-      contributors: [{ summary, session, slice: computeSlice(session.turns, shas) }],
+      // Explicitly-selected sessions are the user's own attribution claim — anchor-grade.
+      contributors: [{ summary, session, slice: computeSlice(session.turns, shas), basis: "anchor" }],
       excludedCount: 0,
       sidechains: [],
     };
@@ -124,8 +136,12 @@ async function resolveContributors(
   return { ...selection, sidechains };
 }
 
-/** Slice → price → roll up → role each contributor into what the comment renders (R2/R3). */
-async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<ContributorView> {
+/**
+ * Slice → price → roll up → role each contributor into what the comment
+ * renders (R2/R3). The sliced `ReceiptModel` is returned alongside the view —
+ * SPEC-0027's artifact page renders it in full instead of discarding it.
+ */
+async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<{ view: ContributorView; model: ReceiptModel }> {
   const rendered = raw.slice.kind === "slice" ? sliceSessionForReceipt(raw.session, raw.slice) : raw.session;
   const model = await buildReceiptModel(rendered);
   const window: RollupWindow =
@@ -133,7 +149,7 @@ async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<
       ? { start: rendered.startedAt, end: rendered.endedAt }
       : null;
   const subagents = await deps.rollup(raw.summary.filePath, window);
-  return {
+  const view: ContributorView = {
     role: deriveRole(raw.summary, raw.session, subagents.length > 0),
     sessionId: stemOf(raw.summary.filePath),
     slice: raw.slice,
@@ -141,11 +157,69 @@ async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<
     usd: model.totalUsd,
     tokens: model.totalTokens,
     subagents,
+    basis: raw.basis,
+    durationMs: model.durationMs,
   };
+  return { view, model };
 }
 
-/** `aireceipts pr [--post] [--session <id>]`. Returns the process exit code. */
+/**
+ * SPEC-0027 R2/R3: build the artifact from the retained models and push it to
+ * the base repo's artifact branch. Returns the confirmed link, or `null` with
+ * the failure already written to stderr — the caller renders the one final
+ * body either way (a link never outruns its artifact, kill criterion c).
+ */
+function publishAndLink(
+  bodyInput: PrBodyInput,
+  sessions: ArtifactSession[],
+  deps: PrDeps,
+): { fileName: string; url: string } | null {
+  const pr = resolvePr(deps.runGh);
+  if (!pr.ok) {
+    deps.err(`artifact skipped: ${pr.error}`);
+    return null;
+  }
+  const fileName = artifactFileName(pr.prNumber);
+  const content = renderPrArtifactHtml({ prNumber: pr.prNumber, body: bodyInput, sessions });
+  const repoUrl = `https://github.com/${pr.ownerRepo}.git`;
+  // R4: the exact publish target, inspectable before anything is pushed.
+  deps.err(`publishing ${fileName} to ${ARTIFACT_BRANCH} on ${repoUrl}`);
+  const outcome = publishArtifact({ repoUrl, fileName, content, prNumber: pr.prNumber, run: deps.runGit });
+  if (!outcome.ok) {
+    deps.err(outcome.error);
+    return null;
+  }
+  return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName) };
+}
+
+/** The details-section stat line: role · id · slice/commits · turns · duration · in/out/cached (round 2). */
+function detailLabel(view: ContributorView, model: ReceiptModel): string {
+  const parts = [view.role, view.sessionId];
+  parts.push(view.basis === "helper" ? HELPER_FULL_LABEL : view.slice.kind === "slice" ? sliceHeaderLine(view.slice) : (view.slice.label ?? "entire session"));
+  const turns = view.slice.kind === "slice" ? view.slice.endTurn - view.slice.startTurn + 1 : view.slice.turnCount;
+  if (turns > 0) {
+    parts.push(`${turns} turns`);
+  }
+  if (model.durationMs !== undefined) {
+    parts.push(compactDuration(formatDuration(model.durationMs)));
+  }
+  const t = model.totalTokens;
+  parts.push(`in ${formatShortTokens(t.input)}`, `out ${formatShortTokens(t.output)}`);
+  const pct = cacheServedPct(t);
+  if (pct !== undefined) {
+    parts.push(`${pct}% cached`);
+  }
+  return parts.join(" · ");
+}
+
+/** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns the process exit code. */
 export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<number> {
+  // R4 (SPEC-0027): the artifact exists to be linked — reject before rendering.
+  if (opts.artifact && !opts.post) {
+    deps.err("--artifact requires --post");
+    return 1;
+  }
+
   // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
   const { shas, commitMs } = branchCommits(deps.runGit, deps.cwd);
 
@@ -158,29 +232,50 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // SPEC-0024 R3 ordering: base views first (their rollups define what is
   // already counted), then promotion of uncovered anchored sidechains, then
   // one chronological sort across both (startedAt, then id — SPEC-0023 order).
-  const entries: { view: ContributorView; startedAt: number; id: string }[] = [];
+  const entries: { view: ContributorView; model: ReceiptModel; startedAt: number; id: string }[] = [];
   const covered = new Set<string>();
   for (const raw of resolved.contributors) {
-    const view = await buildContributorView(raw, deps);
+    const { view, model } = await buildContributorView(raw, deps);
     covered.add(raw.summary.filePath);
     for (const row of view.subagents) {
       covered.add(row.filePath);
     }
-    entries.push({ view, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
+    entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
   }
   const promoted = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
   for (const raw of promoted) {
-    entries.push({ view: await buildContributorView(raw, deps), startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
+    const { view, model } = await buildContributorView(raw, deps);
+    entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
   }
   if (entries.length === 0) {
     deps.err(NO_MATCH);
     return 1;
   }
   entries.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
+  // Round 2: the fence renders authors first, helpers grouped after — the
+  // details section and the artifact page must show the SAME order, so the
+  // size-cap's drop-from-END sheds helpers before authors.
+  const fenceOrdered = [...entries.filter((e) => e.view.basis !== "helper"), ...entries.filter((e) => e.view.basis === "helper")];
   const views = entries.map((e) => e.view);
-  const body = renderPrBody({ contributors: views, excludedCount: resolved.excludedCount });
+  const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount };
 
-  // R3 (SPEC-0019): render first, unconditionally — before any gh call.
+  // SPEC-0027 R3: push the artifact BEFORE rendering the one final body, so
+  // the printed and posted bodies are identical and the link only renders
+  // after a confirmed push. A failed publish still posts (additive-only).
+  let artifactFailed = false;
+  let link: { fileName: string; url: string } | null = null;
+  if (opts.artifact) {
+    const sessions: ArtifactSession[] = fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), model: e.model }));
+    link = publishAndLink(bodyInput, sessions, deps);
+    artifactFailed = link === null;
+  }
+  // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
+  // --no-details. The label is the stat line: everything the fence dropped
+  // (id, slice reason) plus the session's anatomy, in one place.
+  const details = opts.details === false ? undefined : fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
+  const body = renderPrBody(bodyInput, { artifactLink: link ?? undefined, details });
+
+  // R3 (SPEC-0019): render before the comment upsert, unconditionally.
   deps.out(body);
 
   if (!opts.post) {
@@ -193,5 +288,5 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     return 1;
   }
   deps.err(`posted receipt (${result.action}) to PR #${result.prNumber}`);
-  return 0;
+  return artifactFailed ? 1 : 0;
 }
