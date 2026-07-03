@@ -194,7 +194,7 @@ informative.
 
 ## Success criteria
 
-- [ ] This spec's own implementation PR carries the new comment shape: solo
+- [x] This spec's own implementation PR carries the new comment shape: solo
       or multi rows per R1, cache line if applicable, hint line, and a
       working collapsed details section.
 - [x] Goldens untouched — the terminal receipt surface did not move (only `goldens/cli/help.txt` and the SPEC-0027 artifact-page golden regenerated, both deliberate).
