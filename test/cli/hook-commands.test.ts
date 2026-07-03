@@ -6,22 +6,23 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseArgs } from "../../src/cli/args.js";
+import { resolveCommand } from "../../src/cli/args.js";
+import { parseOptions } from "../../src/cli/options.js";
 import { main } from "../../src/cli/index.js";
 
-describe("parseArgs (new commands)", () => {
-  it("--mini → mini command, carrying an optional selector", () => {
-    expect(parseArgs(["--mini"]).command).toBe("mini");
-    expect(parseArgs(["--mini", "3"]).selector).toBe("3");
+describe("parse (new commands)", () => {
+  it("--mini → mini command, carrying an optional selector", async () => {
+    expect(await resolveCommand(["--mini"])).toBe("mini");
+    expect(parseOptions(["--mini", "3"]).positional[0]).toBe("3");
   });
 
-  it("install-hook / uninstall-hook positionals map to their commands", () => {
-    expect(parseArgs(["install-hook"]).command).toBe("install-hook");
-    expect(parseArgs(["uninstall-hook"]).command).toBe("uninstall-hook");
+  it("install-hook / uninstall-hook positionals map to their commands", async () => {
+    expect(await resolveCommand(["install-hook"])).toBe("install-hook");
+    expect(await resolveCommand(["uninstall-hook"])).toBe("uninstall-hook");
   });
 
-  it("--help still wins over everything (unchanged)", () => {
-    expect(parseArgs(["--mini", "--help"]).command).toBe("help");
+  it("--help still wins over everything (unchanged)", async () => {
+    expect(await resolveCommand(["--mini", "--help"])).toBe("help");
   });
 });
 
