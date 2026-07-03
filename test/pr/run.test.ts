@@ -11,6 +11,7 @@ import { runPr, type PrDeps } from "../../src/pr/index.js";
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
 const ANCHORS = path.join(FIX, "claude-anchors.jsonl");
+const CODEX_BRANCH = path.join(FIX, "codex-branch-commit.jsonl");
 const PARENT_WITH_SUBAGENTS = path.join(FIX, "parent-with-subagents.jsonl");
 const CHILD_ONE = path.join(FIX, "parent-with-subagents", "subagents", "agent-child1.jsonl");
 const ok = (stdout: string): CommandResult => ({ stdout, stderr: "", code: 0, missing: false });
@@ -18,6 +19,7 @@ const ok = (stdout: string): CommandResult => ({ stdout, stderr: "", code: 0, mi
 /** git mock: one worktree at /home/dev/repo, one branch commit (our SHA) at 10:02. */
 const gitOk: CommandRunner = (_cmd, args) => {
   if (args[0] === "worktree") return ok("worktree /home/dev/repo\n");
+  if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return ok("/home/dev/repo\n");
   if (args[0] === "rev-parse") return ok("origin/main\n");
   if (args[0] === "merge-base") return ok("0000000000000000000000000000000000000000\n");
   if (args[0] === "log") return ok("b1c2d3e4f5061728394a5b6c7d8e9f0011223344|2026-06-28T10:02:00.000Z\n");
@@ -26,6 +28,7 @@ const gitOk: CommandRunner = (_cmd, args) => {
 
 const gitSubagentTime: CommandRunner = (_cmd, args) => {
   if (args[0] === "worktree") return ok("worktree /home/dev/repo\n");
+  if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return ok("/home/dev/repo\n");
   if (args[0] === "rev-parse") return ok("origin/main\n");
   if (args[0] === "merge-base") return ok("0000000000000000000000000000000000000000\n");
   if (args[0] === "log") return ok("1111111111111111111111111111111111111111|2026-06-27T12:01:00.000Z\n");
@@ -89,7 +92,10 @@ describe("R3 render-first ordering", () => {
     const code = await runPr({ post: true, session: "agent-child1" }, deps);
     expect(code).toBe(0);
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
-    expect(out[0]).toContain("session `agent-child1`");
+    // Explicit selection renders a single-contributor body; the child stem shows on the provenance line.
+    expect(out[0]).toContain("1 session behind this PR");
+    expect(out[0]).toContain("session: agent-child1");
+    expect(out[0]).toContain("entire session (slice unavailable)");
     expect(ghCalls.some((c) => c.includes("issues/26/comments"))).toBe(true);
     expect(err.join("\n")).toContain("posted receipt (created) to PR #26");
   });
@@ -142,15 +148,38 @@ describe("R1d selection outcomes", () => {
     expect(err.join("\n")).toContain("--session");
   });
 
-  it("multiple matches → lists ids and requires --session, exit 1", async () => {
+  it("multiple matching sessions → both contribute (union), one receipt total, exit 0 (SPEC-0023 R1)", async () => {
     const session = (await loadById("claude-code", ANCHORS))!;
-    const { deps, out, err } = await makeDeps({
-      listSessions: async () => [session, { ...session, id: "dupe", filePath: "dupe.jsonl" }],
+    const dupe = { ...session, id: "dupe", filePath: "dupe.jsonl" };
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [session, dupe],
+      loadSession: async (summary) => (summary.id === "dupe" ? session : loadById(summary.source, summary.id)),
     });
     const code = await runPr({ post: false }, deps);
-    expect(code).toBe(1);
-    expect(out).toHaveLength(0);
-    expect(err.join("\n")).toContain("multiple sessions match");
+    expect(code).toBe(0);
+    expect(out[0]).toContain("2 sessions behind this PR");
+    expect(out[0]).toContain("TOTAL priced");
+    expect(out[0]).toContain("counted: 2 sessions");
+  });
+
+  it("codex + claude mix → both contribute, one receipt total across vendors (SPEC-0023 R1/R6)", async () => {
+    const claude = (await loadById("claude-code", ANCHORS))!;
+    const codexSummary = { id: CODEX_BRANCH, source: "codex" as const, filePath: CODEX_BRANCH };
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [
+        claude,
+        // summary carries the cwd + time window the candidate filter needs.
+        { ...codexSummary, cwd: "/home/dev/repo", startedAt: Date.parse("2026-06-28T10:01:30.000Z"), endedAt: Date.parse("2026-06-28T10:02:10.000Z"), totals: claude.totals },
+      ],
+      loadSession: async (summary) => loadById(summary.source, summary.id),
+    });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(0);
+    expect(out[0]).toContain("2 sessions behind this PR");
+    expect(out[0]).toContain("codex · ");
+    expect(out[0]).toContain("builder · ");
+    expect(out[0]).toContain("TOTAL priced");
+    expect(out[0]).toContain("counted: 2 sessions");
   });
 
   it("auto-selection still skips a sidechain transcript", async () => {

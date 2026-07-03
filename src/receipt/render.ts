@@ -22,6 +22,11 @@ export interface RenderOptions {
   template?: TemplateName;
 }
 
+export interface RenderBlockOptions {
+  color?: boolean;
+  width?: number;
+}
+
 function perforation(width: number): string {
   const unit = "- ";
   return unit.repeat(Math.ceil(width / unit.length)).slice(0, width).trimEnd();
@@ -98,12 +103,11 @@ function renderBlock(block: Block, lines: string[], width: number, dim: Colorize
   }
 }
 
-/** Renders `model` as an array of lines (no trailing newline join) at a fixed width, so `compare.ts` can zip two receipts side by side. */
-export function renderReceiptLines(model: ReceiptModel, opts: RenderOptions = {}): string[] {
+/** Renders an already-built block list through the same terminal interpreter used by receipt templates. */
+export function renderBlockLines(blocks: Block[], opts: RenderBlockOptions = {}): string[] {
   const width = opts.width ?? RECEIPT_WIDTH;
   const enabled = opts.color ?? colorEnabled();
   const { dim, bold } = makeColorizer(enabled);
-  const { blocks } = buildReceiptView(model, opts.template ?? "classic");
 
   const lines: string[] = [dim(perforation(width))];
   for (const block of blocks) {
@@ -111,6 +115,12 @@ export function renderReceiptLines(model: ReceiptModel, opts: RenderOptions = {}
   }
   lines.push(dim(perforation(width)));
   return lines;
+}
+
+/** Renders `model` as an array of lines (no trailing newline join) at a fixed width, so `compare.ts` can zip two receipts side by side. */
+export function renderReceiptLines(model: ReceiptModel, opts: RenderOptions = {}): string[] {
+  const { blocks } = buildReceiptView(model, opts.template ?? "classic");
+  return renderBlockLines(blocks, opts);
 }
 
 export function renderReceipt(model: ReceiptModel, opts: RenderOptions = {}): string {

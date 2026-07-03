@@ -1,18 +1,19 @@
-// SPEC-0019 — `aireceipts pr` orchestration. Selects the session that built the
-// current branch (R1b/R1d, or explicit --session), slices it to this PR's turn
-// range (R1e), rolls up subagents (R1c), and renders the body. R3 is the spine:
-// the full pasteable body is ALWAYS written to stdout BEFORE any `gh` call, so a
-// failed post can never eat the receipt. Selection errors (no/many matches)
-// happen before there's anything to render and exit 1 with a stderr message.
+// SPEC-0023 (widens SPEC-0019) — `aireceipts pr` orchestration. Selects EVERY
+// session that built the current branch (R1: Claude by branch-SHA anchor, Codex
+// by cwd+time), slices each to its own PR turn range (R1e), rolls up each one's
+// subagents (R1c), labels a descriptive role (R3), and renders one body with
+// per-session rows + a single combined total (R4). R3 of SPEC-0019 is still the
+// spine: the full pasteable body is ALWAYS written to stdout BEFORE any `gh`
+// call. `--session <id>` still resolves exactly one session (R5).
 import * as path from "node:path";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
-import { renderReceipt } from "../receipt/render.js";
-import { branchCommits, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
-import { selectCandidates, selectExplicitSession } from "./select.js";
+import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
+import { isBranchCandidate, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
+import { deriveRole, selectContributors, type RawContributor } from "./contributors.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
-import { renderPrBody } from "./body.js";
+import { renderPrBody, type ContributorView } from "./body.js";
 import { upsertPrComment } from "./comment.js";
 
 export interface PrOptions {
@@ -45,71 +46,89 @@ export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
   };
 }
 
-/** Resolve the session to attribute: explicit --session, else auto-select by worktree + time. */
-async function resolveSession(
+const NO_MATCH = "no session matches this repo + branch; re-run with --session <id> to pick one explicitly";
+
+function stemOf(filePath: string): string {
+  return path.basename(filePath).replace(/\.jsonl$/, "");
+}
+
+/** Resolve the contributor set: explicit --session → exactly one (R5); else the conservative auto-selected set (R1). */
+async function resolveContributors(
   opts: PrOptions,
   deps: PrDeps,
+  shas: readonly string[],
   commitMs: readonly number[],
-): Promise<{ summary: SessionSummary } | { error: string }> {
+): Promise<{ contributors: RawContributor[]; excludedCount: number } | { error: string }> {
   const sessions = await deps.listSessions();
+
   if (opts.session) {
     const summary = await selectExplicitSession(sessions, opts.session);
-    return summary ? { summary } : { error: `no session matched "${opts.session}"` };
+    if (!summary) {
+      return { error: `no session matched "${opts.session}"` };
+    }
+    const session = await deps.loadSession(summary);
+    if (!session) {
+      return { error: `failed to load session "${summary.id}"` };
+    }
+    return { contributors: [{ summary, session, slice: computeSlice(session.turns, shas) }], excludedCount: 0 };
   }
+
   if (sessions.length === 0) {
     return { error: "no agent sessions found on disk" };
   }
   const roots = worktreeRoots(deps.runGit, deps.cwd);
-  const selection = selectCandidates(sessions, roots, commitMs);
-  if (selection.kind === "none") {
-    return { error: "no session matches this repo + branch; re-run with --session <id> to pick one explicitly" };
+  const candidates = sessions.filter((s) => isBranchCandidate(s, roots, commitMs));
+  if (candidates.length === 0) {
+    return { error: NO_MATCH };
   }
-  if (selection.kind === "many") {
-    const ids = selection.matches
-      .map((s) => `  ${path.basename(s.filePath).replace(/\.jsonl$/, "")}  ${s.title ?? ""}`.trimEnd())
-      .join("\n");
-    return { error: `multiple sessions match this branch — re-run with --session <id>:\n${ids}` };
+  const selection = await selectContributors(candidates, shas, {
+    loadSession: deps.loadSession,
+    currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
+  });
+  if (selection.contributors.length === 0) {
+    return { error: NO_MATCH };
   }
-  return { summary: selection.summary };
+  return selection;
+}
+
+/** Slice → price → roll up → role each contributor into what the comment renders (R2/R3). */
+async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<ContributorView> {
+  const rendered = raw.slice.kind === "slice" ? sliceSessionForReceipt(raw.session, raw.slice) : raw.session;
+  const model = await buildReceiptModel(rendered);
+  const window: RollupWindow =
+    raw.slice.kind === "slice" && rendered.startedAt !== undefined && rendered.endedAt !== undefined
+      ? { start: rendered.startedAt, end: rendered.endedAt }
+      : null;
+  const subagents = await deps.rollup(raw.summary.filePath, window);
+  return {
+    role: deriveRole(raw.summary, raw.session, subagents.length > 0),
+    sessionId: stemOf(raw.summary.filePath),
+    slice: raw.slice,
+    modelMix: model.modelMix,
+    usd: model.totalUsd,
+    tokens: model.totalTokens,
+    subagents,
+  };
 }
 
 /** `aireceipts pr [--post] [--session <id>]`. Returns the process exit code. */
 export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<number> {
-  // Branch SHAs + commit dates: SHAs slice (R1e), commit dates filter (R1d).
+  // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
   const { shas, commitMs } = branchCommits(deps.runGit, deps.cwd);
 
-  const resolved = await resolveSession(opts, deps, commitMs);
+  const resolved = await resolveContributors(opts, deps, shas, commitMs);
   if ("error" in resolved) {
     deps.err(resolved.error);
     return 1;
   }
-  const session = await deps.loadSession(resolved.summary);
-  if (!session) {
-    deps.err(`failed to load session "${resolved.summary.id}"`);
-    return 1;
+
+  const views: ContributorView[] = [];
+  for (const raw of resolved.contributors) {
+    views.push(await buildContributorView(raw, deps));
   }
+  const body = renderPrBody({ contributors: views, excludedCount: resolved.excludedCount });
 
-  const slice = computeSlice(session.turns, shas);
-  const rendered = slice.kind === "slice" ? sliceSessionForReceipt(session, slice) : session;
-  const model = await buildReceiptModel(rendered);
-  const receiptText = renderReceipt(model, { color: false });
-
-  const window: RollupWindow =
-    slice.kind === "slice" && rendered.startedAt !== undefined && rendered.endedAt !== undefined
-      ? { start: rendered.startedAt, end: rendered.endedAt }
-      : null;
-  const subagents = await deps.rollup(resolved.summary.filePath, window);
-
-  const body = renderPrBody({
-    sessionId: path.basename(resolved.summary.filePath).replace(/\.jsonl$/, ""),
-    slice,
-    receiptText,
-    parentUsd: model.totalUsd,
-    parentTokens: model.totalTokens,
-    subagents,
-  });
-
-  // R3: render first, unconditionally — before any gh call.
+  // R3 (SPEC-0019): render first, unconditionally — before any gh call.
   deps.out(body);
 
   if (!opts.post) {

@@ -190,13 +190,33 @@ export function gitWriteVerb(argv: string[]): GitVerb | null {
 
 /** The single git-write verb this tool call represents, if any (first match across compound commands). */
 export function toolCallGitVerb(call: ToolCall): GitVerb | null {
-  for (const argv of resolveInvocations(rawInvocations(call.input))) {
+  for (const argv of toolCallInvocations(call)) {
     const verb = gitWriteVerb(argv);
     if (verb) {
       return verb;
     }
   }
   return null;
+}
+
+/**
+ * The resolved argv commands a tool call invokes (quote-respecting, shell
+ * wrappers unwrapped) — the same tokenized view `toolCallGitVerb` uses, exposed
+ * so other classifiers (SPEC-0023's `codex exec` launch detection) can match on
+ * a real argv[0] rather than a substring (an orchestrator that merely echoes
+ * "codex exec" in a string must not count).
+ */
+export function toolCallInvocations(call: ToolCall): string[][] {
+  return resolveInvocations(rawInvocations(call.input));
+}
+
+/** True if `argv` is a real `codex exec …` invocation (argv[0] is `codex`, first non-option token is `exec`). */
+export function isCodexExec(argv: string[]): boolean {
+  if (argv.length === 0 || path.basename(argv[0]) !== "codex") {
+    return false;
+  }
+  const sub = argv.slice(1).find((tok) => !tok.startsWith("-"));
+  return sub === "exec";
 }
 
 const HEX_RUN_RE = /[0-9a-f]{7,40}/g;
