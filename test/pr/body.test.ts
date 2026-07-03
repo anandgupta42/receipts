@@ -231,12 +231,15 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     expect(body.indexOf("<details>")).toBeGreaterThan(body.indexOf("```"));
   });
 
-  it("places the SPEC-0027 artifact link under the details section", () => {
+  it("places the SPEC-0027 artifact link under the details section, after a BLANK line (GFM HTML-block rule)", () => {
     const body = renderPrBody(
       { contributors: [builder()], excludedCount: 0 },
       { details: [detail("builder · abc123")], artifactLink: { fileName: "pr-9.html", url: "https://x/pr-9.html" } },
     );
     expect(body.indexOf("full receipt: [pr-9.html]")).toBeGreaterThan(body.indexOf("</details>"));
+    // Without the blank line GitHub swallows the link into the HTML block and
+    // renders it as raw text (maintainer catch on PR #63, 2026-07-03).
+    expect(body).toContain("</details>\n\nfull receipt: [pr-9.html]");
   });
 
   it("omits the section entirely without details (--no-details path)", () => {

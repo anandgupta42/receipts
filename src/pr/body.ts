@@ -301,11 +301,13 @@ export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): str
   if (extras.details !== undefined && extras.details.length > 0) {
     // Budget with the EXACT bytes that surround the section: everything
     // rendered so far, the real link line (never a guess), and the join
-    // newlines each appended line costs.
-    const used = [...lines.join("\n")].length + (linkLine === undefined ? 0 : [...linkLine].length + 1) + 2;
+    // newlines each appended line costs (incl. the blank line below).
+    const used = [...lines.join("\n")].length + (linkLine === undefined ? 0 : [...linkLine].length + 1) + 3;
     const section = detailsSection(extras.details, COMMENT_SIZE_CAP - used);
     if (section !== null) {
-      lines.push(section);
+      // GFM: an HTML block swallows everything until a BLANK line — without
+      // one, the link after </details> renders as raw text, not a link.
+      lines.push(section, "");
     }
   }
   if (linkLine !== undefined) {
