@@ -152,11 +152,11 @@ after a confirmed push.
 
 ## Success criteria
 
-- [ ] This spec's own implementation PR publishes its receipt artifact to
+- [x] This spec's own implementation PR publishes its receipt artifact to
       this repo's `aireceipts/artifacts` branch and its comment carries the
       working link; the source-view landing experience is recorded in the PR
       for the kill-criterion (b) judgment.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass
       unmasked (`echo $?`); new HTML goldens committed, existing goldens
       untouched.
