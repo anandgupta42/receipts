@@ -1,0 +1,16 @@
+# reason: fake token — leakage-test fixture that PROVES the benchmark allowlist rejects secrets
+0764e59a94a8a42ceee8588b84e6d9f7217cba27:src/benchmark/schemas.test.ts:generic-api-key:50
+# reason: fake token — leakage-test fixture that PROVES the benchmark allowlist rejects secrets
+5ad717f083cc14dc6e52ab0ce746a72da629086b:src/benchmark/schemas.test.ts:generic-api-key:50
+# reason: App Insights ingestion key — write-only, deliberately public, documented as such in this very file
+e1d0fd21ece9212ff81e489774d3937a3e9a0569:docs/telemetry.md:generic-api-key:94
+# reason: App Insights ingestion key — write-only, deliberately embedded (docs/telemetry.md); old key rotated to dedicated resource
+e1d0fd21ece9212ff81e489774d3937a3e9a0569:src/telemetry/config.ts:generic-api-key:24
+# reason: App Insights ingestion key — write-only, deliberately public, documented as such in this very file
+b90223a82d3c1896d4210de843815ad3ae780455:docs/telemetry.md:generic-api-key:94
+# reason: App Insights ingestion key — write-only, deliberately embedded (docs/telemetry.md); old key rotated to dedicated resource
+b90223a82d3c1896d4210de843815ad3ae780455:src/telemetry/config.ts:generic-api-key:24
+# reason: App Insights ingestion key — write-only, deliberately public, documented as such in this very file
+a5fb175674da37a4619ff4f4d824fa58b55a22c1:docs/telemetry.md:generic-api-key:94
+# reason: App Insights ingestion key — write-only, deliberately embedded (docs/telemetry.md); old key rotated to dedicated resource
+a5fb175674da37a4619ff4f4d824fa58b55a22c1:src/telemetry/config.ts:generic-api-key:24
