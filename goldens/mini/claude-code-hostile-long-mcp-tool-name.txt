@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Claude Code · claude-sonnet-5 · 25s
+total  $0.01
+top    mcp__claude-in-chrome__browser_batch · $0.01 (1 call)
+no waste detected
+run  aireceipts  for the full receipt

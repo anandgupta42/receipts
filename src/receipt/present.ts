@@ -36,6 +36,7 @@ const FOOTER_EMOJI = "🥟";
 const THINKING_REPLY = "(thinking/reply)";
 
 const TITLE_MAX = 46;
+const META_MAX = 50;
 
 /** One-line session title: newlines collapsed, truncated with an ellipsis. The receipt must say WHAT the work was, not just what it cost. */
 function titleLine(model: ReceiptModel): string | undefined {
@@ -70,15 +71,42 @@ function cacheLine(model: ReceiptModel): string | undefined {
   return `cache served ${pct}% of input tokens`;
 }
 
-function metaLines(model: ReceiptModel): string[] {
+function charCount(s: string): number {
+  return [...s].length;
+}
+
+function withoutSeconds(utc: string): string {
+  return utc.replace(/:\d{2} UTC$/u, " UTC");
+}
+
+function compactDuration(duration: string): string {
+  return duration.replace(/ \d{2}s$/u, "");
+}
+
+function agentTimeLine(model: ReceiptModel): string {
   const startLabel = model.startedAtMs !== undefined ? formatAbsoluteUtc(model.startedAtMs) : "start time unknown";
   const durationLabel = model.durationMs !== undefined ? formatDuration(model.durationMs) : "duration unknown";
+  const full = `${model.agentLabel} · ${startLabel} · ${durationLabel}`;
+  if (charCount(full) <= META_MAX) {
+    return full;
+  }
+
+  const compactStart = model.startedAtMs !== undefined ? withoutSeconds(startLabel) : "unknown start";
+  const compact = `${model.agentLabel} · ${compactStart} · ${compactDuration(durationLabel)}`;
+  if (charCount(compact) <= META_MAX) {
+    return compact;
+  }
+
+  return `${model.agentLabel} · ${compactStart}`;
+}
+
+function metaLines(model: ReceiptModel): string[] {
   const lines: string[] = [];
   const title = titleLine(model);
   if (title !== undefined) {
     lines.push(title);
   }
-  lines.push(`${model.agentLabel} · ${startLabel} · ${durationLabel}`);
+  lines.push(agentTimeLine(model));
   if (model.modelMix.length > 0) {
     lines.push(model.modelMix.map((m) => `${m.model} ${Math.round(m.tokenShare * 100)}%`).join(" · "));
   }

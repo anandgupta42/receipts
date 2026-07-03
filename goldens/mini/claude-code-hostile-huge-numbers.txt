@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Claude Code · claude-opus-4-8 · 2m 00s
+total  $12,500.00
+top    Bash · $12,500.00 (1 call)
+no waste detected
+run  aireceipts  for the full receipt
