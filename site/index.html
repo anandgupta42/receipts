@@ -295,6 +295,19 @@
 .agfoot{display:block;color:#6b747c;font-size:11px}
 .agtx{font-size:10px;letter-spacing:.5px}
 .agmark{display:block}
+.scnimg{border-radius:18px}
+.scnrow{align-items:stretch}
+.scn>p{margin-bottom:18px}
+.steps{position:relative}
+.step{position:relative}
+@media (min-width:720px){
+  .step:not(:last-child)::after{content:"→";position:absolute;right:-9%;top:44px;font-size:22px;color:#b6bdc3}
+}
+.step .art,.step .copybox.stepbox{margin-top:16px}
+.payoff{font:12.5px/1.5 ui-monospace,Menlo,monospace;color:#5a6068;margin:10px 0 0}
+.grn2{color:#3d8f68;font-weight:600;white-space:nowrap}
+.agterm{width:fit-content;max-width:100%;justify-self:center}
+.agterm pre{padding-right:28px}
 </style>
 </head>
 <body>
@@ -332,20 +345,20 @@
     <section aria-label="What a receipt catches">
       <div class="scenarios">
         <div class="scn">
-          <img class="scnimg" src="assets/scn-loop.png" alt="" width="64" height="64">
+          <img class="scnimg" src="assets/scn-loop.png" alt="" width="76" height="76">
           <h3>The waste you didn't see</h3>
           <p>Agents get stuck — retrying failed commands, re-reading context. The receipt flags every loop, in dollars.</p>
           <pre class="art cardart">⚠ re-ran failing command ×5 · <span class="redl">wasted</span>
 <span class="redl">$156.28</span> caught in one day · 45 sessions</pre>
         </div>
         <div class="scn">
-          <img class="scnimg" src="assets/scn-week.png" alt="" width="64" height="64">
+          <img class="scnimg" src="assets/scn-week.png" alt="" width="76" height="76">
           <h3>The week, in one number</h3>
           <p>Totals, per-agent split, honest deltas.</p>
           <div class="bignum">$10,056<span class="cents">.63</span><span class="numcap">one real week · 319 sessions</span></div>
         </div>
         <div class="scn">
-          <img class="scnimg" src="assets/scn-pr.png" alt="" width="64" height="64">
+          <img class="scnimg" src="assets/scn-pr.png" alt="" width="76" height="76">
           <h3>Receipts on your PRs</h3>
           <p>What the change cost to make — every agent counted.</p>
           <div class="prmock"><div class="prhead"><span class="prav"></span><span class="prname">aireceipts <em>bot</em> commented</span></div><pre class="art cardart">orchestrator · fable ······ $12.30
@@ -397,9 +410,9 @@ TOTAL ····················· <span class="grnl">$56.10</span
         <div class="step">
           <span class="k">02</span>
           <p>Read the receipt</p>
-          <pre class="art" aria-label="Receipt excerpt">⚠ Bash loop ×5 ······· $0.08 (3m 45s)
+          <pre class="art" aria-label="Receipt excerpt">⚠ re-ran failing command ×5 · <span class="redl">$0.08</span>
 ──────────────────────────────
-TOTAL ················· $0.09</pre>
+TOTAL ····················· $0.09</pre>
         </div>
         <div class="step">
           <span class="k">03</span>
@@ -408,6 +421,7 @@ TOTAL ················· $0.09</pre>
 # paste it into CLAUDE.md</span>
 - Bash loop ×5: change the input
   before a 3rd retry.</pre>
+          <p class="payoff">→ tomorrow's receipt: <span class="grn2">no retries · $0.00</span></p>
         </div>
       </div>
       
