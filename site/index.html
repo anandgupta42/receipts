@@ -255,6 +255,23 @@
 .ag strong{display:block;font-size:15px;margin-bottom:4px}
 .ag span{font-size:12.5px;color:#5a6068;line-height:1.45}
 .agq{border-style:dashed}
+.darkstage{background:#14181c;color:#e8eaec;padding-top:72px;padding-bottom:72px;margin-inline:calc(50% - 50vw);padding-inline:calc(50vw - 50%)}
+.darkstage .lede{color:#fff}
+.agwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:32px;align-items:center}
+@media (min-width:960px){.agwrap{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
+.aglist{font:14px/2.1 ui-monospace,Menlo,monospace;color:#c8d0d4;margin:0;overflow-x:auto}
+.aglist{background:transparent;border:0;padding:0}
+.agterm{margin:0;box-shadow:0 24px 64px rgba(0,0,0,.5);border:1px solid #2a3138;border-radius:12px}
+.scnimg{border-radius:16px;margin-bottom:14px;box-shadow:0 10px 28px rgba(0,0,0,.25)}
+.cardart{margin-top:14px;font-size:11.5px;padding:10px 12px}
+.bignum{margin-top:12px;font-weight:800;font-size:34px;letter-spacing:-.02em;color:#14181c}
+.bignum .cents{font-size:20px;color:#5a6068}
+.numcap{display:block;font-weight:400;font-size:12px;color:#5a6068;margin-top:2px}
+.prmock{margin-top:14px;border:1px solid #d8dbd6;border-radius:10px;padding:10px 12px;background:#fff}
+.prmock .prav{display:inline-block;width:18px;height:18px;border-radius:50%;background:#14181c;vertical-align:middle;margin-right:7px}
+.prmock .prname{font-size:12.5px;font-weight:600}
+.prmock .prname em{font-style:normal;font-weight:400;color:#5a6068;border:1px solid #d8dbd6;border-radius:4px;padding:0 4px;font-size:10.5px;margin-left:4px}
+.prmock .cardart{margin-top:8px}
 </style>
 </head>
 <body>
@@ -292,19 +309,22 @@
     <section aria-label="What a receipt catches">
       <div class="scenarios">
         <div class="scn">
-          <svg class="scnic" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2v5h-5"/><path d="M17 7A8 8 0 1 0 19 12"/><circle cx="12" cy="12" r="0.5"/></svg>
+          <img class="scnimg" src="assets/scn-loop.png" alt="" width="64" height="64">
           <h3>The loop you didn't see</h3>
-          <p>A retried command burned <span class="n">$0.08</span> and <span class="n">3m45s</span>. The receipt flags it in <span class="flag">red</span>.</p>
+          <p>A retried command, caught and priced.</p>
+          <pre class="art cardart">⚠ Bash loop ×5 ···· $0.08 (3m 45s)</pre>
         </div>
         <div class="scn">
-          <svg class="scnic" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M7 15l3 2 6-5" stroke-width="1.6"/></svg>
+          <img class="scnimg" src="assets/scn-week.png" alt="" width="64" height="64">
           <h3>The week, in one number</h3>
-          <p><span class="n">aireceipts week</span>: totals, per-agent split, honest deltas.</p>
+          <p>Totals, per-agent split, honest deltas.</p>
+          <div class="bignum">$10,056<span class="cents">.63</span><span class="numcap">one real week · 319 sessions</span></div>
         </div>
         <div class="scn">
-          <svg class="scnic" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5v7M13 6h2a3 3 0 0 1 3 3v6.5"/><path d="M11 4l2 2-2 2"/></svg>
+          <img class="scnimg" src="assets/scn-pr.png" alt="" width="64" height="64">
           <h3>Receipts on your PRs</h3>
-          <p>Each pull request carries the cost of making it — every agent counted.</p>
+          <p>Every contributor counted, on the PR itself.</p>
+          <div class="prmock"><span class="prav"></span><span class="prname">aireceipts <em>bot</em></span><pre class="art cardart">🧾 3 sessions ······ TOTAL $42.37</pre></div>
         </div>
       </div>
     </section>
@@ -369,16 +389,16 @@ TOTAL ················· $0.09</pre>
   <!-- ============ PROOF ============ -->
   <div class="band">
     <div class="wrap">
-      <section aria-label="Works with the agents you already run">
+      <section class="darkstage" aria-label="Works with the agents you already run">
         <h2 class="lede">Works with the agents you already run.</h2>
-        <div class="agrid">
-          <div class="ag"><strong>Claude Code</strong><span>full per-turn pricing, cache tiers</span></div>
-          <div class="ag"><strong>Codex</strong><span>full per-turn parsing</span></div>
-          <div class="ag"><strong>Gemini CLI</strong><span>full per-turn pricing</span></div>
-          <div class="ag"><strong>opencode</strong><span>full per-turn parsing</span></div>
-          <div class="ag agq"><strong>Cursor</strong><span>totals only — its logs stop there, so we do too</span></div>
-        </div>
-        <div class="proof-term">
+        <div class="agwrap">
+        <pre class="aglist" aria-label="Supported agents and their fidelity, styled as receipt lines">Claude Code ······· full per-turn, cache tiers
+Codex ····················· full per-turn
+Gemini CLI ············ full per-turn, priced
+opencode ·················· full per-turn
+Cursor ··· totals only — its logs stop there,
+           so we do too</pre>
+        <div class="proof-term agterm">
           <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts</span></div>
 <pre class="render" tabindex="0" aria-label="An itemized receipt for a 10m 30s Claude Code session: Bash $0.05, Edit $0.05, thinking $0.03, Write $0.03, Read $0.02, total $0.18; the same tokens on claude-haiku-4-5 would be $0.04."><span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -</span>
 <span class="h">                    AIRECEIPTS                    </span>
@@ -393,6 +413,7 @@ Read...............................$0.02  (1 call)
 <span class="g">TOTAL........................................$0.18</span>
 <span class="d">same tokens on claude-haiku-4-5..............$0.04</span></pre>
         </div>
+      </div>
       </section>
     </div>
   </div>
