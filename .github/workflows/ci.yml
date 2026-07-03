@@ -70,3 +70,20 @@ jobs:
       - name: cite-check
         if: steps.changed.outputs.files != ''
         run: node --experimental-strip-types scripts/cite-check.ts ${{ steps.changed.outputs.files }}
+
+  cli-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: built CLI and packed tarball
+        run: npx vitest run test/cli-e2e
