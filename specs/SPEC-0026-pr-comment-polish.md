@@ -161,11 +161,49 @@ renders as one line: full receipt omitted (comment size limit)>
 </details>
 ```
 
-Copy rules: `no commits to slice by` (maintainer pushed back on "(no git
-writes)" as attribution-internal jargon, 2026-07-03 — the label must name the
-user-visible fact and the reason there is no turn range); the hint says `npx aireceipts` (the README's canonical invocation);
+Copy rules (round 2 supersedes the per-row label): helpers group under one
+header — `CODEX HELPERS (N) — no commits` — because the explainer belongs to
+the GROUP the credit rule proved things about, not to five identical rows; the hint says `npx aireceipts` (the README's canonical invocation);
 the summary line always carries the count so the collapsed state is
 informative.
+
+### Round 2 (maintainer dogfood on PR #63's live receipt, 2026-07-03)
+
+The first shipped shape read as "very busy" on a real 6-session receipt, and
+flat rows hid the story ("someone will be confused what actually happened
+here"). Iterated live over five mockup rounds
+(https://claude.ai/code/artifact/6067cce8-25fa-467e-a36d-42190f15e003);
+final grammar, maintainer-accepted ("this looks good"):
+
+- **Fence = story.** Top-level rows are sessions that COMMITTED (role at
+  N≥2, model mix, cost; their `session slice: turns A–B of N` line stays —
+  a sliced cost means something different). The supporting cast indents:
+  `SUBAGENTS (N)` as before, and helper-credited sessions under
+  `CODEX HELPERS (N) — no commits`, one muted row each carrying its cost
+  plus ONE fact beside it: `<model> · <duration>` (a receipt is not a dashboard — time, token
+  triples, and labeled token facts were each tried and rejected as busy
+  or legend-dependent).
+- **No session ids in the fence.** Ids and full-session explainers move to
+  the details section's per-session stat line:
+  `<role> · <id> · <slice|no commits> · <turns> turns · <dur> · in <k> ·
+  out <k> · <cached>% cached` (self-labeling; cache as percent — the
+  masthead's own convention). The `npx aireceipts --session <id>` hint
+  moves inside the details section next to the ids it needs; the fence's
+  last note points at the section (`full receipts + session ids: section
+  below`) and falls back to the command hint whenever no section follows
+  (`--no-details`, or the size floor dropped it — a hint must never point
+  at nothing).
+- **`100%` never renders** — a share earns ink only for a real mix, and a
+  real mix never rounds a partial share to `100%`/`0%` (`>99%`/`<1%`, the
+  cache line's own honesty rule).
+- **Details/artifact order mirrors the fence** (authors first, helpers
+  after), so the size-cap's drop-from-END sheds helpers before authors.
+- **Subagent names sanitized** — a markup-shaped child title (fork
+  boilerplate) falls back to `agent-<id>`, the masthead's own rule.
+- **Not configurable, deliberately**: one canonical comment shape is the
+  trust asset; per-fact knobs fragment the contract and multiply the
+  honesty surface. SPEC-0020 templates remain the principled home if
+  customization demand ever materializes.
 
 ## Test matrix
 
@@ -248,6 +286,13 @@ criteria: this spec's own PR must post the new comment shape.
 
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 26 spec(s) OK,
 exit 0.
+
+**2026-07-03 · round 2 (maintainer dogfood, five design iterations):** fence
+grammar reworked as recorded in the Design section; implemented on PR #63's
+branch with the deliberate test flips documented in the commit. One honesty
+edge found during implementation: the section-pointer hint could dangle when
+the size floor dropped the details section — the final body now decides the
+hint after the section decision.
 
 **2026-07-03 · S5 (implementation review, Codex): REWORK → fixed.** (1) MEDIUM:
 the size-cap budget reserved a hardcoded 200 chars for the artifact link —

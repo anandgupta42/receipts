@@ -92,9 +92,10 @@ describe("R3 render-first ordering", () => {
     const code = await runPr({ post: true, session: "agent-child1" }, deps);
     expect(code).toBe(0);
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
-    // Explicit selection renders a single-contributor body; the child stem shows on the provenance line.
+    // Explicit selection renders a single-contributor body; round 2 moved the
+    // child stem + slice reason to the details section's stat line.
     expect(out[0]).toContain("1 session behind this PR");
-    expect(out[0]).toContain("session: agent-child1");
+    expect(out[0]).toContain("agent-child1");
     expect(out[0]).toContain("entire session (slice unavailable)");
     expect(ghCalls.some((c) => c.includes("issues/26/comments"))).toBe(true);
     expect(err.join("\n")).toContain("posted receipt (created) to PR #26");
@@ -380,6 +381,35 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
     expect(out[0]).not.toContain("full receipt:");
     expect(posted.some((p) => JSON.parse(p).body === out[0])).toBe(true);
     expect(err.join("\n")).toContain("Permission denied");
+  });
+
+  it("details order mirrors the fence: author receipts before helper receipts", async () => {
+    // A codex helper (no writes, current worktree) that STARTED BEFORE the
+    // anchored author must still render after it in the details section.
+    const author = (await loadById("claude-code", ANCHORS))!;
+    const helper = {
+      id: CODEX_BRANCH,
+      source: "codex" as const,
+      filePath: CODEX_BRANCH,
+      cwd: "/home/dev/repo",
+      startedAt: (author.startedAt ?? 0) - 60_000,
+      endedAt: Date.parse("2026-06-28T10:02:10.000Z"),
+      totals: author.totals,
+    };
+    const byId = new Map<string, unknown>([[author.id, author]]);
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [author, helper],
+      loadSession: async (summary) =>
+        summary.source === "codex" ? loadById("codex", CODEX_BRANCH) : ((byId.get(summary.id) ?? null) as never),
+    });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(0);
+    const body = out[0];
+    const authorLabel = body.indexOf("builder · claude-anchors");
+    const helperLabel = body.indexOf("codex · codex-branch-commit");
+    expect(authorLabel).toBeGreaterThan(-1);
+    expect(helperLabel).toBeGreaterThan(-1);
+    expect(authorLabel).toBeLessThan(helperLabel);
   });
 
   it("without --artifact nothing publishes and the body is unchanged", async () => {

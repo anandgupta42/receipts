@@ -12,6 +12,9 @@ import * as path from "node:path";
 import type { Session, SessionSummary } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
+import { cacheServedPct, compactDuration } from "../receipt/present.js";
+import { formatDuration, formatShortTokens } from "../receipt/format.js";
+import { HELPER_FULL_LABEL, sliceHeaderLine } from "./body.js";
 import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
 import { isBranchCandidate, overlapsBranchWindow, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
@@ -155,6 +158,7 @@ async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<
     tokens: model.totalTokens,
     subagents,
     basis: raw.basis,
+    durationMs: model.durationMs,
   };
   return { view, model };
 }
@@ -186,6 +190,26 @@ function publishAndLink(
     return null;
   }
   return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName) };
+}
+
+/** The details-section stat line: role · id · slice/commits · turns · duration · in/out/cached (round 2). */
+function detailLabel(view: ContributorView, model: ReceiptModel): string {
+  const parts = [view.role, view.sessionId];
+  parts.push(view.basis === "helper" ? HELPER_FULL_LABEL : view.slice.kind === "slice" ? sliceHeaderLine(view.slice) : (view.slice.label ?? "entire session"));
+  const turns = view.slice.kind === "slice" ? view.slice.endTurn - view.slice.startTurn + 1 : view.slice.turnCount;
+  if (turns > 0) {
+    parts.push(`${turns} turns`);
+  }
+  if (model.durationMs !== undefined) {
+    parts.push(compactDuration(formatDuration(model.durationMs)));
+  }
+  const t = model.totalTokens;
+  parts.push(`in ${formatShortTokens(t.input)}`, `out ${formatShortTokens(t.output)}`);
+  const pct = cacheServedPct(t);
+  if (pct !== undefined) {
+    parts.push(`${pct}% cached`);
+  }
+  return parts.join(" · ");
 }
 
 /** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns the process exit code. */
@@ -228,6 +252,10 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     return 1;
   }
   entries.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
+  // Round 2: the fence renders authors first, helpers grouped after — the
+  // details section and the artifact page must show the SAME order, so the
+  // size-cap's drop-from-END sheds helpers before authors.
+  const fenceOrdered = [...entries.filter((e) => e.view.basis !== "helper"), ...entries.filter((e) => e.view.basis === "helper")];
   const views = entries.map((e) => e.view);
   const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount };
 
@@ -237,18 +265,14 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   let artifactFailed = false;
   let link: { fileName: string; url: string } | null = null;
   if (opts.artifact) {
-    const sessions: ArtifactSession[] = entries.map((e) => ({ label: `${e.view.role} · ${e.view.sessionId}`, model: e.model }));
+    const sessions: ArtifactSession[] = fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), model: e.model }));
     link = publishAndLink(bodyInput, sessions, deps);
     artifactFailed = link === null;
   }
-  // SPEC-0026 R5 — per-session full receipts, collapsed, unless --no-details.
-  const details =
-    opts.details === false
-      ? undefined
-      : entries.map((e) => ({
-          label: `${e.view.role} · ${e.view.sessionId}`,
-          text: renderReceipt(e.model, { color: false }),
-        }));
+  // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
+  // --no-details. The label is the stat line: everything the fence dropped
+  // (id, slice reason) plus the session's anatomy, in one place.
+  const details = opts.details === false ? undefined : fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
   const body = renderPrBody(bodyInput, { artifactLink: link ?? undefined, details });
 
   // R3 (SPEC-0019): render before the comment upsert, unconditionally.
