@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#0e1417">
 <meta property="og:type" content="website">
 <meta property="og:title" content="aireceipts — your agent works, you get the receipt">
-<meta property="og:description" content="Local, deterministic cost receipts for AI coding agents — no account, no upload.">
+<meta property="og:description" content="Every session, itemized and priced — locally. No account. Nothing uploaded.">
 <meta property="og:image" content="assets/hero-receipt.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="assets/hero-receipt.png">
@@ -241,6 +241,8 @@
     *{transition:none!important;animation:none!important}
     .object img{transform:none}
   }
+.scnic{display:block;margin-bottom:12px;color:#14181c;opacity:.85}
+@media (prefers-color-scheme: dark){}
 </style>
 </head>
 <body>
@@ -259,7 +261,7 @@
   <div class="stage">
     <div class="stage-in">
       <h1 class="display">Your agent works. <span class="soft">You get the receipt.</span></h1>
-      <p class="stage-sub">Local, deterministic cost receipts for AI coding agents — no account, no upload.</p>
+      <p class="stage-sub">Every session, itemized and priced — locally. No account. Nothing uploaded.</p>
       <div class="cta-hold">
         <div class="copybox">
           <code><span class="p" aria-hidden="true">$</span>npx aireceipts</code>
@@ -278,16 +280,19 @@
     <section aria-label="What a receipt catches">
       <div class="scenarios">
         <div class="scn">
+          <svg class="scnic" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2v5h-5"/><path d="M17 7A8 8 0 1 0 19 12"/><circle cx="12" cy="12" r="0.5"/></svg>
           <h3>The loop you didn't see</h3>
           <p>A retried command burned <span class="n">$0.08</span> and <span class="n">3m45s</span>. The receipt flags it in <span class="flag">red</span>.</p>
         </div>
         <div class="scn">
+          <svg class="scnic" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M7 15l3 2 6-5" stroke-width="1.6"/></svg>
           <h3>The week, in one number</h3>
           <p><span class="n">aireceipts week</span>: totals, per-agent split, honest deltas.</p>
         </div>
         <div class="scn">
+          <svg class="scnic" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><circle cx="18" cy="18" r="2.5"/><path d="M6 8.5v7M13 6h2a3 3 0 0 1 3 3v6.5"/><path d="M11 4l2 2-2 2"/></svg>
           <h3>Receipts on your PRs</h3>
-          <p>Every pull request shows what it cost to produce — every contributor counted.</p>
+          <p>Each pull request carries the cost of making it — every agent counted.</p>
         </div>
       </div>
     </section>
@@ -300,7 +305,7 @@
         <h2 class="lede">Your numbers, your rules.</h2>
         <ol class="rules">
           <li>No fabricated dollars, ever.</li>
-          <li>Every price cited with URL + date.</li>
+          <li>Every price cited: URL, date, excerpt.</li>
           <li>Comparisons are arithmetic, not predictions.</li>
           <li>Same transcript in, byte-identical receipt out.</li>
         </ol>
