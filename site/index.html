@@ -293,6 +293,8 @@
 .lead{flex:1;border-bottom:1px dotted #3a424a;transform:translateY(-4px);min-width:16px}
 .agval{color:#9aa4ac;font-size:12.5px;text-align:right}
 .agfoot{display:block;color:#6b747c;font-size:11px}
+.agtx{font-size:10px;letter-spacing:.5px}
+.agmark{display:block}
 </style>
 </head>
 <body>
@@ -333,8 +335,8 @@
           <img class="scnimg" src="assets/scn-loop.png" alt="" width="64" height="64">
           <h3>The waste you didn't see</h3>
           <p>Loops, retries, trivial turns on premium models — caught and priced.</p>
-          <pre class="art cardart">≈ trivial turns, premium-priced · <span class="redl">$2.68</span>
-  22% of this session's $12.30</pre>
+          <pre class="art cardart">⚠ Bash loop ×5 ············· <span class="redl">$0.08</span>
+≈ trivial turns, premium-priced <span class="redl">$8.12</span></pre>
         </div>
         <div class="scn">
           <img class="scnimg" src="assets/scn-week.png" alt="" width="64" height="64">
@@ -385,6 +387,7 @@ TOTAL ····················· <span class="grnl">$56.10</span
   <!-- ============ STEPPER + CTA ============ -->
   <div class="wrap">
     <section aria-label="Three steps">
+        <h2 class="lede">Sixty seconds to your first receipt.</h2>
       <div class="steps">
         <div class="step">
           <span class="k">01</span>
@@ -419,11 +422,11 @@ TOTAL ················· $0.09</pre>
         <div class="agwrap">
         <div class="agleft">
 <ul class="aglist2" aria-label="Supported agents and their fidelity">
-          <li><span class="agtile">❯_</span><span class="agname">Claude Code</span><span class="lead"></span><span class="agval">full per-turn, cache tiers</span></li>
-          <li><span class="agtile">◆</span><span class="agname">Codex</span><span class="lead"></span><span class="agval">full per-turn</span></li>
-          <li><span class="agtile">✦</span><span class="agname">Gemini CLI</span><span class="lead"></span><span class="agval">full per-turn, priced</span></li>
-          <li><span class="agtile">⌘</span><span class="agname">opencode</span><span class="lead"></span><span class="agval">full per-turn</span></li>
-          <li><span class="agtile agdim">▢</span><span class="agname">Cursor</span><span class="lead"></span><span class="agval">totals only<span class="agfoot"> — its logs stop there, so we do too</span></span></li>
+          <li><span class="agtile"><img class="agmark" src="assets/agents/claudecode.svg" alt="" width="14" height="14"></span><span class="agname">Claude Code</span><span class="lead"></span><span class="agval">full per-turn, cache tiers</span></li>
+          <li><span class="agtile agtx">cx</span><span class="agname">Codex</span><span class="lead"></span><span class="agval">full per-turn</span></li>
+          <li><span class="agtile"><img class="agmark" src="assets/agents/gemini.svg" alt="" width="14" height="14"></span><span class="agname">Gemini CLI</span><span class="lead"></span><span class="agval">full per-turn, priced</span></li>
+          <li><span class="agtile"><img class="agmark" src="assets/agents/opencode.svg" alt="" width="14" height="14"></span><span class="agname">opencode</span><span class="lead"></span><span class="agval">full per-turn</span></li>
+          <li><span class="agtile agdim"><img class="agmark" src="assets/agents/cursor.svg" alt="" width="14" height="14"></span><span class="agname">Cursor</span><span class="lead"></span><span class="agval">totals only<span class="agfoot"> — its logs stop there, so we do too</span></span></li>
         </ul>
 </div>
         <div class="proof-term agterm">
