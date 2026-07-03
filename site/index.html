@@ -243,6 +243,8 @@
   }
 .scnic{display:block;margin-bottom:12px;color:#14181c;opacity:.85}
 @media (prefers-color-scheme: dark){}
+.art{margin-top:14px;background:#14181c;color:#c8d0d4;border-radius:10px;padding:12px 14px;font:11px/1.6 ui-monospace,Menlo,monospace;overflow-x:auto;box-shadow:0 8px 24px rgba(0,0,0,.12)}
+.stepbox{margin-top:14px}
 </style>
 </head>
 <body>
@@ -320,22 +322,24 @@
         <div class="step">
           <span class="k">01</span>
           <p>Run <code>npx aireceipts</code></p>
+          <div class="copybox stepbox"><span class="ps">$</span><input type="text" value="npx aireceipts" readonly><button class="copy" data-copy="npx aireceipts">COPY</button></div>
         </div>
         <div class="step">
           <span class="k">02</span>
           <p>Read the receipt</p>
+          <pre class="art" aria-label="Receipt excerpt">⚠ Bash loop ×5 ······· $0.08 (3m 45s)
+──────────────────────────────
+TOTAL ················· $0.09</pre>
         </div>
         <div class="step">
           <span class="k">03</span>
           <p>Paste the handoff <span class="grow">— your agent works cheaper tomorrow.</span></p>
+          <pre class="art" aria-label="Handoff excerpt">handoff:
+- Bash loop ×5: change the input
+  before a 3rd retry.</pre>
         </div>
       </div>
-      <div class="cta-hold" style="justify-content:flex-start">
-        <div class="copybox">
-          <code><span class="p" aria-hidden="true">$</span>npx aireceipts</code>
-          <button type="button" class="copy-btn" data-cmd="npx aireceipts" aria-label="Copy the command npx aireceipts to the clipboard">Copy</button>
-        </div>
-      </div>
+      
     </section>
   </div>
 
