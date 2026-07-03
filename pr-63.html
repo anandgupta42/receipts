@@ -22,55 +22,51 @@ footer{font-size:11px;color:var(--muted);text-align:center;margin-top:36px}</sty
 <p class="sub">receipt artifact · PR #63</p>
 <section><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
-            6 sessions behind this PR             
+            7 sessions behind this PR             
 
-orchestrator · claude-fable-5 100%.........$195.55
-  session: df374859-7920-40f3-88e0-a613ae74b101
-  session slice: turns 433–747 of 749
+claude-fable-5.............................$272.58
+  session slice: turns 433–843 of 844
   SUBAGENTS (1)
-  &lt;fork-boilerplate&gt; You are a worker f…...$168.82
-codex · gpt-5.5 100%.........................$1.74
-  session: rollout-2026-07-02T22-34-30-019f2678-a…
-  entire session (no commits to slice by)
-codex · gpt-5.5 100%.........................$0.30
-  session: rollout-2026-07-02T22-54-12-019f268a-b…
-  entire session (no commits to slice by)
-codex · gpt-5.5 100%.........................$1.26
-  session: rollout-2026-07-03T12-45-50-019f2984-1…
-  entire session (no commits to slice by)
-codex · gpt-5.5 100%.........................$1.57
-  session: rollout-2026-07-03T13-16-44-019f29a0-6…
-  entire session (no commits to slice by)
-codex · gpt-5.5 100%.........................$1.70
-  session: rollout-2026-07-03T13-37-49-019f29b3-a…
-  entire session (no commits to slice by)
+  agent-a0dafa2d70546bde5 · claude-fabl…...$175.21
+  CODEX HELPERS (6) — no commits
+  gpt-5.5 · 4m...............................$1.74
+  gpt-5.5 · 1m...............................$0.30
+  gpt-5.5 · 3m...............................$1.26
+  gpt-5.5 · 4m...............................$1.57
+  gpt-5.5 · 5m...............................$1.70
+  gpt-5.5 · 4m...............................$1.12
 --------------------------------------------------
-TOTAL priced...............................$370.93
-  counted: 6 sessions + 1 subagent
-  cache served 97% of input tokens
+TOTAL priced...............................$455.47
+  counted: 7 sessions + 1 subagent
+  cache served 98% of input tokens
   details: npx aireceipts --session &lt;id&gt;
 - - - - - - - - - - - - - - - - - - - - - - - - -
       aireceipts · local · buy me a samosa 🥟      
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>orchestrator · df374859-7920-40f3-88e0-a613ae74b101</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>orchestrator · df374859-7920-40f3-88e0-a613ae74b101 · session slice: turns 433–843 of 844 · 411 turns · 2h 27m · in 130k · out 519k · &gt;99% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
           “Fix aireceipts GitHub issues”          
-   Claude Code · Jul 03 2026 19:44 UTC · 1h 41m   
+   Claude Code · Jul 03 2026 19:44 UTC · 2h 27m   
                claude-fable-5 100%                
         cache served &gt;99% of input tokens         
 
-(thinking/reply)...............$92.52  (145 turns)
-Bash...........................$76.63  (127 calls)
-Write............................$8.80  (14 calls)
-Edit.............................$8.01  (13 calls)
-Read..............................$3.30  (6 calls)
+(thinking/reply)..............$133.54  (196 turns)
+Bash..........................$105.11  (163 calls)
+Write............................$9.95  (15 calls)
+Edit.............................$8.75  (14 calls)
+Read..............................$4.08  (7 calls)
+Artifact..........................$4.03  (5 calls)
 TaskUpdate........................$2.48  (4 calls)
 SendMessage.......................$1.98  (3 calls)
 TaskCreate........................$1.17  (2 calls)
+AskUserQuestion....................$0.83  (1 call)
 Agent..............................$0.66  (1 call)
+
+≈ re-priced eligible trivial spans...........$0.07
+  (1 tiny turns, priced at claude-haiku-4-5)
 --------------------------------------------------
-TOTAL......................................$195.55
-same tokens on claude-haiku-4-5.............$19.56
+TOTAL......................................$272.58
+same tokens on claude-haiku-4-5.............$27.26
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
@@ -80,7 +76,7 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
       aireceipts · local · buy me a samosa 🥟      
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · rollout-2026-07-02T22-34-30-019f2678-ab69-73e1-a74d-3bf92afe3064</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>codex · rollout-2026-07-02T22-34-30-019f2678-ab69-73e1-a74d-3bf92afe3064 · no commits · 1 turns · 4m · in 142k · out 13k · 90% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
  “You are the independent PR critic (review-pr)…” 
     Codex · Jul 03 2026 05:34:30 UTC · 4m 38s     
@@ -101,7 +97,7 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
       aireceipts · local · buy me a samosa 🥟      
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · rollout-2026-07-02T22-54-12-019f268a-b3da-7f22-bba8-737e6158e739</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>codex · rollout-2026-07-02T22-54-12-019f268a-b3da-7f22-bba8-737e6158e739 · no commits · 1 turns · 1m · in 25k · out 4.1k · 78% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
  “Review the specs-only diff at /private/tmp/cl…” 
     Codex · Jul 03 2026 05:54:12 UTC · 1m 27s     
@@ -121,7 +117,7 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
       aireceipts · local · buy me a samosa 🥟      
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · rollout-2026-07-03T12-45-50-019f2984-15cd-7ae2-8b31-fbd6bc2b4494</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>codex · rollout-2026-07-03T12-45-50-019f2984-15cd-7ae2-8b31-fbd6bc2b4494 · no commits · 1 turns · 3m · in 119k · out 11k · 85% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
  “Attack the spec file specs/SPEC-0027-receipt-…” 
     Codex · Jul 03 2026 19:45:50 UTC · 3m 44s     
@@ -142,7 +138,7 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
       aireceipts · local · buy me a samosa 🥟      
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · rollout-2026-07-03T13-16-44-019f29a0-6299-73f1-9386-31bd8e0350d5</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>codex · rollout-2026-07-03T13-16-44-019f29a0-6299-73f1-9386-31bd8e0350d5 · no commits · 1 turns · 4m · in 164k · out 15k · 78% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
  “You are the independent PR critic for airecei…” 
     Codex · Jul 03 2026 20:16:45 UTC · 4m 57s     
@@ -163,7 +159,7 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
       aireceipts · local · buy me a samosa 🥟      
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · rollout-2026-07-03T13-37-49-019f29b3-adc1-7bb1-9aab-5a7d1a8e0e25</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>codex · rollout-2026-07-03T13-37-49-019f29b3-adc1-7bb1-9aab-5a7d1a8e0e25 · no commits · 1 turns · 5m · in 105k · out 16k · 93% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
  “Independent PR critic for aireceipts. Review…”  
     Codex · Jul 03 2026 20:37:49 UTC · 5m 48s     
@@ -175,6 +171,27 @@ list_projects......................$0.04  (1 call)
 --------------------------------------------------
 TOTAL........................................$1.70
 same tokens on gpt-5.4-mini..................$0.25
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+      aireceipts · local · buy me a samosa 🥟      
+- - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
+<section><h2>codex · rollout-2026-07-03T15-05-50-019f2a04-42a5-7bc0-8ecd-2c408b0b9d0f · no commits · 1 turns · 4m · in 73k · out 13k · 91% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Independent PR critic for aireceipts. Review…”  
+    Codex · Jul 03 2026 22:05:50 UTC · 4m 27s     
+                   gpt-5.5 100%                   
+         cache served 91% of input tokens         
+
+exec_command.....................$1.08  (32 calls)
+list_projects......................$0.03  (1 call)
+--------------------------------------------------
+TOTAL........................................$1.12
+same tokens on gpt-5.4-mini..................$0.17
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
