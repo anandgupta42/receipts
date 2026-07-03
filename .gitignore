@@ -6,3 +6,5 @@ coverage/
 reports/
 .review-ok
 .github/meta/
+# maintainer-labeled thrash calibration corpus — local transcript paths, never committed (SPEC-0017, issue #46)
+eval/clean-corpus.local.json
