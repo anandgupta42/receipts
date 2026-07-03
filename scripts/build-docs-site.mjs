@@ -701,7 +701,7 @@ function barcodeSvg() {
 
 function wrapPage({ title, sourcePath, body, navSections }) {
   const sourceLine = sourcePath === undefined
-    ? "Every page below is generated from the markdown in docs/ — each one names the source it wraps."
+    ? "Start with your first receipt in 60 seconds. Then one guide per command, a reference, and the why-pages."
     : `Rendered from <code>${escapeHtml(sourcePath)}</code>.`;
   const navMarkup = navSections
     .map((sec) => {
@@ -860,7 +860,7 @@ function main() {
   }
 
   const indexBody = `
-<p>The aireceipts user guide, rendered as static pages for GitHub Pages. Source paths are shown so the generated site stays traceable to the markdown it wraps.</p>
+<p>New here? <strong>Get started</strong> walks you to your first receipt in under a minute. Everything else answers one question each.</p>
 ${NAV_SECTIONS.map((s) => `<h2>${escapeHtml(s.section)}</h2>
 <ul class="doc-index-list">
 ${s.items.map((rel) => {

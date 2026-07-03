@@ -411,15 +411,18 @@ footer{
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>kind</code></td><td>enum</td><td><code>stuck-loop</code> or <code>trivial-spans</code>.</td></tr>
+    <tr><td><code>kind</code></td><td>enum</td><td><code>stuck-loop</code>, <code>trivial-spans</code>, or <code>context-thrash</code>.</td></tr>
     <tr><td><code>runLength</code></td><td>number</td><td>(stuck-loop) Consecutive identical calls.</td></tr>
     <tr><td><code>wallClockMs</code></td><td>number | null</td><td>(stuck-loop) Wall-clock spent in the loop, or null.</td></tr>
     <tr><td><code>eligibleTurnCount</code></td><td>number</td><td>(trivial-spans) Turns that could have used a cheaper model.</td></tr>
     <tr><td><code>cheaperModel</code></td><td>string</td><td>(trivial-spans) The cheaper model the arithmetic used.</td></tr>
+    <tr><td><code>compactionCount</code></td><td>number</td><td>(context-thrash) Refill-positive compactions clustered in the window.</td></tr>
+    <tr><td><code>turnSpan</code></td><td>number</td><td>(context-thrash) Assistant-turn span from the window's first to last compaction.</td></tr>
+    <tr><td><code>turnIndices</code></td><td>array</td><td>(context-thrash) The contributing post-compaction turn indices (the cost basis).</td></tr>
   </tbody>
 </table></div>
 
-<p>Each variant also carries a <code>tool</code>/<code>usd</code>/<code>tokens</code> field as documented above.</p>
+<p>Each variant also carries a <code>tool</code>/<code>usd</code>/<code>tokens</code> field as documented above. The <code>context-thrash</code> variant omits <code>tool</code>, carries a nullable <code>usd</code> (tokens-only when any contributing turn is unpriced, I2), and reports prompt-only <code>tokens</code>.</p>
 
 <h3 id="pricedelta">PriceDelta</h3>
 
