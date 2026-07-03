@@ -245,6 +245,16 @@
 @media (prefers-color-scheme: dark){}
 .art{margin-top:14px;background:#14181c;color:#c8d0d4;border-radius:10px;padding:12px 14px;font:11px/1.6 ui-monospace,Menlo,monospace;overflow-x:auto;box-shadow:0 8px 24px rgba(0,0,0,.12)}
 .stepbox{margin-top:14px}
+.ruleswrap{display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
+@media (min-width:900px){.ruleswrap{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);align-items:start}}
+.proof{max-width:480px}
+.proofcard{font-size:12px;line-height:1.7}
+.proofcap{font-size:13.5px;color:#5a6068;margin:10px 0 0}
+.agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;margin:22px 0 28px}
+.ag{border:1px solid #d8dbd6;border-radius:12px;padding:14px 16px;background:#fff}
+.ag strong{display:block;font-size:15px;margin-bottom:4px}
+.ag span{font-size:12.5px;color:#5a6068;line-height:1.45}
+.agq{border-style:dashed}
 </style>
 </head>
 <body>
@@ -305,12 +315,25 @@
     <div class="wrap">
       <section aria-label="Your numbers, your rules">
         <h2 class="lede">Your numbers, your rules.</h2>
+        <div class="ruleswrap">
         <ol class="rules">
           <li>No fabricated dollars, ever.</li>
           <li>Every price cited: URL, date, excerpt.</li>
           <li>Comparisons are arithmetic, not predictions.</li>
           <li>Same transcript in, byte-identical receipt out.</li>
         </ol>
+        <div class="proof">
+          <pre class="art proofcard" aria-label="A real cited price-table row">"claude-fable-5": {
+  "input": 10.0, "output": 50.0,
+  "sources": [{
+    "url": "platform.claude.com/…/pricing",
+    "observed_at": "2026-07-02",
+    "excerpt": "Base Input $10 / MTok …"
+  }]
+}</pre>
+          <p class="proofcap">A real row from the price table. Every dollar on every receipt traces to one — checked and live-verified in CI.</p>
+        </div>
+        </div>
       </section>
     </div>
   </div>
@@ -348,12 +371,12 @@ TOTAL ················· $0.09</pre>
     <div class="wrap">
       <section aria-label="Works with the agents you already run">
         <h2 class="lede">Works with the agents you already run.</h2>
-        <div class="agents">
-          <span>Claude Code</span><span class="sep" aria-hidden="true">·</span>
-          <span>Codex</span><span class="sep" aria-hidden="true">·</span>
-          <span>Gemini CLI</span><span class="sep" aria-hidden="true">·</span>
-          <span>opencode</span>
-          <span class="deg">(Cursor, honestly degraded)</span>
+        <div class="agrid">
+          <div class="ag"><strong>Claude Code</strong><span>full per-turn pricing, cache tiers</span></div>
+          <div class="ag"><strong>Codex</strong><span>full per-turn parsing</span></div>
+          <div class="ag"><strong>Gemini CLI</strong><span>full per-turn pricing</span></div>
+          <div class="ag"><strong>opencode</strong><span>full per-turn parsing</span></div>
+          <div class="ag agq"><strong>Cursor</strong><span>totals only — its logs stop there, so we do too</span></div>
         </div>
         <div class="proof-term">
           <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts</span></div>
