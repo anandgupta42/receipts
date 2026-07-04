@@ -216,3 +216,10 @@ needed. One matrix deviation: R5 said README "emoji count == 2" (title 🧾 +
 footer 🔺), but #78 replaced the title emoji with the wordmark image after
 this spec was approved — the exact-identity guard now pins the intentional
 set to just `["🔺"]`.
+Post-merge gates: `tsc` 0, `eslint` 0, `verify-goldens` 0 (90 artifacts),
+`determinism-check --runs=10` 0, `spec-lint` 0 (35 specs), `hygiene` 0.
+`vitest` is 999/1001: the two failures are upstream #69 stress tests
+("100 generated opencode combinations", "100 simulated opencode sessions")
+timing out on this loaded dev machine — reproduced byte-for-byte on a clean
+`origin/main` worktree with zero SPEC-0034 changes, so they are
+pre-existing environment timeouts, not regressions; CI arbitrates.
