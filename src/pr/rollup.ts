@@ -54,11 +54,16 @@ export async function rollupChildren(
   parentFilePath: string,
   window: RollupWindow,
   deps: Partial<RollupDeps> = {},
+  /** SPEC-0038 R3 dedup — children independently credited as contributors are skipped here (filePath key), so no token counts twice. */
+  excluded?: ReadonlySet<string>,
 ): Promise<SubagentRow[]> {
   const { discover, load } = { ...defaultDeps, ...deps };
   const childFiles = await discover(parentFilePath);
   const rows: SubagentRow[] = [];
   for (const childFile of childFiles) {
+    if (excluded?.has(childFile)) {
+      continue;
+    }
     const agentId = parseChildPath(childFile)?.agentId ?? childFile;
     let session: Session | null = null;
     try {

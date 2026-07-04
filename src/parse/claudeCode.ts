@@ -220,6 +220,29 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
       return;
     }
 
+    // SPEC-0038 R4 — the fork boundary cuts at the adapter: everything before a
+    // `fork-context-ref` marker is inherited parent history and must not exist
+    // downstream (anchors, slicing, pricing, rollup all see post-fork turns
+    // only). Current fork files carry the marker first with no inherited copies;
+    // the reset makes that a guarantee, not an observation.
+    if (r.type === "fork-context-ref") {
+      turns.length = 0;
+      toolCallById.clear();
+      compactionByTurn.clear();
+      totalUsage = emptyUsage();
+      turnCount = 0;
+      toolCallCount = 0;
+      model = undefined;
+      firstUserText = undefined;
+      aiTitle = undefined;
+      rawSidechain = false;
+      startedAt = undefined;
+      endedAt = undefined;
+      cwd = undefined;
+      gitBranch = undefined;
+      return;
+    }
+
     const ts = parseTimestamp(r.timestamp);
     if (ts !== undefined) {
       startedAt = startedAt === undefined ? ts : Math.min(startedAt, ts);
@@ -250,6 +273,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
               input: block.input,
               status: "running",
               startedAt: ts,
+              ...(block.name === "Bash" ? { shell: true } : {}),
             };
             toolCalls.push(call);
             if (block.id) {

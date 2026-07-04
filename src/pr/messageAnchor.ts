@@ -6,7 +6,7 @@
 // the branch, and claimed by exactly one current-worktree session that never
 // SHA-committed elsewhere. Credit only — never slicing (no SHA → no turn range).
 import type { Session } from "../parse/types.js";
-import { hexRuns, matchesBranchSha, toolCallGitVerb, toolCallInvocations, gitWriteVerb } from "./gitWrite.js";
+import { matchesBranchSha, toolCallGitVerb, toolCallInvocations, gitWriteVerb, writeOutputShas } from "./gitWrite.js";
 
 /** Noise suppression only — the safety mechanism is uniqueness + unclaimed (R3). */
 export const MSG_MIN = 12;
@@ -61,6 +61,12 @@ export function sessionCommitSubjects(session: Session): string[] {
   const out: string[] = [];
   for (const turn of session.turns) {
     for (const call of turn.toolCalls) {
+      // SPEC-0038 R1a — the shell gate applies to INPUT parsing too: an Agent/
+      // MCP call carrying a command-shaped field must not message-credit
+      // (S5 finding 6).
+      if (call.shell !== true) {
+        continue;
+      }
       for (const argv of toolCallInvocations(call)) {
         const subject = firstCommitSubject(argv);
         if (subject !== null && subject !== "" && !out.includes(subject)) {
@@ -82,10 +88,11 @@ export function claimedBranchShas(session: Session, branchShas: readonly string[
   const out: string[] = [];
   for (const turn of session.turns) {
     for (const call of turn.toolCalls) {
-      if (!toolCallGitVerb(call)) {
+      const verb = toolCallGitVerb(call);
+      if (!verb) {
         continue;
       }
-      for (const run of hexRuns(String(call.output ?? ""))) {
+      for (const run of writeOutputShas(verb, String(call.output ?? ""))) {
         const matches = branchShas.filter((sha) => sha.startsWith(run));
         if (matches.length === 1 && !out.includes(matches[0])) {
           out.push(matches[0]);
@@ -105,10 +112,11 @@ export function claimedBranchShas(session: Session, branchShas: readonly string[
 export function hasForeignShaWrites(session: Session, branchShas: readonly string[]): boolean {
   for (const turn of session.turns) {
     for (const call of turn.toolCalls) {
-      if (!toolCallGitVerb(call)) {
+      const verb = toolCallGitVerb(call);
+      if (!verb) {
         continue;
       }
-      for (const run of hexRuns(String(call.output ?? ""))) {
+      for (const run of writeOutputShas(verb, String(call.output ?? ""))) {
         if (!matchesBranchSha(run, branchShas)) {
           return true;
         }

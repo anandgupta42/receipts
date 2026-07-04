@@ -33,15 +33,14 @@ function turn(index: number, opts: { commitSha?: string; commitShas?: string[]; 
   const toolCalls = [];
   const shas = opts.commitShas ?? (opts.commitSha !== undefined ? [opts.commitSha] : []);
   if (shas.length > 0) {
-    toolCalls.push({
-      name: "Bash",
+    toolCalls.push({ name: "Bash", shell: true,
       input: { command: "git commit -m x" },
       output: shas.map((s) => `[main ${s.slice(0, 7)}] x`).join("\n"),
       status: "ok" as const,
     });
   }
   if (opts.push !== undefined) {
-    toolCalls.push({ name: "Bash", input: { command: "git push" }, output: opts.push, status: "ok" as const });
+    toolCalls.push({ name: "Bash", shell: true, input: { command: "git push" }, output: opts.push, status: "ok" as const });
   }
   return { index, timestamp: 1000 + index, model: "claude-opus-4-8", usage: usage(opts.input ?? 500, opts.output ?? 50), toolCalls };
 }
@@ -65,7 +64,7 @@ function session(turns: Turn[]): Session {
 
 describe("SPEC-0031 R1 · anchorEvents", () => {
   it("captures full branch SHAs per commit turn, transcript order, commit verbs only", () => {
-    const turns = [turn(0), turn(1, { commitSha: SHA_A }), turn(2, { push: SHA_B.slice(0, 12) }), turn(3, { commitSha: SHA_B })];
+    const turns = [turn(0), turn(1, { commitSha: SHA_A }), turn(2, { push: `   0000000..${SHA_B.slice(0, 12)}  feat -> feat` }), turn(3, { commitSha: SHA_B })];
     const events = anchorEvents(turns, COMMITS.shas);
     expect(events).toEqual([
       { turnIndex: 1, shas: [SHA_A] },
@@ -87,7 +86,7 @@ describe("SPEC-0031 R1 · segmentation", () => {
   });
 
   it("folds a trailing own-push span into the last segment (partition stays complete)", () => {
-    const turns = [turn(0), turn(1, { commitSha: SHA_A }), turn(2), turn(3, { push: `pushed ${SHA_A}` })];
+    const turns = [turn(0), turn(1, { commitSha: SHA_A }), turn(2), turn(3, { push: `   0000000..${SHA_A.slice(0, 12)}  feat -> feat` })];
     const slice = computeSlice(turns, COMMITS.shas);
     expect(slice).toMatchObject({ kind: "slice", endTurn: 3 });
     const segs = segmentSlice(slice, anchorEvents(turns, COMMITS.shas), COMMITS);

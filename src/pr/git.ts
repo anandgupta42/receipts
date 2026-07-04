@@ -72,7 +72,15 @@ export function currentWorktreeRoot(run: CommandRunner, cwd?: string): string | 
 export function defaultBranchRef(run: CommandRunner, cwd?: string): string {
   const res = run("git", ["rev-parse", "--abbrev-ref", "origin/HEAD"], { cwd });
   const name = res.code === 0 ? res.stdout.trim() : "";
-  return name && name !== "origin/HEAD" ? name : "main";
+  if (name && name !== "origin/HEAD") {
+    return name;
+  }
+  // SPEC-0038 (forensic P2, PR #87): agent worktrees carry a local `main`
+  // pinned at worktree-creation time; comparing against it inflated the
+  // branch-SHA set from 1 commit to 11+ and mis-attributed a lead session.
+  // Prefer the remote-tracking ref, which is shared and current.
+  const originMain = run("git", ["rev-parse", "--verify", "--quiet", "origin/main"], { cwd });
+  return originMain.code === 0 && originMain.stdout.trim() ? "origin/main" : "main";
 }
 
 export interface BranchCommits {

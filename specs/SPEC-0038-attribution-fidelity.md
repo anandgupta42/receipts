@@ -1,7 +1,7 @@
 ---
 id: SPEC-0038
 title: "Attribution fidelity — anchors are authorship, receipts never double-count"
-status: draft
+status: building
 milestone: M4
 depends: [SPEC-0024, SPEC-0032]
 ---
@@ -220,4 +220,57 @@ evidence exists than the withdrawn comment on #87.
 **2026-07-04 · S4 (lint):** `node scripts/spec-lint.mjs` → 35 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-04 · approved (button 1):** maintainer, in-session ("PR #93 — SPEC-0038 attribution fidelity - aproved").
+
+**2026-07-04 · S5 (build forensics — R5's mandate to pin, not guess):** run
+against the REAL artifacts of the #87 event (bounded reads only): (P1) the
+lead session genuinely authored one plumbing merge commit on the PR branch —
+amplification, not only echoes, was live; R2 bounds it. (P2) the builder
+worktree's local `main` was days stale, inflating `branchCommits` from 1
+commit to 11+ — fixed here: `defaultBranchRef` prefers `origin/main` when
+`origin/HEAD` is unset (under-inflation-only direction, tested). (P3) fork
+transcripts turn out to carry a `fork-context-ref` FIRST record and no
+inherited copies — R4's boundary is structural ground truth, implemented as
+an adapter reset so the guarantee holds even for hypothetical mid-file
+markers. (P4) top-level discovery EXCLUDES child paths by design (SPEC-0023
+R1c) — the real reason builder sessions were unreceiptable; R3 admits them
+as candidates with rollup dedup by filePath.
+
+**2026-07-04 · S6 (implementation review, Codex, full capture): REWORK →
+fixed.** 9 findings:
+1. HIGH — push grammar missed `sha -> ref` — accepted; shape added.
+2. HIGH — `hex..hex` matched anywhere + old-sha claimed authorship —
+   accepted; update lines must carry ` -> `, and only the NEW sha anchors
+   (the old tip was prior work; under-credit-only).
+3. MEDIUM — `echo "[main <sha>] fake"` inside a compound can still forge a
+   bracket line — accepted as documented residual: accidental contamination
+   is killed; deliberate self-forgery is transcript editing (trust.md #10's
+   class), and no output-only rule can distinguish it.
+4. HIGH — boundary-shift test wording contradicted R4's row — accepted via
+   reframe: the adapter's guarantee is that nothing BEFORE the marker is
+   ever admitted; the marker is ground truth (P3), so an early marker only
+   cuts more. Spec row's "early must not admit inherited spend" is
+   satisfied in exactly that sense.
+5. MEDIUM — fork reset left `aiTitle`/`rawSidechain` — accepted; reset.
+6. HIGH — the SPEC-0032 message fallback parsed command fields of ANY tool
+   (an Agent prompt could message-credit) — accepted; the shell gate now
+   applies to input parsing too.
+7. HIGH — recursive child discovery could admit grandchildren — accepted;
+   nested candidates are direct-level only (path-checked).
+8. MEDIUM — uncapped nested loads — accepted; 200/parent cap + the
+   window gate on parents.
+9. MEDIUM — gemini can never anchor (its adapter records no tool
+   input/output — nothing to gate or grammar-match) — accepted as a
+   recorded limitation, not a flag: gemini sessions surface through the
+   honest excluded count, never guessed in. Codex `exec_command` flagging
+   is a recorded deviation from R1a's letter (fixtures prove it IS codex's
+   shell surface); launch detection pinned unchanged by test.
+
+**Kill criterion (a) result:** full-suite attribution fixtures pass with
+contributor sets preserved; one stub was made MORE realistic (run.test's
+branch log now lists the pushed tip commit, as any real branch does) after
+the new-sha-only rule exposed that it listed a branch whose tip was never
+committed. (b) not triggered: the fork marker is reliable (P3) — forks
+render post-fork turns, not exclusions. The two vitest failures on this
+loaded machine are upstream #69 stress timeouts, reproduced byte-identically
+on an unmodified baseline tree mid-build.

@@ -22,7 +22,7 @@ function bashTurn(index: number, command: string, output: string): Turn {
     timestamp: 1000 + index,
     model: "claude-opus-4-8",
     usage,
-    toolCalls: [{ name: "Bash", input: { command }, output, status: "ok" }],
+    toolCalls: [{ name: "Bash", shell: true, input: { command }, output, status: "ok" }],
   };
 }
 

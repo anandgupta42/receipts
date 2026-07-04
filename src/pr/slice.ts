@@ -5,7 +5,7 @@
 // rebase/amend leaves only a push anchor), we render the labeled full session
 // rather than a confident wrong cut (I3 applied to attribution).
 import type { Turn } from "../parse/types.js";
-import { hexRuns, matchesBranchSha, toolCallGitVerb, type GitVerb } from "./gitWrite.js";
+import { matchesBranchSha, toolCallGitVerb, writeOutputShas, type GitVerb } from "./gitWrite.js";
 
 /** The label shown when a slice can't be computed — full-session cost is never presented as PR cost unlabeled. */
 export const FULL_FALLBACK_LABEL = "entire session (slice unavailable)";
@@ -43,7 +43,7 @@ function classifyAnchors(turns: Turn[], branchShas: readonly string[]): GitAncho
       if (!verb) {
         continue;
       }
-      const runs = hexRuns(String(call.output ?? ""));
+      const runs = writeOutputShas(verb, String(call.output ?? ""));
       if (runs.length === 0) {
         continue;
       }
@@ -72,11 +72,12 @@ export function classifyBranchAnchors(turns: Turn[], branchShas: readonly string
   let writeCount = 0;
   for (const turn of turns) {
     for (const call of turn.toolCalls) {
-      if (!toolCallGitVerb(call)) {
+      const verb = toolCallGitVerb(call);
+      if (!verb) {
         continue;
       }
       writeCount++;
-      if (hexRuns(String(call.output ?? "")).some((r) => matchesBranchSha(r, branchShas))) {
+      if (writeOutputShas(verb, String(call.output ?? "")).some((r) => matchesBranchSha(r, branchShas))) {
         hasOwn = true;
       }
     }
@@ -107,7 +108,7 @@ export function anchorEvents(turns: Turn[], branchShas: readonly string[]): Anch
       if (toolCallGitVerb(call) !== "commit") {
         continue;
       }
-      for (const run of hexRuns(String(call.output ?? ""))) {
+      for (const run of writeOutputShas("commit", String(call.output ?? ""))) {
         // A prefix matching MULTIPLE branch commits is ambiguous — attributing
         // it would guess; skip it (the turn still prices, just unsegmented).
         const matches = branchShas.filter((sha) => sha.startsWith(run));

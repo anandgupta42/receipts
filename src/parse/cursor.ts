@@ -108,12 +108,16 @@ function parseArgs(raw: unknown): unknown {
   }
 }
 
+const CURSOR_SHELL_TOOLS = new Set(["run_terminal_cmd", "terminal", "shell", "bash"]);
+
 function toToolCall(t: ToolFormerData): ToolCall {
+  const name = toolName(t);
   return {
-    name: toolName(t),
+    name,
     input: parseArgs(t.rawArgs),
     output: typeof t.result === "string" ? t.result : undefined,
     status: t.status === "error" ? "error" : "ok",
+    ...(CURSOR_SHELL_TOOLS.has(name) ? { shell: true } : {}),
   };
 }
 

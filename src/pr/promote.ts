@@ -37,7 +37,14 @@ export async function promoteOrphanSidechains(
     if (!classifyBranchAnchors(session.turns, branchShas).hasOwn) {
       continue;
     }
-    promoted.push({ summary, session, slice: computeSlice(session.turns, branchShas), basis: "anchor" });
+    // SPEC-0038 R2b — promotion requires a sliceable commit anchor: `hasOwn`
+    // via push-only output no longer promotes (rebase-safety parity with
+    // computeSlice's own rule); a full-fallback sidechain is a silent miss.
+    const slice = computeSlice(session.turns, branchShas);
+    if (slice.kind === "full") {
+      continue;
+    }
+    promoted.push({ summary, session, slice, basis: "anchor" });
   }
   return promoted;
 }

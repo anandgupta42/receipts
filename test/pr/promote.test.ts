@@ -17,7 +17,7 @@ function commitTurn(index: number, output: string): Turn {
     timestamp: 1000 + index,
     model: "claude-opus-4-8",
     usage,
-    toolCalls: [{ name: "Bash", input: { command: "git commit -m x" }, output, status: "ok" }],
+    toolCalls: [{ name: "Bash", shell: true, input: { command: "git commit -m x" }, output, status: "ok" }],
   };
 }
 

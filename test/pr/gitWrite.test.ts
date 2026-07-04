@@ -26,7 +26,7 @@ describe("gitWriteVerb (tokenized argv)", () => {
 });
 
 describe("toolCallGitVerb (across input shapes)", () => {
-  const call = (input: unknown): ToolCall => ({ name: "Bash", input });
+  const call = (input: unknown): ToolCall => ({ name: "Bash", shell: true, input });
 
   it("reads Claude's {command} string and splits compound commands", () => {
     expect(toolCallGitVerb(call({ command: "git add -A && git commit -m 'msg'" }))).toBe("commit");
