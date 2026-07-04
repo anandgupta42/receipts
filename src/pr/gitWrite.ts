@@ -188,8 +188,14 @@ export function gitWriteVerb(argv: string[]): GitVerb | null {
   return null;
 }
 
-/** The single git-write verb this tool call represents, if any (first match across compound commands). */
+/** The single git-write verb this tool call represents, if any (first match
+ * across compound commands). SPEC-0038 R1a: only adapter-flagged REAL shell
+ * executions can mint verbs — Agent/Task results, MCP tools carrying `command`
+ * fields, and quoted echoes are categorically excluded. */
 export function toolCallGitVerb(call: ToolCall): GitVerb | null {
+  if (call.shell !== true) {
+    return null;
+  }
   for (const argv of toolCallInvocations(call)) {
     const verb = gitWriteVerb(argv);
     if (verb) {
@@ -229,4 +235,49 @@ export function hexRuns(text: string): string[] {
 /** A hex run is OURS iff it prefix-matches (is a prefix of) some branch SHA. */
 export function matchesBranchSha(run: string, branchShas: readonly string[]): boolean {
   return branchShas.some((sha) => sha.startsWith(run));
+}
+
+// ── SPEC-0038 R1b — write-output line grammars ──────────────────────────────
+// Anchor SHAs are taken only from output lines shaped like git's own write
+// confirmations, never from the whole blob: a compound command
+// (`git commit … && git log --oneline`) yields ONE output where other commits'
+// SHAs sit inside a write span, and a name gate alone cannot see the difference.
+//   commit: `[<ref> <sha>] subject`, incl. `[<ref> (root-commit) <sha>]`
+//   push:   ` <old>..<new>  <ref> -> <ref>` (fast-forward), `+ <old>...<new>`
+//           (forced) — the update-line pair; `* [new branch] a -> b` has no SHA.
+const COMMIT_LINE_RE = /^\[[^\]\n]* ([0-9a-f]{7,40})\]/;
+// Push update lines always name the ref mapping on the same line (`a..b ref ->
+// ref`, `+ a...b ref -> ref (forced)`, `sha -> ref` for SHA-spec pushes) — the
+// ` -> ` requirement is what keeps a `git log a..b` echo inside a compound
+// push span inert (S5 finding 2). Only the NEW sha is authorship: the old tip
+// was someone's prior work, not this span's (under-credit-only direction).
+const PUSH_UPDATE_RE = /(?:^|\s)(?:[0-9a-f]{7,40})\.\.\.?([0-9a-f]{7,40})\s+\S+ -> \S+/;
+const PUSH_SHA_REF_RE = /(?:^|\s)([0-9a-f]{7,40}) -> \S+/;
+
+/**
+ * The SHAs a git-write span's output actually confirms, per the verb's own
+ * line grammar (SPEC-0038 R1b). Lines not matching the grammar contribute
+ * nothing — `git log` echoes, prose SHAs, and notification quotes are inert.
+ */
+export function writeOutputShas(verb: GitVerb, output: string): string[] {
+  const shas: string[] = [];
+  for (const line of output.split("\n")) {
+    if (verb === "commit") {
+      const m = COMMIT_LINE_RE.exec(line.trim());
+      if (m) {
+        shas.push(m[1]);
+      }
+    } else {
+      const upd = PUSH_UPDATE_RE.exec(line);
+      if (upd) {
+        shas.push(upd[1]);
+        continue;
+      }
+      const shaRef = PUSH_SHA_REF_RE.exec(line);
+      if (shaRef) {
+        shas.push(shaRef[1]);
+      }
+    }
+  }
+  return shas;
 }

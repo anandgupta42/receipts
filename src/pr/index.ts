@@ -23,6 +23,8 @@ import { buildPerCommitRows, renderPerCommitLines, segmentSlice } from "./perCom
 import { deriveRole, selectContributors, type PoolCandidate, type RawContributor } from "./contributors.js";
 import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
+import { nestedCandidates } from "./nested.js";
+import { isChildPath } from "../parse/children.js";
 import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
 import { resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
@@ -43,7 +45,7 @@ export interface PrDeps {
   loadSession: (summary: SessionSummary) => Promise<Session | null>;
   runGit: CommandRunner;
   runGh: CommandRunner;
-  rollup: (parentFilePath: string, window: RollupWindow) => Promise<SubagentRow[]>;
+  rollup: (parentFilePath: string, window: RollupWindow, excluded?: ReadonlySet<string>) => Promise<SubagentRow[]>;
   cwd: string;
   out: (s: string) => void;
   err: (s: string) => void;
@@ -55,7 +57,7 @@ export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
     loadSession: async (summary) => (await import("../parse/load.js")).loadSession(summary),
     runGit: defaultRunner,
     runGh: defaultRunner,
-    rollup: (parentFilePath, window) => rollupChildren(parentFilePath, window),
+    rollup: (parentFilePath, window, excluded) => rollupChildren(parentFilePath, window, {}, excluded),
     cwd: process.cwd(),
     out: (s) => process.stdout.write(`${s}\n`),
     err: (s) => process.stderr.write(`${s}\n`),
@@ -91,13 +93,22 @@ async function resolveContributors(
   subjects: readonly string[],
 ): Promise<Resolved | { error: string }> {
   const sessions = await deps.listSessions();
+  // SPEC-0038 R3 — nested subagent sessions of window-overlapping Claude
+  // parents join the candidate set under the same gates (and are explicitly
+  // selectable). Loaded once here; selection reuses the preloaded sessions.
+  const nested = await nestedCandidates(sessions, commitMs);
+  const preloaded = new Map(nested.map((n) => [n.summary.filePath, n.session]));
+  const loadSession = (summary: SessionSummary): Promise<Session | null> => {
+    const hit = preloaded.get(summary.filePath);
+    return hit ? Promise.resolve(hit) : deps.loadSession(summary);
+  };
 
   if (opts.session) {
-    const summary = await selectExplicitSession(sessions, opts.session);
+    const summary = await selectExplicitSession([...sessions, ...nested.map((n) => n.summary)], opts.session);
     if (!summary) {
       return { error: `no session matched "${opts.session}"` };
     }
-    const session = await deps.loadSession(summary);
+    const session = await loadSession(summary);
     if (!session) {
       return { error: `failed to load session "${summary.id}"` };
     }
@@ -129,12 +140,19 @@ async function resolveContributors(
       }
     }
   }
+  for (const n of nested) {
+    if (isBranchCandidate(n.summary, roots, commitMs)) {
+      candidates.push({ summary: n.summary, pool: "repo" });
+    } else if (overlapsBranchWindow(n.summary, commitMs)) {
+      candidates.push({ summary: n.summary, pool: "anchor" });
+    }
+  }
   if (candidates.length === 0 && sidechains.length === 0) {
     return { error: NO_MATCH };
   }
   const selection = await selectContributors(candidates, shas, {
     branchSubjects: subjects,
-    loadSession: deps.loadSession,
+    loadSession,
     currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
   });
   return { ...selection, sidechains };
@@ -145,14 +163,14 @@ async function resolveContributors(
  * renders (R2/R3). The sliced `ReceiptModel` is returned alongside the view —
  * SPEC-0027's artifact page renders it in full instead of discarding it.
  */
-async function buildContributorView(raw: RawContributor, deps: PrDeps): Promise<{ view: ContributorView; model: ReceiptModel }> {
+async function buildContributorView(raw: RawContributor, deps: PrDeps, excludedChildren?: ReadonlySet<string>): Promise<{ view: ContributorView; model: ReceiptModel }> {
   const rendered = raw.slice.kind === "slice" ? sliceSessionForReceipt(raw.session, raw.slice) : raw.session;
   const model = await buildReceiptModel(rendered);
   const window: RollupWindow =
     raw.slice.kind === "slice" && rendered.startedAt !== undefined && rendered.endedAt !== undefined
       ? { start: rendered.startedAt, end: rendered.endedAt }
       : null;
-  const subagents = await deps.rollup(raw.summary.filePath, window);
+  const subagents = await deps.rollup(raw.summary.filePath, window, excludedChildren);
   const view: ContributorView = {
     role: deriveRole(raw.summary, raw.session, subagents.length > 0),
     sessionId: stemOf(raw.summary.filePath),
@@ -287,8 +305,13 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // one chronological sort across both (startedAt, then id — SPEC-0023 order).
   const entries: { view: ContributorView; model: ReceiptModel; startedAt: number; id: string; raw: RawContributor }[] = [];
   const covered = new Set<string>();
+  // SPEC-0038 R3 dedup — nested sessions credited as contributors must not
+  // ALSO appear inside their parent's SUBAGENTS rollup (filePath key).
+  const nestedContributorPaths = new Set(
+    resolved.contributors.filter((r) => isChildPath(r.summary.filePath)).map((r) => r.summary.filePath),
+  );
   for (const raw of resolved.contributors) {
-    const { view, model } = await buildContributorView(raw, deps);
+    const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
     covered.add(raw.summary.filePath);
     for (const row of view.subagents) {
       covered.add(row.filePath);
@@ -297,7 +320,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   }
   const promoted = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
   for (const raw of promoted) {
-    const { view, model } = await buildContributorView(raw, deps);
+    const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   if (entries.length === 0) {

@@ -255,6 +255,7 @@ function toToolCall(part: RawPartData): ToolCall | null {
     input: parseMaybeJson(part.state?.input),
     output: part.state?.output ?? part.state?.result ?? part.state?.error,
     status,
+    ...(name === "bash" ? { shell: true } : {}),
     startedAt: timestampOf(part.state?.time?.start, part.time?.ran, part.time?.created),
     endedAt: timestampOf(part.state?.time?.end, part.time?.completed),
   };

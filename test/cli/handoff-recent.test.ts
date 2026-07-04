@@ -44,9 +44,9 @@ function wasteSession(id: string, endedAt: number): Session {
     model: "claude-opus-4-8",
     usage: tokens,
     toolCalls: [
-      { name: "Bash", input: { command: "npm test" } },
-      { name: "Bash", input: { command: "npm test" } },
-      { name: "Bash", input: { command: "npm test" } },
+      { name: "Bash", shell: true, input: { command: "npm test" } },
+      { name: "Bash", shell: true, input: { command: "npm test" } },
+      { name: "Bash", shell: true, input: { command: "npm test" } },
     ],
   };
   return {

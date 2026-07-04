@@ -92,6 +92,22 @@ that makes it visible on the receipt.*
    shape invariants apply there.
 10. **Transcripts are editable.** See above — time-integrity caveats surface
     some inconsistencies, not all edits.
+11. **A quoted SHA is not authorship** (found live on our own PR #87,
+    2026-07-04: a subagent's completion report quoted its commit SHA into the
+    lead session's transcript, and the lead's entire day — ~$965 — was
+    credited to a one-commit PR). Direction: over-credit, potentially by
+    orders of magnitude. Fix shipped with this entry: anchors are accepted
+    only from adapter-flagged real shell executions AND only from output
+    lines matching git's own write grammars (`[ref sha]`, `old..new`,
+    `sha -> ref`); cross-project sessions that cannot be sliced to a commit
+    anchor are silently ignored rather than rendered as `entire session`.
+12. **A fork inherits its parent's context, not its parent's bill.** Fork
+    transcripts reference inherited history; pricing a fork must count only
+    post-fork turns or the parent's spend double-counts. Direction:
+    over-credit. The adapter cuts at the fork marker, so every downstream
+    stage — anchors, slicing, per-commit tables, rollups — sees only the
+    fork's own work; a fork with no marker would render nothing rather than
+    a summed-inherited receipt.
 
 If you need a stronger guarantee than an author's disclosure — billing-grade
 attribution across a team — use your vendor's console. aireceipts will not

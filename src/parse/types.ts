@@ -57,6 +57,11 @@ export type ToolCallStatus = "ok" | "error" | "running";
 
 export interface ToolCall {
   name: string;
+  /** SPEC-0038 R1a — set at parse time by each adapter iff this call is a REAL
+   * shell execution (Claude Code `Bash`, codex `shell`/`exec_command`, opencode
+   * `bash`, cursor terminal tools). Only flagged calls can mint git-write verbs;
+   * Agent/Task results, MCP tools with `command` fields, and echoes never do. */
+  shell?: boolean;
   input?: unknown;
   output?: unknown;
   status?: ToolCallStatus;

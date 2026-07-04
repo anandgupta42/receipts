@@ -28,6 +28,6 @@ describe("docs/trust.md", () => {
     const entries = section.match(/^\d+\. \*\*/gm) ?? [];
     // 10 scenarios at introduction (2026-07-03). Add entries freely; removing
     // one must be a conscious act that updates this floor with justification.
-    expect(entries.length).toBeGreaterThanOrEqual(10);
+    expect(entries.length).toBeGreaterThanOrEqual(12);
   });
 });

@@ -197,11 +197,16 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     if (type === "function_call" || type === "tool_call" || type === "custom_tool_call") {
       toolCallCount++;
       const callId = String(item.call_id ?? item.id ?? "");
+      const name = String(item.name ?? "tool");
       const call: ToolCall = {
-        name: String(item.name ?? "tool"),
+        name,
         input: parseMaybeJson(item.arguments ?? item.input),
         status: "running",
         startedAt: ts,
+        // Deviation from SPEC-0038 R1a's letter, recorded in Validation: codex
+        // fixtures carry `exec_command` (not `shell`) as the real shell surface;
+        // both are flagged. Launch detection reads invocations, not this flag.
+        ...(name === "shell" || name === "exec_command" ? { shell: true } : {}),
       };
       if (callId) {
         toolCallById.set(callId, call);

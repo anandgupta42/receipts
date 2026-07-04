@@ -83,6 +83,7 @@ export async function selectContributors(
   interface Loaded {
     summary: SessionSummary;
     here: boolean;
+    pool: CandidatePool;
     session: Session | null;
     anchors: BranchAnchorSummary | null;
   }
@@ -93,7 +94,7 @@ export async function selectContributors(
     // the only key (SPEC-0024 R1).
     const here = pool === "repo" && inCurrentWorktree(summary, deps.currentWorktreeRoot);
     const session = await deps.loadSession(summary);
-    loaded.push({ summary, here, session, anchors: session ? classifyBranchAnchors(session.turns, branchShas) : null });
+    loaded.push({ summary, here, pool, session, anchors: session ? classifyBranchAnchors(session.turns, branchShas) : null });
   }
 
   // SPEC-0032 R3 — the eligible-subject set: branch subjects on commits no
@@ -162,10 +163,20 @@ export async function selectContributors(
     // fallback structurally credits it (weaker basis, labeled on the row).
     const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0 && here);
     if (include) {
+      const slice = computeSlice(session.turns, branchShas);
+      // SPEC-0038 R2a — an anchor-pool session contributes ONLY with a
+      // sliceable own commit anchor. Entire-session + full rollup landing
+      // cross-project was PR #87's maximum-misstatement shape; a full-
+      // fallback here is silently ignored, exactly SPEC-0024's miss
+      // semantics (never excludedCount — the fence's "in repo + branch
+      // window" copy stays true).
+      if (l.pool === "anchor" && slice.kind === "full") {
+        continue;
+      }
       contributors.push({
         summary,
         session,
-        slice: computeSlice(session.turns, branchShas),
+        slice,
         basis: anchors.hasOwn ? "anchor" : "helper",
       });
     } else if (messageCredited.has(l)) {
