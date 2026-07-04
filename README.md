@@ -134,4 +134,4 @@ gates: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0. If we ever meet in person, I owe you a samosa.
+Apache-2.0.
