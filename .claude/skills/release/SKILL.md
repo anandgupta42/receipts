@@ -14,6 +14,21 @@ or a SHA that doesn't match HEAD → STOP; run `/release-manager` first. No exce
 no maintainer override at this step (overrides live inside the verdict file, written
 and signed there).
 
+## 0.6 Preflight — the packaged artifact must install and run (mechanical gate)
+
+`node scripts/preflight-release.mjs` must exit 0 on the exact SHA being cut. CI
+proves the *source* is green; this proves the *published artifact* is real — it
+builds clean, the tarball is lean and complete (no sourcemaps, `data/prices`
+present, size under ceiling), the real tarball **installs into a clean project and
+the installed `aireceipts` binary runs against a fixture and prints a priced
+receipt**, and goldens/determinism/spec-lint/hygiene hold. A red preflight blocks
+the release — no override, no `--quick` (that mode is explicitly not release-valid).
+
+Until `release-publish.yml` runs preflight itself (add a `node
+scripts/preflight-release.mjs` step before `npm publish` — needs a push with
+`workflow` scope), **this skill is the only gate**: do not skip it, and do not
+dispatch the publish workflow on a SHA whose preflight you have not seen pass.
+
 ## 1. Preconditions
 
 `main`'s CI is green. No open PR is claiming to be part of this release that isn't

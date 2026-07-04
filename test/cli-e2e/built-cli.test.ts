@@ -504,5 +504,8 @@ describe("packed tarball smoke", () => {
     expect(run.stdout).toContain("AIRECEIPTS");
     expect(run.stdout).toContain("Claude Code");
     expect(run.stdout).toContain("TOTAL");
+    // The fixture is a priced session: a `$` on the TOTAL line proves the
+    // installed package loaded its data/prices tables (not a tokens-only fall).
+    expect(run.stdout).toMatch(/TOTAL[.\s]*\$\d/);
   });
 }, 90_000);

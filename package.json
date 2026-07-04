@@ -19,6 +19,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "preflight": "node scripts/preflight-release.mjs",
     "prepublishOnly": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
