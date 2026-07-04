@@ -123,7 +123,7 @@ async function checkLiveness(
         headers: {
           // Some vendor pages 403 an unadorned client; present a browser-ish UA.
           "user-agent":
-            "Mozilla/5.0 (compatible; aireceipts-cite-check/1.0; +https://github.com/anandgupta42/aireceipts)",
+            "Mozilla/5.0 (compatible; aireceipts-cite-check/1.0; +https://github.com/anandgupta42/receipts)",
           accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         },
       });

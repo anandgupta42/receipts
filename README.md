@@ -2,7 +2,7 @@
 
 **Your AI coding agent just billed you. Here's the receipt.**
 
-[![CI](https://github.com/anandgupta42/aireceipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/aireceipts/actions/workflows/ci.yml)
+[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 <picture>
@@ -120,8 +120,8 @@ send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 ## Docs
 
 **[User guide](docs/guide/01-getting-started.md)** — get started, every command,
-pricing, troubleshooting. Hosted: [anandgupta42.github.io/aireceipts](https://anandgupta42.github.io/aireceipts/)
-· [docs site](https://anandgupta42.github.io/aireceipts/docs/)
+pricing, troubleshooting. Hosted: [anandgupta42.github.io/receipts](https://anandgupta42.github.io/receipts/)
+· [docs site](https://anandgupta42.github.io/receipts/docs/)
 
 [What a receipt proves](docs/trust.md) · [PR receipts](docs/pr-receipts.md) ·
 [JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
