@@ -25,6 +25,7 @@ import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js"
 import { resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
 import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
+import { buildShareLines } from "./share.js";
 import type { ReceiptModel } from "../receipt/model.js";
 
 export interface PrOptions {
@@ -34,6 +35,8 @@ export interface PrOptions {
   artifact?: boolean;
   /** SPEC-0026 R5: include the collapsed full-receipts section (default true; `--no-details` clears it). */
   details?: boolean;
+  /** SPEC-0035 R5: print ready-to-paste share intent URLs to stderr (requires --artifact). */
+  share?: boolean;
 }
 
 export interface PrDeps {
@@ -219,6 +222,11 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     deps.err("--artifact requires --post");
     return 1;
   }
+  // SPEC-0035 R5: the share hint targets the artifact link — same shape as the guard above.
+  if (opts.share && !opts.artifact) {
+    deps.err("--share requires --artifact");
+    return 1;
+  }
 
   // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
   const { shas, commitMs } = branchCommits(deps.runGit, deps.cwd);
@@ -288,5 +296,20 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     return 1;
   }
   deps.err(`posted receipt (${result.action}) to PR #${result.prNumber}`);
+  // SPEC-0035 R5: only after BOTH the push (link !== null) AND the upsert
+  // (result.ok, just confirmed above) succeed — never advertise a receipt
+  // whose comment failed to post. Text only; no network from this branch.
+  // S5 (Codex finding 3): the artifact and the comment each resolved the PR
+  // independently — the hint prints only when both landed on the SAME PR, so
+  // a mid-command `gh pr view` flip can never share pr-N.html for PR M.
+  if (opts.share && link !== null) {
+    if (link.fileName === artifactFileName(result.prNumber)) {
+      for (const line of buildShareLines(link.url)) {
+        deps.err(line);
+      }
+    } else {
+      deps.err(`share hint skipped: artifact ${link.fileName} does not match comment PR #${result.prNumber}`);
+    }
+  }
   return artifactFailed ? 1 : 0;
 }
