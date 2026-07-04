@@ -1,0 +1,91 @@
+# SPEC-0033 R5 — the 2026-shaped publish path: OIDC trusted publishing, no
+# long-lived npm token in this repo ever again (classic tokens were revoked
+# 2025-12). Manual dispatch only — publishing is never a side effect of a
+# merge to main.
+#
+# Sequencing recorded here per the spec (R5): (1) SPEC-0030's rename must have
+# landed first — `package.json.repository` must match `github.repository` or
+# npm's provenance validation fails; (2) the repo must be public — npm does
+# not generate provenance for private repos; (3) the FIRST publish of a new
+# package name is a manual, maintainer-run step with a granular token (npm's
+# trusted-publisher UI needs an existing package to attach to) — configure
+# the trusted publisher on npmjs.com immediately after, then every publish
+# after that runs through this workflow. VERIFY this first-publish sequence
+# live on launch day and record what actually happened in the release notes;
+# the docs are firm for existing packages, thinner for brand-new ones.
+name: release-publish
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Fork guard + ref guard — trusted publishing is scoped to this repository,
+    # and a manual dispatch pointed at a side branch or tag must not be able to
+    # publish either: only main publishes (Codex review finding 1).
+    if: github.repository == 'anandgupta42/receipts' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      # OIDC token for npm trusted publishing — this replaces NODE_AUTH_TOKEN
+      # entirely. No npm token is read, stored, or referenced anywhere below.
+      id-token: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          # Tooling floor: npm CLI >= 11.5.1 (first version with trusted-publishing
+          # OIDC support) requires Node >= 22.14. node-version below satisfies both;
+          # do not lower it.
+          node-version: "22.14"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: assert package.json.repository matches this repository
+        # Exact match, not substring: parse the URL and require the github.com
+        # host with exactly this owner/repo path (Codex review finding 2 — a
+        # glob would accept e.g. github.com/anandgupta42/receipts-malicious).
+        run: |
+          set -euo pipefail
+          node -e "
+            const raw = require('./package.json').repository.url;
+            const url = new URL(raw.replace(/^git\+/, ''));
+            const path = url.pathname.replace(/^\//, '').replace(/\.git$/, '');
+            if (url.hostname !== 'github.com' || path !== process.env.GITHUB_REPOSITORY) {
+              console.error(
+                'package.json.repository (' + raw + ') does not match ' +
+                'github.repository (' + process.env.GITHUB_REPOSITORY + ') — refusing to publish.',
+              );
+              process.exit(1);
+            }
+          "
+
+      - name: assert npm CLI meets the trusted-publishing floor (>= 11.5.1)
+        run: |
+          set -euo pipefail
+          npm_version=$(npm --version)
+          node -e "
+            const [have, want] = ['${npm_version}', '11.5.1'];
+            const parts = (s) => s.split('.').map(Number);
+            const [ha, hb, hc] = parts(have);
+            const [wa, wb, wc] = parts(want);
+            const ok = ha !== wa ? ha > wa : hb !== wb ? hb > wb : hc >= wc;
+            if (!ok) {
+              console.error(\`npm \${have} is below the trusted-publishing floor (\${want})\`);
+              process.exit(1);
+            }
+          "
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: publish with provenance (trusted publishing, OIDC)
+        # --provenance is explicit on purpose: a no-op on the trusted-publishing
+        # OIDC path, but required if this workflow is ever run on the documented
+        # fallback (a short-lived granular token) so provenance is never silently
+        # skipped either way.
+        run: npm publish --provenance --access public

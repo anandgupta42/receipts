@@ -14,7 +14,7 @@ import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { cacheServedPct, compactDuration } from "../receipt/present.js";
 import { formatDuration, formatShortTokens } from "../receipt/format.js";
-import { HELPER_FULL_LABEL, sliceHeaderLine } from "./body.js";
+import { HELPER_FULL_LABEL } from "./body.js";
 import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
 import { isBranchCandidate, overlapsBranchWindow, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
@@ -88,6 +88,7 @@ async function resolveContributors(
   deps: PrDeps,
   shas: readonly string[],
   commitMs: readonly number[],
+  subjects: readonly string[],
 ): Promise<Resolved | { error: string }> {
   const sessions = await deps.listSessions();
 
@@ -132,6 +133,7 @@ async function resolveContributors(
     return { error: NO_MATCH };
   }
   const selection = await selectContributors(candidates, shas, {
+    branchSubjects: subjects,
     loadSession: deps.loadSession,
     currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
   });
@@ -195,24 +197,71 @@ function publishAndLink(
   return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName) };
 }
 
-/** The details-section stat line: role · id · slice/commits · turns · duration · in/out/cached (round 2). */
-function detailLabel(view: ContributorView, model: ReceiptModel): string {
-  const parts = [view.role, view.sessionId];
-  parts.push(view.basis === "helper" ? HELPER_FULL_LABEL : view.slice.kind === "slice" ? sliceHeaderLine(view.slice) : (view.slice.label ?? "entire session"));
+/** Last `-`-segment, first 8 chars: `df374859-…-a613ae74b101` → `a613ae74`; codex rollout ids → hash tail. */
+function shortSessionId(id: string): string {
+  if (id.length <= 14) {
+    return id;
+  }
+  const seg = id.split("-").pop() ?? id;
+  return seg.length >= 8 ? seg.slice(0, 8) : id.slice(0, 12);
+}
+
+/** Everything after the role: id · slice/commits · turns · duration · tokens · cached (round 3 phrasing). */
+function detailStats(view: ContributorView, model: ReceiptModel): string[] {
+  const parts = [shortSessionId(view.sessionId)];
+  parts.push(
+    view.basis === "helper"
+      ? HELPER_FULL_LABEL
+      : view.slice.kind === "slice"
+        ? `turns ${view.slice.startTurn + 1}–${view.slice.endTurn + 1} of ${view.slice.turnCount}`
+        : (view.slice.label ?? "entire session"),
+  );
   const turns = view.slice.kind === "slice" ? view.slice.endTurn - view.slice.startTurn + 1 : view.slice.turnCount;
   if (turns > 0) {
-    parts.push(`${turns} turns`);
+    parts.push(`${turns} turn${turns === 1 ? "" : "s"}`);
   }
   if (model.durationMs !== undefined) {
     parts.push(compactDuration(formatDuration(model.durationMs)));
   }
   const t = model.totalTokens;
-  parts.push(`in ${formatShortTokens(t.input)}`, `out ${formatShortTokens(t.output)}`);
+  parts.push(`${formatShortTokens(t.input)} in / ${formatShortTokens(t.output)} out`);
   const pct = cacheServedPct(t);
   if (pct !== undefined) {
     parts.push(`${pct}% cached`);
   }
-  return parts.join(" · ");
+  return parts;
+}
+
+/** Plain stat line for the artifact page (no markdown). */
+function detailLabel(view: ContributorView, model: ReceiptModel): string {
+  return [view.role, ...detailStats(view, model)].join(" · ");
+}
+
+/** Ledger-table row for the details section: [session, id, scope, turns, time, tokens, cached]. */
+function detailRow(view: ContributorView, model: ReceiptModel): string[] {
+  const scope =
+    view.basis === "helper"
+      ? HELPER_FULL_LABEL
+      : view.slice.kind === "slice"
+        ? `turns ${view.slice.startTurn + 1}–${view.slice.endTurn + 1} of ${view.slice.turnCount}`
+        : (view.slice.label ?? "entire session");
+  const turns = view.slice.kind === "slice" ? view.slice.endTurn - view.slice.startTurn + 1 : view.slice.turnCount;
+  const t = model.totalTokens;
+  const pct = cacheServedPct(t);
+  return [
+    `**${view.role}**`,
+    `\`${shortSessionId(view.sessionId)}\``,
+    scope,
+    turns > 0 ? String(turns) : "—",
+    model.durationMs !== undefined ? compactDuration(formatDuration(model.durationMs)) : "—",
+    `${formatShortTokens(t.input)} / ${formatShortTokens(t.output)}`,
+    pct !== undefined ? `${pct}%` : "—",
+  ];
+}
+
+/** Small heading over each receipt in the details section. */
+function detailHeading(view: ContributorView): string {
+  return `#### ${view.role} · \`${shortSessionId(view.sessionId)}\``;
 }
 
 /** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns the process exit code. */
@@ -227,7 +276,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   const branchInfo = branchCommits(deps.runGit, deps.cwd);
   const { shas, commitMs } = branchInfo;
 
-  const resolved = await resolveContributors(opts, deps, shas, commitMs);
+  const resolved = await resolveContributors(opts, deps, shas, commitMs, branchInfo.subjects);
   if ("error" in resolved) {
     deps.err(resolved.error);
     return 1;
@@ -296,7 +345,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
   // --no-details. The label is the stat line: everything the fence dropped
   // (id, slice reason) plus the session's anatomy, in one place.
-  const details = opts.details === false ? undefined : fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
+  const details = opts.details === false ? undefined : fenceOrdered.map((e) => ({ label: detailHeading(e.view), row: detailRow(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
   const body = renderPrBody(bodyInput, { artifactLink: link ?? undefined, details });
 
   // R3 (SPEC-0019): render before the comment upsert, unconditionally.
