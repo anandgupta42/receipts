@@ -41,3 +41,31 @@ measurement; single 3-month window.
 Every receipt shown in the README is byte-pinned to a committed golden.
 The marketing surface obeys the same invariant as the product (I5): if the
 renderer didn't produce it, the README can't show it.
+
+## Prior art & the prepared launch-thread reply (SPEC-0030 R2)
+
+Positioning rules: never argue priority or state of mind; cite the lineage
+(ccusage → claude-receipts → Infracost-for-infra); make the difference
+categorical ("a souvenir vs bookkeeping"). Facts checked 2026-07-03:
+claude-receipts created 2026-01-29, 616 stars, no HN front-page moment
+(4 and 1 points on its two submissions), thermal-printer novelty over
+ccusage, Claude-only, by its author's own README "a creative side project."
+
+Paste-ready reply for "this already exists":
+
+> claude-receipts is great — it's in our Related Work next to ccusage,
+> which powers it. Different jobs though: claude-receipts is a souvenir (a
+> thermal-printed memento of a Claude Code session; go see the photos,
+> they're wonderful). aireceipts is bookkeeping: its own parsers across
+> Claude Code / Codex / Cursor / opencode, prices from cited and dated
+> tables that CI verifies, byte-deterministic output, and PR-level
+> attribution — every PR in our repo carries the receipt of the agent
+> sessions that built it, with explicit floors when anything can't be
+> proven, and a doc on what a receipt can and can't prove. Same good
+> metaphor — Infracost did it for Terraform PRs years ago — different
+> category of tool.
+
+If someone asks directly whether the author knew of claude-receipts:
+answer truthfully in one sentence and move on — this file's git history
+timestamps when it was found and credited. Never volunteer state-of-mind
+as a defense; the lineage and the categorical difference are the defense.
