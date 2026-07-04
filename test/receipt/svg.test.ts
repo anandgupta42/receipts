@@ -3,6 +3,7 @@
 // objective design properties (R1 font-safety, R2 geometry/contrast, R3
 // compare, R4 field-set parity) and the honesty invariants (I2 zero-`$` in
 // tokens-only mode).
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadById } from "../../src/index.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
@@ -11,6 +12,7 @@ import type { TokenUsage } from "../../src/parse/types.js";
 import { renderReceiptLines } from "../../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg, rowGeometry, THEMES } from "../../src/receipt/svg.js";
 import { buildReceiptView } from "../../src/receipt/present.js";
+import { samosaGlyphMarkup } from "../../src/receipt/samosa-glyph.js";
 import type { ThemeName } from "../../src/receipt/svg.js";
 
 const PRICED = { source: "claude-code", path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
@@ -317,6 +319,30 @@ describe("renderReceiptSvg — R2 drawn samosa glyph (SPEC-0034)", () => {
       const svg = renderReceiptSvg(model, { template });
       expect(svg).not.toContain("🥟");
       expect(svg).not.toContain("🔺");
+    }
+  });
+});
+
+describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't import the module, so pin them to it", () => {
+  // site/*.html are hand-authored static files and build-docs-site.mjs is a
+  // plain .mjs script; none of them can import the TS glyph module at
+  // runtime. Their inlined copies must stay byte-identical to the module's
+  // three <path> literals, or the surfaces drift apart silently.
+  const DUPLICATING_FILES = [
+    "site/samosa.html",
+    "site/view.html",
+    "site/index.html",
+    "scripts/build-docs-site.mjs",
+  ];
+
+  it("every inlined copy carries the module's exact three path literals", () => {
+    const paths = samosaGlyphMarkup().match(/<path d="[^"]*"\/>/g) ?? [];
+    expect(paths).toHaveLength(3);
+    for (const file of DUPLICATING_FILES) {
+      const html = readFileSync(file, "utf8");
+      for (const path of paths) {
+        expect(html, `${file} drifted from samosa-glyph.ts: missing ${path}`).toContain(path);
+      }
     }
   });
 });

@@ -1,6 +1,6 @@
 // SPEC-0034 R2 — the drawn samosa glyph, once, for every graphical surface.
 // Unicode ships no samosa codepoint (see the spec's Purpose); this is the
-// real shape instead of a mislabeled 🥟. HTML surfaces (already themed via
+// real shape instead of a mislabeled dumpling (U+1F95F). HTML surfaces (already themed via
 // CSS custom properties / prefers-color-scheme) draw it with `currentColor`
 // so it inherits the surrounding text color for free — no light/dark
 // duplication needed there. The receipt SVG exporter is the one surface that

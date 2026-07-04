@@ -188,3 +188,20 @@ receipt prints `🔺` (not `🥟`); `--svg` export contains zero emoji codepoint
 and exactly one drawn-glyph `<g>` matching the R2 path; `site/samosa.html`
 has zero external URLs (the sole `http://` match is the inert `xmlns` SVG
 namespace) and zero `<script>` tags; README guard's 9 tests green post-regen.
+
+**2026-07-04 · S6 (Codex code review, commit `64d0c3e`):** verdict REWORK,
+3 findings, all accepted and fixed in a follow-up commit. (1) High —
+`site/samosa.html` still rendered `🥟` in its prose ("DUMPLING (🥟,
+U+1F95F)"), violating the R5 "no dumpling on shipped surfaces" matrix row;
+fixed to "DUMPLING (U+1F95F)" (the Unicode fact stays, the emoji goes), and
+the `samosa-glyph.ts` comment's `🥟` was reworded the same way. (2) Medium —
+the glyph path is duplicated in `site/samosa.html`, `site/view.html`,
+`site/index.html`, and `scripts/build-docs-site.mjs` rather than sourced from
+the module; static HTML and a plain `.mjs` build script cannot import the TS
+module, so the duplication itself stays, but a new drift-guard test
+(`test/receipt/svg.test.ts`) now pins every inlined copy byte-identical to
+the module's three `<path>` literals. (3) Medium — the README emoji guard
+asserted `<= 2` while R5 pins exactly 2; tightened to exact identity
+(`["🧾", "🔺"]`) plus exact count. Codex's `vitest`/`verify-goldens` failures
+were read-only-sandbox artifacts (Vite temp dir + `mkdtemp` blocked), not
+real: both re-ran green locally before and after the fixes.

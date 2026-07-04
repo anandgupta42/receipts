@@ -83,9 +83,12 @@ describe("SPEC-0029 · README guard", () => {
     expect(goldens.some((g) => g === mutated)).toBe(false);
   });
 
-  it("R4: emoji cap — the 🔺 inside the receipt bytes plus the title 🧾, nothing else (SPEC-0034 R5)", () => {
+  it("R4: emoji count — exactly the title 🧾 plus the 🔺 inside the receipt bytes (SPEC-0034 R5)", () => {
     const emoji = readme.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) ?? [];
-    expect(emoji.length).toBeLessThanOrEqual(MAX_EMOJI);
+    // Exact identity, not a cap: SPEC-0034 R5 pins the count at 2, and a
+    // ≤ check would miss the footer 🔺 silently disappearing from README.
+    expect(emoji).toEqual(["🧾", "🔺"]);
+    expect(emoji.length).toBe(MAX_EMOJI);
   });
 
   it("R4: length cap", () => {
