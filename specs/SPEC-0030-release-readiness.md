@@ -1,7 +1,7 @@
 ---
 id: SPEC-0030
 title: "Release readiness — rename to receipts, the why, and the org dogfood kit"
-status: draft
+status: building
 milestone: M4
 depends: [SPEC-0029]
 ---
@@ -167,7 +167,7 @@ continuous window):
 | R1 npm fields | package.json | repository/homepage/bugs point at `receipts` |
 | R2 why-section | README | Design copy present under hero; guard 9/9 still green |
 | R3 workflow_call | pr-receipt-check.yml | `on:` includes `workflow_call`; same-repo trigger retained |
-| R3 caller template | docs/adopt/pr-receipt-check-caller.yml | matches Design verbatim |
+| R3 caller template | docs/adopt/pr-receipt-check-caller.yml | yaml body matches Design; explanatory header comments allowed |
 | R1 artifact branch untouched | `ARTIFACT_BRANCH` | still `aireceipts/artifacts` |
 | R3 called-workflow shape | pr-receipt-check.yml | workflow_call present; checks out anandgupta42/receipts; explicit permissions; reads caller PR context |
 | R4 report-only | script under mocked gh runner | zero write-verb calls recorded |
@@ -228,7 +228,18 @@ today — it fails, correctly, until v0.1.0 ships. Related-work requirement
 grounded in the measured prior art (claude-receipts: 616 stars, thermal-
 printer novelty over ccusage; verified by reading its README).
 
+**2026-07-03 · S5 (PR A implementation review, Codex): REWORK → fixed.**
+(2) "zero writes" claim overbroad (compile wrapper + npm/gh caches write
+locally) — accepted; claim scoped to "no repo/GitHub mutations" everywhere
+it appears, test renamed to what it proves. (3) HIGH — the prior-art copy
+broke its own rules: "Infracost pioneered" was a priority claim (now
+"does"), and the evidence note asserted state-of-mind as a defense (now an
+instruction to answer truthfully once, with the git timestamp as the only
+artifact). (4) caller template carries explanatory header comments — spec
+row made precise rather than stripping useful comments. Earlier findings
+truncated in capture were subsumed by (2).
+
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 30 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-03 · approved (button 1):** maintainer, in-session ("approved") after the hardened prior-art positioning round. Build split: PR A (R2/R4/R5 + caller template, mergeable now) and PR B (R1 cutover + R3 workflow_call, held green for the rename window). Positioning addendum: lineage framing (ccusage, claude-receipts, Infracost), committed reply paragraph, no independent-invention claims anywhere.
