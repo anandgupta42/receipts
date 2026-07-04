@@ -1,12 +1,12 @@
 ---
-id: SPEC-0036
+id: SPEC-0039
 title: "Human-authored PRs — a declared receipt, not a permanent nag"
 status: draft
 milestone: M4
 depends: [SPEC-0019, SPEC-0023]
 ---
 
-# SPEC-0036 · human-authored PRs
+# SPEC-0039 · human-authored PRs
 
 Invariants: I2 (a human receipt shows NO dollars — a $0.00 claim is
 unprovable and therefore banned), I3 (the declaration is labeled as a
