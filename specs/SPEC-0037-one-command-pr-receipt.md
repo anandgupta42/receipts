@@ -85,7 +85,7 @@ or optionally enforces presence.
 - **Given** `gh` is missing, **when** the command can render a receipt, **then** the exact
   body prints before the "copy into your PR" diagnostic.
 - **Given** more than one plausible session matches, **when** the command runs, **then**
-  it refuses to guess and prints the candidate ids plus the `--session <id>` command.
+  all plausible sessions contribute as a union with one receipt total (SPEC-0023 R1 semantics); `--session <id>` narrows explicitly when wanted.
 - **Given** an unsupported assistant with no adapter, **when** the command runs, **then**
   it says no supported sessions were found and lists the supported adapters, rather than
   implying the PR does not need a receipt.
@@ -174,8 +174,10 @@ contract and SPEC-0036's presence check.
       unsupported assistant transcripts.
 - [x] SPEC-0036 workflow/docs still say CI checks presence only and is notice-only by
       default.
-- [x] Acceptance testing performed live with command + output recorded in this spec's
-      Validation section before shipping.
+- [ ] Acceptance testing performed live with the blessed command itself
+      (`npx aireceipts pr --post`, or its source-checkout equivalent with `--post`)
+      — the recorded run used `node dist/cli.js pr --session …` without posting;
+      box re-opened by independent review (S2 finding 2).
 - [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
@@ -212,3 +214,33 @@ printed a marked `<!-- aireceipts-dogfood -->` PR body and exited 0. Gates passe
 unmasked: `npx tsc --noEmit` 0, `npx eslint . --max-warnings 0` 0, `npx vitest run`
 998 tests passed, goldens byte-identical, determinism 10/10 byte-identical,
 `spec-lint` 34 specs OK, hygiene OK.
+
+**2026-07-04 · record corrected (lead session):** the entry above labeled
+"S2 (maintainer review)" is a **button-1 approval**, not an S2 — S2 is the
+independent adversarial critic, which had not run. It has now.
+
+**2026-07-04 · S2 (Codex, read-only, full capture): REWORK → applied on this
+branch.** 6 findings:
+1. HIGH — the blessed command is not honest until npm publish (README/install
+   docs say source-first) — **accepted**: pre-release note added beside the
+   one-command block in docs/pr-receipts.md; deleted by the release flow with
+   the README caveat.
+2. HIGH — live-acceptance box was checked on a `node dist/cli.js pr --session`
+   run that neither used the blessed command nor posted — **accepted**: box
+   re-opened with the reason inline.
+3. MEDIUM — ambiguous-session contract ("refuse and print candidates")
+   contradicts shipped SPEC-0023 R1 union semantics — **accepted**: the
+   union IS the designed behavior; requirement reworded to match, refusal
+   language removed.
+4. MEDIUM — "unsupported assistant" diagnostics promised beyond the real
+   seam (adapter failures collapse to empty lists in src/parse/load.ts:21) —
+   **accepted**: diagnostic scoped to what runPr can truthfully say; richer
+   diagnostics moved to the unbuilt-slice requirements where the seam work
+   belongs.
+5. MEDIUM — fork/external-repo posting unpinned (upsert wrote through
+   git-context placeholders) — **accepted as already fixed elsewhere**: PR
+   #87's S6 patch makes upsertPrComment address the resolved base repo
+   explicitly; this spec's unbuilt e2e slice gains a fork-PR row.
+6. MEDIUM — the wiring test pins prose ordering, not the operational story —
+   **accepted as scoped**: that is exactly what a docs-slice test can pin;
+   the operational assertions live in the unbuilt e2e slice's rows.

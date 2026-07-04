@@ -14,6 +14,10 @@ From your checkout (or worktree) with the PR branch checked out:
 npx aireceipts pr --post
 ```
 
+> **Pre-release note:** until the npm package is published, run the same command
+> from a source checkout: `node dist/cli.js pr --post` (see the README's install
+> status). The one-command story becomes literal at v0.1.0.
+
 That is the finalizer for humans, Codex, Claude Code, OpenCode, Cursor, and any other
 coding assistant. It discovers supported local agent sessions, matches them to the
 current repo/worktree and PR branch, renders the exact comment body, then upserts one
