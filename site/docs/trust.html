@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What a receipt proves — and what it can't — aireceipts docs</title>
+<meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
+<meta name="theme-color" content="#e9edf0">
+<style>
+:root{
+  --field:#e7ecef;
+  --sheet:#ffffff;
+  --ink:#14181c;
+  --muted:#586570;
+  --faint:#8a949c;
+  --rule:#e3e8eb;
+  --rule-strong:#c2cbd1;
+  --seal:#b23a3a;
+  --ledger:#2f5d3a;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--field);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  padding:clamp(16px,3.5vw,40px) 16px clamp(40px,6vw,72px);
+}
+a{color:var(--ledger);text-underline-offset:2px;text-decoration-thickness:1px}
+a:focus-visible{outline:2px solid var(--ledger);outline-offset:2px;border-radius:2px}
+.sheet{
+  width:100%;
+  max-width:1040px;
+  margin:0 auto;
+  background:var(--sheet);
+  border:1px solid var(--rule-strong);
+  border-radius:3px;
+  padding:clamp(20px,3.6vw,44px) clamp(18px,4vw,52px) clamp(28px,4vw,44px);
+  box-shadow:0 1px 0 #fff inset,0 30px 64px -42px rgba(20,32,44,.42);
+}
+header.mast{padding-top:2px}
+.masthead-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:16px;
+  font-family:var(--sans);
+  font-size:11.5px;
+  font-weight:700;
+  letter-spacing:.26em;
+  text-transform:uppercase;
+  color:var(--faint);
+}
+.masthead-row .brand{color:var(--ink);letter-spacing:.30em;text-decoration:none}
+.masthead-row nav{display:flex;gap:16px;flex-wrap:wrap;justify-content:flex-end}
+.masthead-row nav a{color:var(--muted);letter-spacing:.12em;text-decoration:none}
+.masthead-row nav a:hover{color:var(--ink)}
+.rule2{
+  margin:12px 0 0;
+  height:0;
+  border-top:3px solid var(--ink);
+  box-shadow:0 5px 0 -4px var(--ink);
+}
+.doc-hero{padding:clamp(24px,4vw,38px) 0 clamp(20px,3vw,30px)}
+.doc-label{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin:0 0 16px;
+  font-size:11.5px;
+  font-weight:700;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--faint);
+}
+.doc-label::after{content:"";flex:1 1 auto;height:1px;background:var(--rule-strong)}
+h1{
+  font-family:var(--serif);
+  font-size:clamp(30px,5vw,50px);
+  line-height:1.1;
+  font-weight:600;
+  letter-spacing:0;
+  margin:0;
+  max-width:19ch;
+}
+.sub{
+  color:var(--muted);
+  font-size:clamp(15px,2.2vw,17.5px);
+  max-width:58ch;
+  margin:15px 0 0;
+  line-height:1.55;
+}
+.doc-grid{
+  display:grid;
+  grid-template-columns:minmax(190px,240px) minmax(0,1fr);
+  gap:clamp(24px,4vw,46px);
+  border-top:1px solid var(--rule);
+  padding-top:clamp(24px,4vw,38px);
+}
+.toc{
+  align-self:start;
+  position:sticky;
+  top:18px;
+  border-right:1px solid var(--rule);
+  padding-right:20px;
+}
+.toc h2{
+  margin:0 0 12px;
+  color:var(--faint);
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.toc-section{
+  margin:18px 0 8px;
+  color:var(--faint);
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.toc-section:first-of-type{margin-top:0}
+.toc ol,.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.toc a{color:var(--muted);font-size:14px;text-decoration:none}
+.toc a:hover{color:var(--ink);text-decoration:underline}
+.doc-content{min-width:0}
+.doc-content > :first-child{margin-top:0}
+.doc-content h1{font-size:clamp(28px,4vw,42px)}
+.doc-content h2{
+  margin:clamp(32px,4vw,44px) 0 12px;
+  padding-top:18px;
+  border-top:1px solid var(--rule);
+  font-family:var(--serif);
+  font-size:clamp(22px,3vw,30px);
+  line-height:1.2;
+  font-weight:600;
+  letter-spacing:0;
+}
+.doc-content h3{
+  margin:28px 0 10px;
+  font-family:var(--serif);
+  font-size:21px;
+  line-height:1.25;
+  font-weight:600;
+  letter-spacing:0;
+}
+.doc-content h4,.doc-content h5,.doc-content h6{margin:22px 0 8px;font-size:16px;line-height:1.35}
+.doc-content p{margin:0 0 16px;color:var(--ink)}
+.doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
+.doc-content li{margin:7px 0}
+.doc-content blockquote{
+  margin:20px 0;
+  padding:14px 18px;
+  border-left:4px solid var(--ledger);
+  background:#f7f9fa;
+  color:var(--muted);
+}
+code{
+  font-family:var(--mono);
+  font-size:.92em;
+  background:#f6f8f9;
+  border:1px solid var(--rule);
+  border-radius:4px;
+  padding:.08em .32em;
+}
+pre.doc-code{
+  margin:18px 0;
+  overflow-x:auto;
+  max-width:100%;
+  background:#0f1518;
+  border:1px solid #1c272d;
+  border-radius:9px;
+  padding:14px 16px;
+  box-shadow:0 20px 44px -34px rgba(9,14,18,.9);
+}
+pre.doc-code code{
+  display:block;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  padding:0;
+  color:#d6dde2;
+  font-size:13px;
+  line-height:1.5;
+}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+th,td{padding:10px 12px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:left}
+th{background:#f6f8f9;color:var(--ink);font-weight:700}
+tr:last-child td{border-bottom:0}
+.doc-index-list{list-style:none;margin:0;padding:0;display:grid;gap:0;border-top:1px solid var(--rule)}
+.doc-index-list li{padding:18px 0;border-bottom:1px solid var(--rule)}
+.doc-index-list a{
+  display:inline-block;
+  font-family:var(--serif);
+  font-size:22px;
+  line-height:1.2;
+  font-weight:600;
+}
+.doc-index-list .path{
+  display:block;
+  margin-top:4px;
+  color:var(--faint);
+  font-family:var(--mono);
+  font-size:12px;
+}
+.doc-index-list p{margin:8px 0 0;color:var(--muted);max-width:70ch}
+footer{
+  border-top:1px solid var(--rule);
+  margin-top:clamp(34px,5vw,52px);
+  padding-top:clamp(26px,4vw,34px);
+}
+.close{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:20px;
+  flex-wrap:wrap;
+}
+.close-copy{max-width:34ch}
+.issued{
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--faint);
+  display:flex;
+  gap:18px;
+  flex-wrap:wrap;
+  margin:0 0 14px;
+}
+.thanks{
+  font-family:var(--serif);
+  font-size:19px;
+  font-weight:600;
+  color:var(--ink);
+  margin:0 0 10px;
+}
+.serial{
+  font-family:var(--mono);
+  font-size:10.5px;
+  letter-spacing:.34em;
+  color:var(--faint);
+  margin:0;
+  padding-left:.34em;
+}
+.seal{flex:0 0 auto;width:clamp(104px,17vw,128px);height:auto;color:var(--seal);transform:rotate(-5deg)}
+.barcode{color:var(--rule-strong);height:30px;display:block;margin:24px 0 8px}
+.flinks{font-size:14px;color:var(--muted);line-height:2}
+.flinks a{color:var(--ledger)}
+.flinks .sep{color:var(--rule-strong);padding:0 .6ch}
+.samosa{color:var(--muted);margin:10px 0 0;font-size:13.5px}
+.samosa a{color:inherit;text-decoration:none}
+.samosa a:hover{color:var(--ink)}
+.samosa svg{vertical-align:middle;margin-right:4px}
+@media (max-width:760px){
+  .doc-grid{grid-template-columns:minmax(0,1fr)}
+  .toc{position:static;border-right:0;border-bottom:1px solid var(--rule);padding:0 0 18px}
+}
+@media (max-width:480px){
+  .masthead-row{letter-spacing:.16em;align-items:flex-start}
+  .masthead-row nav{gap:10px}
+  .close{flex-direction:column-reverse;align-items:flex-start}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="mast">
+    <div class="masthead-row">
+      <a class="brand" href="../index.html">AIRECEIPTS</a>
+      <nav aria-label="Primary">
+        <a href="../index.html">Home</a>
+        <a href="index.html">Docs</a>
+      </nav>
+    </div>
+    <div class="rule2" aria-hidden="true"></div>
+    <div class="doc-hero">
+      <p class="doc-label">Docs ledger</p>
+      <h1>What a receipt proves — and what it can't</h1>
+      <p class="sub">Rendered from <code>docs/trust.md</code>.</p>
+    </div>
+  </header>
+  <main class="doc-grid">
+    <aside class="toc" aria-label="Docs contents">
+      <h2>Contents</h2>
+      <p class="toc-section">Start here</p>
+      <ul>
+        <li><a href="01-getting-started.html">Get started in 60 seconds</a></li>
+        <li><a href="02-install.html">Install</a></li>
+        <li><a href="03-install-hook.html">Install the agent hook</a></li>
+      </ul>
+      <p class="toc-section">Using it</p>
+      <ul>
+        <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
+        <li><a href="05-compare.html">Compare two sessions</a></li>
+        <li><a href="06-week.html">Aggregate the week</a></li>
+        <li><a href="07-statusline.html">Show a statusline in your shell</a></li>
+        <li><a href="08-budget.html">Set and watch a budget</a></li>
+        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="10-templates.html">Use a template</a></li>
+        <li><a href="11-share-and-export.html">Share and export</a></li>
+      </ul>
+      <p class="toc-section">Reference</p>
+      <ul>
+        <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
+        <li><a href="statusline.html">Statusline</a></li>
+        <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
+        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+      </ul>
+      <p class="toc-section">Why</p>
+      <ul>
+        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+      </ul>
+    </aside>
+    <article class="doc-content">
+<h1 id="what-a-receipt-proves-and-what-it-cant">What a receipt proves — and what it can't</h1>
+
+<p>aireceipts is local-first: it reads agent transcripts off your disk and prints a receipt. That design is why it needs no accounts or servers — and it is also the exact boundary of what a receipt can claim. This page states both sides plainly. (SPEC-0028.)</p>
+
+<h2 id="what-a-receipt-proves">What a receipt proves</h2>
+
+<ul>
+  <li><strong>The records existed on the author's machine.</strong> Every number is computed from transcript files found locally at render time — never from a guess, a prediction, or a remote service.</li>
+  <li><strong>The dollars come from cited, dated price tables.</strong> A <code>$</code> renders only when a <code>data/prices/&lt;vendor&gt;.json</code> row — carrying its <code>sources:</code> citations — matches the session's model and date. No matching row means tokens are shown instead. A receipt's prices can be audited back to the vendor page they were copied from.</li>
+  <li><strong>The rendering is deterministic.</strong> The same transcript and price tables produce a byte-identical receipt, on any machine (<code>--methodology</code> describes the attribution; goldens and a determinism gate enforce it in CI).</li>
+  <li><strong>Incompleteness is labeled.</strong> A PR receipt that could not attribute every candidate session renders its totals as a floor (<code>TOTAL priced ≥ $X</code>) and counts the sessions it left out. A number that might understate says so in the number.</li>
+</ul>
+
+<h2 id="what-a-receipt-cannot-prove">What a receipt cannot prove</h2>
+
+<ul>
+  <li><strong>That the transcript is untouched.</strong> Transcripts are plain JSONL on the author's disk. The author can edit them, and no local-first tool can detect every edit — a tool that could would need attestation infrastructure and a server, which aireceipts refuses by design. A PR receipt is therefore the <strong>author's disclosure</strong>, like a changelog entry: normally honest, verifiable in its arithmetic, but not cryptographic evidence.</li>
+  <li><strong>That nothing is missing.</strong> A session that never touched the branch — or hid its tracks (no commits) — may be absent. Absent sessions make totals <em>under</em>state, which is why known gaps render as floors, never as bare numbers.</li>
+</ul>
+
+<h2 id="what-makes-fabrication-visible">What makes fabrication visible</h2>
+
+<ul>
+  <li><strong>Reconciliation</strong> (<code>node scripts/cost-reconcile.mjs</code>): each adapter that registers a fidelity validator is checked against its agent's own accounting — Codex sessions must sum exactly to the rollout's cumulative token envelope; Claude Code sessions must satisfy usage-shape invariants. Drift is printed, named, and fails the gate.</li>
+  <li><strong>Time-integrity caveats</strong>: a receipt whose turns claim timestamps after the transcript file's own modification time, or whose span is non-positive while carrying usage, renders a <code>caveat:</code> line and a <code>caveats</code> entry in <code>--json</code>. Caveats never change a <code>$</code> — they are facts attached to the number.</li>
+  <li><strong>Determinism</strong>: anyone with the transcript can re-render the receipt and compare bytes.</li>
+</ul>
+
+<h2 id="where-the-numbers-can-go-wrong">Where the numbers can go wrong</h2>
+
+<p><em>A living list (maintainer directive, 2026-07-03): every newly discovered scenario gets an entry here in the same PR that handles it — the doc test pins this section and its minimum size, so removing an entry fails CI. Each entry names the scenario, the direction of the error, and the marker that makes it visible on the receipt.</em></p>
+
+<ol>
+  <li><strong>A contributing session leaves no proof.</strong> <code>git commit --quiet</code>, cherry-picks, or filtering the SHA out of push output leave no branch SHA in any tool output — the session is excluded and the total renders as a floor (<code>≥</code>). Understates; marked by the floor and the &quot;not attributed&quot; note. (Observed live on PR #61 and PR #66.)</li>
+  <li><strong>Rows round; the total doesn't.</strong> Each row shows its own rounded cents while TOTAL formats the raw sum, so hand-adding rows can differ from the total by up to about half a cent per priced row. Bounded and enforced by the ledger property test; exact values live in <code>--json</code>.</li>
+  <li><strong>Unpriced models show tokens, never dollars.</strong> No dated, cited price row → tokens only; a mixed receipt renders <code>$</code> and token subtotals separately, never blended.</li>
+  <li><strong>Cursor sessions carry totals only.</strong> No per-turn usage exists in the transcript, so per-tool attribution is impossible; the receipt says so verbatim rather than splitting by guesswork.</li>
+  <li><strong>Helper crediting is a heuristic.</strong> A no-commit Codex session in the current worktree during the branch window is credited on cwd+time — unrelated concurrent Codex work in the same worktree could over-credit. Grouped under <code>CODEX HELPERS — no commits</code>, never presented as an author.</li>
+  <li><strong>Slices are anchor-bounded.</strong> Work before a session's first branch commit or after its last may fall outside the counted turn range; the slice line states the exact range so the boundary is inspectable.</li>
+  <li><strong>Subagent rollups are window-bounded.</strong> A child straddling the slice window counts if its launch or finish lands inside; a child that cannot be parsed is listed as unreadable, priced at nothing, and floors the total.</li>
+  <li><strong>Price tables age.</strong> Rows are dated and cited, with a daily drift tripwire — but a receipt rendered before a price correction reflects the table it cited that day. Re-render to re-price.</li>
+  <li><strong>Vendor accounting is only as checkable as the vendor makes it.</strong> Codex sessions reconcile exactly (tolerance 0) against the rollout's own token envelope; Claude Code transcripts carry no independent total, so only shape invariants apply there.</li>
+  <li><strong>Transcripts are editable.</strong> See above — time-integrity caveats surface some inconsistencies, not all edits.</li>
+</ol>
+
+<p>If you need a stronger guarantee than an author's disclosure — billing-grade attribution across a team — use your vendor's console. aireceipts will not pretend to be that, and a receipt that pretended would be worth less than one that tells you exactly what it knows.</p>
+    </article>
+  </main>
+  <footer>
+    <div class="close">
+      <div class="close-copy">
+        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="thanks">Thank you for your tokens.</p>
+        <p class="serial">AIRECEIPTS · NO. 0001</p>
+      </div>
+      <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="A round vermillion seal reading RECEIPTED, SETTLED, and NO FABRICATED DOLLARS.">
+  <defs>
+    <path id="ring-top" d="M 30 100 A 70 70 0 0 1 170 100"/>
+    <path id="ring-bot" d="M 34 100 A 66 66 0 0 0 166 100"/>
+  </defs>
+  <circle cx="100" cy="100" r="95" fill="none" stroke="currentColor" stroke-width="2.5"/>
+  <circle cx="100" cy="100" r="83" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <g fill="currentColor" font-family="system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-weight="700">
+    <text font-size="14.5" letter-spacing="3.5" text-anchor="middle"><textPath href="#ring-top" startOffset="50%">RECEIPTED</textPath></text>
+    <text font-size="14.5" letter-spacing="3.5" text-anchor="middle"><textPath href="#ring-bot" startOffset="50%">SETTLED</textPath></text>
+  </g>
+  <line x1="66" y1="70" x2="134" y2="70" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="66" y1="130" x2="134" y2="130" stroke="currentColor" stroke-width="1.5"/>
+  <g fill="currentColor" font-family="system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-weight="700" text-anchor="middle" letter-spacing="1.5">
+    <text x="100" y="91" font-size="15">NO</text>
+    <text x="100" y="106" font-size="13">FABRICATED</text>
+    <text x="100" y="121" font-size="15">DOLLARS</text>
+  </g>
+</svg>
+    </div>
+    <svg class="barcode" viewBox="0 0 90 34" width="180" height="30" fill="currentColor" role="img" aria-label="Barcode encoding the word aireceipts.">
+  <rect x="0" y="0" width="3" height="34"/><rect x="4" y="0" width="2" height="34"/><rect x="8" y="0" width="3" height="34"/><rect x="12" y="0" width="2" height="34"/><rect x="16" y="0" width="4" height="34"/><rect x="21" y="0" width="3" height="34"/><rect x="26" y="0" width="3" height="34"/><rect x="31" y="0" width="2" height="34"/><rect x="35" y="0" width="3" height="34"/><rect x="39" y="0" width="4" height="34"/><rect x="45" y="0" width="3" height="34"/><rect x="50" y="0" width="2" height="34"/><rect x="54" y="0" width="3" height="34"/><rect x="58" y="0" width="2" height="34"/><rect x="62" y="0" width="4" height="34"/><rect x="67" y="0" width="1" height="34"/><rect x="70" y="0" width="4" height="34"/><rect x="76" y="0" width="1" height="34"/><rect x="79" y="0" width="4" height="34"/><rect x="84" y="0" width="4" height="34"/>
+</svg>
+    <p class="flinks">
+      <a href="../index.html">Home</a><span class="sep" aria-hidden="true">·</span><a href="index.html">Docs</a><span class="sep" aria-hidden="true">·</span><span>Apache-2.0</span>
+    </p>
+    <p class="samosa"><a href="../samosa.html"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><path d="M24 5 L43 39 Q44.5 41.5 41.5 41.5 H6.5 Q3.5 41.5 5 39 Z"/><path d="M17 29 q3 2.5 7 0"/><path d="M21 20 l3 -3 3 3"/></g></svg>buy me a samosa</a></p>
+  </footer>
+</div>
+</body>
+</html>

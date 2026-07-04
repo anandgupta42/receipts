@@ -21,7 +21,7 @@
 ## Evidence
 <!-- Gates one-liner (tsc/eslint/vitest N/N/goldens/spec-lint), spec link
      (specs/SPEC-NNNN) + its Validation record. Attach this PR's build receipt by
-     running `aireceipts pr --post` from your worktree (SPEC-0019) — it upserts a
+     running `npx aireceipts pr --post` from your worktree (SPEC-0037) — it upserts a
      marked receipt comment; link or note it here. -->
 
 ## Notes

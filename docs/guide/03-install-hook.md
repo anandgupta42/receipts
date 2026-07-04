@@ -9,6 +9,10 @@ without running a command yourself.
 > but don't yet have an equivalent auto-install. For those, run `aireceipts`
 > yourself or add it to your own shell/CI flow.
 
+For PR receipts across any supported coding assistant, use the universal finalizer
+instead: `npx aireceipts pr --post` from the repo worktree. This Claude hook is optional
+convenience for end-of-session mini receipts, not the PR workflow.
+
 ## Install
 
 ```sh

@@ -16,6 +16,7 @@ import { RECEIPT_WIDTH, renderBlockLines } from "../receipt/render.js";
 import type { Role } from "./contributors.js";
 import type { SliceResult } from "./slice.js";
 import type { SubagentRow } from "./rollup.js";
+import { SAMOSA_URL } from "./publish.js";
 
 /** The one marker that identifies aireceipts' PR comment (R2) and the R5 presence check. */
 export const DOGFOOD_MARKER = "<!-- aireceipts-dogfood -->";
@@ -54,7 +55,6 @@ const OMITTED_NOTE = "full receipt omitted (comment size limit)";
 
 const WORDMARK = "AIRECEIPTS";
 const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
-const FOOTER_EMOJI = "🥟";
 const NOTE_INDENT = 2;
 
 /** The R1e(e) header line: the turn range, or the honesty label for a full-session fallback. */
@@ -280,7 +280,7 @@ function prBlocks(input: PrBodyInput): Block[] {
   });
   blocks.push(...helperGroupBlocks(helpers, authors.length === 0));
   blocks.push(...totalBlocks(input));
-  blocks.push({ kind: "footer", text: FOOTER_TEXT, emoji: FOOTER_EMOJI });
+  blocks.push({ kind: "footer", text: FOOTER_TEXT });
   return blocks;
 }
 
@@ -308,11 +308,16 @@ export interface PrBodyExtras {
 
 const FENCE = "```";
 
+/** SPEC-0034 R3 — the one place in the comment that renders a link; the fenced receipt stays link-free by nature. */
+const SAMOSA_LINK = `[buy me a samosa](${SAMOSA_URL})`;
+
 /**
  * The `<details>` section, size-capped: the largest prefix of receipts that
  * fits is kept, trailing ones degrade to one-line omission notes; `null` when
  * even all-omitted cannot fit (the caller drops the section). Computed with
- * prefix sums — one pass, no quadratic reassembly.
+ * prefix sums — one pass, no quadratic reassembly. The section always ends
+ * with the samosa link (SPEC-0034 R3); its fixed length is folded into the
+ * frame so the budget accounting still holds.
  */
 function detailsSection(details: DetailReceipt[], budget: number): string | null {
   const kept = details.map((d) => `${d.label}\n\n${FENCE}\n${d.text}\n${FENCE}`);
@@ -325,7 +330,9 @@ function detailsSection(details: DetailReceipt[], budget: number): string | null
     ...details.map((d) => `| ${d.row.join(" | ")} |`),
   ].join("\n");
   const header = `<details><summary>full receipts (${plural(details.length, "session")})</summary>\n\n${table}`;
-  const frame = [...header].length + [...`\n\n${"\n"}\n</details>`].length + details.length; // header + blank lines + joins
+  // header + blank lines + joins + the closing samosa link and its own blank-line pair
+  const frame =
+    [...header].length + [...`\n\n${"\n"}\n${SAMOSA_LINK}\n\n</details>`].length + details.length;
   const size = (s: string): number => [...s].length + 1; // +1 for its join newline
 
   const allOmitted = frame + omitted.reduce((sum, s) => sum + size(s), 0);
@@ -340,7 +347,7 @@ function detailsSection(details: DetailReceipt[], budget: number): string | null
     keep++;
   }
   const parts = details.map((_, i) => (i < keep ? kept[i] : omitted[i]));
-  return [header, "", ...parts, "", "</details>"].join("\n");
+  return [header, "", ...parts, "", SAMOSA_LINK, "", "</details>"].join("\n");
 }
 
 /**

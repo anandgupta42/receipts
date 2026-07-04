@@ -39,6 +39,8 @@ export interface CliOptions {
   readonly artifact: boolean;
   /** SPEC-0026 R5: `aireceipts pr --no-details` omits the collapsed full-receipts section. */
   readonly noDetails: boolean;
+  /** SPEC-0035 R5: `aireceipts pr --post --artifact --share` prints share intent URLs to stderr. */
+  readonly share: boolean;
   // Command-selecting boolean flags (consumed by the registry, not the commands):
   readonly help: boolean;
   readonly methodology: boolean;
@@ -75,6 +77,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let prSession: string | undefined;
   let artifact = false;
   let noDetails = false;
+  let share = false;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -121,6 +124,8 @@ export function parseOptions(argv: string[]): CliOptions {
       artifact = true;
     } else if (arg === "--no-details") {
       noDetails = true;
+    } else if (arg === "--share") {
+      share = true;
     } else if (arg === "--session") {
       prSession = argv[++i];
     } else if (arg.startsWith("--session=")) {
@@ -157,6 +162,7 @@ export function parseOptions(argv: string[]): CliOptions {
     prSession,
     artifact,
     noDetails,
+    share,
     help,
     methodology,
     telemetryShow,
