@@ -3,7 +3,8 @@
 `aireceipts pr` attaches the cost receipt of the AI-agent session that built a branch to
 that branch's pull request, as a single marked comment that stays current across pushes.
 Transcripts live on the developer's machine, never on the CI runner — so generation is
-local, and CI only *notices* when a PR is missing its receipt.
+local. CI checks for the marked receipt comment and is notice-only by default, with an
+opt-in setting for maintainers who want same-repo PRs to require a receipt.
 
 ## For contributors (30 seconds)
 
@@ -67,9 +68,11 @@ who viewed which receipt.
 
    > Before opening a PR, run `npx aireceipts pr --post` to attach your build receipt.
 
-That's it. The workflow emits a neutral `::notice` when a PR has no receipt comment and
-**never fails the build** — external contributors have no local sessions and must not be
-blocked.
+That's it. By default, the workflow emits a neutral `::notice` when a PR has no receipt
+comment and never fails the build. To enforce receipts for same-repo PRs, set the repo
+variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`; fork PRs stay notice-only because source
+transcripts remain on the contributor's machine. CI still never generates a receipt
+itself: the source transcripts stay local.
 
 ## What the comment contains
 
