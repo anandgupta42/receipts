@@ -1,8 +1,7 @@
-# SPEC-0019 R5 — soft presence check: notice (never fail) when a PR is missing
-# its aireceipts receipt comment. Generation runs on the developer's machine
-# (transcripts aren't on the runner); this only NOTICES a skip. The verdict logic
-# lives in scripts/check-pr-receipt.mjs (unit-tested); this workflow is the thin
-# caller that feeds it `gh api` output.
+# SPEC-0019 R5 — presence check for the aireceipts PR receipt comment.
+# Generation runs on the developer's machine (transcripts aren't on the runner),
+# so this workflow is notice-only by default. Maintainers can opt into same-repo
+# enforcement with the repository variable AIRECEIPTS_REQUIRE_PR_RECEIPT=true.
 name: pr-receipt-check
 
 on:
@@ -35,11 +34,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+          REQUIRE_PR_RECEIPT: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT }}
         run: |
+          set -euo pipefail
           gh api --paginate "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" > comments.json || echo "[]" > comments.json
-          verdict=$(node scripts/check-pr-receipt.mjs comments.json)
-          if [ "$verdict" = "missing" ]; then
-            echo "::notice::No aireceipts receipt comment found. Run \`npx aireceipts pr --post\` from your worktree to attach one. (Optional — external contributors have no local sessions.)"
-          else
-            echo "aireceipts receipt comment present."
+          args=(comments.json --head-repo "$HEAD_REPO" --base-repo "$BASE_REPO")
+          if [ "${REQUIRE_PR_RECEIPT:-}" = "true" ]; then
+            args+=(--require-same-repo)
           fi
+          verdict=$(node scripts/check-pr-receipt.mjs "${args[@]}")
+          case "$verdict" in
+            found)
+              echo "aireceipts receipt comment present."
+              ;;
+            missing-required)
+              echo "::error::No aireceipts receipt comment found. This repo has AIRECEIPTS_REQUIRE_PR_RECEIPT=true, so run \`npx aireceipts pr --post\` from your worktree and rerun this check."
+              exit 1
+              ;;
+            missing-notice)
+              echo "::notice::No aireceipts receipt comment found. Run \`npx aireceipts pr --post\` from your worktree to attach one. Maintainers can opt into same-repo enforcement with AIRECEIPTS_REQUIRE_PR_RECEIPT=true."
+              ;;
+            *)
+              echo "::error::Unexpected pr receipt verdict: $verdict"
+              exit 1
+              ;;
+          esac
