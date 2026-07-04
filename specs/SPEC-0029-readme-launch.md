@@ -1,7 +1,7 @@
 ---
 id: SPEC-0029
 title: "Launch README — evidence-shaped first screen, receipt parity enforced"
-status: draft
+status: building
 milestone: M4
 depends: []
 ---
@@ -55,9 +55,11 @@ number.
   codex --add-topic cli --add-topic developer-tools` ride the same
   checklist — maintainer's button, never CI). The badge row sits
   directly under the tagline: at most 3 badges (CI, npm version, license),
-  newline-delimited, no heading. The current tagline ("Your AI coding agent
-  just worked for 33 minutes. Here's the receipt.") is already in the
-  winning register and is kept as the default; the Design section is the
+  newline-delimited, no heading. The tagline is "Your AI coding
+  agent just billed you. Here's the receipt." — swapped at build time from
+  the 33-minute variant because the hero receipt's REAL duration (10m 30s)
+  must never sit next to a contradicting number (parity spirit; recorded
+  here per R1's own rule); the Design section is the
   place to swap it, nowhere else. The tagline must be bold and under 120
   characters (guard-tested).
 - **R2 — Hero: the real receipt as an image, then as bytes.** A
@@ -82,7 +84,8 @@ number.
 - **R4 — The README guard (new test, `test/readme-guard.test.ts`).**
   Asserts mechanically: (a) tagline line equals `package.json` description
   byte-for-byte; (b) every fenced receipt in README is byte-identical to a
-  committed golden file (parity — the README never lies about output);
+  committed golden file modulo the single trailing newline every golden
+  ends with (fence content carries none — the only permitted difference);
   (c) the `<picture>` sources resolve to files that exist in `goldens/svg/`;
   (d) emoji count ≤ 2 (the 🥟 signature plus the title 🧾 only); (e) total
   length ≤ 260 lines; (f) `docs/trust.md` and `docs/telemetry.md` linked
@@ -106,7 +109,7 @@ First screen, exactly:
 ```
 # aireceipts 🧾
 
-**Your AI coding agent just worked for 33 minutes. Here's the receipt.**
+**Your AI coding agent just billed you. Here's the receipt.**
 
 [CI badge] [npm badge] [license badge]
 
@@ -154,9 +157,13 @@ link line reads: "What a receipt proves — and what it can't:
   X" tables) — I6 adjacent; facts and links only.
 - **Automating the GitHub description/topics sync** (R5 is a recorded
   manual step — repo settings are the maintainer's button).
-- **Rewriting docs/** — this spec touches `README.md`, the guard test, and
-  `package.json` description only if the tagline changes (it does not, by
-  default).
+- **Rewriting docs/** — this spec touches `README.md`, the guard test, the
+  evidence note, and `package.json`'s description.
+- **npm README rendering.** The hero and relative links resolve on GitHub
+  (the launch surface); `files:` excludes `goldens/` and `docs/`, so the npm
+  page will render degraded until publish day. Recorded release-checklist
+  decision (maintainer): either add the two hero SVGs to `files:` or
+  absolutize the URLs at publish — not decided here.
 
 ## Test matrix
 
@@ -233,4 +240,16 @@ regeneration/week), the criterion narrows pinning to the hero.
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 29 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-03 · approved (button 1):** maintainer, in-session ("approved"). Status → building.
+
+**2026-07-03 · S5 (implementation review, Codex): REWORK → fixed.** Findings
+1–3 lost to capture truncation (twice now — process note: pipe reviews to a
+file). Visible findings: (4) CLI-table guard asserted a loose link count —
+accepted, now per-command linked-row checks; (5) trailing-newline
+normalization contradicted "byte-for-byte" — accepted, spec wording made
+precise (the single trailing golden newline is the only permitted
+difference); (6) the Design block still carried the old 33-minute tagline —
+accepted, fixed; (7) npm README will render degraded (files: excludes
+goldens/docs) — accepted as a recorded publish-day decision in Non-goals,
+not solved here. Red-then-green for receipt parity demonstrated live
+(mutated dollar → guard names the exact failure → restored green).
