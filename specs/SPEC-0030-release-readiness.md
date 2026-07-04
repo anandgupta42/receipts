@@ -1,7 +1,7 @@
 ---
 id: SPEC-0030
 title: "Release readiness — rename to receipts, the why, and the org dogfood kit"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0029]
 ---
@@ -243,3 +243,5 @@ truncated in capture were subsumed by (2).
 exit 0.
 
 **2026-07-03 · approved (button 1):** maintainer, in-session ("approved") after the hardened prior-art positioning round. Build split: PR A (R2/R4/R5 + caller template, mergeable now) and PR B (R1 cutover + R3 workflow_call, held green for the rename window). Positioning addendum: lineage framing (ccusage, claude-receipts, Infracost), committed reply paragraph, no independent-invention claims anywhere.
+
+**2026-07-04 · shipped:** merged via #71 #72 (rename window executed 2026-07-04); ledger sweep pre-release.

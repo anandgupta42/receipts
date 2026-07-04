@@ -1,7 +1,7 @@
 ---
 id: SPEC-0033
 title: "OSS launch hardening — pinned supply chain, least privilege, priced contributions"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0030] # draft in flight (PR #70) — R5 interlocks with its rename
 ---
@@ -314,3 +314,5 @@ alone — those SHAs were fetched and cross-checked against `gh api
 repos/<owner>/<repo>/commits/<tag>` during the build (S5). All gates re-run
 green after the fixes (tsc/eslint/vitest 970 tests/goldens/spec-lint/hygiene
 all exit 0; actionlint 0; zizmor real-repo run exit 0).
+
+**2026-07-04 · shipped:** merged via #81; ledger sweep pre-release.

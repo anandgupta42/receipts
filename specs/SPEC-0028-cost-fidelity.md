@@ -1,7 +1,7 @@
 ---
 id: SPEC-0028
 title: "Cost fidelity — floor totals, per-adapter reconciliation, plausibility tripwires, trust doc"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0023]
 ---
@@ -263,3 +263,5 @@ file ignoring `AIRECEIPTS_HOME`, unlike budget and summary-cache. Fix: the
 path now honors `homeOverride ?? AIRECEIPTS_HOME ?? homedir()` at call
 time (src/telemetry/notice.ts). Not an assertion change — the failing
 tests were right.
+
+**2026-07-04 · shipped:** merged via #65; ledger sweep pre-release.

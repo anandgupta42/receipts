@@ -1,7 +1,7 @@
 ---
 id: SPEC-0034
 title: "The samosa — a clickable link, an honest glyph, a small delightful page"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0027, SPEC-0029]
 ---
@@ -241,3 +241,5 @@ a negative test assertion). Side effect: `build-docs-site.mjs` now throws
 on manifest gaps and `NAV_SECTIONS` was missing `trust.md` +
 `adopt/org-rollout.md` (pre-existing on `origin/main`, blocked this
 regen) — both added to the nav.
+
+**2026-07-04 · shipped:** merged via #91; ledger sweep pre-release.
