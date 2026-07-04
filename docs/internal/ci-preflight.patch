@@ -1,0 +1,43 @@
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+index 4904193..5e6b496 100644
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -46,6 +46,20 @@ jobs:
+       - name: hygiene
+         run: node scripts/hygiene.mjs
+ 
++  preflight:
++    # The consolidated pre-release gate, --quick (skips the heavy re-runs other
++    # jobs already do). Its unique coverage: the publish-shape manifest (name,
++    # bin, exact files allowlist, no prepack/prepare) and tarball leanness
++    # (no sourcemaps, size/count) — caught on every PR, not just at release.
++    runs-on: ubuntu-latest
++    steps:
++      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version: "22.14"
++      - run: npm ci
++      - run: npm run preflight -- --quick
++
+   prices:
+     # Mechanical enforcement of I2/I3: any PR touching data/prices/** must pass
+     # cite-check (schema + non-empty cited sources). The Claude Code hook is UX;
+diff --git a/.github/workflows/release-publish.yml b/.github/workflows/release-publish.yml
+index 39554d3..8ee8a18 100644
+--- a/.github/workflows/release-publish.yml
++++ b/.github/workflows/release-publish.yml
+@@ -81,7 +81,12 @@ jobs:
+ 
+       - run: npm ci
+ 
+-      - run: npm run build
++      # Preflight is the release gate: build + lean-tarball shape + install the
++      # real tarball and run the installed binary (priced receipt) + full suite +
++      # goldens + determinism + cite-check liveness. A red SHA cannot publish.
++      # (It builds internally, so the separate `npm run build` step is gone.)
++      - name: preflight — the packaged artifact must install and run
++        run: npm run preflight
+ 
+       - name: publish with provenance (trusted publishing, OIDC)
+         # --provenance is explicit on purpose: a no-op on the trusted-publishing
