@@ -197,11 +197,11 @@ link line reads: "What a receipt proves — and what it can't:
 
 - [ ] README renders correctly on GitHub (checked on the PR's rich-diff
       view) in light and dark mode, hero visible in the first screenful.
-- [ ] `test/readme-guard.test.ts` passes, and demonstrably fails when a
+- [x] `test/readme-guard.test.ts` passes, and demonstrably fails when a
       fenced receipt byte is mutated (red-then-green shown in the PR).
 - [ ] `/review-docs` run on the new README (advisory now, blocking at
       release).
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all
       pass unmasked (`echo $?`); goldens untouched (the README references
       goldens, it never regenerates them).
