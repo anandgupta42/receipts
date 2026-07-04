@@ -40,9 +40,12 @@ best-guess mapping (I2-adjacent: no fabricated positions).
 - **R1 — Extraction.** `parseTranscript` in `src/parse/codex.ts` emits one
   `Compaction` per DISTINCT compaction event: a top-level `compacted` record, or an
   `event_msg` whose payload type is `context_compacted`. The paired forms for the
-  SAME event (record + marker, observed carrying identical timestamps) resolve to
-  one entry — paired by identical timestamp, falling back to stream adjacency when
-  timestamps are absent. Distinct events that share a `turnIndex` are ALL retained:
+  SAME event (record + marker) resolve to one entry — paired as OPPOSITE forms at
+  the same `turnIndex`. (Implementation-time correction, 2026-07-04: real streams
+  emit the marker a few records and ~2-3ms after its `compacted` record, so
+  neither timestamp equality nor strict adjacency holds; the earlier draft rule
+  was wrong against the data and is replaced by same-position opposite-form
+  pairing, which merges every sampled real pair.) Distinct events that share a `turnIndex` are ALL retained:
   Claude Code's per-turn dedupe (`src/parse/claudeCode.ts:356-359`) collapses echo
   shapes of one event, which is not evidence that Codex events are unique per turn
   — undercounting compactions would understate thrash. `replacement_history`
@@ -95,8 +98,8 @@ best-guess mapping (I2-adjacent: no fabricated positions).
 
 | Case | Input | Expected |
 |---|---|---|
-| R1 both forms | `compacted` + paired `context_compacted` (same ts) | one `Compaction` at that `turnIndex` |
-| R1 pair without ts | paired forms, no timestamps | one entry via stream adjacency |
+| R1 both forms | `compacted` + `context_compacted`, real shape (~3ms apart, records between) | one `Compaction` at that `turnIndex` |
+| R1 pair without ts | paired forms, no timestamps | one entry via same-`turnIndex` opposite-form pairing |
 | R1 multiple events | fixture with 2 distinct compactions | two entries, ordered by `turnIndex` |
 | R1 same-turn distinct events | 2 distinct compactions before the same next turn | two entries sharing that `turnIndex` |
 | R1 no content retained | `compacted` with `replacement_history` | no field beyond `turnIndex`/`atMs` |
@@ -135,6 +138,14 @@ adjacency; distinct same-turn events all retained — turnIndex-only dedupe woul
 undercount thrash); lazy-turn note extended to assistant-message turn creation
 (`codex.ts:190-193`); I2 line reworded to "no new pricing source" since enabling
 compactions can let the existing thrash `$` line render for Codex.
+
+**2026-07-04 · Implementation correction (R1 pairing rule).** Live acceptance on
+the real 96-compaction rollout initially produced 192 entries: the draft pairing
+rule (identical timestamp, adjacency fallback) matches NO real pair — sampled
+records show the marker 3 records and 3ms after its `compacted` record. R1
+respecified to opposite-form pairing at the same `turnIndex`; re-run yields
+exactly 96. Recorded here per the kill criterion's "do not ship a best-guess
+mapping" clause — the shipped rule is evidence-fitted, not guessed.
 
 **2026-07-04 · Maintainer approval:** approved via direct maintainer directive in
 session ("go ahead and merge and also start implementing the specs") after both

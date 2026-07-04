@@ -144,8 +144,11 @@ export interface SessionSummary {
  * assistant turn is retained with `turnIndex = turns.length` and is
  * thrash-ineligible (no following turns to prove refill). `atMs` is the raw
  * record's own timestamp, absent (not synthesized) when the record carried none.
- * Only the Claude Code adapter populates this — other agents record no
- * compaction signal, so their sessions never carry compactions and never thrash.
+ * Populated by the adapters whose raw formats carry a verified compaction
+ * signal: Claude Code (SPEC-0017 summary/boundary shapes) and Codex (SPEC-0040
+ * `compacted` records + `context_compacted` markers, paired per event).
+ * Adapters without a verified signal (Cursor, Gemini, opencode) leave it
+ * absent, so their sessions never carry compactions.
  */
 export interface Compaction {
   turnIndex: number;
