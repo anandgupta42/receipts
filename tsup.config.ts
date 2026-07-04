@@ -13,7 +13,10 @@ export default defineConfig({
   target: "node20",
   platform: "node",
   clean: true,
-  sourcemap: true,
+  // No sourcemaps in the published artifact: they were 70% of the npm tarball
+  // and nothing (tests run on src via vitest; the determinism check runs the
+  // built cli.js) consumes them at runtime. A bundled end-user CLI ships JS only.
+  sourcemap: false,
   dts: false,
   banner: {
     js: "#!/usr/bin/env node",
