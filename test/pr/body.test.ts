@@ -275,7 +275,7 @@ describe("SPEC-0026 R4 · footer hint", () => {
   it("is the last muted note of the fenced receipt", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 1 });
     const lines = fencedLines(body);
-    const hint = lines.findIndex((l) => l.includes("details: npx aireceipts --session <id>"));
+    const hint = lines.findIndex((l) => l.includes("details: npx aireceipts-cli --session <id>"));
     expect(hint).toBeGreaterThan(-1);
     // After the hint: only the rule/footer decoration, never another note.
     expect(lines.slice(hint + 1).every((l) => !l.trim().startsWith("(") && !l.includes("not attributed"))).toBe(true);
@@ -332,7 +332,7 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 }, { details: many });
     expect(body).not.toContain("<details>");
     // The dropped section must not leave a dangling "section below" hint.
-    expect(body).toContain("details: npx aireceipts --session <id>");
+    expect(body).toContain("details: npx aireceipts-cli --session <id>");
     expect(body).not.toContain("section below");
     expect(body).toContain(rollup);
   });

@@ -36,7 +36,7 @@ over `Stop` is therefore proven, not assumed: `Stop` fires per assistant turn
 - `reason` observed as `"other"` here; Claude Code documents `clear`, `logout`,
   `prompt_input_exit`, `other`.
 - `transcript_path` points at the just-ended session's JSONL. The installed
-  command (`npx aireceipts --mini`, no args) does **not** consume this payload —
+  command (`npx aireceipts-cli --mini`, no args) does **not** consume this payload —
   it renders the *newest* session, which at `SessionEnd` is the one that just
   ended. Reading `transcript_path` from stdin to target the exact session is a
   possible future refinement, out of scope for this spec's fixed command string.
@@ -65,11 +65,11 @@ over `Stop` is therefore proven, not assumed: `Stop` fires per assistant turn
 - Target `hooks.SessionEnd` with the nested `…[].hooks[]` command shape (matches
   this repo's own `.claude/settings.json` and the user's real one).
 - **R3/R6 reconciliation (flagged for the lead):** R3 quotes the entry as
-  `{"matcher":"*","hooks":[{"type":"command","command":"npx aireceipts --mini"}]}`
+  `{"matcher":"*","hooks":[{"type":"command","command":"npx aireceipts-cli --mini"}]}`
   with no wrapper, while R6 mandates a bounded invocation. A shell `timeout`
   wrapper is **not portable** to a clean macOS box (no `timeout` binary), which
   would silently break the hook. Resolution shipped: keep the exact command
-  string `npx aireceipts --mini` and add Claude Code's **native** per-hook
+  string `npx aireceipts-cli --mini` and add Claude Code's **native** per-hook
   `"timeout": 10` field (idiomatic — the user's real settings.json already uses
   `"timeout"` on a hook; the spike confirmed Claude Code enforces/cancels it).
   Belt-and-suspenders: `aireceipts --mini` is itself fail-safe (catches all,

@@ -6,7 +6,7 @@
 // tree and touch nothing else (R3: every other key deep-equal before/after).
 
 /** The exact command string the installed hook runs. Also the identity key for idempotency + uninstall. */
-export const HOOK_COMMAND = "npx aireceipts --mini";
+export const HOOK_COMMAND = "npx aireceipts-cli --mini";
 
 /**
  * Bounded invocation (R6): Claude Code enforces this per-hook `timeout`

@@ -22,7 +22,7 @@ jobs:
     uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
 `;
 export const CONTRIBUTING_LINE =
-  "Before opening a PR, run `npx aireceipts pr --post` to attach your build receipt.";
+  "Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.";
 
 export interface RepoInfo {
   name: string;
@@ -33,7 +33,7 @@ export interface RepoInfo {
 
 /** Kill criterion (b): no packet before the CLI is installable. */
 export function npmPublished(run: CommandRunner): boolean {
-  const res = run("npm", ["view", "aireceipts", "version"]);
+  const res = run("npm", ["view", "aireceipts-cli", "version"]);
   return res.code === 0 && /\d+\.\d+\.\d+/.test(res.stdout);
 }
 

@@ -10,7 +10,7 @@ without running a command yourself.
 > yourself or add it to your own shell/CI flow.
 
 For PR receipts across any supported coding assistant, use the universal finalizer
-instead: `npx aireceipts pr --post` from the repo worktree. This Claude hook is optional
+instead: `npx aireceipts-cli pr --post` from the repo worktree. This Claude hook is optional
 convenience for end-of-session mini receipts, not the PR workflow.
 
 ## Install
@@ -32,7 +32,7 @@ aireceipts will add a SessionEnd hook to ~/.claude/settings.json:
 +         "hooks": [
 +           {
 +             "type": "command",
-+             "command": "npx aireceipts --mini",
++             "command": "npx aireceipts-cli --mini",
 +             "timeout": 10
 +           }
 +         ]
@@ -44,7 +44,7 @@ aireceipts will add a SessionEnd hook to ~/.claude/settings.json:
 (Existing settings are preserved; formatting may be normalized to 2-space JSON.)
 
 Apply this change? [y/N] y
-Installed. A 6-line receipt now prints when a Claude Code session ends (`npx aireceipts --mini`).
+Installed. A 6-line receipt now prints when a Claude Code session ends (`npx aireceipts-cli --mini`).
 ```
 
 Answer anything other than `y` and it makes no change. Your other Claude Code
@@ -64,7 +64,7 @@ run  aireceipts  for the full receipt
 ## Where it writes
 
 The hook lands in your Claude Code `settings.json` — `~/.claude/settings.json` by
-default, or wherever `$CLAUDE_CONFIG_DIR` points. It runs `npx aireceipts --mini`,
+default, or wherever `$CLAUDE_CONFIG_DIR` points. It runs `npx aireceipts-cli --mini`,
 capped at a 10-second timeout, so a slow run can never hold up your shell.
 
 ## Uninstall

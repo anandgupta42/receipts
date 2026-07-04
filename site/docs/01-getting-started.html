@@ -337,7 +337,7 @@ footer{
 
 <p>You don't install anything first. One command reads your newest session and prices it:</p>
 
-<pre class="doc-code"><code class="language-sh">npx aireceipts</code></pre>
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli</code></pre>
 
 <p>The first time it runs, it prints a one-line note about anonymous diagnostics (and how to turn them off — see <a href="12-troubleshooting.html">Troubleshooting</a>), then the receipt. You'll see something like this:</p>
 
@@ -374,7 +374,7 @@ guessed dollars. Full method: aireceipts
 
 <p>One session is a number. The trailing week is a habit:</p>
 
-<pre class="doc-code"><code class="language-sh">npx aireceipts week</code></pre>
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli week</code></pre>
 
 <pre class="doc-code"><code>                  WEEKLY DIGEST                   
     Jun 18 2026 → Jun 25 2026 · since override    
@@ -404,7 +404,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
 
 <p>You won't remember to run a command after every session. Let Claude Code run it for you:</p>
 
-<pre class="doc-code"><code class="language-sh">npx aireceipts install-hook</code></pre>
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli install-hook</code></pre>
 
 <p>It shows you the exact change, asks before writing, and installs a <code>SessionEnd</code> hook. From then on a six-line mini-receipt prints when a Claude Code session ends. Full walkthrough: <a href="03-install-hook.html">Install the agent hook</a>.</p>
 
