@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aggregate the week — aireceipts docs</title>
+<title>Rolling out receipt checks across a fleet of repos — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,8 +286,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Aggregate the week</h1>
-      <p class="sub">Rendered from <code>docs/guide/06-week.md</code>.</p>
+      <h1>Rolling out receipt checks across a fleet of repos</h1>
+      <p class="sub">Rendered from <code>docs/adopt/org-rollout.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -327,74 +327,21 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="aggregate-the-week">Aggregate the week</h1>
+<h1 id="rolling-out-receipt-checks-across-a-fleet-of-repos">Rolling out receipt checks across a fleet of repos</h1>
 
-<p>Goal: total every session from the last seven days, across every agent, with an honest comparison to the week before.</p>
+<p>For one repo, adoption is the 3-line caller — see <a href="pr-receipt-check-caller.yml">pr-receipt-check-caller.yml</a> and <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
 
-<pre class="doc-code"><code class="language-sh">aireceipts week</code></pre>
+<p>For many repos (an org dogfood, a platform team), generate the adoption packet:</p>
 
-<pre class="doc-code"><code>                  WEEKLY DIGEST                   
-    Jun 18 2026 → Jun 25 2026 · since override    
+<pre class="doc-code"><code class="language-sh">node scripts/rollout-dogfood.mjs --org your-org --days 90</code></pre>
 
-Sessions.........................................5
-Priced total (5 of 5)........................$0.22
-Tokens (all sessions)..................166,338 tok
+<p>It enumerates repos active in the window (skipping archived repos, forks, and repos already carrying the caller) and prints, per repo: the caller file, the CONTRIBUTING line, and a copy-paste command sheet that opens a PR. <strong>It performs no repo or GitHub mutations</strong> — each repo's owners review and merge their own PR, and the script refuses to run until <code>aireceipts</code> is actually on npm (a packet telling developers to run an unpublished command helps nobody).</p>
 
-By agent
-  Claude Code.......................$0.19 · 2 sess
-  Codex.............................$0.03 · 3 sess
-
-Top waste
-  stuck-loop.....................$0.01 · 1 session
-  trivial-spans.................$0.00 · 2 sessions
-
-vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
-  Priced $ Δ................................+$0.12
-  Tokens Δ.............................+93,700 tok
-  Excluded.........................0 now / 0 prior
---------------------------------------------------
-       aireceipts · local · buy me a samosa       </code></pre>
-
-<p><code>Priced total (5 of 5)</code> reads &quot;5 of 5 sessions had a price&quot;; if some ran on unpriced models, the dollar total covers only the priced ones while the token total covers all of them — a coverage gap can never masquerade as a spend change. The deltas at the bottom are reported <strong>per category, never blended</strong>: the dollar delta only appears when both weeks are fully priced, the token delta always appears, and <code>Excluded</code> counts unpriced sessions in each window separately.</p>
-
-<h2 id="the-window">The window</h2>
-
-<p>By default the window is <code>[now − 7 days, now)</code> — so the digest moves with the clock, and running it tomorrow includes a different seven days. The prior window is always the seven days immediately before it. A session is bucketed by when it <strong>ended</strong>; a session with no end time is counted in neither window rather than guessed into one.</p>
-
-<h2 id="pin-the-window-with-since">Pin the window with <code>--since</code></h2>
-
-<p>Pass a date to anchor the window's <strong>start</strong> instead of its end (<code>[D, D + 7 days)</code>), which also makes the output reproducible:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts week --since 2026-06-18</code></pre>
-
-<p>That's the invocation behind the digest above — the <code>· since override</code> in the header marks it.</p>
-
-<h2 id="split-by-project">Split by project</h2>
-
-<pre class="doc-code"><code class="language-sh">aireceipts week --by-project</code></pre>
-
-<p>adds a breakdown keyed by the working directory each session ran in:</p>
-
-<pre class="doc-code"><code>By project
-  form..............................$0.18 · 1 sess
-  (unknown).........................$0.03 · 3 sess
-  qa................................$0.01 · 1 sess</code></pre>
-
-<p>Sessions whose project can't be determined (some agents don't record it) roll up under <code>(unknown)</code> rather than being dropped.</p>
-
-<h2 id="machine-readable">Machine-readable</h2>
-
-<p>For dashboards and scripts, <code>--json</code> emits the same digest as structured data:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts week --since 2026-06-18 --json</code></pre>
-
-<p>See <a href="11-share-and-export.html">Share and export</a> for the shape.</p>
-
-<h2 id="next">Next</h2>
+<p>Two constraints inherited from GitHub:</p>
 
 <ul>
-  <li><strong><a href="08-budget.html">Set a budget</a></strong> — turn the weekly total into an exit code.</li>
-  <li><strong><a href="09-handoff.html">Fix it next time</a></strong> — act on the <code>Top waste</code> lines.</li>
+  <li>The caller references the receipts repo by name; reusable-workflow references are <strong>not</strong> redirected if that repo is ever renamed — callers should only be created once the source repo's name is final.</li>
+  <li>The receipt check never fails a build (it emits a neutral notice), so adopting it is zero-risk for CI.</li>
 </ul>
     </article>
   </main>

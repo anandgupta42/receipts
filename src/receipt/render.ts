@@ -98,7 +98,9 @@ function renderBlock(block: Block, lines: string[], width: number, dim: Colorize
       return;
     case "footer":
       lines.push(dim(perforation(width)));
-      lines.push(center(block.emoji !== undefined ? `${block.text} ${block.emoji}` : block.text, width));
+      // Text-only: no emoji stands in for the samosa here — graphical
+      // renderers honor `samosaMark` by drawing the real glyph instead.
+      lines.push(center(block.text, width));
       return;
   }
 }

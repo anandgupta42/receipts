@@ -83,8 +83,13 @@ describe("SPEC-0029 · README guard", () => {
     expect(goldens.some((g) => g === mutated)).toBe(false);
   });
 
-  it("R4: emoji cap — the 🥟 inside the receipt bytes plus the title 🧾, nothing else", () => {
+  it("R4: zero emoji — the wordmark image and drawn SVGs carry all visual identity (SPEC-0034 R5 fallback)", () => {
     const emoji = readme.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) ?? [];
+    // Exact identity, not a cap. History: the title 🧾 became the wordmark
+    // image (#78), and the footer 🔺 was rejected by the maintainer ("not a
+    // samosa") — SPEC-0034's recorded fallback made the footer text-only.
+    // The intentional emoji set is now empty.
+    expect(emoji).toEqual([]);
     expect(emoji.length).toBeLessThanOrEqual(MAX_EMOJI);
   });
 

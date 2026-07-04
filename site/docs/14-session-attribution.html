@@ -256,6 +256,9 @@ footer{
 .flinks a{color:var(--ledger)}
 .flinks .sep{color:var(--rule-strong);padding:0 .6ch}
 .samosa{color:var(--muted);margin:10px 0 0;font-size:13.5px}
+.samosa a{color:inherit;text-decoration:none}
+.samosa a:hover{color:var(--ink)}
+.samosa svg{vertical-align:middle;margin-right:4px}
 @media (max-width:760px){
   .doc-grid{grid-template-columns:minmax(0,1fr)}
   .toc{position:static;border-right:0;border-bottom:1px solid var(--rule);padding:0 0 18px}
@@ -313,12 +316,14 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics telemetry</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -404,7 +409,7 @@ footer{
     <p class="flinks">
       <a href="../index.html">Home</a><span class="sep" aria-hidden="true">·</span><a href="index.html">Docs</a><span class="sep" aria-hidden="true">·</span><span>Apache-2.0</span>
     </p>
-    <p class="samosa">buy me a samosa</p>
+    <p class="samosa"><a href="../samosa.html"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><path d="M24 5 L43 39 Q44.5 41.5 41.5 41.5 H6.5 Q3.5 41.5 5 39 Z"/><path d="M17 29 q3 2.5 7 0"/><path d="M21 20 l3 -3 3 3"/></g></svg>buy me a samosa</a></p>
   </footer>
 </div>
 </body>
