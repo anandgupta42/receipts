@@ -26,9 +26,10 @@ import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js
 import { nestedCandidates } from "./nested.js";
 import { isChildPath } from "../parse/children.js";
 import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
-import { resolvePr, upsertPrComment } from "./comment.js";
+import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
 import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
+import { buildShareLines } from "./share.js";
 import type { ReceiptModel } from "../receipt/model.js";
 
 export interface PrOptions {
@@ -38,6 +39,8 @@ export interface PrOptions {
   artifact?: boolean;
   /** SPEC-0026 R5: include the collapsed full-receipts section (default true; `--no-details` clears it). */
   details?: boolean;
+  /** SPEC-0035 R5: print ready-to-paste share intent URLs to stderr (requires --artifact). */
+  share?: boolean;
 }
 
 export interface PrDeps {
@@ -196,7 +199,7 @@ function publishAndLink(
   sessions: ArtifactSession[],
   deps: PrDeps,
   extras?: { notAttributable?: string[]; perCommitJson?: string },
-): { fileName: string; url: string } | null {
+): { fileName: string; url: string; ownerRepo: string } | null {
   const pr = resolvePr(deps.runGh);
   if (!pr.ok) {
     deps.err(`artifact skipped: ${pr.error}`);
@@ -212,7 +215,7 @@ function publishAndLink(
     deps.err(outcome.error);
     return null;
   }
-  return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName) };
+  return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName), ownerRepo: pr.ownerRepo };
 }
 
 /** Last `-`-segment, first 8 chars: `df374859-…-a613ae74b101` → `a613ae74`; codex rollout ids → hash tail. */
@@ -289,6 +292,11 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     deps.err("--artifact requires --post");
     return 1;
   }
+  // SPEC-0035 R5: the share hint targets the artifact link — same shape as the guard above.
+  if (opts.share && !opts.artifact) {
+    deps.err("--share requires --artifact");
+    return 1;
+  }
 
   // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
   const branchInfo = branchCommits(deps.runGit, deps.cwd);
@@ -339,7 +347,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // the printed and posted bodies are identical and the link only renders
   // after a confirmed push. A failed publish still posts (additive-only).
   let artifactFailed = false;
-  let link: { fileName: string; url: string } | null = null;
+  let link: { fileName: string; url: string; ownerRepo: string } | null = null;
   if (opts.artifact) {
     // SPEC-0031 R3a — per-commit tables for sliced sessions; everything else
     // (helpers, full fallbacks) lands in the labeled bucket. The slicer's own
@@ -384,5 +392,33 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     return 1;
   }
   deps.err(`posted receipt (${result.action}) to PR #${result.prNumber}`);
+  // SPEC-0035 R5: only after BOTH the push (link !== null) AND the upsert
+  // (result.ok, just confirmed above) succeed — never advertise a receipt
+  // whose comment failed to post. Text only; no network from this branch.
+  // S5 (Codex finding 3): the artifact and the comment each resolved the PR
+  // independently — the hint prints only when both landed on the SAME PR, so
+  // a mid-command `gh pr view` flip can never share pr-N.html for PR M.
+  // Maintainer review (PR #87): a private repo's artifact 404s for every
+  // reader — the viewer chrome already refuses share on a failed load, and
+  // the CLI hint must not hand out intent URLs the viewer will reject.
+  // Tightened per that review's Codex round: intent URLs print only on a
+  // POSITIVE public answer (one gh call, --share path only); an errored
+  // check skips neutrally, and the match guard covers owner/repo too.
+  if (opts.share && link !== null) {
+    if (link.fileName !== artifactFileName(result.prNumber) || link.ownerRepo !== result.ownerRepo) {
+      deps.err(`share hint skipped: artifact ${link.ownerRepo}/${link.fileName} does not match comment PR ${result.ownerRepo}#${result.prNumber}`);
+    } else {
+      const visibility = repoVisibility(link.ownerRepo, deps.runGh);
+      if (visibility === "public") {
+        for (const line of buildShareLines(link.url)) {
+          deps.err(line);
+        }
+      } else if (visibility === "private") {
+        deps.err("share: skipped — repo is private; the viewer cannot render this for readers (works automatically once the repo is public)");
+      } else {
+        deps.err("share: skipped — could not verify repo visibility");
+      }
+    }
+  }
   return artifactFailed ? 1 : 0;
 }

@@ -10,6 +10,7 @@ function run(ctx: CommandContext): Promise<number> {
     session: ctx.options.prSession,
     artifact: ctx.options.artifact,
     details: !ctx.options.noDetails,
+    share: ctx.options.share,
   });
 }
 
@@ -21,12 +22,14 @@ export const command: CommandDef = {
   help: {
     order: 100,
     lines: [
-      "  aireceipts pr [--post] [--session <id>] [--artifact] [--no-details]",
+      "  aireceipts pr [--post] [--session <id>] [--artifact] [--no-details] [--share]",
       "                                        attach the building session's receipt to",
       "                                         the current PR (dry-run prints the body;",
       "                                         --post upserts it via gh; --artifact also",
       "                                         publishes pr-<n>.html to the",
-      "                                         aireceipts/artifacts branch and links it)",
+      "                                         aireceipts/artifacts branch and links it;",
+      "                                         --share prints ready-to-paste X/LinkedIn",
+      "                                         intent URLs to stderr, requires --artifact)",
     ],
   },
 };

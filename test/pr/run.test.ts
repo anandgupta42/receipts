@@ -87,7 +87,7 @@ describe("R3 render-first ordering", () => {
     const ghCalls: string[] = [];
     const gh: CommandRunner = (_cmd, args) => {
       ghCalls.push(args.join(" "));
-      if (args[0] === "pr") return ok('{"number": 26}');
+      if (args[0] === "pr") return ok('{"number": 26, "url": "https://github.com/o/r/pull/26"}');
       return ok("[]");
     };
     const { deps, out, err } = await makeDeps({
@@ -111,7 +111,7 @@ describe("R3 render-first ordering", () => {
     const ghCalls: string[] = [];
     const gh: CommandRunner = (_cmd, args) => {
       ghCalls.push(args.join(" "));
-      if (args[0] === "pr") return ok('{"number": 7}');
+      if (args[0] === "pr") return ok('{"number": 7, "url": "https://github.com/o/r/pull/7"}');
       return ok("[]");
     };
     const { deps, out } = await makeDeps({ runGh: gh });
@@ -341,19 +341,24 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
     return { run, gitCalls };
   }
 
-  /** gh mock that answers pr view --json number,url and records upsert payloads. */
+  /** gh mock that answers pr view --json number,url, reports the repo public, and records upsert payloads. */
   function ghWithPr(prNumber: number) {
     const posted: string[] = [];
+    const ghCalls: string[][] = [];
     const run: CommandRunner = (_cmd, args, opts) => {
+      ghCalls.push([...args]);
       if (args[0] === "pr") {
         return ok(JSON.stringify({ number: prNumber, url: `https://github.com/o/r/pull/${prNumber}` }));
+      }
+      if (args[0] === "api" && args[1] === "repos/o/r" && args[2] === "--jq" && args[3] === ".private") {
+        return ok("false\n"); // public
       }
       if (opts?.stdin) {
         posted.push(opts.stdin);
       }
       return ok("[]");
     };
-    return { run, posted };
+    return { run, posted, ghCalls };
   }
 
   it("rejects --artifact without --post before rendering (R4)", async () => {
@@ -426,5 +431,166 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
     expect(code).toBe(0);
     expect(out[0]).not.toContain("full receipt:");
     expect(gitCalls.some((a) => a[0] === "push" || a[0] === "hash-object")).toBe(false);
+  });
+
+  describe("SPEC-0035 R5 --share (e2e through runPr)", () => {
+    it("rejects --share without --artifact before rendering", async () => {
+      const { deps, out, err } = await makeDeps();
+      const code = await runPr({ post: true, artifact: false, share: true }, deps);
+      expect(code).toBe(1);
+      expect(out).toHaveLength(0);
+      expect(err.join("\n")).toContain("--share requires --artifact");
+    });
+
+    it("both the push and the comment upsert succeed: prints X + LinkedIn intent URLs, body unchanged", async () => {
+      const { run: runGit } = gitWithPlumbing();
+      const { run: runGh, posted } = ghWithPr(7);
+      const { deps, out, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(0);
+      const raw = encodeURIComponent("https://raw.githubusercontent.com/o/r/refs/heads/aireceipts/artifacts/pr-7.html");
+      const canonical = `https://anandgupta42.github.io/receipts/view.html?src=${raw}`;
+      expect(err.join("\n")).toContain("share:");
+      expect(err.join("\n")).toContain("https://twitter.com/intent/tweet?text=");
+      expect(err.join("\n")).toContain(encodeURIComponent(canonical));
+      expect(err.join("\n")).toContain("https://www.linkedin.com/sharing/share-offsite/?url=");
+      // The share hint is stderr-only — the posted/rendered body never changes shape.
+      expect(posted.some((p) => JSON.parse(p).body === out[0])).toBe(true);
+      expect(out[0]).not.toContain("twitter.com");
+      expect(out[0]).not.toContain("linkedin.com");
+    });
+
+    it("push fails: no share hint even though --share was requested (link is null)", async () => {
+      const { run: runGit } = gitWithPlumbing(true);
+      const { run: runGh } = ghWithPr(7);
+      const { deps, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(1);
+      expect(err.join("\n")).not.toContain("twitter.com");
+      expect(err.join("\n")).not.toContain("linkedin.com");
+    });
+
+    it("push succeeds but the comment upsert fails: no share hint (timing — both must succeed)", async () => {
+      const { run: runGit } = gitWithPlumbing();
+      const runGh: CommandRunner = (_cmd, args) => {
+        if (args[0] === "pr") return ok(JSON.stringify({ number: 7, url: "https://github.com/o/r/pull/7" }));
+        if (args.includes("-X") && args.includes("POST")) return { stdout: "", stderr: "422", code: 1, missing: false };
+        return ok("[]");
+      };
+      const { deps, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(1);
+      expect(err.join("\n")).not.toContain("twitter.com");
+      expect(err.join("\n")).not.toContain("linkedin.com");
+    });
+
+    it("PRIVATE repo: exactly one skip line, zero intent URLs (PR #87 review — the viewer would 404 for readers)", async () => {
+      const { run: runGit } = gitWithPlumbing();
+      const posted: string[] = [];
+      const ghCalls: string[][] = [];
+      const runGh: CommandRunner = (_cmd, args, opts) => {
+        ghCalls.push([...args]);
+        if (args[0] === "pr") return ok(JSON.stringify({ number: 7, url: "https://github.com/o/r/pull/7" }));
+        if (args[0] === "api" && args[1] === "repos/o/r" && args[2] === "--jq" && args[3] === ".private") {
+          return ok("true\n"); // private
+        }
+        if (opts?.stdin) {
+          posted.push(opts.stdin);
+          return ok("{}");
+        }
+        return ok("[]");
+      };
+      const { deps, out, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(0); // push + upsert both succeeded — only the hint is replaced
+      const stderr = err.join("\n");
+      expect(err.filter((l) => l.startsWith("share:"))).toEqual([
+        "share: skipped — repo is private; the viewer cannot render this for readers (works automatically once the repo is public)",
+      ]);
+      expect(stderr).not.toContain("twitter.com");
+      expect(stderr).not.toContain("linkedin.com");
+      // The exact endpoint fired, and only AFTER the comment write (both successes first).
+      const visIdx = ghCalls.findIndex((a) => a[0] === "api" && a[1] === "repos/o/r" && a[2] === "--jq" && a[3] === ".private");
+      const writeIdx = ghCalls.findIndex((a) => a.includes("POST") || a.includes("PATCH"));
+      expect(visIdx).toBeGreaterThan(writeIdx);
+      // The posted body is untouched by the guard.
+      expect(posted.some((p) => JSON.parse(p).body === out[0])).toBe(true);
+    });
+
+    it("explicitly PUBLIC repo: intent URLs unchanged, exactly one visibility call", async () => {
+      const { run: runGit } = gitWithPlumbing();
+      const { run: runGh, ghCalls } = ghWithPr(7);
+      const { deps, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(0);
+      const stderr = err.join("\n");
+      expect(stderr).toContain("https://twitter.com/intent/tweet?text=");
+      expect(stderr).toContain("https://www.linkedin.com/sharing/share-offsite/?url=");
+      expect(stderr).not.toContain("share: skipped");
+      expect(ghCalls.filter((a) => a[0] === "api" && a[1] === "repos/o/r" && a[2] === "--jq")).toHaveLength(1);
+    });
+
+    it("visibility check errors: neutral skip — no intent URLs, no false private claim (S6 Codex round)", async () => {
+      const { run: runGit } = gitWithPlumbing();
+      const runGh: CommandRunner = (_cmd, args, opts) => {
+        if (args[0] === "pr") return ok(JSON.stringify({ number: 7, url: "https://github.com/o/r/pull/7" }));
+        if (args[0] === "api" && args[2] === "--jq") return { stdout: "", stderr: "boom", code: 1, missing: false };
+        if (opts?.stdin) return ok("{}");
+        return ok("[]");
+      };
+      const { deps, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(0);
+      expect(err.filter((l) => l.startsWith("share:"))).toEqual(["share: skipped — could not verify repo visibility"]);
+      expect(err.join("\n")).not.toContain("repo is private");
+      expect(err.join("\n")).not.toContain("twitter.com");
+    });
+
+    it("same PR number but a different base repo mid-command: hint skipped (S6 owner/repo guard)", async () => {
+      const { run: runGit } = gitWithPlumbing();
+      let prViews = 0;
+      const runGh: CommandRunner = (_cmd, args, opts) => {
+        if (args[0] === "pr") {
+          prViews += 1;
+          const repo = prViews === 1 ? "o/r" : "o2/r";
+          return ok(JSON.stringify({ number: 7, url: `https://github.com/${repo}/pull/7` }));
+        }
+        if (opts?.stdin) return ok("{}");
+        return ok("[]");
+      };
+      const { deps, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(0);
+      expect(err.join("\n")).toContain("share hint skipped");
+      expect(err.join("\n")).not.toContain("twitter.com");
+    });
+
+    it("artifact PR and comment PR disagree (mid-command `gh pr view` flip): hint skipped (S5)", async () => {
+      const { run: runGit } = gitWithPlumbing();
+      // First `pr view` (artifact publish) says PR 7; the second (comment upsert) says PR 8.
+      let prViews = 0;
+      const runGh: CommandRunner = (_cmd, args, opts) => {
+        if (args[0] === "pr") {
+          prViews += 1;
+          const n = prViews === 1 ? 7 : 8;
+          return ok(JSON.stringify({ number: n, url: `https://github.com/o/r/pull/${n}` }));
+        }
+        if (opts?.stdin) return ok("{}");
+        return ok("[]");
+      };
+      const { deps, err } = await makeDeps({ runGit, runGh });
+      const code = await runPr({ post: true, artifact: true, share: true }, deps);
+      expect(code).toBe(0); // both halves succeeded — only the hint is withheld
+      expect(err.join("\n")).toContain("share hint skipped");
+      expect(err.join("\n")).not.toContain("twitter.com");
+      expect(err.join("\n")).not.toContain("linkedin.com");
+    });
+
+    it("--share without --post/--artifact never printed on a plain dry run", async () => {
+      const { deps, err } = await makeDeps();
+      const code = await runPr({ post: false }, deps);
+      expect(code).toBe(0);
+      expect(err.join("\n")).not.toContain("twitter.com");
+    });
   });
 });

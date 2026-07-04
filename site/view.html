@@ -4,6 +4,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>aireceipts · receipt viewer</title>
+<!-- SPEC-0035 R4: static, leak-free unfurl metadata. One committed brand
+     card for every receipt — no per-receipt image (that would need
+     deterministic per-receipt PNGs, cut in SPEC-0027). og:url is
+     intentionally omitted: this one file serves every receipt via ?src=,
+     so any single hardcoded URL here would misrepresent the actual link. -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="aireceipts — receipt viewer">
+<meta property="og:description" content="A local, deterministic viewer for aireceipts cost receipts — what AI coding agents actually cost.">
+<meta property="og:image" content="https://anandgupta42.github.io/receipts/og-card.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="aireceipts — receipt viewer">
+<meta name="twitter:description" content="A local, deterministic viewer for aireceipts cost receipts — what AI coding agents actually cost.">
+<meta name="twitter:image" content="https://anandgupta42.github.io/receipts/og-card.png">
 <style>
   :root{--paper:#FAF7F1;--ink:#23262E;--muted:#8B8578;--ground:#EFEAE0;--warn:#B0574E}
   @media (prefers-color-scheme:dark){:root{--paper:#2D3039;--ink:#E8E6E1;--muted:#9A958C;--ground:#262932}}
@@ -13,23 +26,41 @@
   header{padding:14px 18px;font-size:12.5px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:baseline}
   header .brand{color:var(--ink);font-weight:600;letter-spacing:.1em}
   header a{color:inherit}
+  header button{color:inherit;background:none;border:0;padding:0;font:inherit;cursor:pointer;text-decoration:underline dotted}
+  header a{text-decoration:underline dotted}
   main{flex:1;display:flex;flex-direction:column;padding:0 18px 24px;max-width:960px;width:100%;margin:0 auto}
   iframe{flex:1;width:100%;min-height:80vh;border:0;background:var(--paper);border-radius:2px;
          box-shadow:0 1px 0 rgba(0,0,0,.25),0 12px 30px -18px rgba(0,0,0,.45)}
   .msg{padding:28px 0;font-size:14px;max-width:64ch}
   .msg.error{color:var(--warn)}
   .msg a{color:inherit}
+  footer{padding:18px;text-align:center;font-size:11px;color:var(--muted)}
+  footer a{color:inherit;text-decoration:none}
+  footer a:hover{color:var(--ink)}
+  footer svg{vertical-align:middle;margin-right:4px}
 </style>
 </head>
 <body>
 <header>
   <span class="brand">AIRECEIPTS</span>
   <span id="provenance">receipt viewer</span>
+  <!-- SPEC-0035 R2: share controls are chrome, outside the sandboxed iframe,
+       and stay `hidden` until a load actually succeeds (never on an
+       unresolved/error receipt — an unresolved receipt is not shareable). -->
+  <span id="share" hidden>
+    · <a id="share-x" href="#" rel="noopener noreferrer" target="_blank">share on X</a>
+    · <a id="share-linkedin" href="#" rel="noopener noreferrer" target="_blank">share on LinkedIn</a>
+    · <button id="share-copy" type="button">copy link</button>
+  </span>
 </header>
 <main>
   <div id="status" class="msg">loading…</div>
   <iframe id="frame" sandbox="" hidden title="rendered receipt"></iframe>
 </main>
+<!-- SPEC-0034 R3 — outside the sandboxed iframe: this chrome is our own trusted markup, not the fetched artifact. -->
+<footer>
+  <a href="samosa.html"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><path d="M24 5 L43 39 Q44.5 41.5 41.5 41.5 H6.5 Q3.5 41.5 5 39 Z"/><path d="M17 29 q3 2.5 7 0"/><path d="M21 20 l3 -3 3 3"/></g></svg>buy me a samosa</a>
+</footer>
 <script>
 // Renders a receipt artifact fetched from GitHub — and ONLY from GitHub.
 // The host allowlist is a security boundary: without it this page would
@@ -41,6 +72,15 @@
   var status = document.getElementById("status");
   var frame = document.getElementById("frame");
   var provenance = document.getElementById("provenance");
+  var shareRow = document.getElementById("share");
+  var shareX = document.getElementById("share-x");
+  var shareLinkedIn = document.getElementById("share-linkedin");
+  var shareCopy = document.getElementById("share-copy");
+
+  // SPEC-0035 R3 — maintainer-approved verbatim (PR #77 comment); do not edit.
+  // This exact string also ships as SHARE_TEXT in src/pr/share.ts for the CLI
+  // --share hint; test/site-share.test.ts asserts the two stay byte-identical.
+  var SHARE_TEXT = "An aireceipts cost receipt — what the AI agents actually cost.";
 
   function fail(text, href) {
     status.className = "msg error";
@@ -52,6 +92,7 @@
       a.textContent = "open the file on GitHub instead";
       status.appendChild(a);
     }
+    // R2: no share affordance on an unresolved receipt — shareRow stays hidden.
   }
 
   /** Normalize a github.com blob URL or raw URL to a raw.githubusercontent.com URL, or return null. */
@@ -63,6 +104,18 @@
       return null;
     }
     if (u.protocol !== "https:" || u.search !== "" || u.hash !== "") {
+      return null;
+    }
+    // S5 hardening: no userinfo, no port — those have no business in a
+    // GitHub artifact URL and only exist to confuse a boundary like this one.
+    if (u.username !== "" || u.password !== "" || u.port !== "") {
+      return null;
+    }
+    // S5 hardening: URL normalization must be a NO-OP. A string that merely
+    // normalizes INTO an artifact URL (dot-segment climbs like
+    // /pr-7.html/%2e%2e/pr-8.html, stripped control characters, case-folded
+    // hosts) is not a literal artifact URL and is refused outright.
+    if (u.href !== input) {
       return null;
     }
     if (u.hostname === "raw.githubusercontent.com") {
@@ -78,24 +131,90 @@
     return null;
   }
 
+  // SPEC-0035 R1 — a CAPTURING parse, not a loose shape test. owner/repo are
+  // isolated as clean tokens restricted to the GitHub slug charset, so a
+  // delimiter smuggled in via encoding (%2F, %26, %3F) or a literal &/? in
+  // the path cannot survive: those characters simply aren't in this charset,
+  // so the match fails outright. The ref is pinned to the exact artifact
+  // branch (no bare-branch-name shorthand), and the file must look like an
+  // artifact filename. Anything else parses to null — no render, no share.
+  var ARTIFACT_PATH = /^\/([A-Za-z0-9][A-Za-z0-9._-]{0,38})\/([A-Za-z0-9][A-Za-z0-9._-]{0,38})\/refs\/heads\/aireceipts\/artifacts\/(pr-\d+\.html)$/;
+
+  /** Parse a raw.githubusercontent.com URL into clean owner/repo/file tokens, or null. */
+  function parseArtifact(rawUrl) {
+    var m = ARTIFACT_PATH.exec(rawUrl.pathname);
+    return m === null ? null : { owner: m[1], repo: m[2], file: m[3] };
+  }
+
+  /** Rebuild the canonical raw artifact URL from VALIDATED tokens — never the raw ?src= string. */
+  function canonicalRawUrl(parts) {
+    return new URL("https://raw.githubusercontent.com/" + parts.owner + "/" + parts.repo + "/refs/heads/aireceipts/artifacts/" + parts.file);
+  }
+
+  /** Rebuild this viewer's own canonical, shareable URL: this page's own origin+path plus a clean ?src=. */
+  function canonicalViewerUrl(rawArtifactUrl) {
+    var u = new URL(window.location.origin + window.location.pathname);
+    u.searchParams.set("src", rawArtifactUrl.href);
+    return u;
+  }
+
+  // S5 (Codex finding 1): sandbox="" blocks scripts but NOT passive resource
+  // loads — <img src>, CSS url(), <meta refresh>, nested iframes would still
+  // fire from a hostile "artifact" in someone else's repo, phoning home or
+  // dressing a forgery in this chrome. This CSP <meta>, injected AHEAD of the
+  // fetched document, closes that: nothing may load from anywhere; only the
+  // artifact's own inline styles apply. aireceipts artifacts are
+  // self-contained by contract, so a legitimate receipt loses nothing.
+  var FRAME_CSP = "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\">";
+
+  /** Confine fetched artifact HTML: lead with the frame CSP (after any doctype, to keep standards mode). */
+  function confine(html) {
+    var m = /^\s*<!doctype[^>]*>/i.exec(html);
+    return m === null ? FRAME_CSP + html : html.slice(0, m[0].length) + FRAME_CSP + html.slice(m[0].length);
+  }
+
+  /** SPEC-0035 R3: intent URLs — fixed text, canonical URL as a separate param, no tracking keys. */
+  function buildShareTargets(viewerUrl) {
+    var x = new URL("https://twitter.com/intent/tweet");
+    x.searchParams.set("text", SHARE_TEXT);
+    x.searchParams.set("url", viewerUrl.href);
+    var linkedin = new URL("https://www.linkedin.com/sharing/share-offsite/");
+    linkedin.searchParams.set("url", viewerUrl.href);
+    return { x: x.href, linkedin: linkedin.href };
+  }
+
+  /** SPEC-0035 R2: reveal the share row ONLY after a confirmed successful load. */
+  function showShare(viewerUrl) {
+    var targets = buildShareTargets(viewerUrl);
+    shareX.href = targets.x;
+    shareLinkedIn.href = targets.linkedin;
+    shareCopy.addEventListener("click", function () {
+      navigator.clipboard.writeText(viewerUrl.href).then(function () {
+        var was = shareCopy.textContent;
+        shareCopy.textContent = "copied";
+        setTimeout(function () {
+          shareCopy.textContent = was;
+        }, 1500);
+      });
+    });
+    shareRow.hidden = false;
+  }
+
   var src = new URLSearchParams(window.location.search).get("src");
   if (!src) {
     fail("No receipt URL. Expected ?src=<raw.githubusercontent.com URL of a receipt artifact>.");
     return;
   }
   var raw = normalize(src);
-  // Beyond the host allowlist: only aireceipts artifact paths render at all.
-  // This page must never become a generic HTML renderer under our domain —
-  // an arbitrary public repo's .html could impersonate content here.
-  var ARTIFACT_PATH = /^\/[^/]+\/[^/]+\/(refs\/heads\/)?aireceipts\/artifacts\/pr-\d+\.html$/;
-  if (raw === null || !ARTIFACT_PATH.test(raw.pathname)) {
+  var parts = raw === null ? null : parseArtifact(raw);
+  if (parts === null) {
     fail("Refusing to render: only aireceipts receipt artifacts (aireceipts/artifacts branch, pr-<n>.html) hosted on GitHub are accepted.");
     return;
   }
-  var segs = raw.pathname.split("/");
-  provenance.textContent = "rendering " + segs[segs.length - 1] + " from " + segs[1] + "/" + segs[2];
+  var canonical = canonicalRawUrl(parts);
+  provenance.textContent = "rendering " + parts.file + " from " + parts.owner + "/" + parts.repo;
 
-  fetch(raw.href)
+  fetch(canonical.href)
     .then(function (res) {
       if (!res.ok) {
         throw new Error("GitHub returned " + res.status + " (private repo or deleted artifact?).");
@@ -105,10 +224,11 @@
     .then(function (html) {
       status.hidden = true;
       frame.hidden = false;
-      frame.srcdoc = html;
+      frame.srcdoc = confine(html);
+      showShare(canonicalViewerUrl(canonical));
     })
     .catch(function (err) {
-      fail(String(err.message || err), src);
+      fail(String(err.message || err), canonical.href);
     });
 })();
 </script>
