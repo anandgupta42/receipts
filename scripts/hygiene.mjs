@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -163,6 +163,67 @@ export function isFalsePositiveEntry(line) {
   return /^\d{4}-\d{2}-\d{2} · [^·\n]+ · [^·\n]+ · [^·\n]+$/u.test(line);
 }
 
+// SPEC-0033 R1/R3 — mechanical backstop for workflow supply-chain hygiene:
+// every remote `uses:` must be `@<40-hex SHA> # <tag>` (comment included, so
+// the human-readable version never drifts from the pin), and no workflow may
+// carry an inline `zizmor: ignore` pragma (.github/zizmor.yml is the only
+// suppression path). Skips local (`./`) and Docker (`docker://`) references,
+// which don't take a tag/SHA the same way; survives even if the zizmor gate
+// is ever demoted.
+const USES_LINE = /^\s*(?:-\s*)?uses:\s*(.+?)\s*$/;
+const FULL_SHA = /^[0-9a-f]{40}$/;
+const ZIZMOR_PRAGMA = /zizmor:\s*ignore/i;
+
+export function checkWorkflowPinsText(text, file) {
+  const violations = [];
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+
+  lines.forEach((line, index) => {
+    const lineNo = index + 1;
+    if (ZIZMOR_PRAGMA.test(line)) {
+      violations.push(
+        `${file}:${lineNo}: inline "zizmor: ignore" pragma — .github/zizmor.yml is the only suppression path (SPEC-0033 R3)`,
+      );
+    }
+
+    const match = USES_LINE.exec(line);
+    if (!match) return;
+    const value = match[1];
+    const hashIndex = value.indexOf(" #");
+    const ref = (hashIndex === -1 ? value : value.slice(0, hashIndex)).trim();
+    const comment = hashIndex === -1 ? "" : value.slice(hashIndex + 2).trim();
+    if (ref.startsWith("./") || ref.startsWith("docker://")) return;
+
+    const atIndex = ref.lastIndexOf("@");
+    const pin = atIndex === -1 ? "" : ref.slice(atIndex + 1);
+    if (!FULL_SHA.test(pin)) {
+      violations.push(
+        `${file}:${lineNo}: "uses: ${ref}" is not SHA-pinned — use a full 40-hex commit SHA with a trailing "# <tag>" comment`,
+      );
+    } else if (comment === "") {
+      violations.push(
+        `${file}:${lineNo}: "uses: ${ref}" is missing the trailing "# <tag>" comment naming the pinned version`,
+      );
+    }
+  });
+
+  return violations;
+}
+
+export function checkWorkflowPins(rootDir = process.cwd()) {
+  const dir = join(rootDir, ".github", "workflows");
+  if (!existsSync(dir)) return [];
+
+  const violations = [];
+  for (const entry of readdirSync(dir).sort()) {
+    if (!/\.ya?ml$/.test(entry)) continue;
+    const relPath = join(".github", "workflows", entry);
+    const text = readFileSync(join(dir, entry), "utf8");
+    violations.push(...checkWorkflowPinsText(text, relPath));
+  }
+  return violations;
+}
+
 export function getTrackedFiles(rootDir = process.cwd()) {
   const output = execFileSync("git", ["ls-files"], { cwd: rootDir, encoding: "utf8" });
   return output.split("\n").filter(Boolean);
@@ -174,6 +235,7 @@ export function runHygiene({ rootDir = process.cwd(), title, trackedFiles } = {}
     ...checkLineBudgets(rootDir),
     ...checkRootAllowlist(files),
     ...checkGitleaksIgnore(rootDir),
+    ...checkWorkflowPins(rootDir),
     ...(title === undefined ? [] : checkPrTitle(title)),
   ];
 }
@@ -216,6 +278,7 @@ Runs the fast local hygiene gates:
   R2 tracked root allowlist from git ls-files
   R6 .gitleaksignore suppression entries require preceding "# reason:" comments
   R3 PR-title lint when --title is provided
+  R9 (SPEC-0033) every workflow "uses:" is SHA-pinned (40-hex + "# <tag>" comment); no inline zizmor pragmas
 
 CI-only or slower commands:
   R4 determinism: node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs

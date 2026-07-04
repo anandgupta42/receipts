@@ -1,0 +1,12 @@
+# SPEC-0033 R1 — SHA pins never rot silently: Dependabot opens a reviewed PR
+# bumping the pinned SHA (with the tag comment updated) whenever an action
+# publishes a new release. No npm ecosystem entry here on purpose — the
+# existing deps.yml audit already fails CI on high-severity findings, and at
+# this dependency count (11) update PRs would be solo-maintainer noise
+# (SPEC-0033 non-goals).
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
