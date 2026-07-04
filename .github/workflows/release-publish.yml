@@ -81,7 +81,12 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      # Preflight is the release gate: build + lean-tarball shape + install the
+      # real tarball and run the installed binary (priced receipt) + full suite +
+      # goldens + determinism + cite-check liveness. A red SHA cannot publish.
+      # (It builds internally, so the separate `npm run build` step is gone.)
+      - name: preflight — the packaged artifact must install and run
+        run: npm run preflight
 
       - name: publish with provenance (trusted publishing, OIDC)
         # --provenance is explicit on purpose: a no-op on the trusted-publishing
