@@ -9,6 +9,7 @@ import { DOGFOOD_MARKER, HELPER_FULL_LABEL, renderPrBody, renderPrReceiptText, s
 import { cacheServedText } from "../../src/receipt/present.js";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 import { FULL_FALLBACK_LABEL } from "../../src/pr/slice.js";
+import { SAMOSA_URL } from "../../src/pr/publish.js";
 
 const tokens = (input: number, output = 0) => withTotal({ ...emptyUsage(), input, output });
 const mix = (model: string, share: number): ModelMixEntry => ({ model, tokens: tokens(100), tokenShare: share });
@@ -334,5 +335,20 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     expect(body).toContain("details: npx aireceipts --session <id>");
     expect(body).not.toContain("section below");
     expect(body).toContain(rollup);
+  });
+
+  it("SPEC-0034 R3 — the samosa link closes the details section, after the last receipt and before </details>; the fenced receipt itself carries no link", () => {
+    const body = renderPrBody(
+      { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
+      { details: [detail("builder · abc123", "AAA"), detail("builder · def456", "BBB")] },
+    );
+    const samosaLink = `[buy me a samosa](${SAMOSA_URL})`;
+    expect(body).toContain(samosaLink);
+    expect(body.indexOf("BBB")).toBeLessThan(body.indexOf(samosaLink));
+    expect(body.indexOf(samosaLink)).toBeLessThan(body.indexOf("</details>"));
+    // The fenced receipt (what the terminal/README also render) never carries a link.
+    const fence = fencedLines(body).join("\n");
+    expect(fence).not.toContain("[buy me a samosa]");
+    expect(fence).not.toContain(SAMOSA_URL);
   });
 });

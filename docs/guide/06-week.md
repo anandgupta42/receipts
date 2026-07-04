@@ -28,7 +28,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
   Tokens Δ.............................+93,700 tok
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
-      aireceipts · local · buy me a samosa 🥟      
+      aireceipts · local · buy me a samosa 🔺      
 ```
 
 `Priced total (5 of 5)` reads "5 of 5 sessions had a price"; if some ran on

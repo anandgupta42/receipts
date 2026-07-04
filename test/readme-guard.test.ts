@@ -83,7 +83,7 @@ describe("SPEC-0029 · README guard", () => {
     expect(goldens.some((g) => g === mutated)).toBe(false);
   });
 
-  it("R4: emoji cap — the 🥟 inside the receipt bytes plus the title 🧾, nothing else", () => {
+  it("R4: emoji cap — the 🔺 inside the receipt bytes plus the title 🧾, nothing else (SPEC-0034 R5)", () => {
     const emoji = readme.match(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu) ?? [];
     expect(emoji.length).toBeLessThanOrEqual(MAX_EMOJI);
   });

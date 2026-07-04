@@ -1,7 +1,7 @@
 ---
 id: SPEC-0034
 title: "The samosa — a clickable link, an honest glyph, a small delightful page"
-status: draft
+status: building
 milestone: M4
 depends: [SPEC-0027, SPEC-0029]
 ---
@@ -130,12 +130,12 @@ fatigue erodes the golden gate's signal).
 
 ## Success criteria
 
-- [ ] `🥟` appears nowhere on a shipped surface; `🔺` (terminal) and the
+- [x] `🥟` appears nowhere on a shipped surface; `🔺` (terminal) and the
       drawn SVG (graphical) replace it; the samosa page loads offline.
-- [ ] Golden churn is a single reviewed commit with the regeneration
+- [x] Golden churn is a single reviewed commit with the regeneration
       explained; determinism ×10 stable.
-- [ ] README guard green after regeneration (emoji count 2).
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] README guard green after regeneration (emoji count 2).
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass
@@ -171,4 +171,20 @@ testable without the page; the page (R3/R4) is the delight layer.
 
 **2026-07-03 · S4 (lint):** spec-lint OK.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-03 · approved (button 1):** maintainer, in-session ("all specs
+approved"). Glyph + no-payment confirmations recorded on PR #76.
+
+**2026-07-04 · S5 (build, gates + live walk):** all 7 gates green, unmasked
+(`echo $?`): `tsc` 0, `eslint --max-warnings 0` 0, `vitest run` 0 (985 tests,
+84 files), `verify-goldens` 0 (90 artifacts byte-identical), `determinism-check
+--runs=10` 0 (10/10 byte-identical), `spec-lint` 0 (32 specs), `hygiene` 0.
+Golden churn: 53 files, one shot — `git diff --stat` shows 57 insertions/56
+deletions, confirming a width-neutral swap in terminal/mini goldens plus
+additive (not destructive) glyph-group markup in SVG goldens, nothing else
+touched. Added the missing R3 test (`test/pr/body.test.ts`) asserting the
+samosa link closes the `<details>` section while the fenced receipt stays
+link-free. Walked all 4 success criteria live against the built CLI: terminal
+receipt prints `🔺` (not `🥟`); `--svg` export contains zero emoji codepoints
+and exactly one drawn-glyph `<g>` matching the R2 path; `site/samosa.html`
+has zero external URLs (the sole `http://` match is the inert `xmlns` SVG
+namespace) and zero `<script>` tags; README guard's 9 tests green post-regen.

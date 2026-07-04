@@ -657,6 +657,9 @@ footer{
 .flinks a{color:var(--ledger)}
 .flinks .sep{color:var(--rule-strong);padding:0 .6ch}
 .samosa{color:var(--muted);margin:10px 0 0;font-size:13.5px}
+.samosa a{color:inherit;text-decoration:none}
+.samosa a:hover{color:var(--ink)}
+.samosa svg{vertical-align:middle;margin-right:4px}
 @media (max-width:760px){
   .doc-grid{grid-template-columns:minmax(0,1fr)}
   .toc{position:static;border-right:0;border-bottom:1px solid var(--rule);padding:0 0 18px}
@@ -763,7 +766,7 @@ ${body}
     <p class="flinks">
       <a href="../index.html">Home</a><span class="sep" aria-hidden="true">·</span><a href="index.html">Docs</a><span class="sep" aria-hidden="true">·</span><span>Apache-2.0</span>
     </p>
-    <p class="samosa">buy me a samosa</p>
+    <p class="samosa"><a href="../samosa.html"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><path d="M24 5 L43 39 Q44.5 41.5 41.5 41.5 H6.5 Q3.5 41.5 5 39 Z"/><path d="M17 29 q3 2.5 7 0"/><path d="M21 20 l3 -3 3 3"/></g></svg>buy me a samosa</a></p>
   </footer>
 </div>
 </body>

@@ -42,7 +42,7 @@ calls; unpriced models show tokens only, never
 guessed dollars. Full method: aireceipts
 --methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-      aireceipts · local · buy me a samosa 🥟      
+      aireceipts · local · buy me a samosa 🔺      
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
@@ -83,7 +83,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
   Tokens Δ.............................+93,700 tok
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
-      aireceipts · local · buy me a samosa 🥟      
+      aireceipts · local · buy me a samosa 🔺      
 ```
 
 Every session on your machine, across every supported agent, totalled for the

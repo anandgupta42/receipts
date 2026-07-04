@@ -36,7 +36,7 @@ calls; unpriced models show tokens only, never
 guessed dollars. Full method: aireceipts
 --methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-      aireceipts · local · buy me a samosa 🥟      
+      aireceipts · local · buy me a samosa 🔺      
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
@@ -143,4 +143,4 @@ gates: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0.
+Apache-2.0. · [buy me a samosa](https://anandgupta42.github.io/receipts/samosa.html)

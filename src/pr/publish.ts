@@ -18,6 +18,9 @@ const ARTIFACT_REF = `refs/heads/${ARTIFACT_BRANCH}`;
  */
 export const VIEWER_URL = "https://anandgupta42.github.io/receipts/view.html";
 
+/** SPEC-0034 R3/R4 — the samosa page's absolute URL, for surfaces (comment, artifact) that can't use a relative link. */
+export const SAMOSA_URL = "https://anandgupta42.github.io/receipts/samosa.html";
+
 /** The viewer link for one artifact: the raw URL (canonical refs/heads form — the branch name contains a slash) passed as ?src=. */
 export function artifactViewUrl(ownerRepo: string, fileName: string): string {
   const raw = `https://raw.githubusercontent.com/${ownerRepo}/${ARTIFACT_REF}/${fileName}`;
