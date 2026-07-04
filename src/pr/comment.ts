@@ -8,7 +8,7 @@ import type { CommandRunner } from "./git.js";
 import { DOGFOOD_MARKER } from "./body.js";
 
 export type UpsertOutcome =
-  | { ok: true; action: "created" | "updated"; prNumber: number; commentId?: number }
+  | { ok: true; action: "created" | "updated"; prNumber: number; ownerRepo: string; commentId?: number }
   | { ok: false; error: string; missing?: boolean };
 
 /** SPEC-0027 R3 — the one base-repo resolution the publish URL and blob URL both derive from. */
@@ -44,6 +44,27 @@ export function resolvePr(run: CommandRunner): PrResolution {
   return { ok: true, prNumber, ownerRepo: m[1] };
 }
 
+/** SPEC-0035 R5 (PR #87 review): what GitHub reports about the base repo's visibility. */
+export type RepoVisibility = "private" | "public" | "unknown";
+
+/**
+ * SPEC-0035 R5 (visibility guard, PR #87 review, tightened per its Codex
+ * round): the share hint prints intent URLs only on a POSITIVE public
+ * answer. `gh pr view --json` exposes no repo visibility field, so this is
+ * the one cheapest equivalent call — run only on the `--share` path, after
+ * both the push and the upsert have succeeded. An errored or unparseable
+ * check is "unknown", which the caller skips neutrally: never a broken
+ * private link, never a public repo mislabeled private.
+ */
+export function repoVisibility(ownerRepo: string, run: CommandRunner): RepoVisibility {
+  const res = run("gh", ["api", `repos/${ownerRepo}`, "--jq", ".private"]);
+  if (res.code !== 0) {
+    return "unknown";
+  }
+  const out = res.stdout.trim();
+  return out === "true" ? "private" : out === "false" ? "public" : "unknown";
+}
+
 interface RawComment {
   id?: number;
   body?: string;
@@ -75,24 +96,18 @@ function findMarkerCommentId(json: string): number | undefined {
  * add the "copy the receipt above" hint.
  */
 export function upsertPrComment(body: string, run: CommandRunner): UpsertOutcome {
-  const view = run("gh", ["pr", "view", "--json", "number"]);
-  if (view.missing) {
-    return { ok: false, error: "gh not found — copy the receipt above into your PR", missing: true };
+  // SPEC-0035 S6 (Codex round): resolve number AND base owner/repo from the
+  // one `gh pr view` call (via resolvePr, same as the artifact path) and
+  // address every endpoint at that explicit base repo — never the
+  // `{owner}/{repo}` git-context placeholders, which could name a different
+  // repo than the PR the number came from.
+  const pr = resolvePr(run);
+  if (!pr.ok) {
+    return pr;
   }
-  if (view.code !== 0) {
-    return { ok: false, error: `no PR for this branch (gh pr view failed): ${view.stderr.trim()}` };
-  }
-  let prNumber: number;
-  try {
-    prNumber = Number((JSON.parse(view.stdout) as { number?: unknown }).number);
-  } catch {
-    return { ok: false, error: "could not parse PR number from gh pr view" };
-  }
-  if (!Number.isInteger(prNumber)) {
-    return { ok: false, error: "gh pr view returned no PR number" };
-  }
+  const { prNumber, ownerRepo } = pr;
 
-  const list = run("gh", ["api", "--paginate", `repos/{owner}/{repo}/issues/${prNumber}/comments`]);
+  const list = run("gh", ["api", "--paginate", `repos/${ownerRepo}/issues/${prNumber}/comments`]);
   if (list.code !== 0) {
     return { ok: false, error: `could not list PR comments: ${list.stderr.trim()}` };
   }
@@ -100,20 +115,20 @@ export function upsertPrComment(body: string, run: CommandRunner): UpsertOutcome
   const payload = JSON.stringify({ body });
 
   if (existingId !== undefined) {
-    const patch = run("gh", ["api", `repos/{owner}/{repo}/issues/comments/${existingId}`, "-X", "PATCH", "--input", "-"], {
+    const patch = run("gh", ["api", `repos/${ownerRepo}/issues/comments/${existingId}`, "-X", "PATCH", "--input", "-"], {
       stdin: payload,
     });
     if (patch.code !== 0) {
       return { ok: false, error: `could not update PR comment: ${patch.stderr.trim()}` };
     }
-    return { ok: true, action: "updated", prNumber, commentId: existingId };
+    return { ok: true, action: "updated", prNumber, ownerRepo, commentId: existingId };
   }
 
-  const create = run("gh", ["api", `repos/{owner}/{repo}/issues/${prNumber}/comments`, "-X", "POST", "--input", "-"], {
+  const create = run("gh", ["api", `repos/${ownerRepo}/issues/${prNumber}/comments`, "-X", "POST", "--input", "-"], {
     stdin: payload,
   });
   if (create.code !== 0) {
     return { ok: false, error: `could not create PR comment: ${create.stderr.trim()}` };
   }
-  return { ok: true, action: "created", prNumber };
+  return { ok: true, action: "created", prNumber, ownerRepo };
 }

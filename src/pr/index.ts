@@ -22,7 +22,7 @@ import { deriveRole, selectContributors, type PoolCandidate, type RawContributor
 import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
 import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
-import { resolvePr, upsertPrComment } from "./comment.js";
+import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
 import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
 import { buildShareLines } from "./share.js";
@@ -176,7 +176,7 @@ function publishAndLink(
   bodyInput: PrBodyInput,
   sessions: ArtifactSession[],
   deps: PrDeps,
-): { fileName: string; url: string } | null {
+): { fileName: string; url: string; ownerRepo: string } | null {
   const pr = resolvePr(deps.runGh);
   if (!pr.ok) {
     deps.err(`artifact skipped: ${pr.error}`);
@@ -192,7 +192,7 @@ function publishAndLink(
     deps.err(outcome.error);
     return null;
   }
-  return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName) };
+  return { fileName, url: artifactViewUrl(pr.ownerRepo, fileName), ownerRepo: pr.ownerRepo };
 }
 
 /** The details-section stat line: role · id · slice/commits · turns · duration · in/out/cached (round 2). */
@@ -271,7 +271,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // the printed and posted bodies are identical and the link only renders
   // after a confirmed push. A failed publish still posts (additive-only).
   let artifactFailed = false;
-  let link: { fileName: string; url: string } | null = null;
+  let link: { fileName: string; url: string; ownerRepo: string } | null = null;
   if (opts.artifact) {
     const sessions: ArtifactSession[] = fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), model: e.model }));
     link = publishAndLink(bodyInput, sessions, deps);
@@ -302,13 +302,26 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // S5 (Codex finding 3): the artifact and the comment each resolved the PR
   // independently — the hint prints only when both landed on the SAME PR, so
   // a mid-command `gh pr view` flip can never share pr-N.html for PR M.
+  // Maintainer review (PR #87): a private repo's artifact 404s for every
+  // reader — the viewer chrome already refuses share on a failed load, and
+  // the CLI hint must not hand out intent URLs the viewer will reject.
+  // Tightened per that review's Codex round: intent URLs print only on a
+  // POSITIVE public answer (one gh call, --share path only); an errored
+  // check skips neutrally, and the match guard covers owner/repo too.
   if (opts.share && link !== null) {
-    if (link.fileName === artifactFileName(result.prNumber)) {
-      for (const line of buildShareLines(link.url)) {
-        deps.err(line);
-      }
+    if (link.fileName !== artifactFileName(result.prNumber) || link.ownerRepo !== result.ownerRepo) {
+      deps.err(`share hint skipped: artifact ${link.ownerRepo}/${link.fileName} does not match comment PR ${result.ownerRepo}#${result.prNumber}`);
     } else {
-      deps.err(`share hint skipped: artifact ${link.fileName} does not match comment PR #${result.prNumber}`);
+      const visibility = repoVisibility(link.ownerRepo, deps.runGh);
+      if (visibility === "public") {
+        for (const line of buildShareLines(link.url)) {
+          deps.err(line);
+        }
+      } else if (visibility === "private") {
+        deps.err("share: skipped — repo is private; the viewer cannot render this for readers (works automatically once the repo is public)");
+      } else {
+        deps.err("share: skipped — could not verify repo visibility");
+      }
     }
   }
   return artifactFailed ? 1 : 0;

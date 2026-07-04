@@ -136,6 +136,10 @@ unfurls fall back to a single static brand card — never a dynamic one.
 | S5 srcdoc CSP | mocked fetch returns `<img src="https://evil.example/pixel">` | frame CSP `<meta>` injected ahead of the hostile bytes; `default-src 'none'` |
 | S5 literal shape | `?src=` with userinfo, `:444`, or a `%2e%2e` climb | rejected before fetch (URL normalization must be a no-op) |
 | S5 PR match | artifact resolves PR 7, upsert resolves PR 8 (mocked flip) | share hint withheld; "share hint skipped" on stderr |
+| S6 private repo | `--share`, mocked `gh api repos/<o/r>` reports private | exactly one "share: skipped — repo is private…" line; zero intent URLs; body unchanged |
+| S6 public repo | same, visibility positively reports public | intent URLs unchanged; exactly one visibility call, after the write |
+| S6 unknown | visibility check errors or answers garbage | neutral "share: skipped — could not verify repo visibility"; no URLs, no false private claim |
+| S6 repo flip | same PR number, different base repo between publish and upsert (mocked) | hint skipped (owner/repo added to the S5 match guard) |
 
 ## Success criteria
 
@@ -215,6 +219,35 @@ otherwise "share hint skipped" on stderr; mocked-flip matrix row added.
 Codex confirmed as non-issues: delimiter smuggling into fetch/share
 targets (canonical rebuild wins), fixed share text in both surfaces, and
 no stdout/comment-body leak from the CLI hint.
+
+**2026-07-03 · S6 (maintainer review, PR #87): 1 finding — accepted and
+fixed.** The CLI share hint had no repo-visibility awareness: on a PRIVATE
+repo it would hand out intent URLs whose viewer link 404s for every reader
+(the viewer chrome gates correctly; the CLI hint did not). Fix: one
+`repoVisibility()` helper in `src/pr/comment.ts` (`gh api repos/<ownerRepo>
+--jq .private` — `gh pr view --json` exposes no visibility field, so this
+is the cheapest single equivalent call, run only on the `--share` path
+after both successes). Private → exactly one skip line, no intent URLs;
+public → unchanged. Matrix rows S6 added with e2e + unit coverage.
+
+**2026-07-03 · S6 Codex round (read-only, full diff): 1 MED, 2 LOW — all
+accepted.** 1 (MED — fail-open on an errored visibility check could still
+hand out broken private links) — **accepted**; the helper is tri-state
+(`private|public|unknown`): intent URLs print only on a POSITIVE public
+answer, unknown skips neutrally ("could not verify repo visibility") so a
+public repo is never mislabeled private either. 2 (LOW — the S5 match
+guard compared PR numbers only, and `upsertPrComment` addressed
+`{owner}/{repo}` git-context placeholders, so a same-number different-repo
+flip could slip through) — **accepted**; `upsertPrComment` now resolves
+via the same `resolvePr` as the artifact path, addresses every endpoint at
+the explicit base repo (`repos/<ownerRepo>/…`), returns `ownerRepo`, and
+the guard requires filename AND owner/repo equality. 3 (LOW — visibility
+mocks matched any `--jq` call) — **accepted**; tests pin the exact
+`["api","repos/o/r","--jq",".private"]` argv, assert it fires after the
+comment write, and assert exactly one `share:`-prefixed stderr line in the
+skip cases. Codex non-issues: REST shape correct, no argv injection from
+`ownerRepo` (regex-parsed, passed as one argv element), ordering correct
+on a successful check.
 
 **2026-07-03 · PR #77 comment (maintainer, folded in at build time per the
 comment's own instruction):** "Maintainer confirmation (in-session,
