@@ -1,7 +1,7 @@
 {
   "name": "aireceipts",
   "version": "0.1.0",
-  "description": "Local receipts for AI coding-agent transcripts.",
+  "description": "Your AI coding agent just billed you. Here's the receipt.",
   "license": "Apache-2.0",
   "type": "module",
   "private": false,
