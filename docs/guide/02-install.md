@@ -21,18 +21,8 @@ npm install -g aireceipts-cli
 aireceipts            # now available directly
 ```
 
-> **Pre-release note.** Until the npm package is published, install from source:
->
-> ```sh
-> git clone https://github.com/<owner>/receipts
-> cd receipts
-> npm install
-> npm run build
-> node dist/cli.js        # this is your `aireceipts`
-> ```
->
-> The commands in these docs are written as `aireceipts …`; with a source
-> checkout, read that as `node dist/cli.js …`.
+> **Prefer not to install?** `npx aireceipts-cli` runs the latest release without
+> a global install — the command inside is the same `aireceipts`.
 
 ## Upgrade
 
