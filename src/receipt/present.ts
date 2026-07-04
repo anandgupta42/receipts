@@ -33,7 +33,6 @@ export const NO_PRICE_MATCH_NOTE = "no price table matched";
 
 const WORDMARK = "AIRECEIPTS";
 const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
-const FOOTER_EMOJI = "🥟";
 const THINKING_REPLY = "(thinking/reply)";
 
 const TITLE_MAX = 46;
@@ -259,7 +258,7 @@ function buildClassic(model: ReceiptModel): Block[] {
     const block = classicWasteBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
-  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, emoji: FOOTER_EMOJI }));
+  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, samosaMark: true }));
   return blocks;
 }
 
@@ -341,7 +340,7 @@ function buildDatavis(model: ReceiptModel): Block[] {
     const block = classicWasteBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
-  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, emoji: FOOTER_EMOJI }));
+  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, samosaMark: true }));
   return blocks;
 }
 

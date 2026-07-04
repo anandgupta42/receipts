@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aggregate the week — aireceipts docs</title>
+<title>What a receipt proves — and what it can't — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,8 +286,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Aggregate the week</h1>
-      <p class="sub">Rendered from <code>docs/guide/06-week.md</code>.</p>
+      <h1>What a receipt proves — and what it can't</h1>
+      <p class="sub">Rendered from <code>docs/trust.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -327,75 +327,52 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="aggregate-the-week">Aggregate the week</h1>
+<h1 id="what-a-receipt-proves-and-what-it-cant">What a receipt proves — and what it can't</h1>
 
-<p>Goal: total every session from the last seven days, across every agent, with an honest comparison to the week before.</p>
+<p>aireceipts is local-first: it reads agent transcripts off your disk and prints a receipt. That design is why it needs no accounts or servers — and it is also the exact boundary of what a receipt can claim. This page states both sides plainly. (SPEC-0028.)</p>
 
-<pre class="doc-code"><code class="language-sh">aireceipts week</code></pre>
-
-<pre class="doc-code"><code>                  WEEKLY DIGEST                   
-    Jun 18 2026 → Jun 25 2026 · since override    
-
-Sessions.........................................5
-Priced total (5 of 5)........................$0.22
-Tokens (all sessions)..................166,338 tok
-
-By agent
-  Claude Code.......................$0.19 · 2 sess
-  Codex.............................$0.03 · 3 sess
-
-Top waste
-  stuck-loop.....................$0.01 · 1 session
-  trivial-spans.................$0.00 · 2 sessions
-
-vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
-  Priced $ Δ................................+$0.12
-  Tokens Δ.............................+93,700 tok
-  Excluded.........................0 now / 0 prior
---------------------------------------------------
-       aireceipts · local · buy me a samosa       </code></pre>
-
-<p><code>Priced total (5 of 5)</code> reads &quot;5 of 5 sessions had a price&quot;; if some ran on unpriced models, the dollar total covers only the priced ones while the token total covers all of them — a coverage gap can never masquerade as a spend change. The deltas at the bottom are reported <strong>per category, never blended</strong>: the dollar delta only appears when both weeks are fully priced, the token delta always appears, and <code>Excluded</code> counts unpriced sessions in each window separately.</p>
-
-<h2 id="the-window">The window</h2>
-
-<p>By default the window is <code>[now − 7 days, now)</code> — so the digest moves with the clock, and running it tomorrow includes a different seven days. The prior window is always the seven days immediately before it. A session is bucketed by when it <strong>ended</strong>; a session with no end time is counted in neither window rather than guessed into one.</p>
-
-<h2 id="pin-the-window-with-since">Pin the window with <code>--since</code></h2>
-
-<p>Pass a date to anchor the window's <strong>start</strong> instead of its end (<code>[D, D + 7 days)</code>), which also makes the output reproducible:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts week --since 2026-06-18</code></pre>
-
-<p>That's the invocation behind the digest above — the <code>· since override</code> in the header marks it.</p>
-
-<h2 id="split-by-project">Split by project</h2>
-
-<pre class="doc-code"><code class="language-sh">aireceipts week --by-project</code></pre>
-
-<p>adds a breakdown keyed by the working directory each session ran in:</p>
-
-<pre class="doc-code"><code>By project
-  form..............................$0.18 · 1 sess
-  (unknown).........................$0.03 · 3 sess
-  qa................................$0.01 · 1 sess</code></pre>
-
-<p>Sessions whose project can't be determined (some agents don't record it) roll up under <code>(unknown)</code> rather than being dropped.</p>
-
-<h2 id="machine-readable">Machine-readable</h2>
-
-<p>For dashboards and scripts, <code>--json</code> emits the same digest as structured data:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts week --since 2026-06-18 --json</code></pre>
-
-<p>See <a href="11-share-and-export.html">Share and export</a> for the shape.</p>
-
-<h2 id="next">Next</h2>
+<h2 id="what-a-receipt-proves">What a receipt proves</h2>
 
 <ul>
-  <li><strong><a href="08-budget.html">Set a budget</a></strong> — turn the weekly total into an exit code.</li>
-  <li><strong><a href="09-handoff.html">Fix it next time</a></strong> — act on the <code>Top waste</code> lines.</li>
+  <li><strong>The records existed on the author's machine.</strong> Every number is computed from transcript files found locally at render time — never from a guess, a prediction, or a remote service.</li>
+  <li><strong>The dollars come from cited, dated price tables.</strong> A <code>$</code> renders only when a <code>data/prices/&lt;vendor&gt;.json</code> row — carrying its <code>sources:</code> citations — matches the session's model and date. No matching row means tokens are shown instead. A receipt's prices can be audited back to the vendor page they were copied from.</li>
+  <li><strong>The rendering is deterministic.</strong> The same transcript and price tables produce a byte-identical receipt, on any machine (<code>--methodology</code> describes the attribution; goldens and a determinism gate enforce it in CI).</li>
+  <li><strong>Incompleteness is labeled.</strong> A PR receipt that could not attribute every candidate session renders its totals as a floor (<code>TOTAL priced ≥ $X</code>) and counts the sessions it left out. A number that might understate says so in the number.</li>
 </ul>
+
+<h2 id="what-a-receipt-cannot-prove">What a receipt cannot prove</h2>
+
+<ul>
+  <li><strong>That the transcript is untouched.</strong> Transcripts are plain JSONL on the author's disk. The author can edit them, and no local-first tool can detect every edit — a tool that could would need attestation infrastructure and a server, which aireceipts refuses by design. A PR receipt is therefore the <strong>author's disclosure</strong>, like a changelog entry: normally honest, verifiable in its arithmetic, but not cryptographic evidence.</li>
+  <li><strong>That nothing is missing.</strong> A session that never touched the branch — or hid its tracks (no commits) — may be absent. Absent sessions make totals <em>under</em>state, which is why known gaps render as floors, never as bare numbers.</li>
+</ul>
+
+<h2 id="what-makes-fabrication-visible">What makes fabrication visible</h2>
+
+<ul>
+  <li><strong>Reconciliation</strong> (<code>node scripts/cost-reconcile.mjs</code>): each adapter that registers a fidelity validator is checked against its agent's own accounting — Codex sessions must sum exactly to the rollout's cumulative token envelope; Claude Code sessions must satisfy usage-shape invariants. Drift is printed, named, and fails the gate.</li>
+  <li><strong>Time-integrity caveats</strong>: a receipt whose turns claim timestamps after the transcript file's own modification time, or whose span is non-positive while carrying usage, renders a <code>caveat:</code> line and a <code>caveats</code> entry in <code>--json</code>. Caveats never change a <code>$</code> — they are facts attached to the number.</li>
+  <li><strong>Determinism</strong>: anyone with the transcript can re-render the receipt and compare bytes.</li>
+</ul>
+
+<h2 id="where-the-numbers-can-go-wrong">Where the numbers can go wrong</h2>
+
+<p><em>A living list (maintainer directive, 2026-07-03): every newly discovered scenario gets an entry here in the same PR that handles it — the doc test pins this section and its minimum size, so removing an entry fails CI. Each entry names the scenario, the direction of the error, and the marker that makes it visible on the receipt.</em></p>
+
+<ol>
+  <li><strong>A contributing session leaves no proof.</strong> <code>git commit --quiet</code>, cherry-picks, or filtering the SHA out of push output leave no branch SHA in any tool output — the session is excluded and the total renders as a floor (<code>≥</code>). Understates; marked by the floor and the &quot;not attributed&quot; note. (Observed live on PR #61 and PR #66.)</li>
+  <li><strong>Rows round; the total doesn't.</strong> Each row shows its own rounded cents while TOTAL formats the raw sum, so hand-adding rows can differ from the total by up to about half a cent per priced row. Bounded and enforced by the ledger property test; exact values live in <code>--json</code>.</li>
+  <li><strong>Unpriced models show tokens, never dollars.</strong> No dated, cited price row → tokens only; a mixed receipt renders <code>$</code> and token subtotals separately, never blended.</li>
+  <li><strong>Cursor sessions carry totals only.</strong> No per-turn usage exists in the transcript, so per-tool attribution is impossible; the receipt says so verbatim rather than splitting by guesswork.</li>
+  <li><strong>Helper crediting is a heuristic.</strong> A no-commit Codex session in the current worktree during the branch window is credited on cwd+time — unrelated concurrent Codex work in the same worktree could over-credit. Grouped under <code>CODEX HELPERS — no commits</code>, never presented as an author.</li>
+  <li><strong>Slices are anchor-bounded.</strong> Work before a session's first branch commit or after its last may fall outside the counted turn range; the slice line states the exact range so the boundary is inspectable.</li>
+  <li><strong>Subagent rollups are window-bounded.</strong> A child straddling the slice window counts if its launch or finish lands inside; a child that cannot be parsed is listed as unreadable, priced at nothing, and floors the total.</li>
+  <li><strong>Price tables age.</strong> Rows are dated and cited, with a daily drift tripwire — but a receipt rendered before a price correction reflects the table it cited that day. Re-render to re-price.</li>
+  <li><strong>Vendor accounting is only as checkable as the vendor makes it.</strong> Codex sessions reconcile exactly (tolerance 0) against the rollout's own token envelope; Claude Code transcripts carry no independent total, so only shape invariants apply there.</li>
+  <li><strong>Transcripts are editable.</strong> See above — time-integrity caveats surface some inconsistencies, not all edits.</li>
+</ol>
+
+<p>If you need a stronger guarantee than an author's disclosure — billing-grade attribution across a team — use your vendor's console. aireceipts will not pretend to be that, and a receipt that pretended would be worth less than one that tells you exactly what it knows.</p>
     </article>
   </main>
   <footer>

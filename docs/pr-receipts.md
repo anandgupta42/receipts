@@ -6,30 +6,59 @@ Transcripts live on the developer's machine, never on the CI runner — so gener
 local. CI checks for the marked receipt comment and is notice-only by default, with an
 opt-in setting for maintainers who want same-repo PRs to require a receipt.
 
-## For contributors (30 seconds)
+## For contributors and coding assistants (one command)
 
 From your checkout (or worktree) with the PR branch checked out:
 
 ```sh
-npx aireceipts pr            # dry-run: prints the exact comment body to stdout
-npx aireceipts pr --post     # upserts the receipt comment on the PR via gh
+npx aireceipts pr --post
 ```
 
-`--post` requires the [`gh` CLI](https://cli.github.com/) authenticated to your repo
-(`gh auth login`); no other tokens or servers are involved. Re-running after more commits
-edits the same comment in place — no comment spam. If auto-selection finds more than one
-matching session (or you want a specific one), pass `--session <id>` (an id from
-`aireceipts --list`).
+> **Pre-release note:** until the npm package is published, run the same command
+> from a source checkout: `node dist/cli.js pr --post` (see the README's install
+> status). The one-command story becomes literal at v0.1.0.
 
-Prefer a git alias so it runs itself:
+That is the finalizer for humans, Codex, Claude Code, OpenCode, Cursor, and any other
+coding assistant. It discovers supported local agent sessions, matches them to the
+current repo/worktree and PR branch, renders the exact comment body, then upserts one
+marked PR comment through `gh`.
+
+`npx` needs Node/npm. Posting needs the [`gh` CLI](https://cli.github.com/) authenticated
+to your repo (`gh auth login`); no other tokens or servers are involved. Re-running after
+more commits edits the same comment in place — no comment spam. If auto-selection finds
+more than one matching session (or you want a specific one), pass `--session <id>` (an id
+from `aireceipts --list`):
+
+```sh
+npx aireceipts pr --post --session <id>
+```
+
+The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
+copy the body straight into a comment.
+
+For a dry run without posting:
+
+```sh
+npx aireceipts pr
+```
+
+### Assistant instruction
+
+Use the same instruction for every coding assistant:
+
+```text
+Before you finish a PR-producing task, run `npx aireceipts pr --post` from the repo worktree and include any failure message in the handoff.
+```
+
+### Optional convenience: git alias
+
+This is only a local shortcut. It is not required for adoption and does not replace the
+one command above.
 
 ```sh
 git config alias.receipt '!npx aireceipts pr --post'
 git receipt                  # after pushing your branch
 ```
-
-The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
-copy the body straight into a comment.
 
 ### Optional: publish a durable receipt page
 

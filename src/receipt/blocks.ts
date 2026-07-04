@@ -74,8 +74,12 @@ export type Block =
   | { kind: "footnote"; text: string; spaceBefore?: boolean }
   /** Grocery's deterministic pipe-barcode. */
   | { kind: "barcode"; pattern: string }
-  /** The closing line (`emoji` is a terminal-only decoration the SVG drops for renderer safety). */
-  | { kind: "footer"; text: string; emoji?: string };
+  /**
+   * The closing line. `samosaMark` asks graphical renderers to draw the real
+   * samosa glyph beside the text; terminal output stays text-only (maintainer:
+   * 🔺 rejected — "not a samosa" — and this product prints no approximations).
+   */
+  | { kind: "footer"; text: string; samosaMark?: true };
 
 /** The layout-agnostic receipt: an ordered block list every renderer interprets. */
 export interface ReceiptView {
@@ -190,7 +194,8 @@ function blockStrings(b: Block): string[] {
     case "barcode":
       return [b.pattern];
     case "footer":
-      return b.emoji !== undefined ? [b.text, b.emoji] : [b.text];
+      // `samosaMark` is a drawn-glyph request, not text content — no field.
+      return [b.text];
     case "rule":
       return [];
   }
