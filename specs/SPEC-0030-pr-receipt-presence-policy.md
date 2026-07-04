@@ -1,7 +1,7 @@
 ---
 id: SPEC-0030
 title: "PR receipt presence policy - notice by default, opt-in enforcement"
-status: draft
+status: shipped
 milestone: M4
 depends: [SPEC-0019]
 ---
@@ -23,9 +23,8 @@ boundary clear: GitHub Actions can check for the marked comment on any PR creati
 but it cannot generate a real receipt because the source transcripts live on the
 developer's machine.
 
-This spec is the approval gate for the provisional branch implementation already present
-on PR #69. That implementation is not considered accepted or shipped until this draft is
-approved by the maintainer.
+This spec records the approval gate for PR #69's provisional implementation; maintainer
+approval converted that implementation from provisional to accepted.
 
 ## Requirements
 
@@ -133,20 +132,20 @@ receipt.
 
 ## Success criteria
 
-- [ ] Maintainer approves this draft before the implementation is considered accepted.
-- [ ] `scripts/check-pr-receipt.mjs` has unit coverage for default, enforced same-repo,
+- [x] Maintainer approves this draft before the implementation is considered accepted.
+- [x] `scripts/check-pr-receipt.mjs` has unit coverage for default, enforced same-repo,
       enforced fork, marker present, marker absent, and invalid JSON.
-- [ ] `.github/workflows/pr-receipt-check.yml` is notice-only by default and has an
+- [x] `.github/workflows/pr-receipt-check.yml` is notice-only by default and has an
       opt-in same-repo blocking path keyed by `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`.
-- [ ] `docs/pr-receipts.md` calls out the UX tradeoffs: default notice-only,
+- [x] `docs/pr-receipts.md` calls out the UX tradeoffs: default notice-only,
       opt-in enforcement, fork behavior, and no CI receipt generation.
-- [ ] Acceptance testing performed live: script returns `missing-notice` for default
+- [x] Acceptance testing performed live: script returns `missing-notice` for default
       same-repo and `missing-required` only with `--require-same-repo`.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, and `node scripts/hygiene.mjs` all pass unmasked.
-- [ ] The PR receipt comment is updated after the accepted implementation commit.
+- [x] The PR receipt comment is updated after the accepted implementation commit.
 
 ## Open questions
 
@@ -167,7 +166,19 @@ the contributor-hostile failure mode the maintainer rejected. Same-repo enforcem
 still available for repos that deliberately want it, and the fork path stays advisory.
 The script is deterministic over provided JSON and the workflow policy is explicit.
 
-**2026-07-04 · S2 (maintainer review): pending.** Button 1 is required before the
-provisional PR #69 implementation is treated as accepted. If this draft is rejected,
-the branch must revert or replace the provisional enforcement commit rather than ship it
-under SPEC-0019.
+**2026-07-04 · S2 (maintainer review): APPROVED.** Maintainer approved the spec
+in-session ("spec approved"). Button 1 exercised; the PR #69 implementation may now be
+treated as accepted rather than provisional.
+
+**2026-07-04 · S3 (live acceptance): PASS.** Direct script probes:
+same-repo default → `missing-notice`; same-repo with `--require-same-repo` →
+`missing-required`; fork with `--require-same-repo` → `missing-notice`. Focused unit
+coverage lives in `test/pr/check-pr-receipt.test.ts`; workflow/doc wiring coverage lives
+in `test/pr/wiring-docs.test.ts`.
+
+**2026-07-04 · S4 (gate + dogfood): PASS.** Full AGENTS verification block passed
+unmasked after the spec landed: `npx tsc --noEmit` 0, `npx eslint . --max-warnings 0`
+0, `npx vitest run` 964 tests passed, goldens byte-identical, determinism 10/10
+byte-identical, `spec-lint` 29 specs OK, hygiene OK. `node dist/cli.js pr --post`
+updated the marked receipt comment on PR #69 after the accepted implementation/spec
+commits.
