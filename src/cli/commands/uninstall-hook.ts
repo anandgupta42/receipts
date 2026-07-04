@@ -3,9 +3,18 @@
 import { uninstallHook } from "../../hook/install.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { hookIoFor } from "../common/output.js";
+import type { ResultValue } from "../../telemetry/schemas.js";
 
-function run(ctx: CommandContext): Promise<number> {
-  return uninstallHook(hookIoFor(ctx));
+async function run(ctx: CommandContext): Promise<number> {
+  try {
+    const code = await uninstallHook(hookIoFor(ctx));
+    const result: ResultValue = code === 0 ? "success" : "internal_error";
+    ctx.telemetry.recordHookConfigured({ operation: "uninstall", promptOutcome: "not_prompted", result });
+    return code;
+  } catch (err) {
+    ctx.telemetry.recordHookConfigured({ operation: "uninstall", promptOutcome: "not_prompted", result: "write_failed" });
+    throw err;
+  }
 }
 
 export const command: CommandDef = {

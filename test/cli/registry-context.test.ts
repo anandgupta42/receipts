@@ -38,7 +38,15 @@ function fakeContext(argv: string[], stdin: NodeJS.ReadStream): { ctx: CommandCo
     now: () => 0,
     fs: { writeFile: async () => {} },
     prompt: async () => false,
-    telemetry: { showPayload: () => ({ enabled: false, events: [] }) },
+    telemetry: {
+      showPayload: () => ({ enabled: false, events: [] }),
+      noteReceiptGenerated: async () => {},
+      recordExportGenerated: () => {},
+      recordPrFlowCompleted: () => {},
+      recordHookConfigured: () => {},
+      recordIntegrationSurfaceRendered: () => {},
+      noteMilestone: async () => {},
+    },
     renderHelp: () => "",
   };
   return { ctx, out: () => out };

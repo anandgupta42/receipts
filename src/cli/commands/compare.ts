@@ -10,6 +10,33 @@ import { renderCompareSvg } from "../../receipt/svg.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { noSessionsMessage } from "../common/session.js";
 import { svgOutOf, writeSvg } from "../common/output.js";
+import { receiptTelemetryFromModels } from "../common/telemetry.js";
+import type { ExportFormatValue, OutputModeValue } from "../../telemetry/schemas.js";
+
+async function recordCompareTelemetry(
+  ctx: CommandContext,
+  models: Parameters<typeof receiptTelemetryFromModels>[0]["models"],
+  totals: { turnCount: number; toolCallCount: number },
+  outputMode: OutputModeValue,
+): Promise<void> {
+  await ctx.telemetry.noteReceiptGenerated(
+    receiptTelemetryFromModels({
+      surface: "compare",
+      models,
+      outputMode,
+      template: "none",
+      turnCount: totals.turnCount,
+      toolCallCount: totals.toolCallCount,
+    }),
+    "compare",
+  );
+  await ctx.telemetry.noteMilestone("first_compare", "compare");
+}
+
+async function recordCompareExport(ctx: CommandContext, format: ExportFormatValue, wroteFile: boolean): Promise<void> {
+  ctx.telemetry.recordExportGenerated({ surface: "compare", format, wroteFile, result: "success" });
+  await ctx.telemetry.noteMilestone("first_export", "compare");
+}
 
 async function run(ctx: CommandContext): Promise<number> {
   const { options } = ctx;
@@ -52,14 +79,25 @@ async function run(ctx: CommandContext): Promise<number> {
     return 1;
   }
   const [modelA, modelB] = await Promise.all([buildReceiptModel(sessionA), buildReceiptModel(sessionB)]);
+  const totals = {
+    turnCount: sessionA.totals.turnCount + sessionB.totals.turnCount,
+    toolCallCount: sessionA.totals.toolCallCount + sessionB.totals.toolCallCount,
+  };
   if (svgOut.svg) {
     await writeSvg(ctx, renderCompareSvg(modelA, modelB, { theme: svgOut.theme }), svgOut.output ?? "compare.svg");
+    await recordCompareTelemetry(ctx, [modelA, modelB], totals, "svg");
+    await recordCompareExport(ctx, "svg", true);
   } else if (options.csvMode !== undefined) {
     ctx.stdout.write(`${toCompareCsv(modelA, modelB, compareDeltaLine(modelA, modelB))}\n`);
+    await recordCompareTelemetry(ctx, [modelA, modelB], totals, "csv");
+    await recordCompareExport(ctx, "csv_session", false);
   } else if (options.json) {
     ctx.stdout.write(`${JSON.stringify(toCompareJsonModel(modelA, modelB), null, 2)}\n`);
+    await recordCompareTelemetry(ctx, [modelA, modelB], totals, "json");
+    await recordCompareExport(ctx, "json", false);
   } else {
     ctx.stdout.write(`${renderCompare(modelA, modelB)}\n`);
+    await recordCompareTelemetry(ctx, [modelA, modelB], totals, "text");
   }
   return 0;
 }
