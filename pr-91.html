@@ -25,33 +25,44 @@ div.pc pre{font-size:11.5px;color:var(--muted)}</style>
 <p class="sub">receipt artifact · PR #91</p>
 <section><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
-            4 sessions behind this PR             
+            3 sessions behind this PR             
 
-  CODEX HELPERS (4) — no commits
-  gpt-5.5 · 4m...............................$2.23
-  gpt-5.5 · 1m...............................$0.34
-  gpt-5.5 · 2m...............................$0.82
-  gpt-5.5 · 3m...............................$1.26
+orchestrator · claude-fable-5...............$53.71
+  session slice: turns 1–109 of 112
+orchestrator · claude-sonnet-5 64% · cla…...$71.07
+  session slice: turns 1–709 of 712
+  CODEX HELPERS (1) — no commits
+  gpt-5.5 · 5m...............................$1.98
 --------------------------------------------------
-TOTAL priced.................................$4.65
-  counted: 4 sessions
-  cache served 85% of input tokens
+TOTAL priced.............................≥ $126.76
+  counted: 3 sessions
+  cache served 97% of input tokens
+
+1 candidate session not attributed
+(in repo + branch window, no branch commit)
   details: npx aireceipts --session &lt;id&gt;
 - - - - - - - - - - - - - - - - - - - - - - - - -
        aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · 17970e9a · no commits · 1 turn · 4m · 270k in / 11k out · 80% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>orchestrator · aae2a916 · turns 1–109 of 112 · 109 turns · 22m · 22k in / 45k out · 98% cached</h2><div class="pc"><pre>bcb6246  feat: SPEC-0031 per-commit cost attribution on the artifact page  ·  109 turns  ·  $53.71
+(turns preceding each commit anchor, booked to that commit — a ledger convention, not causality)</pre></div><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
- “Review this PR as an independent critic (I am…” 
-    Codex · Jul 04 2026 06:24:06 UTC · 4m 03s     
-                   gpt-5.5 100%                   
-         cache served 80% of input tokens         
+ Claude Code · Jul 04 2026 05:05:05 UTC · 22m 38s 
+               claude-fable-5 100%                
+         cache served 98% of input tokens         
 
-exec_command.....................$2.19  (52 calls)
-list_projects......................$0.04  (1 call)
+Bash............................$28.44  (61 calls)
+(thinking/reply)................$21.42  (39 turns)
+Write.............................$2.05  (4 calls)
+Read..............................$1.06  (3 calls)
+Edit...............................$0.41  (1 call)
+Agent..............................$0.32  (1 call)
+
+≈ re-priced eligible trivial spans...........$2.14
+  (39 tiny turns, priced at claude-haiku-4-5)
 --------------------------------------------------
-TOTAL........................................$2.23
-same tokens on gpt-5.4-mini..................$0.33
+TOTAL.......................................$53.71
+same tokens on claude-haiku-4-5..............$5.37
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
@@ -61,17 +72,34 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
        aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · e8241709 · no commits · 1 turn · 1m · 41k in / 2.7k out · 71% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>orchestrator · a797863c · turns 1–709 of 712 · 709 turns · 8h 51m · 318k in / 187k out · 97% cached</h2><div class="pc"><pre>64d0c3e  feat: SPEC-0034 the samosa — clickable link, honest glyph, small page  ·  450 turns  ·  $18.90
+011f56b  fix: SPEC-0034 codex review — drop rendered 🥟, pin glyph copies, exact …  ·  88 turns  ·  $13.83
+f7d10c0  Merge origin/main into feat/m4-samosa — #79 base merged; keep #80 table…  ·  54 turns  ·  $9.50
+72373b9  docs: SPEC-0034 — record post-merge gate results in the validation note  ·  9 turns  ·  $1.62
+b5e8361  fix: SPEC-0034 fallback — maintainer rejected 🔺, footer goes text-only  ·  108 turns  ·  $27.21
+(turns preceding each commit anchor, booked to that commit — a ledger convention, not causality)</pre></div><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
- “You are the independent critic re-reviewing a…” 
-    Codex · Jul 04 2026 06:34:37 UTC · 1m 01s     
-                   gpt-5.5 100%                   
-         cache served 71% of input tokens         
+ “Build SPEC-0034 (the samosa) in the receipts…”  
+   Claude Code · Jul 04 2026 05:32 UTC · 8h 51m   
+     claude-sonnet-5 64% · claude-fable-5 36%     
+         cache served 97% of input tokens         
 
-exec_command.....................$0.34  (11 calls)
+(thinking/reply)...............$29.67  (319 turns)
+Bash...........................$27.61  (238 calls)
+Edit.............................$5.93  (60 calls)
+Read.............................$5.65  (77 calls)
+Write............................$2.15  (13 calls)
+Monitor...........................$0.08  (2 calls)
+
+≈ re-priced eligible trivial spans...........$6.56
+  (317 tiny turns, priced at claude-haiku-4-5)
+≈ context thrash: 3 compactions in 34 tur…...$0.95
+  context refilled ≥80% of peak within 5 turns
+≈ context thrash: 2 compactions in 20 tur…...$0.66
+  context refilled ≥80% of peak within 5 turns
 --------------------------------------------------
-TOTAL........................................$0.34
-same tokens on gpt-5.4-mini..................$0.05
+TOTAL.......................................$71.07
+same tokens on claude-haiku-4-5.............$15.28
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
@@ -81,40 +109,21 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
        aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · f4ed9e78 · no commits · 1 turn · 2m · 95k in / 5.8k out · 78% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
+<section><h2>codex · aa01cd64 · no commits · 1 turn · 5m · 146k in / 12k out · 92% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
- “You are the independent critic reviewing a ME…” 
-    Codex · Jul 04 2026 06:44:51 UTC · 2m 08s     
+ “Independent critic for the receipts repo. Two…” 
+    Codex · Jul 04 2026 14:21:02 UTC · 5m 42s     
                    gpt-5.5 100%                   
-         cache served 78% of input tokens         
+         cache served 92% of input tokens         
 
-exec_command.....................$0.79  (32 calls)
-list_projects......................$0.02  (1 call)
---------------------------------------------------
-TOTAL........................................$0.82
-same tokens on gpt-5.4-mini..................$0.12
-  (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
-- - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
-- - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>codex · 7d348736 · no commits · 1 turn · 3m · 74k in / 10k out · 94% cached</h2><div><pre>- - - - - - - - - - - - - - - - - - - - - - - - -
-                    AIRECEIPTS                    
- “You are the independent critic reviewing a ma…” 
-    Codex · Jul 04 2026 14:20:12 UTC · 3m 54s     
-                   gpt-5.5 100%                   
-         cache served 94% of input tokens         
-
-exec_command.....................$1.21  (45 calls)
+exec_command.....................$1.84  (66 calls)
+write_stdin.......................$0.06  (2 calls)
 index_status.......................$0.03  (1 call)
 list_projects......................$0.03  (1 call)
+search_code........................$0.03  (1 call)
 --------------------------------------------------
-TOTAL........................................$1.26
-same tokens on gpt-5.4-mini..................$0.19
+TOTAL........................................$1.98
+same tokens on gpt-5.4-mini..................$0.30
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
@@ -124,10 +133,8 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
        aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -</pre></div></section>
-<section><h2>not commit-attributable</h2><div><pre>codex · 17970e9a · no commits · 1 turn · 4m · 270k in / 11k out · 80% cached
-codex · e8241709 · no commits · 1 turn · 1m · 41k in / 2.7k out · 71% cached
-codex · f4ed9e78 · no commits · 1 turn · 2m · 95k in / 5.8k out · 78% cached
-codex · 7d348736 · no commits · 1 turn · 3m · 74k in / 10k out · 94% cached</pre></div></section>
+<section><h2>not commit-attributable</h2><div><pre>codex · aa01cd64 · no commits · 1 turn · 5m · 146k in / 12k out · 92% cached</pre></div></section>
+<template id="per-commit">[{"session":"agent-aae2a9162fee1cdf5","rows":[{"shortSha":"bcb6246","subject":"feat: SPEC-0031 per-commit cost attribution on the artifact page","turnCount":109,"usd":53.706758,"totalTokens":40129142,"extraCount":0}]},{"session":"agent-a797863ceaafba13a","rows":[{"shortSha":"64d0c3e","subject":"feat: SPEC-0034 the samosa — clickable link, honest glyph, small page","turnCount":450,"usd":18.9023354,"totalTokens":64046212,"extraCount":0},{"shortSha":"011f56b","subject":"fix: SPEC-0034 codex review — drop rendered 🥟, pin glyph copies, exact …","turnCount":88,"usd":13.833485300000001,"totalTokens":11787720,"extraCount":0},{"shortSha":"f7d10c0","subject":"Merge origin/main into feat/m4-samosa — #79 base merged; keep #80 table…","turnCount":54,"usd":9.501372,"totalTokens":8290806,"extraCount":0},{"shortSha":"72373b9","subject":"docs: SPEC-0034 — record post-merge gate results in the validation note","turnCount":9,"usd":1.6237805,"totalTokens":1492223,"extraCount":0},{"shortSha":"b5e8361","subject":"fix: SPEC-0034 fallback — maintainer rejected 🔺, footer goes text-only","turnCount":108,"usd":27.213791000000004,"totalTokens":20721789,"extraCount":0}]}]</template>
 <footer>aireceipts · local · generated by aireceipts pr --post --artifact<br><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><path d="M24 5 L43 39 Q44.5 41.5 41.5 41.5 H6.5 Q3.5 41.5 5 39 Z"/><path d="M17 29 q3 2.5 7 0"/><path d="M21 20 l3 -3 3 3"/></g></svg> <a href="https://anandgupta42.github.io/receipts/samosa.html">buy me a samosa</a></footer>
 </main>
 </body>
