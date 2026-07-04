@@ -1,17 +1,39 @@
-# aireceipts 🧾
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/brand/wordmark-dark.svg">
+  <img alt="receipts" src="site/brand/wordmark-light.svg" width="380">
+</picture>
 
 **Your AI coding agent just billed you. Here's the receipt.**
 
-[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml)
-[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
   <img alt="a rendered aireceipts receipt for a real Claude Code session" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
 </picture>
 
-That image is real renderer output, straight from this repo's golden tests — and so is
-this, the same session as text:
+<sub>real renderer output, byte-pinned to this repo's golden tests</sub>
+
+</div>
+
+**Why this exists.** AI coding agents spend real money invisibly — you see the diff,
+never the bill. aireceipts reads the transcripts your agent already writes to disk and
+turns them into receipts: what a session cost, tool by tool; what a PR cost, across
+every agent that built it; where tokens were wasted. Local and deterministic — no
+accounts, no servers, nothing leaves your machine.
+
+## Install
+
+```sh
+npx aireceipts          # receipt for your newest session
+```
+
+> **Status**: source-first pre-release. Until the npm package is published:
+> `git clone … && npm install && npm run build && node dist/cli.js`
+
+What you get back — the hero image above, as the bytes your terminal prints:
 
 ```
 - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -39,21 +61,6 @@ guessed dollars. Full method: aireceipts
       aireceipts · local · buy me a samosa 🥟      
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
-
-**Why this exists.** AI coding agents spend real money invisibly — you see the diff,
-never the bill. aireceipts reads the transcripts your agent already writes to disk and
-turns them into receipts: what a session cost, tool by tool; what a PR cost, across
-every agent that built it; where tokens were wasted. Local and deterministic — no
-accounts, no servers, nothing leaves your machine.
-
-## Install
-
-```sh
-npx aireceipts          # receipt for your newest session
-```
-
-> **Status**: source-first pre-release. Until the npm package is published:
-> `git clone … && npm install && npm run build && node dist/cli.js`
 
 ## Usage
 
@@ -120,8 +127,8 @@ send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 ## Docs
 
 **[User guide](docs/guide/01-getting-started.md)** — get started, every command,
-pricing, troubleshooting. Hosted: [anandgupta42.github.io/receipts](https://anandgupta42.github.io/receipts/)
-· [docs site](https://anandgupta42.github.io/receipts/docs/)
+pricing, troubleshooting ([hosted docs](https://anandgupta42.github.io/receipts/docs/) ·
+[site](https://anandgupta42.github.io/receipts/)).
 
 [What a receipt proves](docs/trust.md) · [PR receipts](docs/pr-receipts.md) ·
 [JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
