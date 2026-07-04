@@ -1,5 +1,5 @@
 {
-  "$schema": "corpus entries map a fixture (source + path) to the exact set of waste classes the detectors must fire for it. Used by test/eval.test.ts to assert precision 1.0 (no unexpected firings) and recall (every expected class fires). Verified against real detector output, not hand-guessed — see SPEC-0001.",
+  "$schema": "corpus entries map a fixture (source + path) to the exact set of waste classes the detectors must fire for it. Used by test/eval.test.ts to assert precision 1.0 (no unexpected firings) and recall (every expected class fires). Verified against real detector output, not hand-guessed \u2014 see SPEC-0001.",
   "entries": [
     {
       "source": "claude-code",
@@ -14,22 +14,30 @@
     {
       "source": "claude-code",
       "path": "test/fixtures/claude-code/loop-bash-5x.jsonl",
-      "expected": ["stuck-loop"]
+      "expected": [
+        "stuck-loop"
+      ]
     },
     {
       "source": "codex",
       "path": "test/fixtures/codex/loop-exec-3x.jsonl",
-      "expected": ["stuck-loop"]
+      "expected": [
+        "stuck-loop"
+      ]
     },
     {
       "source": "codex",
       "path": "test/fixtures/codex/trivial-spans-r4b.jsonl",
-      "expected": ["trivial-spans"]
+      "expected": [
+        "trivial-spans"
+      ]
     },
     {
       "source": "claude-code",
       "path": "test/fixtures/claude-code/trivial-spans-quick-qa.jsonl",
-      "expected": ["trivial-spans"]
+      "expected": [
+        "trivial-spans"
+      ]
     },
     {
       "source": "claude-code",
@@ -39,12 +47,16 @@
     {
       "source": "claude-code",
       "path": "test/fixtures/claude-code/context-thrash-3x.jsonl",
-      "expected": ["context-thrash"]
+      "expected": [
+        "context-thrash"
+      ]
     },
     {
       "source": "claude-code",
       "path": "test/fixtures/claude-code/context-thrash-unpriced.jsonl",
-      "expected": ["context-thrash"]
+      "expected": [
+        "context-thrash"
+      ]
     },
     {
       "source": "claude-code",
@@ -84,7 +96,9 @@
     {
       "source": "opencode",
       "path": "test/fixtures/opencode/loop-shell-3x.db",
-      "expected": ["stuck-loop"]
+      "expected": [
+        "stuck-loop"
+      ]
     },
     {
       "source": "claude-code",
@@ -115,6 +129,18 @@
       "source": "claude-code",
       "path": "test/fixtures/claude-code/hostile-100-tool-variety.jsonl",
       "expected": []
+    },
+    {
+      "source": "codex",
+      "path": "test/fixtures/codex/compactions-2x.jsonl",
+      "expected": []
+    },
+    {
+      "source": "codex",
+      "path": "test/fixtures/codex/compactions-thrash.jsonl",
+      "expected": [
+        "context-thrash"
+      ]
     }
   ]
 }

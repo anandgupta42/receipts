@@ -1,0 +1,21 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Now also memoize the derived settings object.”  
+    Codex · Jul 01 2026 09:00:00 UTC · 1m 12s     
+                gpt-5.3-codex 100%                
+         cache served 59% of input tokens         
+
+exec_command......................$0.02  (2 calls)
+apply_patch........................$0.01  (1 call)
+--------------------------------------------------
+TOTAL........................................$0.03
+same tokens on gpt-5.4-mini..................$0.01
+  (arithmetic, not a prediction)
+
+Per-turn cost split evenly across that turn's tool
+calls; unpriced models show tokens only, never
+guessed dollars. Full method: aireceipts
+--methodology
+- - - - - - - - - - - - - - - - - - - - - - - - -
+       aireceipts · local · buy me a samosa       
+- - - - - - - - - - - - - - - - - - - - - - - - -
