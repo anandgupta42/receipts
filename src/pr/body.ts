@@ -9,6 +9,7 @@ import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry } from "../receipt/model.js";
 import { formatInt, formatUsd } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
+import { MESSAGE_BASIS_LABEL } from "./messageAnchor.js";
 import { formatDuration } from "../receipt/format.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
 import { RECEIPT_WIDTH, renderBlockLines } from "../receipt/render.js";
@@ -32,7 +33,7 @@ export interface ContributorView {
   tokens: TokenUsage;
   subagents: SubagentRow[];
   /** SPEC-0026 R3 — how selection credited this session; `helper` rows render grouped, not top-level (round 2). */
-  basis?: "anchor" | "helper";
+  basis?: "anchor" | "helper" | "message";
   /** Rendered-slice duration — the helper group's one per-row fact (round 2). */
   durationMs?: number;
 }
@@ -108,8 +109,12 @@ function mutedNote(text: string, indent = NOTE_INDENT): Block {
   return { kind: "note", text, indent, muted: true };
 }
 
-/** Round 2: the fence carries provenance ONLY when it changes a number's meaning — a real slice. Ids and full-session explainers live in the details section. */
+/** Round 2: the fence carries provenance ONLY when it changes a number's meaning — a real slice, or the weaker
+ * SPEC-0032 message basis (a reader must see that this row's credit is not SHA-proven, with or without --details). */
 function provenanceBlocks(view: ContributorView): Block[] {
+  if (view.basis === "message") {
+    return [mutedNote(MESSAGE_BASIS_LABEL)];
+  }
   if (view.slice.kind !== "slice") {
     return [];
   }
