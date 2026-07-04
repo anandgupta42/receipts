@@ -531,8 +531,8 @@ export class OpenCodeAdapter implements SessionAdapter {
           out.push(...summaries);
           continue;
         }
-        for (const summary of summaries) {
-          out.push((await this.loadSession(summary.id)) ?? summary);
+        for (const [index, row] of rows.entries()) {
+          out.push(this.loadFromDb(db, dbPath, row.id) ?? summaries[index]);
         }
       } catch {
         // A malformed DB degrades to "no sessions" for this adapter.
@@ -616,6 +616,95 @@ export class OpenCodeAdapter implements SessionAdapter {
     };
   }
 
+  private loadLegacy(db: SqliteReader, dbPath: string, sessionId: string): Session | null {
+    const where = `WHERE s.id = ${sqlString(sessionId)}`;
+    const summaryRow = db.all(`${summarySql(where)} LIMIT 1`)[0] as unknown as SessionRow | undefined;
+    if (!summaryRow) {
+      return null;
+    }
+    const summary = summaryFromRow(dbPath, summaryRow);
+    const sid = summaryRow.id;
+    const messages = db.all(
+      `SELECT id, time_created, time_updated, data FROM message WHERE session_id = ${sqlString(sid)} ORDER BY time_created, id`,
+    ) as unknown as MessageRow[];
+    const parts = db.all(
+      `SELECT message_id, data FROM part WHERE session_id = ${sqlString(sid)} ORDER BY time_created, id`,
+    ) as unknown as PartRow[];
+
+    const partsByMessage = new Map<string, ToolCall[]>();
+    for (const row of parts) {
+      const parsed = parseJsonObject<RawPartData>(row.data);
+      const call = parsed ? toToolCall(parsed) : null;
+      if (!call) {
+        continue;
+      }
+      const calls = partsByMessage.get(row.message_id) ?? [];
+      calls.push(call);
+      partsByMessage.set(row.message_id, calls);
+    }
+
+    const turns: Turn[] = [];
+    let totalUsage = emptyUsage();
+    let startedAt: number | undefined;
+    let endedAt: number | undefined;
+
+    for (const row of messages) {
+      const msg = parseJsonObject<RawMessageData>(row.data);
+      if (msg?.role !== "assistant") {
+        continue;
+      }
+      const ts = timestampOf(msg.time?.created, row.time_created);
+      const done = timestampOf(msg.time?.completed, row.time_updated, ts);
+      if (ts !== undefined) {
+        startedAt = startedAt === undefined ? ts : Math.min(startedAt, ts);
+      }
+      if (done !== undefined) {
+        endedAt = endedAt === undefined ? done : Math.max(endedAt, done);
+      }
+      const usage = mapTokens(msg.tokens);
+      if (usage) {
+        totalUsage = addUsage(totalUsage, usage);
+      }
+      turns.push({
+        index: turns.length,
+        timestamp: ts,
+        model: msg.modelID || summary.model,
+        usage,
+        outputTokens: usage?.output,
+        toolCalls: partsByMessage.get(row.id) ?? [],
+      });
+    }
+
+    const sessionStarted = startedAt ?? summary.startedAt;
+    const sessionEnded = endedAt ?? summary.endedAt ?? sessionStarted;
+    const toolCallCount = turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0);
+    return {
+      ...summary,
+      startedAt: sessionStarted,
+      endedAt: sessionEnded,
+      totals: {
+        tokens: totalUsage.total > 0 ? totalUsage : summary.totals.tokens,
+        durationMs:
+          sessionStarted !== undefined && sessionEnded !== undefined ? Math.max(0, sessionEnded - sessionStarted) : undefined,
+        turnCount: turns.length,
+        toolCallCount,
+      },
+      turns,
+    };
+  }
+
+  private loadFromDb(db: SqliteReader, dbPath: string, sessionId: string | undefined): Session | null {
+    const selectedSessionId = sessionId ?? newestSessionId(db);
+    if (!selectedSessionId) {
+      return null;
+    }
+    const hasLegacy = hasLegacyRows(db);
+    if (hasCurrentRows(db, selectedSessionId) || !hasLegacy) {
+      return this.loadCurrent(db, dbPath, selectedSessionId);
+    }
+    return this.loadLegacy(db, dbPath, selectedSessionId);
+  }
+
   async loadSession(id: string): Promise<Session | null> {
     const { dbPath, sessionId } = splitId(id);
     const db = await openOpencodeDb(dbPath);
@@ -623,88 +712,7 @@ export class OpenCodeAdapter implements SessionAdapter {
       return null;
     }
     try {
-      const selectedSessionId = sessionId ?? newestSessionId(db);
-      if (!selectedSessionId) {
-        return null;
-      }
-      const hasLegacy = hasLegacyRows(db);
-      if (hasCurrentRows(db, selectedSessionId) || !hasLegacy) {
-        return this.loadCurrent(db, dbPath, selectedSessionId);
-      }
-      const where = `WHERE s.id = ${sqlString(selectedSessionId)}`;
-      const summaryRow = db.all(`${summarySql(where)} LIMIT 1`)[0] as unknown as SessionRow | undefined;
-      if (!summaryRow) {
-        return null;
-      }
-      const summary = summaryFromRow(dbPath, summaryRow);
-      const sid = summaryRow.id;
-      const messages = db.all(
-        `SELECT id, time_created, time_updated, data FROM message WHERE session_id = ${sqlString(sid)} ORDER BY time_created, id`,
-      ) as unknown as MessageRow[];
-      const parts = db.all(
-        `SELECT message_id, data FROM part WHERE session_id = ${sqlString(sid)} ORDER BY time_created, id`,
-      ) as unknown as PartRow[];
-
-      const partsByMessage = new Map<string, ToolCall[]>();
-      for (const row of parts) {
-        const parsed = parseJsonObject<RawPartData>(row.data);
-        const call = parsed ? toToolCall(parsed) : null;
-        if (!call) {
-          continue;
-        }
-        const calls = partsByMessage.get(row.message_id) ?? [];
-        calls.push(call);
-        partsByMessage.set(row.message_id, calls);
-      }
-
-      const turns: Turn[] = [];
-      let totalUsage = emptyUsage();
-      let startedAt: number | undefined;
-      let endedAt: number | undefined;
-
-      for (const row of messages) {
-        const msg = parseJsonObject<RawMessageData>(row.data);
-        if (msg?.role !== "assistant") {
-          continue;
-        }
-        const ts = timestampOf(msg.time?.created, row.time_created);
-        const done = timestampOf(msg.time?.completed, row.time_updated, ts);
-        if (ts !== undefined) {
-          startedAt = startedAt === undefined ? ts : Math.min(startedAt, ts);
-        }
-        if (done !== undefined) {
-          endedAt = endedAt === undefined ? done : Math.max(endedAt, done);
-        }
-        const usage = mapTokens(msg.tokens);
-        if (usage) {
-          totalUsage = addUsage(totalUsage, usage);
-        }
-        turns.push({
-          index: turns.length,
-          timestamp: ts,
-          model: msg.modelID || summary.model,
-          usage,
-          outputTokens: usage?.output,
-          toolCalls: partsByMessage.get(row.id) ?? [],
-        });
-      }
-
-      const sessionStarted = startedAt ?? summary.startedAt;
-      const sessionEnded = endedAt ?? summary.endedAt ?? sessionStarted;
-      const toolCallCount = turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0);
-      return {
-        ...summary,
-        startedAt: sessionStarted,
-        endedAt: sessionEnded,
-        totals: {
-          tokens: totalUsage.total > 0 ? totalUsage : summary.totals.tokens,
-          durationMs:
-            sessionStarted !== undefined && sessionEnded !== undefined ? Math.max(0, sessionEnded - sessionStarted) : undefined,
-          turnCount: turns.length,
-          toolCallCount,
-        },
-        turns,
-      };
+      return this.loadFromDb(db, dbPath, sessionId);
     } catch {
       return null;
     } finally {

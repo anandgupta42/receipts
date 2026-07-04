@@ -34,6 +34,7 @@ interface ReceiptToolRowJson {
   tool: string;
   usd: number | null;
   tokens: ReceiptTokenJson;
+  callCount: number;
 }
 
 interface ReceiptJson {
@@ -56,6 +57,14 @@ interface ListRowJson {
     turnCount: number;
     toolCallCount: number;
   };
+}
+
+interface OpenCodeE2eSimulation {
+  title: string;
+  model: string;
+  priced: boolean;
+  tools: string[];
+  tokens: ReceiptTokenJson;
 }
 
 function platformCommand(name: string): string {
@@ -161,6 +170,29 @@ async function stageOpenCodeDb(home: string, fixtureName: string): Promise<strin
 
 function toolRowsByName(rows: ReceiptToolRowJson[]): Record<string, ReceiptToolRowJson> {
   return Object.fromEntries(rows.map((row) => [row.tool, row])) as Record<string, ReceiptToolRowJson>;
+}
+
+function opencodeE2eSimulation(index: number): OpenCodeE2eSimulation {
+  const knownModels = ["claude-haiku-4-5", "gpt-5.3-codex"];
+  const priced = index % 5 < knownModels.length;
+  const output = 20 + (index % 11);
+  const reasoning = index % 7;
+  const cacheRead = index % 13;
+  const cacheCreation = index % 5;
+  const input = 100 + index;
+  return {
+    title: `Simulated opencode session ${index.toString().padStart(3, "0")}`,
+    model: priced ? knownModels[index % knownModels.length] : `local-sim-${index}`,
+    priced,
+    tools: [[], ["bash"], ["read", "write"], ["bash", "bash"]][index % 4],
+    tokens: {
+      input,
+      output: output + reasoning,
+      cacheRead,
+      cacheCreation,
+      total: input + output + reasoning + cacheRead + cacheCreation,
+    },
+  };
 }
 
 /** Is this platform-specific package installable HERE? Passing an incompatible one
@@ -305,6 +337,57 @@ describe("built CLI e2e", () => {
     expect(textResult.stdout).toContain("no price table matched");
     expect(textResult.stdout).not.toContain("$");
   });
+
+  it("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "simulated-100.db");
+
+    const listed = readJson<ListRowJson[]>(await runCli(["--list", "--json"], home));
+
+    expect(listed).toHaveLength(100);
+    expect(listed[0].title).toBe("Simulated opencode session 099");
+    expect(listed[99].title).toBe("Simulated opencode session 000");
+
+    for (let index = 0; index < 100; index += 1) {
+      const sim = opencodeE2eSimulation(index);
+      const listedRow = listed[99 - index];
+
+      expect(listedRow).toMatchObject({
+        source: "opencode",
+        title: sim.title,
+        model: sim.model,
+        totals: {
+          turnCount: 1,
+          toolCallCount: sim.tools.length,
+        },
+      });
+      expect(listedRow.totals.tokens).toMatchObject(sim.tokens);
+    }
+
+    for (const index of [0, 1, 2, 3, 99]) {
+      const sim = opencodeE2eSimulation(index);
+      const selector = String(100 - index);
+      const receipt = readJson<ReceiptJson>(await runCli([selector, "--json"], home));
+      const tools = toolRowsByName(receipt.toolRows);
+
+      expect(receipt.source).toBe("opencode");
+      expect(receipt.title).toBe(sim.title);
+      expect(receipt.modelMix.map((entry) => entry.model)).toEqual([sim.model]);
+      expect(receipt.totalTokens).toMatchObject(sim.tokens);
+      expect(receipt.sessionTotalTokens).toMatchObject(sim.tokens);
+      if (sim.priced) {
+        expect(receipt.totalUsd, sim.title).toBeGreaterThan(0);
+        expect(receipt.priceRowsUsed.map((row) => row.model)).toEqual([sim.model]);
+      } else {
+        expect(receipt.totalUsd, sim.title).toBeNull();
+        expect(receipt.priceRowsUsed).toEqual([]);
+      }
+
+      const toolNames = sim.tools.length === 0 ? ["(thinking/reply)"] : [...new Set(sim.tools)];
+      expect(Object.keys(tools).sort()).toEqual(toolNames.sort());
+      expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
+    }
+  }, 45_000);
 
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
     const home = await makeHome();
