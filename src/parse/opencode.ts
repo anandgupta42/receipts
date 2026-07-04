@@ -277,16 +277,35 @@ function tableExists(db: SqliteReader, name: string): boolean {
   }
 }
 
-function hasCurrentRows(db: SqliteReader, sessionId?: string): boolean {
+function hasLegacyRows(db: SqliteReader): boolean {
+  return tableExists(db, "message") && tableExists(db, "part");
+}
+
+function hasCurrentRows(db: SqliteReader, sessionId: string): boolean {
   if (!tableExists(db, "session_message")) {
     return false;
   }
   try {
-    const where = sessionId ? `WHERE session_id = ${sqlString(sessionId)}` : "";
-    return db.all(`SELECT id FROM session_message ${where} LIMIT 1`).length > 0;
+    return db.all(`SELECT id FROM session_message WHERE session_id = ${sqlString(sessionId)} LIMIT 1`).length > 0;
   } catch {
     return false;
   }
+}
+
+function sessionIds(db: SqliteReader): string[] {
+  return (db.all("SELECT id FROM session ORDER BY time_updated DESC, id") as unknown as Array<{ id: string }>)
+    .map((row) => row.id)
+    .filter((id) => typeof id === "string" && id.length > 0);
+}
+
+function newestSessionId(db: SqliteReader): string | undefined {
+  return sessionIds(db)[0];
+}
+
+function summaryRowFor(db: SqliteReader, sessionId: string, hasLegacy: boolean): SessionRow | undefined {
+  const where = `WHERE s.id = ${sqlString(sessionId)}`;
+  const sql = hasCurrentRows(db, sessionId) || !hasLegacy ? currentSummarySql(where) : summarySql(where);
+  return db.all(`${sql} LIMIT 1`)[0] as unknown as SessionRow | undefined;
 }
 
 async function openOpencodeDb(dbPath: string): Promise<SqliteReader | null> {
@@ -298,7 +317,7 @@ async function openOpencodeDb(dbPath: string): Promise<SqliteReader | null> {
     return null;
   }
   const hasCurrent = tableExists(db, "session_message");
-  const hasLegacy = tableExists(db, "message") && tableExists(db, "part");
+  const hasLegacy = hasLegacyRows(db);
   if (!tableExists(db, "session") || (!hasCurrent && !hasLegacy)) {
     db.close();
     return null;
@@ -503,8 +522,10 @@ export class OpenCodeAdapter implements SessionAdapter {
         continue;
       }
       try {
-        const sql = hasCurrentRows(db) ? currentSummarySql() : summarySql();
-        const rows = db.all(sql) as unknown as SessionRow[];
+        const hasLegacy = hasLegacyRows(db);
+        const rows = sessionIds(db)
+          .map((sessionId) => summaryRowFor(db, sessionId, hasLegacy))
+          .filter((row): row is SessionRow => row !== undefined);
         const summaries = rows.map((row) => summaryFromRow(dbPath, row));
         if (!options.full) {
           out.push(...summaries);
@@ -602,10 +623,15 @@ export class OpenCodeAdapter implements SessionAdapter {
       return null;
     }
     try {
-      if (hasCurrentRows(db, sessionId)) {
-        return this.loadCurrent(db, dbPath, sessionId);
+      const selectedSessionId = sessionId ?? newestSessionId(db);
+      if (!selectedSessionId) {
+        return null;
       }
-      const where = sessionId ? `WHERE s.id = ${sqlString(sessionId)}` : "";
+      const hasLegacy = hasLegacyRows(db);
+      if (hasCurrentRows(db, selectedSessionId) || !hasLegacy) {
+        return this.loadCurrent(db, dbPath, selectedSessionId);
+      }
+      const where = `WHERE s.id = ${sqlString(selectedSessionId)}`;
       const summaryRow = db.all(`${summarySql(where)} LIMIT 1`)[0] as unknown as SessionRow | undefined;
       if (!summaryRow) {
         return null;

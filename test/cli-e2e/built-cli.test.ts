@@ -34,23 +34,17 @@ interface ReceiptToolRowJson {
   tool: string;
   usd: number | null;
   tokens: ReceiptTokenJson;
-  callCount: number;
-}
-
-interface ReceiptPriceRowJson {
-  vendor: string;
-  model: string;
 }
 
 interface ReceiptJson {
   source: string;
   title: string | null;
-  modelMix: Array<{ model: string; tokens: ReceiptTokenJson; tokenShare: number }>;
+  modelMix: Array<{ model: string }>;
   toolRows: ReceiptToolRowJson[];
   totalUsd: number | null;
   totalTokens: ReceiptTokenJson;
   sessionTotalTokens: ReceiptTokenJson;
-  priceRowsUsed: ReceiptPriceRowJson[];
+  priceRowsUsed: Array<{ vendor: string; model: string }>;
 }
 
 interface ListRowJson {
@@ -132,6 +126,16 @@ function runCli(args: string[], home: string, input?: string): Promise<RunResult
   return runProcess(process.execPath, [cliPath, ...args], { env: cliEnv(home), input });
 }
 
+function expectSuccess(result: RunResult): void {
+  expect(result.code, result.stderr).toBe(0);
+  expect(result.stderr).toBe("");
+}
+
+function readJson<T>(result: RunResult): T {
+  expectSuccess(result);
+  return JSON.parse(result.stdout) as T;
+}
+
 async function stageClaudeSession(home: string, fixtureName: string, destName = fixtureName): Promise<string> {
   const root = path.join(home, ".claude", "projects");
   await mkdir(root, { recursive: true });
@@ -147,20 +151,12 @@ function opencodeRoot(home: string): string {
   return path.join(home, ".local", "share", "opencode");
 }
 
-async function stageOpenCodeDb(home: string, fixtureName: string, destName = "opencode.db"): Promise<string> {
+async function stageOpenCodeDb(home: string, fixtureName: string): Promise<string> {
   const root = opencodeRoot(home);
   await mkdir(root, { recursive: true });
-  const dest = path.join(root, destName);
+  const dest = path.join(root, "opencode.db");
   await copyFile(path.join(fixturesDir, "opencode", fixtureName), dest);
   return dest;
-}
-
-function parseReceiptJson(stdout: string): ReceiptJson {
-  return JSON.parse(stdout) as ReceiptJson;
-}
-
-function parseListJson(stdout: string): ListRowJson[] {
-  return JSON.parse(stdout) as ListRowJson[];
 }
 
 function toolRowsByName(rows: ReceiptToolRowJson[]): Record<string, ReceiptToolRowJson> {
@@ -240,11 +236,8 @@ describe("built CLI e2e", () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "clean-multi-vendor.db");
 
-    const listResult = await runCli(["--list", "--json"], home);
-    const listed = parseListJson(listResult.stdout);
+    const listed = readJson<ListRowJson[]>(await runCli(["--list", "--json"], home));
 
-    expect(listResult.code, listResult.stderr).toBe(0);
-    expect(listResult.stderr).toBe("");
     expect(listed).toHaveLength(1);
     expect(listed[0]).toMatchObject({
       source: "opencode",
@@ -257,12 +250,9 @@ describe("built CLI e2e", () => {
     });
     expect(listed[0].totals.tokens).toMatchObject({ input: 2200, output: 700, cacheRead: 150, cacheCreation: 90, total: 3140 });
 
-    const result = await runCli(["--json"], home);
-    const receipt = parseReceiptJson(result.stdout);
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
     const tools = toolRowsByName(receipt.toolRows);
 
-    expect(result.code, result.stderr).toBe(0);
-    expect(result.stderr).toBe("");
     expect(receipt.source).toBe("opencode");
     expect(receipt.title).toBe("Port parser adapter");
     expect(receipt.totalTokens.total).toBe(3140);
@@ -281,12 +271,9 @@ describe("built CLI e2e", () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "mixed-known-unknown.db");
 
-    const result = await runCli(["--json"], home);
-    const receipt = parseReceiptJson(result.stdout);
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
     const tools = toolRowsByName(receipt.toolRows);
 
-    expect(result.code, result.stderr).toBe(0);
-    expect(result.stderr).toBe("");
     expect(receipt.source).toBe("opencode");
     expect(receipt.title).toBe("Mixed known and unknown provider");
     expect(receipt.totalTokens.total).toBe(3140);
@@ -302,11 +289,8 @@ describe("built CLI e2e", () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "legacy-empty-session-message.db");
 
-    const jsonResult = await runCli(["--json"], home);
-    const receipt = parseReceiptJson(jsonResult.stdout);
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
 
-    expect(jsonResult.code, jsonResult.stderr).toBe(0);
-    expect(jsonResult.stderr).toBe("");
     expect(receipt.source).toBe("opencode");
     expect(receipt.title).toBe("Legacy rows with empty session_message");
     expect(receipt.totalUsd).toBeNull();
@@ -317,8 +301,7 @@ describe("built CLI e2e", () => {
 
     const textResult = await runCli([], home);
 
-    expect(textResult.code, textResult.stderr).toBe(0);
-    expect(textResult.stderr).toBe("");
+    expectSuccess(textResult);
     expect(textResult.stdout).toContain("no price table matched");
     expect(textResult.stdout).not.toContain("$");
   });

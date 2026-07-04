@@ -104,6 +104,77 @@ function makeSessionMessageDb(dbPath: string): void {
   db.close();
 }
 
+function addLegacySession(dbPath: string): void {
+  const db = new DatabaseSync(dbPath);
+  db.exec(`
+    CREATE TABLE message (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+    CREATE TABLE part (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+  `);
+  const t0 = Date.parse("2026-06-30T12:01:00.000Z");
+  db.prepare(`
+    INSERT INTO session (
+      id, project_id, slug, directory, path, title, version,
+      tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
+      model, time_created, time_updated
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    "ses_legacy_shape",
+    "project_synthetic",
+    "legacy",
+    "/tmp/aireceipts-opencode-legacy",
+    "/tmp/aireceipts-opencode-legacy",
+    "Synthetic opencode legacy schema",
+    "0.0.0-upstream/merge-v1.17.9-202606301201",
+    10,
+    5,
+    1,
+    2,
+    3,
+    JSON.stringify({ id: "local-big-pickle", providerID: "local" }),
+    t0,
+    t0 + 10_000,
+  );
+  db.prepare("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)").run(
+    "msg_legacy_asst_1",
+    "ses_legacy_shape",
+    t0 + 1_000,
+    t0 + 8_000,
+    JSON.stringify({
+      role: "assistant",
+      modelID: "local-big-pickle",
+      tokens: { input: 10, output: 5, reasoning: 1, cache: { read: 2, write: 3 } },
+      time: { created: t0 + 1_000, completed: t0 + 8_000 },
+    }),
+  );
+  db.prepare("INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)").run(
+    "part_legacy_bash_1",
+    "msg_legacy_asst_1",
+    "ses_legacy_shape",
+    t0 + 2_000,
+    t0 + 3_000,
+    JSON.stringify({
+      type: "tool",
+      tool: "bash",
+      state: { status: "completed", input: { cmd: "pwd" }, output: "/tmp/aireceipts-opencode-legacy" },
+      time: { ran: t0 + 2_000, completed: t0 + 3_000 },
+    }),
+  );
+  db.close();
+}
+
 describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
   const dirs: string[] = [];
   afterEach(() => {
@@ -256,6 +327,35 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     expect(model.totalUsd).toBeNull();
     expect(model.toolRows.map((row) => row.tool)).toContain("write");
     expect(model.toolRows.map((row) => row.tool)).toContain("bash");
+  });
+
+  it("chooses current or legacy rows per session in mixed-schema databases", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-mixed-schema.db");
+    makeSessionMessageDb(dbPath);
+    addLegacySession(dbPath);
+    const adapter = new OpenCodeAdapter({ dbPath });
+
+    const summaries = await adapter.listSessions();
+    expect(summaries.map((summary) => [summary.title, summary.totals.turnCount, summary.totals.toolCallCount])).toEqual([
+      ["Synthetic opencode legacy schema", 1, 1],
+      ["Synthetic opencode current schema", 1, 1],
+    ]);
+
+    const newest = await adapter.loadSession(dbPath);
+    expect(newest).not.toBeNull();
+    expect(newest!.title).toBe("Synthetic opencode legacy schema");
+    expect(newest!.turns).toHaveLength(1);
+    expect(newest!.turns[0]).toMatchObject({
+      model: "local-big-pickle",
+      usage: { input: 10, output: 6, cacheRead: 2, cacheCreation: 3, total: 21 },
+    });
+    expect(newest!.turns[0].toolCalls[0]).toMatchObject({
+      name: "bash",
+      input: { cmd: "pwd" },
+      output: "/tmp/aireceipts-opencode-legacy",
+    });
   });
 
   it("degrades invalid SQLite files to no sessions and null loads", async () => {
