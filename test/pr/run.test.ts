@@ -230,8 +230,8 @@ describe("SPEC-0024 attribution widening (e2e)", () => {
     const code = await runPr({ post: false }, deps);
     expect(code).toBe(0);
     expect(out[0]).toContain("1 session behind this PR");
-    expect(out[0]).toContain("orchestrator · ");
-    expect(out[0]).toContain("lead · session slice");
+    expect(out[0]).toContain("| **orchestrator** |");
+    expect(out[0]).toContain("turns ");
     expect(out[0]).toContain("SUBAGENTS (1)");
     expect(out[0]).toContain("counted: 1 session + 1 subagent");
   });
@@ -268,8 +268,8 @@ describe("SPEC-0024 attribution widening (e2e)", () => {
     expect(code).toBe(0);
     expect(out[0]).toContain("2 sessions behind this PR");
     // Chronological across pools: the promoted teammate row renders before the builder row.
-    expect(out[0].indexOf("team-1 · ")).toBeLessThan(out[0].indexOf("claude-anchors · "));
-    expect(out[0].indexOf("team-1 · ")).toBeGreaterThan(-1);
+    expect(out[0].indexOf("`team-1`")).toBeLessThan(out[0].indexOf("`claude-anchors`"));
+    expect(out[0].indexOf("`team-1`")).toBeGreaterThan(-1);
     expect(out[0]).toContain("counted: 2 sessions");
   });
 
@@ -405,8 +405,8 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
     const code = await runPr({ post: false }, deps);
     expect(code).toBe(0);
     const body = out[0];
-    const authorLabel = body.indexOf("builder · claude-anchors");
-    const helperLabel = body.indexOf("codex · codex-branch-commit");
+    const authorLabel = body.indexOf("#### builder · `claude-anchors`");
+    const helperLabel = body.indexOf("#### codex · `codex-branch`");
     expect(authorLabel).toBeGreaterThan(-1);
     expect(helperLabel).toBeGreaterThan(-1);
     expect(authorLabel).toBeLessThan(helperLabel);
