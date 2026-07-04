@@ -17,7 +17,7 @@ measurement; single 3-month window.
 | Visual in first 30 lines | 86% | hero `<picture>` of golden SVGs, first screen |
 | Animated/terminal cast | 1 of 22 | static image, no GIF |
 | Quantified tagline | 14% | plain human register, no forced number |
-| Emoji per README | median 0.5; 73% ≤2 | `MAX_EMOJI = 2` (title 🧾 + receipt 🥟) |
+| Emoji per README | median 0.5; 73% ≤2 | `MAX_EMOJI = 2` cap; current README uses 0 (wordmark image + drawn SVGs carry the identity) |
 | Length / lists / links / code blocks | 240 / 20.5 / 9.5 / 10 (medians) | `MAX_LINES = 260`; density is review guidance, not a gate |
 | Badges present | 55%, median 1 | `MAX_BADGES = 3`, light row |
 | Install in first 60 lines | 64% | guard asserts ≤ line 60 |

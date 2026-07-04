@@ -3,6 +3,7 @@
 // objective design properties (R1 font-safety, R2 geometry/contrast, R3
 // compare, R4 field-set parity) and the honesty invariants (I2 zero-`$` in
 // tokens-only mode).
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadById } from "../../src/index.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
@@ -11,6 +12,7 @@ import type { TokenUsage } from "../../src/parse/types.js";
 import { renderReceiptLines } from "../../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg, rowGeometry, THEMES } from "../../src/receipt/svg.js";
 import { buildReceiptView } from "../../src/receipt/present.js";
+import { samosaGlyphMarkup } from "../../src/receipt/samosa-glyph.js";
 import type { ThemeName } from "../../src/receipt/svg.js";
 
 const PRICED = { source: "claude-code", path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
@@ -281,6 +283,67 @@ describe("R4 — field-set parity between the terminal and SVG renderers", () =>
     const terminal = fieldsRead(model, (m) => renderReceiptLines(m, { color: false }));
     const svg = fieldsRead(model, (m) => renderReceiptSvg(m));
     expect([...svg].sort()).toEqual([...terminal].sort());
+  });
+});
+
+describe("renderReceiptSvg — R2 drawn samosa glyph (SPEC-0034)", () => {
+  // The glyph's signature anchor path — unique to samosaGlyphGroup's PATH
+  // constant, so its presence/absence is unambiguous in the raw SVG bytes.
+  const GLYPH_ANCHOR = 'd="M24 5 L43 39';
+
+  it("draws the samosa glyph in the classic footer, in the theme's fixed stroke color", async () => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    const light = renderReceiptSvg(model, { theme: "light", template: "classic" });
+    const dark = renderReceiptSvg(model, { theme: "dark", template: "classic" });
+    expect(light).toContain(GLYPH_ANCHOR);
+    expect(dark).toContain(GLYPH_ANCHOR);
+    expect(light).toContain('stroke="#1f2328"');
+    expect(dark).toContain('stroke="#e6edf3"');
+  });
+
+  it("draws the samosa glyph in the datavis footer too", async () => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    const svg = renderReceiptSvg(model, { template: "datavis" });
+    expect(svg).toContain(GLYPH_ANCHOR);
+  });
+
+  it("omits the glyph from the grocery footer (R1 — grocery untouched)", async () => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    const svg = renderReceiptSvg(model, { template: "grocery" });
+    expect(svg).not.toContain(GLYPH_ANCHOR);
+  });
+
+  it("never emits a raw 🥟 or 🔺 codepoint in any template's SVG bytes", async () => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    for (const template of ["classic", "grocery", "datavis"] as const) {
+      const svg = renderReceiptSvg(model, { template });
+      expect(svg).not.toContain("🥟");
+      expect(svg).not.toContain("🔺");
+    }
+  });
+});
+
+describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't import the module, so pin them to it", () => {
+  // site/*.html are hand-authored static files and build-docs-site.mjs is a
+  // plain .mjs script; none of them can import the TS glyph module at
+  // runtime. Their inlined copies must stay byte-identical to the module's
+  // three <path> literals, or the surfaces drift apart silently.
+  const DUPLICATING_FILES = [
+    "site/samosa.html",
+    "site/view.html",
+    "site/index.html",
+    "scripts/build-docs-site.mjs",
+  ];
+
+  it("every inlined copy carries the module's exact three path literals", () => {
+    const paths = samosaGlyphMarkup().match(/<path d="[^"]*"\/>/g) ?? [];
+    expect(paths).toHaveLength(3);
+    for (const file of DUPLICATING_FILES) {
+      const html = readFileSync(file, "utf8");
+      for (const path of paths) {
+        expect(html, `${file} drifted from samosa-glyph.ts: missing ${path}`).toContain(path);
+      }
+    }
   });
 });
 
