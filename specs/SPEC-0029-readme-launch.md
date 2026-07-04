@@ -157,6 +157,16 @@ link line reads: "What a receipt proves — and what it can't:
   X" tables) — I6 adjacent; facts and links only.
 - **Automating the GitHub description/topics sync** (R5 is a recorded
   manual step — repo settings are the maintainer's button).
+- **Translations (maintainer decision, 2026-07-03).** No `README.<lang>.md`
+  at launch: every translation is an unguarded copy that rots silently —
+  an honesty bug for this product, not a cosmetic one — the fenced
+  receipts render in English regardless, and machine translation is a slop
+  signal to exactly this audience. **Future policy, recorded now for the
+  first community translation PR:** accepted under two rules — (a) the
+  translation carries a visible "translated from commit `<sha>`" stamp so
+  staleness is inspectable, never silent; (b) fenced receipts stay
+  byte-golden and untranslated (the guard's parity check extends to every
+  `README.*.md` when the first one lands). English is normative.
 - **Rewriting docs/** — this spec touches `README.md`, the guard test, the
   evidence note, and `package.json`'s description.
 - **npm README rendering.** The hero and relative links resolve on GitHub
