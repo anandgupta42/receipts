@@ -18,6 +18,14 @@ Most changes start as a spec, not a PR:
    the build receipt of the session that wrote it (see below).
 6. **Merge** — a maintainer's call.
 
+**PRs that skip the gates** get this, verbatim, then get closed: "Thanks for
+the PR — this repo merges on green gates only (see the command below); happy
+to reopen once `npx tsc --noEmit && npx eslint . --max-warnings 0 && npx
+vitest run && node scripts/verify-goldens.mjs && node scripts/spec-lint.mjs &&
+node scripts/hygiene.mjs` passes locally." Written once so it's never
+re-litigated per submission — curl's public bounty postmortem is the argument
+for having this ready rather than improvised.
+
 ## Humans are welcome
 
 You don't need to be an agent to send a patch. File an issue, or open a PR
@@ -36,6 +44,10 @@ want the full picture (invariants, file ownership, verification commands).
 If your session built the change, attach its receipt before opening the PR:
 `npx aireceipts pr --post` (see `docs/pr-receipts.md`). Humans without a
 session to attach can skip this.
+
+Found a security issue instead? Don't open a PR or public issue for it —
+`SECURITY.md` has the private reporting path, and it requires a working
+reproduction.
 
 ## Adding to the extension surfaces
 
