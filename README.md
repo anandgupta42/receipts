@@ -2,7 +2,7 @@
 
 **Your AI coding agent just billed you. Here's the receipt.**
 
-[![CI](https://github.com/anandgupta42/aireceipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/aireceipts/actions/workflows/ci.yml)
+[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 <picture>
@@ -40,8 +40,11 @@ guessed dollars. Full method: aireceipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
-aireceipts is a local, deterministic CLI: it reads the transcripts your coding agent
-already writes to disk and prints a cost receipt. No accounts, no servers, no uploads.
+**Why this exists.** AI coding agents spend real money invisibly — you see the diff,
+never the bill. aireceipts reads the transcripts your agent already writes to disk and
+turns them into receipts: what a session cost, tool by tool; what a PR cost, across
+every agent that built it; where tokens were wasted. Local and deterministic — no
+accounts, no servers, nothing leaves your machine.
 
 ## Install
 
@@ -117,12 +120,18 @@ send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 ## Docs
 
 **[User guide](docs/guide/01-getting-started.md)** — get started, every command,
-pricing, troubleshooting. Hosted: [anandgupta42.github.io/aireceipts](https://anandgupta42.github.io/aireceipts/)
-· [docs site](https://anandgupta42.github.io/aireceipts/docs/)
+pricing, troubleshooting. Hosted: [anandgupta42.github.io/receipts](https://anandgupta42.github.io/receipts/)
+· [docs site](https://anandgupta42.github.io/receipts/docs/)
 
 [What a receipt proves](docs/trust.md) · [PR receipts](docs/pr-receipts.md) ·
 [JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
 [telemetry](docs/telemetry.md)
+
+**Related work.** [claude-receipts](https://github.com/chrishutchinson/claude-receipts)
+prints a beautiful thermal-receipt souvenir of a Claude Code session (numbers via
+[ccusage](https://github.com/ryoppippi/ccusage)); [Infracost](https://github.com/infracost/infracost)
+does cost-as-a-PR-comment for Terraform. aireceipts is the bookkeeping sibling:
+multi-agent parsing, cited prices, and PR-level attribution with an honesty model.
 
 ## Contributing
 

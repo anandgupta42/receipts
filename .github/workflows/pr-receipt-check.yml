@@ -7,6 +7,11 @@ name: pr-receipt-check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  # SPEC-0030 R3 — reusable: other repos adopt with a 3-line caller
+  # (docs/adopt/pr-receipt-check-caller.yml). Callers must reference
+  # anandgupta42/receipts — GitHub does NOT redirect reusable-workflow
+  # references after a rename, so callers are created only post-rename.
+  workflow_call: {}
 
 permissions:
   contents: read
@@ -16,7 +21,15 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      # Always check out THIS repo (the workflow's home) explicitly: when
+      # called from another repo, the default checkout would fetch the
+      # CALLER's repo, which does not carry scripts/check-pr-receipt.mjs.
+      # Same-repo runs get main's copy of the script — a PR cannot tamper
+      # with the verdict logic it is being checked by.
       - uses: actions/checkout@v4
+        with:
+          repository: anandgupta42/receipts
+          ref: main
       - name: Check for the aireceipts receipt comment
         env:
           GH_TOKEN: ${{ github.token }}
