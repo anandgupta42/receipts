@@ -16,8 +16,203 @@ import { buildReceiptModel } from "../../src/receipt/model.js";
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/opencode");
 
+interface SimulatedOpenCodeSession {
+  sessionId: string;
+  title: string;
+  currentSchema: boolean;
+  model: string;
+  priced: boolean;
+  input: number;
+  output: number;
+  reasoning: number;
+  cacheRead: number;
+  cacheWrite: number;
+  tools: string[];
+  startedAt: number;
+  endedAt: number;
+}
+
 function tempDir(): string {
   return mkdtempSync(path.join(tmpdir(), "aireceipts-opencode-"));
+}
+
+function createSimulation(index: number): SimulatedOpenCodeSession {
+  const knownModels = ["claude-haiku-4-5", "gpt-5.3-codex"];
+  const priced = index % 5 < knownModels.length;
+  const toolSets = [[], ["bash"], ["read", "write"], ["bash", "bash"]];
+  return {
+    sessionId: `ses_sim_${index.toString().padStart(3, "0")}`,
+    title: `Simulated opencode session ${index.toString().padStart(3, "0")}`,
+    currentSchema: index % 2 === 0,
+    model: priced ? knownModels[index % knownModels.length] : `local-sim-${index}`,
+    priced,
+    input: 100 + index,
+    output: 20 + (index % 11),
+    reasoning: index % 7,
+    cacheRead: index % 13,
+    cacheWrite: index % 5,
+    tools: toolSets[index % toolSets.length],
+    startedAt: Date.parse("2026-06-30T13:00:00.000Z") + index * 10_000,
+    endedAt: Date.parse("2026-06-30T13:00:00.000Z") + index * 10_000 + 5_000,
+  };
+}
+
+function expectedUsage(sim: SimulatedOpenCodeSession) {
+  return {
+    input: sim.input,
+    output: sim.output + sim.reasoning,
+    cacheRead: sim.cacheRead,
+    cacheCreation: sim.cacheWrite,
+    total: sim.input + sim.output + sim.reasoning + sim.cacheRead + sim.cacheWrite,
+  };
+}
+
+function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void {
+  const db = new DatabaseSync(dbPath);
+  db.exec(`
+    CREATE TABLE session (
+      id TEXT PRIMARY KEY,
+      project_id TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      directory TEXT NOT NULL,
+      path TEXT,
+      title TEXT NOT NULL,
+      version TEXT NOT NULL,
+      cost REAL DEFAULT 0 NOT NULL,
+      tokens_input INTEGER DEFAULT 0 NOT NULL,
+      tokens_output INTEGER DEFAULT 0 NOT NULL,
+      tokens_reasoning INTEGER DEFAULT 0 NOT NULL,
+      tokens_cache_read INTEGER DEFAULT 0 NOT NULL,
+      tokens_cache_write INTEGER DEFAULT 0 NOT NULL,
+      model TEXT,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL
+    );
+    CREATE TABLE session_message (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+    CREATE TABLE message (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+    CREATE TABLE part (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+  `);
+  const insertSession = db.prepare(`
+    INSERT INTO session (
+      id, project_id, slug, directory, path, title, version,
+      tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write,
+      model, time_created, time_updated
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const insertSessionMessage = db.prepare(
+    "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  );
+  const insertMessage = db.prepare("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)");
+  const insertPart = db.prepare("INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)");
+
+  for (const sim of sims) {
+    insertSession.run(
+      sim.sessionId,
+      "project_synthetic",
+      sim.sessionId,
+      `/tmp/aireceipts-opencode-sim/${sim.sessionId}`,
+      `/tmp/aireceipts-opencode-sim/${sim.sessionId}`,
+      sim.title,
+      "0.0.0-simulated",
+      sim.input,
+      sim.output,
+      sim.reasoning,
+      sim.cacheRead,
+      sim.cacheWrite,
+      JSON.stringify({ id: sim.model, providerID: sim.priced ? "known" : "local" }),
+      sim.startedAt,
+      sim.endedAt,
+    );
+
+    const tokens = { input: sim.input, output: sim.output, reasoning: sim.reasoning, cache: { read: sim.cacheRead, write: sim.cacheWrite } };
+    if (sim.currentSchema) {
+      insertSessionMessage.run(
+        `${sim.sessionId}_user`,
+        sim.sessionId,
+        "user",
+        1,
+        sim.startedAt,
+        sim.startedAt,
+        JSON.stringify({ text: `run simulation ${sim.sessionId}`, time: { created: sim.startedAt } }),
+      );
+      insertSessionMessage.run(
+        `${sim.sessionId}_assistant`,
+        sim.sessionId,
+        "assistant",
+        2,
+        sim.startedAt + 1_000,
+        sim.endedAt,
+        JSON.stringify({
+          model: { id: sim.model, providerID: sim.priced ? "known" : "local" },
+          tokens,
+          time: { created: sim.startedAt + 1_000, completed: sim.endedAt },
+          content:
+            sim.tools.length === 0
+              ? [{ type: "text", text: "done" }]
+              : sim.tools.map((tool, toolIndex) => ({
+                  type: "tool",
+                  id: `${sim.sessionId}_tool_${toolIndex}`,
+                  name: tool,
+                  state: { status: "completed", input: { index: toolIndex, tool }, result: `ok ${toolIndex}` },
+                  time: { ran: sim.startedAt + 2_000 + toolIndex, completed: sim.startedAt + 3_000 + toolIndex },
+                })),
+        }),
+      );
+      continue;
+    }
+
+    const messageId = `${sim.sessionId}_assistant`;
+    insertMessage.run(
+      messageId,
+      sim.sessionId,
+      sim.startedAt + 1_000,
+      sim.endedAt,
+      JSON.stringify({
+        role: "assistant",
+        modelID: sim.model,
+        providerID: sim.priced ? "known" : "local",
+        tokens,
+        time: { created: sim.startedAt + 1_000, completed: sim.endedAt },
+      }),
+    );
+    sim.tools.forEach((tool, toolIndex) => {
+      insertPart.run(
+        `${sim.sessionId}_part_${toolIndex}`,
+        messageId,
+        sim.sessionId,
+        sim.startedAt + 2_000 + toolIndex,
+        sim.startedAt + 3_000 + toolIndex,
+        JSON.stringify({
+          type: "tool",
+          tool,
+          state: { status: "completed", input: { index: toolIndex, tool }, output: `ok ${toolIndex}` },
+          time: { ran: sim.startedAt + 2_000 + toolIndex, completed: sim.startedAt + 3_000 + toolIndex },
+        }),
+      );
+    });
+  }
+  db.close();
 }
 
 function makeSessionMessageDb(dbPath: string): void {
@@ -356,6 +551,46 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       input: { cmd: "pwd" },
       output: "/tmp/aireceipts-opencode-legacy",
     });
+  });
+
+  it("validates 100 generated opencode schema/model/tool combinations", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-100-simulations.db");
+    const simulations = Array.from({ length: 100 }, (_, index) => createSimulation(index));
+    makeSimulatedDb(dbPath, simulations);
+    const adapter = new OpenCodeAdapter({ dbPath });
+
+    const summaries = await adapter.listSessions();
+    expect(summaries).toHaveLength(100);
+    expect(summaries[0].title).toBe(simulations.at(-1)!.title);
+
+    const summariesByTitle = new Map(summaries.map((summary) => [summary.title, summary]));
+    for (const sim of simulations) {
+      const expected = expectedUsage(sim);
+      const summary = summariesByTitle.get(sim.title);
+      expect(summary, sim.title).toBeDefined();
+      expect(summary!.model).toBe(sim.model);
+      expect(summary!.totals).toMatchObject({ turnCount: 1, toolCallCount: sim.tools.length });
+      expect(summary!.totals.tokens).toMatchObject(expected);
+
+      const session = await adapter.loadSession(`${dbPath}#${sim.sessionId}`);
+      expect(session, sim.title).not.toBeNull();
+      expect(session!.turns).toHaveLength(1);
+      expect(session!.turns[0]).toMatchObject({ model: sim.model, usage: expected });
+      expect(session!.turns[0].toolCalls.map((call) => call.name)).toEqual(sim.tools);
+
+      const receipt = await buildReceiptModel(session!, dataDir);
+      expect(receipt.totalTokens).toMatchObject(expected);
+      if (sim.priced) {
+        expect(receipt.totalUsd, sim.title).toBeGreaterThan(0);
+        expect(receipt.priceRowsUsed.map((row) => row.model)).toEqual([sim.model]);
+      } else {
+        expect(receipt.totalUsd, sim.title).toBeNull();
+        expect(receipt.priceRowsUsed).toEqual([]);
+      }
+      expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
+    }
   });
 
   it("degrades invalid SQLite files to no sessions and null loads", async () => {
