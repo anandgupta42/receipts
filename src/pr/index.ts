@@ -18,6 +18,8 @@ import { HELPER_FULL_LABEL } from "./body.js";
 import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
 import { isBranchCandidate, overlapsBranchWindow, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
+import { anchorEvents } from "./slice.js";
+import { buildPerCommitRows, renderPerCommitLines, segmentSlice } from "./perCommit.js";
 import { deriveRole, selectContributors, type PoolCandidate, type RawContributor } from "./contributors.js";
 import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
@@ -173,6 +175,7 @@ function publishAndLink(
   bodyInput: PrBodyInput,
   sessions: ArtifactSession[],
   deps: PrDeps,
+  extras?: { notAttributable?: string[]; perCommitJson?: string },
 ): { fileName: string; url: string } | null {
   const pr = resolvePr(deps.runGh);
   if (!pr.ok) {
@@ -180,7 +183,7 @@ function publishAndLink(
     return null;
   }
   const fileName = artifactFileName(pr.prNumber);
-  const content = renderPrArtifactHtml({ prNumber: pr.prNumber, body: bodyInput, sessions });
+  const content = renderPrArtifactHtml({ prNumber: pr.prNumber, body: bodyInput, sessions, ...extras });
   const repoUrl = `https://github.com/${pr.ownerRepo}.git`;
   // R4: the exact publish target, inspectable before anything is pushed.
   deps.err(`publishing ${fileName} to ${ARTIFACT_BRANCH} on ${repoUrl}`);
@@ -268,7 +271,8 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   }
 
   // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
-  const { shas, commitMs } = branchCommits(deps.runGit, deps.cwd);
+  const branchInfo = branchCommits(deps.runGit, deps.cwd);
+  const { shas, commitMs } = branchInfo;
 
   const resolved = await resolveContributors(opts, deps, shas, commitMs);
   if ("error" in resolved) {
@@ -279,7 +283,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // SPEC-0024 R3 ordering: base views first (their rollups define what is
   // already counted), then promotion of uncovered anchored sidechains, then
   // one chronological sort across both (startedAt, then id — SPEC-0023 order).
-  const entries: { view: ContributorView; model: ReceiptModel; startedAt: number; id: string }[] = [];
+  const entries: { view: ContributorView; model: ReceiptModel; startedAt: number; id: string; raw: RawContributor }[] = [];
   const covered = new Set<string>();
   for (const raw of resolved.contributors) {
     const { view, model } = await buildContributorView(raw, deps);
@@ -287,12 +291,12 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
     for (const row of view.subagents) {
       covered.add(row.filePath);
     }
-    entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
+    entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const promoted = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
   for (const raw of promoted) {
     const { view, model } = await buildContributorView(raw, deps);
-    entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id });
+    entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   if (entries.length === 0) {
     deps.err(NO_MATCH);
@@ -312,8 +316,28 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   let artifactFailed = false;
   let link: { fileName: string; url: string } | null = null;
   if (opts.artifact) {
-    const sessions: ArtifactSession[] = fenceOrdered.map((e) => ({ label: detailLabel(e.view, e.model), model: e.model }));
-    link = publishAndLink(bodyInput, sessions, deps);
+    // SPEC-0031 R3a — per-commit tables for sliced sessions; everything else
+    // (helpers, full fallbacks) lands in the labeled bucket. The slicer's own
+    // refusal to cut a session is honored here: no table where no slice.
+    const sessions: ArtifactSession[] = [];
+    const islandData: { session: string; rows: unknown[] }[] = [];
+    const notAttributable: string[] = [];
+    for (const e of fenceOrdered) {
+      const label = detailLabel(e.view, e.model);
+      const segments = segmentSlice(e.raw.slice, anchorEvents(e.raw.session.turns, branchInfo.shas), branchInfo);
+      if (segments.length === 0) {
+        notAttributable.push(label);
+        sessions.push({ label, model: e.model });
+        continue;
+      }
+      const rows = await buildPerCommitRows(e.raw.session, segments);
+      islandData.push({ session: e.view.sessionId, rows });
+      sessions.push({ label, model: e.model, perCommitLines: renderPerCommitLines(rows) });
+    }
+    link = publishAndLink(bodyInput, sessions, deps, {
+      notAttributable: notAttributable.length === fenceOrdered.length ? notAttributable : notAttributable.length > 0 ? notAttributable : undefined,
+      perCommitJson: islandData.length > 0 ? JSON.stringify(islandData) : undefined,
+    });
     artifactFailed = link === null;
   }
   // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
