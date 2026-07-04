@@ -69,8 +69,22 @@ This is the **only** skill allowed to edit that section. Move whatever shipped f
 started" to its real tier, and update the "updated by" note if the format changed.
 Nothing else in this file changes.
 
-## 6. Human clicks publish
+## 6. Publish
 
-Prepare the release (tag, changelog, `AGENTS.md` update) as a PR or a tagged commit, but
-**npm publish is the maintainer's button** (AGENTS.md, button 4) — this skill never runs
-`npm publish` itself. Stop and hand off once the tag and changelog are ready.
+Prepare the release (tag, changelog, `AGENTS.md` update) as a PR or a tagged commit,
+then **the maintainer publishes** (AGENTS.md, button 4) — this skill never runs
+`npm publish` or dispatches the workflow itself.
+
+The full mechanics live in **[docs/internal/releasing.md](../../../docs/internal/releasing.md)** —
+read it before handing off. The short version:
+
+- **Routine release (v0.1.1+):** package is `aireceipts-cli`; publishing is the
+  `release-publish.yml` workflow (Actions → Run workflow on `main`, or
+  `gh workflow run release-publish.yml --ref main`). It publishes with provenance
+  via OIDC — **no token**. Preconditions: repo public, CI green on the exact SHA,
+  `package.json.version` bumped to the tag.
+- **This skill's job stops at "ready to dispatch":** tag + changelog + specs flipped
+  + `AGENTS.md` updated + `/review-docs` clean. Then point the maintainer at the
+  runbook and stop.
+- **Never** publish the bare `aireceipts` name (npm blocks it — see the runbook),
+  and never `npm publish` locally for a routine release (loses provenance).
