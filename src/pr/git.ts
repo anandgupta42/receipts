@@ -80,6 +80,18 @@ export interface BranchCommits {
   shas: string[];
   /** Committer instants (epoch ms) of the same commits (R1d overlap). */
   commitMs: number[];
+  /** First-line subjects of the same commits, same order/cap (SPEC-0031 R2). */
+  subjects: string[];
+}
+
+/** Parse one `%H%x00%cI%x00%s` log line (SPEC-0031 R2 — NUL-delimited so
+ * subjects containing `|`/tabs can't corrupt fields; SPEC-0032 reuses this). */
+export function parseBranchCommitLine(line: string): { sha: string; iso: string; subject: string } | null {
+  const [sha, iso = "", subject = ""] = line.split("\u0000");
+  if (!sha) {
+    return null;
+  }
+  return { sha, iso, subject };
 }
 
 /**
@@ -91,30 +103,31 @@ export function branchCommits(run: CommandRunner, cwd?: string): BranchCommits {
   const base = defaultBranchRef(run, cwd);
   const mb = run("git", ["merge-base", base, "HEAD"], { cwd });
   if (mb.code !== 0 || !mb.stdout.trim()) {
-    return { shas: [], commitMs: [] };
+    return { shas: [], commitMs: [], subjects: [] };
   }
   const mergeBase = mb.stdout.trim();
-  const log = run("git", ["log", "--format=%H|%cI", `${mergeBase}..HEAD`], { cwd });
+  const log = run("git", ["log", "--format=%H%x00%cI%x00%s", `${mergeBase}..HEAD`], { cwd });
   if (log.code !== 0) {
-    return { shas: [], commitMs: [] };
+    return { shas: [], commitMs: [], subjects: [] };
   }
   const shas: string[] = [];
   const commitMs: number[] = [];
+  const subjects: string[] = [];
   for (const line of log.stdout.split("\n")) {
-    const trimmed = line.trim();
-    if (!trimmed) {
+    if (!line.trim()) {
       continue;
     }
-    const [sha, iso] = trimmed.split("|");
-    if (sha) {
-      shas.push(sha);
-      const ms = iso ? Date.parse(iso) : NaN;
+    const parsed = parseBranchCommitLine(line);
+    if (parsed) {
+      shas.push(parsed.sha);
+      subjects.push(parsed.subject);
+      const ms = parsed.iso ? Date.parse(parsed.iso) : NaN;
       if (!Number.isNaN(ms)) {
         commitMs.push(ms);
       }
     }
   }
-  return { shas: shas.slice(0, MAX_BRANCH_SHAS), commitMs };
+  return { shas: shas.slice(0, MAX_BRANCH_SHAS), commitMs, subjects: subjects.slice(0, MAX_BRANCH_SHAS) };
 }
 
 /** True if `cwd` is at or inside any of `roots` (R1b common-dir containment). */

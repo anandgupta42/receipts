@@ -13,6 +13,7 @@ import { renderReceiptSvg, renderCompareSvg } from "../src/receipt/svg.js";
 import { renderMiniReceipt } from "../src/receipt/mini.js";
 import { TEMPLATE_NAMES } from "../src/receipt/blocks.js";
 import { renderPrArtifactHtml } from "../src/pr/html.js";
+import { renderPerCommitLines } from "../src/pr/perCommit.js";
 import type { ContributorView } from "../src/pr/body.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 
@@ -113,12 +114,24 @@ function artifactView(role: ContributorView["role"], sessionId: string, model: R
   };
 }
 const artifactViews = [artifactView("builder", "golden-builder", pricedModel), artifactView("builder", "golden-loop", loopModel)];
+// SPEC-0031 R3 — the golden pins the per-commit surface: fixed rows through the
+// real line renderer, the labeled bucket, and the inert template island.
+const goldenPerCommitRows = [
+  { shortSha: "abc1234", subject: "feat: golden first commit", turnCount: 3, usd: 0.12, totalTokens: 41000, extraCount: 0 },
+  { shortSha: "def5678", subject: "fix: golden follow-up", turnCount: 2, usd: null, totalTokens: 9800, extraCount: 1 },
+];
 check(
   "goldens/html/pr-artifact.html",
   renderPrArtifactHtml({
     prNumber: 42,
     body: { contributors: artifactViews, excludedCount: 1 },
-    sessions: artifactViews.map((v, i) => ({ label: `${v.role} · ${v.sessionId}`, model: i === 0 ? pricedModel : loopModel })),
+    sessions: artifactViews.map((v, i) => ({
+      label: `${v.role} · ${v.sessionId}`,
+      model: i === 0 ? pricedModel : loopModel,
+      perCommitLines: i === 0 ? renderPerCommitLines(goldenPerCommitRows) : undefined,
+    })),
+    notAttributable: ["builder · golden-loop"],
+    perCommitJson: JSON.stringify([{ session: "golden-builder", rows: goldenPerCommitRows }]),
   }),
 );
 
