@@ -1,12 +1,12 @@
 ---
-id: SPEC-0030
+id: SPEC-0036
 title: "PR receipt presence policy - notice by default, opt-in enforcement"
 status: shipped
 milestone: M4
 depends: [SPEC-0019]
 ---
 
-# SPEC-0030 · PR receipt presence policy
+# SPEC-0036 · PR receipt presence policy
 
 Invariants: I1 (the check is deterministic over GitHub comment JSON; no model calls),
 I3 (the check reports presence/absence only, never invents a cost), I4 (receipt
