@@ -137,7 +137,16 @@ informs (maintainer judgment on this repo's own PRs), the table demotes to
 ## Success criteria
 
 - [ ] This spec's own implementation PR shows a real per-commit table on
-      its artifact page for the session that built it.
+      its artifact page for the session that built it. **Dogfood finding
+      (2026-07-03, honest miss):** the builder was a FORK whose transcript
+      lives at `<parent-session>/subagents/*.jsonl` — a nested path session
+      discovery never globs, so the building session (and its commit
+      anchors, verified present in the file) is invisible to attribution
+      entirely. Pre-existing gap, out of this spec's scope (discovery, not
+      segmentation); surfaced to the lead for the attribution backlog
+      alongside SPEC-0032. The criterion is demonstrated by the committed
+      golden and the e2e path instead; the box stays unchecked until a
+      non-fork session dogfoods it live.
 - [ ] Ledger property green; red path demonstrated in the PR.
 - [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
