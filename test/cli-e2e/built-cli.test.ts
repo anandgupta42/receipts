@@ -22,6 +22,48 @@ interface RunResult {
   stderr: string;
 }
 
+interface ReceiptTokenJson {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheCreation: number;
+  total: number;
+}
+
+interface ReceiptToolRowJson {
+  tool: string;
+  usd: number | null;
+  tokens: ReceiptTokenJson;
+  callCount: number;
+}
+
+interface ReceiptPriceRowJson {
+  vendor: string;
+  model: string;
+}
+
+interface ReceiptJson {
+  source: string;
+  title: string | null;
+  modelMix: Array<{ model: string; tokens: ReceiptTokenJson; tokenShare: number }>;
+  toolRows: ReceiptToolRowJson[];
+  totalUsd: number | null;
+  totalTokens: ReceiptTokenJson;
+  sessionTotalTokens: ReceiptTokenJson;
+  priceRowsUsed: ReceiptPriceRowJson[];
+}
+
+interface ListRowJson {
+  source: string;
+  title: string | null;
+  model: string | null;
+  totals: {
+    tokens: ReceiptTokenJson;
+    turnCount: number;
+    toolCallCount: number;
+  };
+}
+
 function platformCommand(name: string): string {
   return process.platform === "win32" ? `${name}.cmd` : name;
 }
@@ -68,6 +110,7 @@ function cliEnv(home: string): NodeJS.ProcessEnv {
   return {
     HOME: home,
     USERPROFILE: home,
+    LOCALAPPDATA: path.join(home, "AppData", "Local"),
     AIRECEIPTS_HOME: home,
     AIRECEIPTS_TELEMETRY: "off",
     AIRECEIPTS_TELEMETRY_CONNECTION: "",
@@ -95,6 +138,33 @@ async function stageClaudeSession(home: string, fixtureName: string, destName = 
   const dest = path.join(root, destName);
   await copyFile(path.join(fixturesDir, "claude-code", fixtureName), dest);
   return dest;
+}
+
+function opencodeRoot(home: string): string {
+  if (process.platform === "win32") {
+    return path.join(home, "AppData", "Local", "opencode");
+  }
+  return path.join(home, ".local", "share", "opencode");
+}
+
+async function stageOpenCodeDb(home: string, fixtureName: string, destName = "opencode.db"): Promise<string> {
+  const root = opencodeRoot(home);
+  await mkdir(root, { recursive: true });
+  const dest = path.join(root, destName);
+  await copyFile(path.join(fixturesDir, "opencode", fixtureName), dest);
+  return dest;
+}
+
+function parseReceiptJson(stdout: string): ReceiptJson {
+  return JSON.parse(stdout) as ReceiptJson;
+}
+
+function parseListJson(stdout: string): ListRowJson[] {
+  return JSON.parse(stdout) as ListRowJson[];
+}
+
+function toolRowsByName(rows: ReceiptToolRowJson[]): Record<string, ReceiptToolRowJson> {
+  return Object.fromEntries(rows.map((row) => [row.tool, row])) as Record<string, ReceiptToolRowJson>;
 }
 
 /** Is this platform-specific package installable HERE? Passing an incompatible one
@@ -164,6 +234,93 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("no agent session data detected. Looked in:");
     expect(result.stdout).toContain(path.join(home, ".claude", "projects"));
     expect(result.stdout).toContain(path.join(home, ".codex", "sessions"));
+  });
+
+  it("discovers and prices opencode multi-provider sessions through built CLI", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "clean-multi-vendor.db");
+
+    const listResult = await runCli(["--list", "--json"], home);
+    const listed = parseListJson(listResult.stdout);
+
+    expect(listResult.code, listResult.stderr).toBe(0);
+    expect(listResult.stderr).toBe("");
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      source: "opencode",
+      title: "Port parser adapter",
+      model: "claude-haiku-4-5",
+      totals: {
+        turnCount: 2,
+        toolCallCount: 2,
+      },
+    });
+    expect(listed[0].totals.tokens).toMatchObject({ input: 2200, output: 700, cacheRead: 150, cacheCreation: 90, total: 3140 });
+
+    const result = await runCli(["--json"], home);
+    const receipt = parseReceiptJson(result.stdout);
+    const tools = toolRowsByName(receipt.toolRows);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(receipt.source).toBe("opencode");
+    expect(receipt.title).toBe("Port parser adapter");
+    expect(receipt.totalTokens.total).toBe(3140);
+    expect(receipt.sessionTotalTokens.total).toBe(3140);
+    expect(receipt.totalUsd).toBeCloseTo(0.00975625, 12);
+    expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`).sort()).toEqual([
+      "anthropic:claude-haiku-4-5",
+      "openai:gpt-5.3-codex",
+    ]);
+    expect(receipt.modelMix.map((entry) => entry.model).sort()).toEqual(["claude-haiku-4-5", "gpt-5.3-codex"]);
+    expect(tools.read.usd).toBeCloseTo(0.00301, 12);
+    expect(tools.bash.usd).toBeCloseTo(0.00674625, 12);
+  });
+
+  it("partially prices opencode sessions when only some provider models are known", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "mixed-known-unknown.db");
+
+    const result = await runCli(["--json"], home);
+    const receipt = parseReceiptJson(result.stdout);
+    const tools = toolRowsByName(receipt.toolRows);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(receipt.source).toBe("opencode");
+    expect(receipt.title).toBe("Mixed known and unknown provider");
+    expect(receipt.totalTokens.total).toBe(3140);
+    expect(receipt.totalUsd).toBeCloseTo(0.00301, 12);
+    expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`)).toEqual(["anthropic:claude-haiku-4-5"]);
+    expect(receipt.modelMix.map((entry) => entry.model).sort()).toEqual(["claude-haiku-4-5", "local-big-pickle"]);
+    expect(tools.read.usd).toBeCloseTo(0.00301, 12);
+    expect(tools.bash.usd).toBeNull();
+    expect(tools.bash.tokens.total).toBe(1450);
+  });
+
+  it("keeps unknown opencode provider sessions tokens-only through built CLI", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "legacy-empty-session-message.db");
+
+    const jsonResult = await runCli(["--json"], home);
+    const receipt = parseReceiptJson(jsonResult.stdout);
+
+    expect(jsonResult.code, jsonResult.stderr).toBe(0);
+    expect(jsonResult.stderr).toBe("");
+    expect(receipt.source).toBe("opencode");
+    expect(receipt.title).toBe("Legacy rows with empty session_message");
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.priceRowsUsed).toEqual([]);
+    expect(receipt.totalTokens.total).toBe(36328);
+    expect(receipt.toolRows.every((row) => row.usd === null)).toBe(true);
+    expect(receipt.toolRows.map((row) => row.tool).sort()).toEqual(["(thinking/reply)", "bash", "write"]);
+
+    const textResult = await runCli([], home);
+
+    expect(textResult.code, textResult.stderr).toBe(0);
+    expect(textResult.stderr).toBe("");
+    expect(textResult.stdout).toContain("no price table matched");
+    expect(textResult.stdout).not.toContain("$");
   });
 
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
