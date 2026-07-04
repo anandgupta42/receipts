@@ -16,7 +16,7 @@ import { z } from "zod";
 export const OS_VALUES = ["darwin", "linux", "win32", "other"] as const;
 export type OsValue = (typeof OS_VALUES)[number];
 
-export const COMMAND_CLASS_VALUES = ["receipt", "compare", "other"] as const;
+export const COMMAND_CLASS_VALUES = ["receipt", "compare", "handoff", "other"] as const;
 export type CommandClassValue = (typeof COMMAND_CLASS_VALUES)[number];
 
 export const AGENT_TYPE_VALUES = ["claude-code", "codex", "cursor", "gemini", "opencode", "unknown"] as const;
@@ -45,6 +45,10 @@ const signatureHashSchema = z.string().regex(/^[0-9a-f]{64}$/, "signatureHash mu
 /** An internal per-adapter constant (e.g. `"1"`), not anything read from a transcript. */
 const adapterVersionSchema = z.string().regex(/^[a-zA-Z0-9_.-]{1,32}$/, "adapterVersion must be a short opaque token");
 
+/** SPEC-0042 R5 — emission mode of the handoff command only; enum, never content. */
+export const HANDOFF_FORMAT_VALUES = ["text", "json"] as const;
+export type HandoffFormatValue = (typeof HANDOFF_FORMAT_VALUES)[number];
+
 export const cliRunPropertiesSchema = z
   .object({
     cliVersion: cliVersionSchema,
@@ -54,6 +58,8 @@ export const cliRunPropertiesSchema = z
     agentType: z.enum(AGENT_TYPE_VALUES),
     durationBucket: z.enum(DURATION_BUCKET_VALUES),
     ok: z.boolean(),
+    /** SPEC-0042 R5 — present only on handoff-command runs. */
+    handoffFormat: z.enum(HANDOFF_FORMAT_VALUES).optional(),
   })
   .strict();
 export type CliRunProperties = z.infer<typeof cliRunPropertiesSchema>;

@@ -3,7 +3,8 @@
 // 40 (above the default receipt, below every subcommand), matches `--handoff`.
 import { loadSession } from "../../index.js";
 import type { Session } from "../../parse/types.js";
-import { DEFAULT_HANDOFF_THRESHOLD, renderHandoff, standingRuleSuggestions } from "../../receipt/handoff.js";
+import { DEFAULT_HANDOFF_THRESHOLD, renderHandoff, standingRuleSuggestions, type HandoffCounts } from "../../receipt/handoff.js";
+import { toHandoffJson } from "../../receipt/json.js";
 import { buildReceiptModel } from "../../receipt/model.js";
 import { partitionWindows, windowBounds } from "../../aggregate/week.js";
 import { aggregateWaste, type WasteClassAggregate } from "../../aggregate/waste.js";
@@ -43,8 +44,21 @@ async function run(ctx: CommandContext): Promise<number> {
     return 1;
   }
   const model = await buildReceiptModel(session);
-  const suggestions = standingRuleSuggestions(await recentWasteAggregates(ctx.now()), threshold);
-  ctx.stdout.write(`${renderHandoff(model, suggestions)}\n`);
+  // SPEC-0042 R1/R2 — counts come from the loaded Session; the render stays pure.
+  const counts: HandoffCounts = {
+    turns: session.turns.length,
+    toolCalls: session.totals.toolCallCount,
+    compactions: session.compactions?.length ?? 0,
+  };
+  const aggregates = await recentWasteAggregates(ctx.now());
+  const suggestions = standingRuleSuggestions(aggregates, threshold);
+  // SPEC-0042 R3 — the global `--json` flag is honored (it was previously
+  // ignored here). JSON always emits the full structure, empty arrays included.
+  if (options.json) {
+    ctx.stdout.write(`${JSON.stringify(toHandoffJson(model, suggestions, threshold, counts, aggregates), null, 2)}\n`);
+    return 0;
+  }
+  ctx.stdout.write(`${renderHandoff(model, suggestions, counts)}\n`);
   return 0;
 }
 
@@ -56,7 +70,7 @@ export const command: CommandDef = {
   help: {
     order: 40,
     lines: [
-      "  aireceipts --handoff [selector] [--handoff-threshold N]",
+      "  aireceipts --handoff [selector] [--handoff-threshold N] [--json]",
       "                                        paste-ready block of fired waste lines;",
       "                                         suggests CLAUDE.md rules for waste classes",
       "                                         recurring in N+ recent sessions (default 3)",

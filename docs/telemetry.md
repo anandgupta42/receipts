@@ -21,17 +21,18 @@ There are exactly three event types. Nothing else is ever recorded.
 | `cliVersion` | string | semver, e.g. `"0.3.1"` | From this package's own `package.json`. |
 | `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | `process.platform`, collapsed to a closed set — never the raw platform string. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
-| `commandClass` | enum | `receipt` \| `compare` \| `other` | Which subcommand ran — never the raw argv or any flag values. |
+| `commandClass` | enum | `receipt` \| `compare` \| `handoff` \| `other` | Which subcommand ran — never the raw argv or any flag values. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket — never the raw millisecond count. |
 | `ok` | boolean | | Whether the run succeeded. |
+| `handoffFormat` | enum (optional) | `text` \| `json` | SPEC-0042: emission mode, present only on handoff-command runs — never content. |
 
 ### `cli_error` — one per uncaught error at the CLI's top level
 
 | Field | Type | Values | Notes |
 |---|---|---|---|
 | `errorClass` | enum | `parse_error` \| `io_error` \| `network_error` \| `validation_error` \| `unknown_error` | A small fixed taxonomy derived from the error's constructor name or a well-known Node error code — **never `error.message`**, which can contain a file path or other identifying text. |
-| `command` | enum | `receipt` \| `compare` \| `other` | Same closed taxonomy as `cli_run.commandClass`. |
+| `command` | enum | `receipt` \| `compare` \| `handoff` \| `other` | Same closed taxonomy as `cli_run.commandClass`. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` \| `unknown` | |
 | `inPackage` | boolean | | Whether the error's top stack frame originated inside `aireceipts`'s own installed code (helps us tell "our bug" from "your environment") — the stack trace text itself is inspected internally and never leaves the process. |
 

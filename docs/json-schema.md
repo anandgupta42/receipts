@@ -150,6 +150,34 @@ Also carries `model`, `input`, and `output` (rates in USD per MTok) as documente
 
 `compare` also carries `schemaVersion` on its root.
 
+### Handoff envelope (`handoffJsonSchema`) — SPEC-0042
+
+`aireceipts --handoff <selector> --json`: the machine-readable resume packet. Always
+emits the full structure (empty arrays included). The attribution-only privacy fields
+(`cwd`, `gitBranch`, sidechain linkage) are structurally absent, same as every export.
+
+| Field | Type | Notes |
+|---|---|---|
+| `schemaVersion` | number | Same envelope as receipt/compare. |
+| `source` | string | Agent source enum. |
+| `sessionId` | string | Adapter-local session id. |
+| `title` | string \| null | Session title when known. |
+| `startedAtMs` | number \| null | Session start, epoch ms. |
+| `durationMs` | number \| null | Wall-clock span. |
+| `totals` | object | `tokens` (TokenUsage object) + `turnCount` + `toolCallCount`. |
+| `turnCount` | number | (totals) Assistant turns in the session. |
+| `toolCallCount` | number | (totals) Tool calls in the session. |
+| `wasteLines` | array | Same WasteLine union as the receipt. |
+| `suggestions` | array | Standing-rule suggestion strings (SPEC-0013), possibly empty. |
+| `threshold` | number | The distinct-session recurrence threshold in effect. |
+| `coverage` | object | What the packet covers, checkably: `turns`, `toolCalls`, `compactions`, `wasteLines` (all numbers). |
+| `turns` | number | (coverage) Turn count the packet covers. |
+| `toolCalls` | number | (coverage) Tool-call count the packet covers. |
+| `compactions` | number | (coverage) Compaction events in the session. |
+| `aggregates` | array | `{class, distinctSessionCount}` — exactly the waste classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent). |
+| `class` | string | (aggregates) Waste class name. |
+| `distinctSessionCount` | number | (aggregates) Distinct recent sessions the class fired in. |
+
 <!-- json-fields:end -->
 
 ## CSV

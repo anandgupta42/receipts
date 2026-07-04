@@ -59,7 +59,7 @@ describe("R2: valid events pass their schema", () => {
   });
 
   it("R2: commandClass/command enum covers every CLI command class", () => {
-    for (const value of ["receipt", "compare", "other"] as const) {
+    for (const value of ["receipt", "compare", "handoff", "other"] as const) {
       expect(
         cliRunPropertiesSchema.safeParse({
           cliVersion: "0.1.0",
@@ -139,5 +139,28 @@ describe("R3: leakage fixtures — banned content is structurally rejected", () 
 
   it("validateEvent returns false (never throws) for an unrecognized event name", () => {
     expect(validateEvent({ name: "unknown_event" as never, properties: {} as never })).toBe(false);
+  });
+});
+
+describe("SPEC-0042 R5 — handoffFormat allowlist", () => {
+  const base = {
+    cliVersion: "0.1.0",
+    os: "linux" as const,
+    nodeMajor: 20,
+    commandClass: "handoff" as const,
+    agentType: "unknown" as const,
+    durationBucket: "<100ms" as const,
+    ok: true,
+  };
+
+  it("accepts text/json and absence", () => {
+    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "text" }).success).toBe(true);
+    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "json" }).success).toBe(true);
+    expect(cliRunPropertiesSchema.safeParse(base).success).toBe(true);
+  });
+
+  it("rejects any non-enum value (never content)", () => {
+    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "markdown" }).success).toBe(false);
+    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "/home/user/secret" }).success).toBe(false);
   });
 });

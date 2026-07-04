@@ -62,8 +62,9 @@ be wrong on a real session is an immediate fix or removal.
   schema composes it in-module), added to the `docs/json-schema.md` field-parity
   test like receipt/compare. Exact top-level fields (types by reference to the
   schemas already in `exportSchema.ts`):
-  `schemaVersion`, `source`, `sessionId`, `title` (nullable), `startedAt`
-  (nullable), `durationMs` (nullable), `totals` (the existing token-usage shape +
+  `schemaVersion`, `source`, `sessionId`, `title` (nullable), `startedAtMs`
+  (nullable, epoch ms — named to match the receipt/compare body's existing
+  field), `durationMs` (nullable), `totals` (the existing token-usage shape +
   `turnCount`, `toolCallCount`), `wasteLines` (existing `wasteLineSchema`),
   `suggestions: string[]`, `threshold: number`,
   `coverage: {turns, toolCalls, compactions, wasteLines}` (numbers), and
@@ -182,6 +183,17 @@ coverage); R6's empty contract clarified as the renderer's return value with the
 CLI's existing trailing newline; R3's JSON shape pinned to exact top-level field
 names (implementation may not add/rename without amending the spec); stale
 `handoff.ts:45` ref corrected to `:47`.
+
+**2026-07-04 · Implementation amendments (build-time critic round, 4 findings
+applied).** Pinned field renamed `startedAt` → `startedAtMs`: every ms-epoch
+field in the existing export bodies is `Ms`-suffixed (`receiptBody.startedAtMs`)
+and introducing the one unsuffixed exception would be the worse contract — list
+amended per R3's own rule. R1's omission contract is now literal: the header's
+agent/date/duration line is built from `format.ts` helpers with unknown parts
+OMITTED (no `start time unknown` placeholders; the receipt masthead's
+width-compaction behavior is not inherited). Telemetry allowlist tests extended
+(`handoff` class + `handoffFormat` accept/reject + pass-through). E2e asserts
+schema-parse + coverage values, not just key order.
 
 **2026-07-04 · Maintainer approval:** approved via direct maintainer directive in
 session ("go ahead and merge and also start implementing the specs") after both

@@ -4,7 +4,7 @@ Usage:
   aireceipts [selector] [--json|--csv]  print a receipt (default: newest session)
   aireceipts --list [--json]            list sessions, newest first
   aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
-  aireceipts --handoff [selector] [--handoff-threshold N]
+  aireceipts --handoff [selector] [--handoff-threshold N] [--json]
                                         paste-ready block of fired waste lines;
                                          suggests CLAUDE.md rules for waste classes
                                          recurring in N+ recent sessions (default 3)

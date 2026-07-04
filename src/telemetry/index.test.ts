@@ -41,6 +41,23 @@ describe("recordCliRun builds a valid cli_run event from raw runtime inputs", ()
   });
 });
 
+describe("SPEC-0042 R5 — handoffFormat pass-through", () => {
+  it("records the enum for handoff runs and validates against the strict schema", () => {
+    recordCliRun({ command: "handoff", agentType: undefined, durationMs: 10, ok: true, handoffFormat: "json" });
+    const [event] = peekQueuedEvents();
+    expect((event?.properties as Record<string, unknown>).commandClass).toBe("handoff");
+    expect((event?.properties as Record<string, unknown>).handoffFormat).toBe("json");
+    expect(validateEvent(event as TelemetryEvent)).toBe(true);
+  });
+
+  it("omits the field entirely when not supplied (absent, not null)", () => {
+    recordCliRun({ command: "receipt", agentType: undefined, durationMs: 10, ok: true });
+    const [event] = peekQueuedEvents();
+    expect("handoffFormat" in (event?.properties as Record<string, unknown>)).toBe(false);
+    expect(validateEvent(event as TelemetryEvent)).toBe(true);
+  });
+});
+
 describe("recordCliError builds a valid cli_error event from raw runtime inputs", () => {
   it("enqueues one event that passes schema validation", () => {
     const input: RecordCliErrorInput = {
