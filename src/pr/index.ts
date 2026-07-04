@@ -88,6 +88,7 @@ async function resolveContributors(
   deps: PrDeps,
   shas: readonly string[],
   commitMs: readonly number[],
+  subjects: readonly string[],
 ): Promise<Resolved | { error: string }> {
   const sessions = await deps.listSessions();
 
@@ -132,6 +133,7 @@ async function resolveContributors(
     return { error: NO_MATCH };
   }
   const selection = await selectContributors(candidates, shas, {
+    branchSubjects: subjects,
     loadSession: deps.loadSession,
     currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
   });
@@ -227,7 +229,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   const branchInfo = branchCommits(deps.runGit, deps.cwd);
   const { shas, commitMs } = branchInfo;
 
-  const resolved = await resolveContributors(opts, deps, shas, commitMs);
+  const resolved = await resolveContributors(opts, deps, shas, commitMs, branchInfo.subjects);
   if ("error" in resolved) {
     deps.err(resolved.error);
     return 1;
