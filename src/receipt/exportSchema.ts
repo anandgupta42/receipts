@@ -138,6 +138,47 @@ export const receiptJsonSchema = z
   })
   .strict();
 
+/**
+ * SPEC-0042 R3 — `aireceipts --handoff <selector> --json`, the machine-readable
+ * resume packet. Top-level field names are pinned in the spec; the
+ * implementation may not add or rename fields without amending that list.
+ * `aggregates` carries exactly the classes `aggregateWaste` returned for the
+ * recurrence window (fired classes only, no padding) so a below-threshold
+ * recurring class is inspectable instead of silently absent. R4 privacy: the
+ * banned attribution-only fields (`cwd`, `gitBranch`, `isSidechain`,
+ * `parentSessionId`, `agentId`, `parentFilePath`) are structurally
+ * unrepresentable — `.strict()` rejects them.
+ */
+export const handoffJsonSchema = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION),
+    source: z.enum(AGENT_SOURCES),
+    sessionId: z.string(),
+    title: z.string().nullable(),
+    startedAtMs: z.number().nullable(),
+    durationMs: z.number().nullable(),
+    totals: z
+      .object({
+        tokens: tokenUsageSchema,
+        turnCount: z.number(),
+        toolCallCount: z.number(),
+      })
+      .strict(),
+    wasteLines: z.array(wasteLineSchema),
+    suggestions: z.array(z.string()),
+    threshold: z.number(),
+    coverage: z
+      .object({
+        turns: z.number(),
+        toolCalls: z.number(),
+        compactions: z.number(),
+        wasteLines: z.number(),
+      })
+      .strict(),
+    aggregates: z.array(z.object({ class: z.string(), distinctSessionCount: z.number() }).strict()),
+  })
+  .strict();
+
 /** `aireceipts compare <a> <b> --json` — two receipt bodies plus a factual delta line (R3; no ranking field, I6). */
 export const compareJsonSchema = z
   .object({
@@ -201,5 +242,6 @@ export function collectFieldNames(schema: z.ZodTypeAny, into: Set<string> = new 
 /** The complete documented-field set across every JSON export surface — what the doc parity test asserts against. */
 export function allExportFieldNames(): Set<string> {
   const names = collectFieldNames(receiptJsonSchema);
-  return collectFieldNames(compareJsonSchema, names);
+  collectFieldNames(compareJsonSchema, names);
+  return collectFieldNames(handoffJsonSchema, names);
 }

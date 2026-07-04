@@ -20,6 +20,8 @@ export interface RecordCliRunInput {
   agentType: AgentSource | undefined;
   durationMs: number;
   ok: boolean;
+  /** SPEC-0042 R5 — set only for the handoff command; enum, never content. */
+  handoffFormat?: "text" | "json";
 }
 
 /** Records one `cli_run` event (R2). Call once per CLI invocation, right before the process would otherwise exit. */
@@ -34,6 +36,7 @@ export function recordCliRun(input: RecordCliRunInput): void {
       agentType: toAgentTypeTelemetry(input.agentType),
       durationBucket: bucketDuration(input.durationMs),
       ok: input.ok,
+      ...(input.handoffFormat !== undefined ? { handoffFormat: input.handoffFormat } : {}),
     },
   });
 }

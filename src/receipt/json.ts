@@ -10,6 +10,8 @@ import type { SessionSummary, TokenUsage } from "../parse/types.js";
 import { compareDeltaLine } from "./compare.js";
 import { SCHEMA_VERSION } from "./exportSchema.js";
 import type { ModelMixEntry, PriceRowUsed, ReceiptModel, ToolRow, WasteLine } from "./model.js";
+import type { WasteClassAggregate } from "../aggregate/waste.js";
+import type { HandoffCounts } from "./handoff.js";
 
 function tokenUsageJson(t: TokenUsage) {
   return {
@@ -150,5 +152,44 @@ export function summaryToJson(summary: SessionSummary) {
     },
     filePath: summary.filePath,
     unpriceable: summary.unpriceable ?? false,
+  };
+}
+
+/**
+ * SPEC-0042 R3 — the machine-readable resume packet. Fixed key order = the
+ * schema (I5); validated against `handoffJsonSchema`. Always emits the full
+ * structure (empty arrays included) — machine consumers need shape, not
+ * sentinels (R6). `aggregates` is exactly what `aggregateWaste` returned for
+ * the recurrence window, below-threshold classes included.
+ */
+export function toHandoffJson(
+  model: ReceiptModel,
+  suggestions: string[],
+  threshold: number,
+  counts: HandoffCounts,
+  aggregates: WasteClassAggregate[],
+) {
+  return {
+    schemaVersion: SCHEMA_VERSION,
+    source: model.source,
+    sessionId: model.sessionId,
+    title: model.title ?? null,
+    startedAtMs: model.startedAtMs ?? null,
+    durationMs: model.durationMs ?? null,
+    totals: {
+      tokens: tokenUsageJson(model.sessionTotalTokens),
+      turnCount: counts.turns,
+      toolCallCount: counts.toolCalls,
+    },
+    wasteLines: model.wasteLines.map(wasteLineJson),
+    suggestions,
+    threshold,
+    coverage: {
+      turns: counts.turns,
+      toolCalls: counts.toolCalls,
+      compactions: counts.compactions,
+      wasteLines: model.wasteLines.length,
+    },
+    aggregates: aggregates.map((a) => ({ class: a.class, distinctSessionCount: a.distinctSessionCount })),
   };
 }

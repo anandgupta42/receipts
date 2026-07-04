@@ -32,7 +32,7 @@ export function bucketDuration(ms: number): DurationBucketValue {
   return ">10s";
 }
 
-/** Maps a CLI subcommand name to R2's closed 3-value taxonomy — never the raw command line or its arguments. */
+/** Maps a CLI subcommand name to R2's closed 4-value taxonomy — never the raw command line or its arguments. */
 export function toCommandClass(command: string): CommandClassValue {
   const normalized = command.trim().toLowerCase();
   if (normalized === "receipt" || normalized === "") {
@@ -40,6 +40,10 @@ export function toCommandClass(command: string): CommandClassValue {
   }
   if (normalized === "compare") {
     return "compare";
+  }
+  // SPEC-0042 R5 — handoff adoption must be measurable, not folded into `other`.
+  if (normalized === "handoff") {
+    return "handoff";
   }
   return "other";
 }

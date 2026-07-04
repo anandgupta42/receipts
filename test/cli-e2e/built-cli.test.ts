@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { handoffJsonSchema } from "../../src/receipt/exportSchema.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
@@ -424,6 +425,39 @@ describe("built CLI e2e", () => {
     expect(parsed.schemaVersion).toBe(1);
     expect(Object.keys(parsed).sort()).toEqual(["a", "b", "delta", "schemaVersion"]);
     expect(String(parsed.delta)).not.toMatch(/better|worse|winner|superior|inferior/i);
+  });
+
+  it("SPEC-0042: --handoff --json emits the schema-valid resume packet; text form carries header + coverage", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "loop-bash-5x.jsonl", "loop.jsonl");
+
+    const jsonRun = await runCli(["--handoff", "--json"], home);
+    expect(jsonRun.code, jsonRun.stderr).toBe(0);
+    const parsed = JSON.parse(jsonRun.stdout) as Record<string, unknown>;
+    expect(() => handoffJsonSchema.parse(parsed)).not.toThrow();
+    expect(parsed.coverage).toEqual({ turns: 6, toolCalls: 5, compactions: 0, wasteLines: 1 });
+    expect(parsed.schemaVersion).toBe(1);
+    expect(Object.keys(parsed)).toEqual([
+      "schemaVersion",
+      "source",
+      "sessionId",
+      "title",
+      "startedAtMs",
+      "durationMs",
+      "totals",
+      "wasteLines",
+      "suggestions",
+      "threshold",
+      "coverage",
+      "aggregates",
+    ]);
+    expect(jsonRun.stdout).not.toMatch(/"(cwd|gitBranch|isSidechain|parentSessionId|agentId|parentFilePath)"/);
+
+    const textRun = await runCli(["--handoff"], home);
+    expect(textRun.code, textRun.stderr).toBe(0);
+    expect(textRun.stdout).toContain("handoff: ");
+    expect(textRun.stdout).toContain("total $");
+    expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste lines");
   });
 
   it("treats malformed budget config as stderr-only advisory and still renders the receipt", async () => {

@@ -25,7 +25,14 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const started = Date.now();
   try {
     const code = await command.run(ctx);
-    recordCliRun({ command: command.name, agentType: undefined, durationMs: Date.now() - started, ok: code === 0 });
+    recordCliRun({
+      command: command.name,
+      agentType: undefined,
+      durationMs: Date.now() - started,
+      ok: code === 0,
+      // SPEC-0042 R5 — emission mode for the handoff command only (enum, never content).
+      ...(command.name === "handoff" ? { handoffFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
+    });
     return code;
   } catch (err) {
     recordCliError({ command: command.name, agentType: undefined, err });
