@@ -11,7 +11,7 @@ opt-in setting for maintainers who want same-repo PRs to require a receipt.
 From your checkout (or worktree) with the PR branch checked out:
 
 ```sh
-npx aireceipts pr --post
+npx aireceipts-cli pr --post
 ```
 
 > **Pre-release note:** until the npm package is published, run the same command
@@ -30,7 +30,7 @@ more than one matching session (or you want a specific one), pass `--session <id
 from `aireceipts --list`):
 
 ```sh
-npx aireceipts pr --post --session <id>
+npx aireceipts-cli pr --post --session <id>
 ```
 
 The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
@@ -39,7 +39,7 @@ copy the body straight into a comment.
 For a dry run without posting:
 
 ```sh
-npx aireceipts pr
+npx aireceipts-cli pr
 ```
 
 ### Assistant instruction
@@ -47,7 +47,7 @@ npx aireceipts pr
 Use the same instruction for every coding assistant:
 
 ```text
-Before you finish a PR-producing task, run `npx aireceipts pr --post` from the repo worktree and include any failure message in the handoff.
+Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in the handoff.
 ```
 
 ### Optional convenience: git alias
@@ -56,14 +56,14 @@ This is only a local shortcut. It is not required for adoption and does not repl
 one command above.
 
 ```sh
-git config alias.receipt '!npx aireceipts pr --post'
+git config alias.receipt '!npx aireceipts-cli pr --post'
 git receipt                  # after pushing your branch
 ```
 
 ### Optional: publish a durable receipt page
 
 ```sh
-npx aireceipts pr --post --artifact
+npx aireceipts-cli pr --post --artifact
 ```
 
 `--artifact` (requires `--post`) additionally writes a self-contained
@@ -104,7 +104,7 @@ who viewed which receipt.
 
 2. Add one line to `CONTRIBUTING.md`:
 
-   > Before opening a PR, run `npx aireceipts pr --post` to attach your build receipt.
+   > Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.
 
 That's it. By default, the workflow emits a neutral `::notice` when a PR has no receipt
 comment and never fails the build. To enforce receipts for same-repo PRs, set the repo
