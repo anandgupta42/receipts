@@ -35,7 +35,7 @@ calls; unpriced models show tokens only, never
 guessed dollars. Full method: aireceipts
 --methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-      aireceipts · local · buy me a samosa 🥟      
+       aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 

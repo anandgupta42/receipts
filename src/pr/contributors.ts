@@ -9,9 +9,10 @@
 // rankings (I6): codex / orchestrator (spawned subagents or launched agents) /
 // builder.
 import type { Session, SessionSummary } from "../parse/types.js";
-import { classifyBranchAnchors, computeSlice, type SliceResult } from "./slice.js";
+import { classifyBranchAnchors, computeSlice, type BranchAnchorSummary, type SliceResult } from "./slice.js";
 import { cwdInsideRoots } from "./git.js";
 import { isCodexExec, toolCallInvocations } from "./gitWrite.js";
+import { claimedBranchShas, eligibleSubjects, hasForeignShaWrites, sessionCommitSubjects } from "./messageAnchor.js";
 
 export type Role = "orchestrator" | "builder" | "codex";
 
@@ -35,8 +36,8 @@ export interface RawContributor {
   summary: SessionSummary;
   session: Session;
   slice: SliceResult;
-  /** `anchor` = own branch-SHA proof; `helper` = the SHA-less current-worktree Codex rule. */
-  basis: "anchor" | "helper";
+  /** `anchor` = own branch-SHA proof; `helper` = the SHA-less current-worktree Codex rule; `message` = the SPEC-0032 commit-message fallback (weaker, labeled on the row). */
+  basis: "anchor" | "helper" | "message";
 }
 
 export interface ContributorSelection {
@@ -49,6 +50,8 @@ export interface ContributorDeps {
   loadSession: (summary: SessionSummary) => Promise<Session | null>;
   /** The process's own worktree root — the SHA-less Codex helper rule is scoped to it (R1). `null` → helper rule off. */
   currentWorktreeRoot: string | null;
+  /** Branch commit subjects aligned with `branchShas` (SPEC-0032). Absent/empty → message fallback off. */
+  branchSubjects?: readonly string[];
 }
 
 /** True if the session's cwd is inside the current process's worktree (not a sibling worktree). */
@@ -73,25 +76,90 @@ export async function selectContributors(
   const contributors: RawContributor[] = [];
   let excludedCount = 0;
 
+  // Pass 1 — load and classify EVERYTHING first, so SHA claims are computed
+  // from the full candidate list before any message credit is considered:
+  // a SHA-crediting session anywhere in the list claims its commit regardless
+  // of order (SPEC-0032 R3a — order independence).
+  interface Loaded {
+    summary: SessionSummary;
+    here: boolean;
+    session: Session | null;
+    anchors: BranchAnchorSummary | null;
+  }
+  const loaded: Loaded[] = [];
   for (const { summary, pool } of candidates) {
-    // `here` gates both softeners (helper rule, excluded count) — always false
-    // for the anchor pool, where the SHA anchor is the only key (SPEC-0024 R1).
+    // `here` gates the softeners (helper rule, excluded count, message
+    // fallback) — always false for the anchor pool, where the SHA anchor is
+    // the only key (SPEC-0024 R1).
     const here = pool === "repo" && inCurrentWorktree(summary, deps.currentWorktreeRoot);
     const session = await deps.loadSession(summary);
-    if (!session) {
+    loaded.push({ summary, here, session, anchors: session ? classifyBranchAnchors(session.turns, branchShas) : null });
+  }
+
+  // SPEC-0032 R3 — the eligible-subject set: branch subjects on commits no
+  // candidate SHA-claims, unique on the branch. Empty when subjects weren't
+  // supplied (fallback off).
+  const claimedShas = new Set<string>();
+  for (const l of loaded) {
+    if (l.session) {
+      // Any write verb claims (push output too — a push-anchored commit's
+      // subject must not stay eligible; S5 finding 1).
+      for (const sha of claimedBranchShas(l.session, branchShas)) {
+        claimedShas.add(sha);
+      }
+    }
+  }
+  const subjects = deps.branchSubjects ?? [];
+  const eligible = subjects.length > 0 ? eligibleSubjects(branchShas, subjects, claimedShas) : new Set<string>();
+
+  // SPEC-0032 R4d — claims are counted BEFORE the per-session filters (R4b/
+  // R4c), so a disqualified claimant still poisons its subject: "exactly ONE
+  // candidate claims that eligible subject" means one claim TOTAL, not one
+  // surviving claim (S5 finding 2).
+  const claimCounts = new Map<string, number>();
+  const perSession = new Map<Loaded, string[]>();
+  for (const l of loaded) {
+    if (!l.session || !l.anchors || !l.here) {
+      continue;
+    }
+    const isCodex = l.summary.source === "codex";
+    const shaIncluded = l.anchors.hasOwn || (isCodex && l.anchors.writeCount === 0);
+    if (shaIncluded) {
+      continue;
+    }
+    const matched = sessionCommitSubjects(l.session).filter((s) => eligible.has(s));
+    perSession.set(l, matched);
+    for (const subject of matched) {
+      claimCounts.set(subject, (claimCounts.get(subject) ?? 0) + 1);
+    }
+  }
+  const messageCredited = new Set<Loaded>();
+  for (const [l, matched] of perSession) {
+    // R4c exactly one match; R4d that subject claimed exactly once overall;
+    // R4b no SHA-proven writes elsewhere.
+    if (matched.length === 1 && claimCounts.get(matched[0]) === 1 && l.session && !hasForeignShaWrites(l.session, branchShas)) {
+      messageCredited.add(l);
+    }
+  }
+
+  // Pass 2 — assemble in candidate order with the original SHA/helper rules;
+  // the message fallback only ever converts an excluded-but-here session.
+  for (const l of loaded) {
+    const { summary, here, session, anchors } = l;
+    if (!session || !anchors) {
       // A candidate we can't load can't be proven — count it only if it's plausibly ours.
       if (here) {
         excludedCount++;
       }
       continue;
     }
-    const anchors = classifyBranchAnchors(session.turns, branchShas);
     const isCodex = summary.source === "codex";
     // Own branch SHA → contributes (any source, any pool, SHA-proven). Codex
     // that made NO git writes at all AND ran in this worktree → a pure helper
     // (cwd+time, repo pool only). A session that committed/pushed but produced
     // no branch SHA, or a SHA-less Codex session from a sibling worktree or
-    // the anchor pool, is not proven ours (R1).
+    // the anchor pool, is not proven ours (R1) — unless the SPEC-0032 message
+    // fallback structurally credits it (weaker basis, labeled on the row).
     const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0 && here);
     if (include) {
       contributors.push({
@@ -99,6 +167,15 @@ export async function selectContributors(
         session,
         slice: computeSlice(session.turns, branchShas),
         basis: anchors.hasOwn ? "anchor" : "helper",
+      });
+    } else if (messageCredited.has(l)) {
+      contributors.push({
+        summary,
+        session,
+        // No SHA in output → no turn range; the labeled full-session fallback
+        // stays (SPEC-0032 R5 — credit, never slicing).
+        slice: computeSlice(session.turns, branchShas),
+        basis: "message",
       });
     } else if (here) {
       // Plausibly ours (this worktree) but unproven — surface it in the honest note.
