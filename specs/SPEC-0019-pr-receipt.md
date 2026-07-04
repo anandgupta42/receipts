@@ -18,7 +18,8 @@ lead habit — and it visibly fails (PRs #19–#21 shipped receiptless until the
 maintainer asked). It cannot be a plain CI job: transcripts live on the developer's
 machine, never on the runner. So the correct architecture is **local generation +
 CI presence-verification**: a one-command local step wired into the build procedure,
-and a soft CI check that notices when it was skipped. This is also a real *product*
+and a notice-only CI check that can be configured to require the marked receipt on
+same-repo PRs while keeping fork PRs advisory. This is also a real *product*
 feature — any developer can attach their agent-session receipt to any repo's PR.
 **Kill criterion:** if session→PR attribution mislabels a receipt in dogfood even once
 (wrong session posted), the auto-selection is cut back to explicit `--session <id>`
@@ -106,11 +107,16 @@ only.
   contributors run `npx aireceipts pr --post` (or wire it as a local git alias);
   maintainers copy ONE workflow file (the R5 thin caller) and add one CONTRIBUTING
   line. No server, no tokens beyond `gh`'s own auth.
-- **R5 — CI presence check (soft, testable).** The logic lives in
-  `scripts/check-pr-receipt.mjs` (input: a comments-JSON file; output: found/missing) —
+- **R5 — CI presence check (notice by default, opt-in same-repo blocking, testable).** The logic lives in
+  `scripts/check-pr-receipt.mjs` (input: a comments-JSON file; output:
+  found/missing-required/missing-notice) —
   unit-tested with fixtures; the workflow is a thin caller feeding it
-  `gh api` output and emitting a neutral `::notice` when missing (never a failure —
-  external contributors have no sessions and must not be blocked).
+  `gh api` output. Missing receipts emit a neutral `::notice` by default and never
+  fail the build. Maintainers may set repository variable
+  `AIRECEIPTS_REQUIRE_PR_RECEIPT=true` to fail missing receipts on same-repo PRs;
+  missing receipts on fork PRs remain notice-only because external contributors may
+  not have local sessions and must not be blocked. CI never generates the receipt
+  itself.
 
 ## Scenarios
 
@@ -147,7 +153,7 @@ non-GitHub forges.
 | R2 marker | posted body | starts with `<!-- aireceipts-dogfood -->`, fenced receipt |
 | R3 ordering | gh missing / post fails (mock) | stdout body FIRST, stderr diagnostic, exit 1 |
 | R3 not-a-PR | branch without PR | stdout body + hint, exit 1 |
-| R5 script | comments-JSON fixtures (present/absent) | found/missing verdicts; workflow thin-caller |
+| R5 script | comments-JSON fixtures (present/absent, default/enforced same-repo/fork) | found/missing-required/missing-notice verdicts; workflow thin-caller |
 | R4 wiring | build-spec skill + PR template diff | step + Evidence mention present |
 | R6 integration doc | docs/pr-receipts.md | workflow-copy + CONTRIBUTING line present, ≤5 steps |
 | R1e tokenized matcher | codex-exec instruction-in-string fixture | NOT an anchor |

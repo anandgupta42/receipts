@@ -282,7 +282,7 @@ describe("SPEC-0026 R4 · footer hint", () => {
 });
 
 describe("SPEC-0026 R5 · collapsed full receipts", () => {
-  const detail = (label: string, text = "RECEIPT-TEXT") => ({ label, text });
+  const detail = (label: string, text = "RECEIPT-TEXT") => ({ label, row: ["**r**", "`id`", "scope", "1", "1m", "1 / 1", "—"], text });
 
   it("appends the details section after the fence, receipts in row order, marker still first", () => {
     const body = renderPrBody(

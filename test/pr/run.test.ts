@@ -22,7 +22,7 @@ const gitOk: CommandRunner = (_cmd, args) => {
   if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return ok("/home/dev/repo\n");
   if (args[0] === "rev-parse") return ok("origin/main\n");
   if (args[0] === "merge-base") return ok("0000000000000000000000000000000000000000\n");
-  if (args[0] === "log") return ok("b1c2d3e4f5061728394a5b6c7d8e9f0011223344|2026-06-28T10:02:00.000Z\n");
+  if (args[0] === "log") return ok(["b1c2d3e4f5061728394a5b6c7d8e9f0011223344", "2026-06-28T10:02:00.000Z", "feat: fixture commit"].join("\u0000") + "\n");
   return { stdout: "", stderr: "", code: 1, missing: false };
 };
 
@@ -31,7 +31,7 @@ const gitSubagentTime: CommandRunner = (_cmd, args) => {
   if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return ok("/home/dev/repo\n");
   if (args[0] === "rev-parse") return ok("origin/main\n");
   if (args[0] === "merge-base") return ok("0000000000000000000000000000000000000000\n");
-  if (args[0] === "log") return ok("1111111111111111111111111111111111111111|2026-06-27T12:01:00.000Z\n");
+  if (args[0] === "log") return ok(["1111111111111111111111111111111111111111", "2026-06-27T12:01:00.000Z", "feat: other repo commit"].join("\u0000") + "\n");
   return { stdout: "", stderr: "", code: 1, missing: false };
 };
 
@@ -230,8 +230,8 @@ describe("SPEC-0024 attribution widening (e2e)", () => {
     const code = await runPr({ post: false }, deps);
     expect(code).toBe(0);
     expect(out[0]).toContain("1 session behind this PR");
-    expect(out[0]).toContain("orchestrator · ");
-    expect(out[0]).toContain("lead · session slice");
+    expect(out[0]).toContain("| **orchestrator** |");
+    expect(out[0]).toContain("turns ");
     expect(out[0]).toContain("SUBAGENTS (1)");
     expect(out[0]).toContain("counted: 1 session + 1 subagent");
   });
@@ -268,8 +268,8 @@ describe("SPEC-0024 attribution widening (e2e)", () => {
     expect(code).toBe(0);
     expect(out[0]).toContain("2 sessions behind this PR");
     // Chronological across pools: the promoted teammate row renders before the builder row.
-    expect(out[0].indexOf("team-1 · ")).toBeLessThan(out[0].indexOf("claude-anchors · "));
-    expect(out[0].indexOf("team-1 · ")).toBeGreaterThan(-1);
+    expect(out[0].indexOf("`team-1`")).toBeLessThan(out[0].indexOf("`claude-anchors`"));
+    expect(out[0].indexOf("`team-1`")).toBeGreaterThan(-1);
     expect(out[0]).toContain("counted: 2 sessions");
   });
 
@@ -410,8 +410,8 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
     const code = await runPr({ post: false }, deps);
     expect(code).toBe(0);
     const body = out[0];
-    const authorLabel = body.indexOf("builder · claude-anchors");
-    const helperLabel = body.indexOf("codex · codex-branch-commit");
+    const authorLabel = body.indexOf("#### builder · `claude-anchors`");
+    const helperLabel = body.indexOf("#### codex · `codex-branch`");
     expect(authorLabel).toBeGreaterThan(-1);
     expect(helperLabel).toBeGreaterThan(-1);
     expect(authorLabel).toBeLessThan(helperLabel);

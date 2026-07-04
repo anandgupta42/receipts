@@ -20,11 +20,15 @@ describe("R4 harness wiring", () => {
     expect(evidence).toContain("aireceipts pr --post");
   });
 
-  it("the CI presence workflow is a thin caller emitting a neutral notice, never a failure", () => {
+  it("the CI presence workflow is notice-only by default with opt-in enforcement", () => {
     const wf = read(".github/workflows/pr-receipt-check.yml");
     expect(wf).toContain("scripts/check-pr-receipt.mjs");
+    expect(wf).toContain("AIRECEIPTS_REQUIRE_PR_RECEIPT");
+    expect(wf).toContain("--require-same-repo");
+    expect(wf).toContain("missing-required");
+    expect(wf).toContain("missing-notice");
     expect(wf).toContain("::notice::");
-    expect(wf).not.toContain("exit 1");
+    expect(wf).toContain("exit 1");
   });
 });
 

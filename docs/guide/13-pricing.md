@@ -52,6 +52,24 @@ Every row is cited and checked:
   is listed in an `omitted` array with the reason, and stays tokens-only. It is
   never given a fabricated flat rate.
 
+## Multi-provider agents
+
+Some agents, especially opencode, can run any provider or local model the user
+configures. aireceipts does not treat the agent name as the vendor for those
+sessions. It prices each assistant turn from the turn's model id:
+
+- `claude-*` resolves to the Anthropic price table.
+- `gpt-*` resolves to the OpenAI price table.
+- `gemini-*` resolves to the Google price table.
+- `deepseek-*` resolves to the DeepSeek price table.
+
+After that, the usual rule still applies: the exact model id and session date must
+match a cited `data/prices/<vendor>.json` row. If the model id is custom, local,
+OpenRouter-style, or simply not in the tables yet, that turn contributes tokens
+only. Mixed sessions can therefore have priced rows for known turns and
+tokens-only rows for unknown turns; a fully unknown session renders `no price
+table matched`.
+
 ## "same tokens on claude-haiku-4-5"
 
 The line under the total re-prices the session's **identical token counts** on a

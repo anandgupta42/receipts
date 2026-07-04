@@ -84,6 +84,45 @@ export function classifyBranchAnchors(turns: Turn[], branchShas: readonly string
   return { hasOwn, writeCount };
 }
 
+/** SPEC-0031 R1 — one commit-anchored turn: the full branch SHAs whose prefix
+ * appeared in a `git commit` span's OUTPUT on this turn, transcript order. */
+export interface AnchorEvent {
+  turnIndex: number;
+  /** Full branch SHAs matched on this turn, first-appearance order, deduped. */
+  shas: string[];
+}
+
+/**
+ * SPEC-0031 R1 — per-turn commit anchors (the segmentation seam).
+ * `classifyBranchAnchors` answers only booleans/counts; per-commit tables need
+ * WHICH branch commit each turn anchored. Commit verbs only — push output
+ * re-prints SHAs and is ambiguous under rebase (same reason computeSlice
+ * requires a commit anchor).
+ */
+export function anchorEvents(turns: Turn[], branchShas: readonly string[]): AnchorEvent[] {
+  const events: AnchorEvent[] = [];
+  for (const turn of turns) {
+    const shas: string[] = [];
+    for (const call of turn.toolCalls) {
+      if (toolCallGitVerb(call) !== "commit") {
+        continue;
+      }
+      for (const run of hexRuns(String(call.output ?? ""))) {
+        // A prefix matching MULTIPLE branch commits is ambiguous — attributing
+        // it would guess; skip it (the turn still prices, just unsegmented).
+        const matches = branchShas.filter((sha) => sha.startsWith(run));
+        if (matches.length === 1 && !shas.includes(matches[0])) {
+          shas.push(matches[0]);
+        }
+      }
+    }
+    if (shas.length > 0) {
+      events.push({ turnIndex: turn.index, shas });
+    }
+  }
+  return events;
+}
+
 /**
  * Compute the PR-scoped turn range. See R1e(d)-(f):
  * - no own anchor → labeled full session.

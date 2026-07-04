@@ -9,6 +9,7 @@ import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry } from "../receipt/model.js";
 import { formatInt, formatUsd } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
+import { MESSAGE_BASIS_LABEL } from "./messageAnchor.js";
 import { formatDuration } from "../receipt/format.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
 import { RECEIPT_WIDTH, renderBlockLines } from "../receipt/render.js";
@@ -32,7 +33,7 @@ export interface ContributorView {
   tokens: TokenUsage;
   subagents: SubagentRow[];
   /** SPEC-0026 R3 — how selection credited this session; `helper` rows render grouped, not top-level (round 2). */
-  basis?: "anchor" | "helper";
+  basis?: "anchor" | "helper" | "message";
   /** Rendered-slice duration — the helper group's one per-row fact (round 2). */
   durationMs?: number;
 }
@@ -108,8 +109,12 @@ function mutedNote(text: string, indent = NOTE_INDENT): Block {
   return { kind: "note", text, indent, muted: true };
 }
 
-/** Round 2: the fence carries provenance ONLY when it changes a number's meaning — a real slice. Ids and full-session explainers live in the details section. */
+/** Round 2: the fence carries provenance ONLY when it changes a number's meaning — a real slice, or the weaker
+ * SPEC-0032 message basis (a reader must see that this row's credit is not SHA-proven, with or without --details). */
 function provenanceBlocks(view: ContributorView): Block[] {
+  if (view.basis === "message") {
+    return [mutedNote(MESSAGE_BASIS_LABEL)];
+  }
   if (view.slice.kind !== "slice") {
     return [];
   }
@@ -286,8 +291,10 @@ export function renderPrReceiptText(input: PrBodyInput): string {
 
 /** One pre-rendered per-session full receipt for the R5 details section. */
 export interface DetailReceipt {
-  /** `<role> · <sessionId>` — the same strings the rows already show. */
+  /** Heading over the receipt: `#### <role> · \`<shortId>\`` (markdown; artifact uses its own plain labels). */
   label: string;
+  /** Session-table row cells: [role, id, scope, turns, time, tokens, cached] (round 3 — the ledger table). */
+  row: string[];
   /** `renderReceipt(model, { color: false })` output for the contributor's sliced model. */
   text: string;
 }
@@ -310,7 +317,14 @@ const FENCE = "```";
 function detailsSection(details: DetailReceipt[], budget: number): string | null {
   const kept = details.map((d) => `${d.label}\n\n${FENCE}\n${d.text}\n${FENCE}`);
   const omitted = details.map((d) => `${d.label} — ${OMITTED_NOTE}`);
-  const header = `<details><summary>full receipts (${plural(details.length, "session")})</summary>`;
+  // Round 3: a ledger table up top — uniform, scannable — then each receipt
+  // under its own small heading. The table is always kept (cheap bytes).
+  const table = [
+    "| session | id | scope | turns | time | tokens in / out | cached |",
+    "|---|---|---|---|---|---|---|",
+    ...details.map((d) => `| ${d.row.join(" | ")} |`),
+  ].join("\n");
+  const header = `<details><summary>full receipts (${plural(details.length, "session")})</summary>\n\n${table}`;
   const frame = [...header].length + [...`\n\n${"\n"}\n</details>`].length + details.length; // header + blank lines + joins
   const size = (s: string): number => [...s].length + 1; // +1 for its join newline
 
