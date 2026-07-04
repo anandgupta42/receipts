@@ -365,7 +365,7 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
     const code = await runPr({ post: true, artifact: true }, deps);
     expect(code).toBe(0);
     const raw = encodeURIComponent("https://raw.githubusercontent.com/o/r/refs/heads/aireceipts/artifacts/pr-7.html");
-    expect(out[0]).toContain(`full receipt: [pr-7.html](https://anandgupta42.github.io/aireceipts/view.html?src=${raw})`);
+    expect(out[0]).toContain(`full receipt: [pr-7.html](https://anandgupta42.github.io/receipts/view.html?src=${raw})`);
     // Printed body and posted body are byte-identical (render-first spine).
     expect(posted.some((p) => JSON.parse(p).body === out[0])).toBe(true);
     // R4 preflight names branch, remote, file before the push.

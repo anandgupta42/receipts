@@ -59,17 +59,26 @@ never touched. The viewer page itself carries no analytics or beacons and
 never will (I4's spirit): nobody, including the aireceipts project, learns
 who viewed which receipt.
 
-## For maintainers (repo integration, 5 minutes)
+## For maintainers (repo integration, 2 minutes)
 
-1. Copy one workflow file into your repo: `.github/workflows/pr-receipt-check.yml`
-   (the thin caller that runs `scripts/check-pr-receipt.mjs` — copy that script too).
+1. Paste the 3-line caller as `.github/workflows/pr-receipt-check.yml`
+   ([template](adopt/pr-receipt-check-caller.yml)):
+
+   ```yaml
+   name: pr-receipt-check
+   on: [pull_request]
+   jobs:
+     check:
+       uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
+   ```
+
 2. Add one line to `CONTRIBUTING.md`:
 
    > Before opening a PR, run `npx aireceipts pr --post` to attach your build receipt.
 
 That's it. The workflow emits a neutral `::notice` when a PR has no receipt comment and
 **never fails the build** — external contributors have no local sessions and must not be
-blocked.
+blocked. Rolling out across a whole org: [docs/adopt/org-rollout.md](adopt/org-rollout.md).
 
 ## What the comment contains
 

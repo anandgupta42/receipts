@@ -40,5 +40,13 @@
   },
   "overrides": {
     "qs": "^6.15.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anandgupta42/receipts.git"
+  },
+  "homepage": "https://anandgupta42.github.io/receipts/",
+  "bugs": {
+    "url": "https://github.com/anandgupta42/receipts/issues"
   }
 }

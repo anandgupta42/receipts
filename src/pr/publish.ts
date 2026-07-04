@@ -16,7 +16,7 @@ const ARTIFACT_REF = `refs/heads/${ARTIFACT_BRANCH}`;
  * remedy is this static viewer on the aireceipts site). Works for ANY repo's
  * artifacts with zero setup on their side.
  */
-export const VIEWER_URL = "https://anandgupta42.github.io/aireceipts/view.html";
+export const VIEWER_URL = "https://anandgupta42.github.io/receipts/view.html";
 
 /** The viewer link for one artifact: the raw URL (canonical refs/heads form — the branch name contains a slash) passed as ?src=. */
 export function artifactViewUrl(ownerRepo: string, fileName: string): string {
