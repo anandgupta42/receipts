@@ -1,7 +1,7 @@
 ---
 id: SPEC-0031
 title: "Per-commit cost attribution — the ledger cut at commit boundaries"
-status: draft
+status: building
 milestone: M4
 depends: [SPEC-0023, SPEC-0026, SPEC-0027]
 ---
@@ -30,8 +30,8 @@ post-final-commit work stays outside the PR receipt exactly as SPEC-0019
 designed.
 Placement follows the session's layered design: the fence stays untouched;
 the per-commit table lives on the artifact page (SPEC-0027 — "more
-interesting insight, one click away") and in `--json`; the details section
-gets one compact line per commit.
+interesting insight, one click away") and in the artifact's inert JSON
+island; the fence and details section are frozen.
 
 **Kill criterion:** (a) reconciliation is absolute — for every session, the
 sum of its commit segments must equal its slice total token-exactly and
@@ -181,4 +181,24 @@ SPEC-0028 shipped — evidence it is enforceable exists in the suite today.
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 30 spec(s) OK,
 exit 0.
 
-Status remains draft pending maintainer approval (button 1).
+**2026-07-03 · approved (button 1):** maintainer, in-session ("all specs approved").
+
+**2026-07-03 · S5 (implementation review, Codex, full capture): REWORK → fixed.**
+1. HIGH — `branchCommits` was read twice (selection + tables), risking
+   desync and violating R2's same-call rule — accepted; one `branchInfo`
+   object now feeds both.
+2. MEDIUM — a short SHA prefix matching MULTIPLE branch commits silently
+   picked the newest — accepted; ambiguous prefixes are now skipped
+   (un-attributed beats guessed, I3).
+3. MEDIUM — HTML-escaping the template island made its raw content
+   non-JSON — accepted; the island now unicode-escapes `&<>` inside the
+   JSON text (simultaneously valid JSON and breakout-proof; hostile
+   `</template><script>` subject test added).
+4. LOW — literal NUL bytes made the test file binary to git — accepted;
+   source escapes now.
+5. LOW — freeze coverage weak + a Purpose leftover still promised details
+   lines — accepted; Purpose corrected (fence AND details frozen), and the
+   critic's own no-additivity-bug finding is recorded: table math uses only
+   `totalTokens`/`totalUsd`, which are pure per-turn sums.
+Critic's independent conclusion: "I did not find a token/USD additivity
+bug in the row math." Gates re-run green after rework.

@@ -22,7 +22,7 @@ const gitOk: CommandRunner = (_cmd, args) => {
   if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return ok("/home/dev/repo\n");
   if (args[0] === "rev-parse") return ok("origin/main\n");
   if (args[0] === "merge-base") return ok("0000000000000000000000000000000000000000\n");
-  if (args[0] === "log") return ok("b1c2d3e4f5061728394a5b6c7d8e9f0011223344|2026-06-28T10:02:00.000Z\n");
+  if (args[0] === "log") return ok(["b1c2d3e4f5061728394a5b6c7d8e9f0011223344", "2026-06-28T10:02:00.000Z", "feat: fixture commit"].join("\u0000") + "\n");
   return { stdout: "", stderr: "", code: 1, missing: false };
 };
 
@@ -31,7 +31,7 @@ const gitSubagentTime: CommandRunner = (_cmd, args) => {
   if (args[0] === "rev-parse" && args[1] === "--show-toplevel") return ok("/home/dev/repo\n");
   if (args[0] === "rev-parse") return ok("origin/main\n");
   if (args[0] === "merge-base") return ok("0000000000000000000000000000000000000000\n");
-  if (args[0] === "log") return ok("1111111111111111111111111111111111111111|2026-06-27T12:01:00.000Z\n");
+  if (args[0] === "log") return ok(["1111111111111111111111111111111111111111", "2026-06-27T12:01:00.000Z", "feat: other repo commit"].join("\u0000") + "\n");
   return { stdout: "", stderr: "", code: 1, missing: false };
 };
 
