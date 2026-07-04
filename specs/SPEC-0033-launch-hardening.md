@@ -212,3 +212,105 @@ policy — no other project can make that move this cheaply.
 exit 0.
 
 **2026-07-03 · approved (button 1):** maintainer, in-session ("all specs approved").
+
+**2026-07-03 · S5 (build):** implementation complete on `feat/m4-launch-hardening`.
+
+- **R1** — all 22 pre-existing `uses:` references across the 7 workflow
+  files SHA-pinned (`@<40-hex> # <tag>`), each SHA cross-verified via `gh api
+  repos/<owner>/<repo>/commits/<tag>`. `.github/dependabot.yml` added
+  (github-actions ecosystem, weekly, no npm ecosystem — per the non-goal).
+  `scripts/hygiene.mjs` gained `checkWorkflowPins`/`checkWorkflowPinsText`
+  (internal gate "R9" in that script's own R1-R8 numbering, distinct from
+  this spec's R1) enforcing `uses:` must carry a full 40-hex SHA, skipping
+  `./local` and `docker://` refs; zero violations against the repo, and unit
+  tests cover both the violation and pass paths plus the two skip cases.
+- **R2** — explicit `permissions: {contents: read}` added to the 4 workflows
+  that lacked it (`ci.yml`, `deps.yml`, `hygiene.yml`, `mutation.yml`);
+  `pages.yml`/`price-scan.yml`/`pr-receipt-check.yml` already had blocks and
+  were left alone. **Settings-checklist item recorded, not executed**: repo
+  Actions default workflow token permissions should be set to read-only, and
+  secret scanning + push protection enabled, at flip time — this needs the
+  maintainer's own button; requested as a PR-thread acknowledgment per the
+  test matrix, not performed by this session.
+- **R3** — `zizmor` job added to `hygiene.yml` (`pull_request` trigger),
+  installed by the gitleaks checksum pattern adapted for zizmor's release
+  assets (no companion `_checksums.txt`; the GitHub Releases API's own
+  SHA256 `digest` field is pinned and verified with `sha256sum -c`,
+  independently cross-checked against a real local download's `shasum -a
+  256`). Runs `zizmor --strict-collection --min-severity high
+  .github/workflows`; `.github/zizmor.yml` committed empty (`rules: {}`) as
+  the only suppression path. **Verified green against the real repo**: `zizmor
+  --strict-collection --min-severity high .github/workflows` → "No findings
+  to report... (16 ignored, 31 suppressed)", exit 0; the 15 medium/1
+  informational findings below the `--min-severity high` floor are all
+  `artipacked` (missing `persist-credentials: false`), out of this spec's
+  scope. **Red-path demonstration** (test matrix row "R3 gate red"): a fixture
+  workflow built and run *outside* the repo (not committed — it deliberately
+  combines `pull_request_target`, an unpinned `actions/checkout@v4`, and
+  unsanitized `${{ github.event.pull_request.title }}` interpolated directly
+  into a `run:` shell block) was scanned with the same pinned zizmor binary:
+  `zizmor --strict-collection --min-severity high` exited **14** (highest
+  finding = high) and reported exactly 3 high-severity findings —
+  `dangerous-triggers`, `template-injection`, `unpinned-uses` — proving the
+  gate fails loudly on the pattern class R3 exists to catch. Also caught a
+  real gap mid-implementation: an early real-repo zizmor run (before
+  `mutation.yml`'s permissions block was added) surfaced a genuine medium
+  `excessive-permissions` finding on that file, fixed in the same commit.
+- **R4** — CONTRIBUTING.md gained (a) a verbatim close-response for
+  gate-skipping PRs in "The pipeline" section, and (b) a sentence in "Humans
+  are welcome" pointing security reporters to SECURITY.md's existing
+  no-working-reproduction clause (SECURITY.md itself needed no edit — the
+  clause already existed). **Settings-checklist item recorded, not
+  executed**: require approval for first-time-contributor workflow runs —
+  requested as a PR-thread maintainer acknowledgment, not performed by this
+  session.
+- **R5** — `.github/workflows/release-publish.yml` added:
+  `workflow_dispatch` only, top-level `permissions: {contents: read}`, job
+  adds only `id-token: write` (no `NODE_AUTH_TOKEN` or any npm token
+  anywhere), fork guard (`if: github.repository ==
+  'anandgupta42/receipts'`), an explicit assertion step that
+  `package.json.repository` matches `github.repository` before publishing,
+  a tooling-floor assertion (npm CLI >= 11.5.1 via `setup-node` pinned to
+  `node-version: "22.14"`), and `npm publish --provenance --access public`
+  on the trusted-publishing path. The first-publish sequence (rename → public
+  flip → manual first publish with a granular token → configure npmjs.com
+  trusted publisher → all subsequent publishes through this workflow) is
+  recorded above in R5's text; **not executed** — this session does not
+  publish anything, per the task's explicit constraint.
+- **Gates, unmasked** (`echo $?` after each): `npx tsc --noEmit` → 0; `npx
+  eslint . --max-warnings 0` → 0; `npx vitest run` → 0 (969 tests, 83 files);
+  `node scripts/verify-goldens.mjs` → 0 (90 artifacts byte-identical); `node
+  scripts/spec-lint.mjs` → 0 (31 specs OK); `node scripts/hygiene.mjs` → 0.
+  `actionlint` (checksum-verified local install, v1.7.7, matching
+  `hygiene.yml`'s pin) against every `.github/workflows/*.yml` → 0, no
+  findings.
+
+**2026-07-03 · S6 (Codex, read-only): 4 findings → all accepted, fixed.**
+Full output captured to file. Findings and disposition:
+1. HIGH — `release-publish.yml` could publish from any manually-dispatched
+   ref (the fork guard only checked `github.repository`; `id-token: write`
+   plus `npm ci`/`build`/`publish` would then run for whatever branch or tag
+   was selected) — **accepted**; job `if:` now also requires `github.ref ==
+   'refs/heads/main'`.
+2. MEDIUM — the `package.json.repository` assertion used a substring glob
+   that would accept e.g. `github.com/anandgupta42/receipts-malicious` —
+   **accepted**; replaced with a Node URL parse requiring exact host
+   `github.com` and exact path `== $GITHUB_REPOSITORY` (`.git` stripped).
+3. MEDIUM — the hygiene backstop didn't enforce the spec's full
+   `@[0-9a-f]{40} # v…` shape: a SHA with no trailing tag comment passed,
+   and a remote `uses:` with no `@` at all was silently ignored —
+   **accepted**; `checkWorkflowPinsText` now matches every `uses:` line,
+   flags missing-`@` refs as unpinned, and separately flags a pinned SHA
+   missing its `# <tag>` comment; both paths unit-tested.
+4. LOW — "config-file-only suppressions" wasn't mechanically enforced
+   (zizmor supports inline `# zizmor: ignore[rule]` pragmas) — **accepted**;
+   the same hygiene check now rejects any inline `zizmor: ignore` pragma in
+   a workflow file, naming `.github/zizmor.yml` as the only suppression
+   path; unit-tested.
+Codex also confirmed `pr-receipt-check.yml`'s reusable behavior
+(`workflow_call` + pinned checkout of `anandgupta42/receipts@main`) is
+preserved, and noted SHA↔tag correspondence isn't verifiable from the diff
+alone — those SHAs were fetched and cross-checked against `gh api
+repos/<owner>/<repo>/commits/<tag>` during the build (S5). All gates re-run
+green after the fixes (tsc/eslint/vitest 970 tests/goldens/spec-lint/hygiene
+all exit 0; actionlint 0; zizmor real-repo run exit 0).

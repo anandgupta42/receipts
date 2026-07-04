@@ -1,0 +1,5 @@
+# SPEC-0033 R3 — zizmor's only suppression path. Empty on purpose: no
+# findings have been triaged as accepted false positives yet. Add entries
+# under rules.<id>.ignore (see https://docs.zizmor.sh/configuration/) only
+# after triaging a real CI run — never as a blanket disable.
+rules: {}

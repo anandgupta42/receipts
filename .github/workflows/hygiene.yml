@@ -5,11 +5,15 @@ on:
     types: [opened, edited, synchronize, reopened]
   workflow_dispatch: {}
 
+# SPEC-0033 R2 — least-privilege baseline; every job here only reads.
+permissions:
+  contents: read
+
 jobs:
   repo-hygiene:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: local hygiene
         run: node scripts/hygiene.mjs
@@ -18,7 +22,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: PR title lint
         env:
@@ -31,7 +35,7 @@ jobs:
     env:
       ACTIONLINT_VERSION: "1.7.7"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
@@ -75,7 +79,7 @@ jobs:
     env:
       GITLEAKS_VERSION: "8.24.3"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
@@ -104,7 +108,7 @@ jobs:
     env:
       GITLEAKS_VERSION: "8.24.3"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
@@ -124,3 +128,38 @@ jobs:
       - name: gitleaks full-history scan
         run: |
           "${RUNNER_TEMP}/gitleaks/gitleaks" git --log-opts="--all" --redact --exit-code 1 .
+
+  zizmor:
+    # SPEC-0033 R3 — static analysis for the workflows themselves (the tj-actions
+    # incident and the class of GitHub Actions template-injection bugs zizmor
+    # catches). Installed by the same checksum-verified pattern as gitleaks
+    # above (hygiene.yml:82-93), adapted because zizmor's GitHub releases don't
+    # ship a companion `_checksums.txt`: GitHub computes and publishes a SHA256
+    # `digest` per release asset via the Releases API, which we pin here and
+    # verify locally with `sha256sum -c` exactly like the other tools. Bumping
+    # ZIZMOR_VERSION/ZIZMOR_SHA256 is a manual chore (re-fetch the digest via
+    # `gh api repos/zizmorcore/zizmor/releases/tags/v<version>`), noted beside
+    # the pin so it's not mistaken for an unpinned "latest" install.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      ZIZMOR_VERSION: "1.26.1"
+      ZIZMOR_SHA256: "8556289a64e7aaf2400cd516f61a471aa91c5902cc56ad96a82fd12f90c2ef73"
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: install checksum-verified zizmor
+        run: |
+          set -euo pipefail
+          workdir="${RUNNER_TEMP}/zizmor"
+          mkdir -p "$workdir"
+          cd "$workdir"
+          archive="zizmor-x86_64-unknown-linux-gnu.tar.gz"
+          base_url="https://github.com/zizmorcore/zizmor/releases/download/v${ZIZMOR_VERSION}"
+          curl -fsSLO "${base_url}/${archive}"
+          echo "${ZIZMOR_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive"
+
+      - name: zizmor
+        run: |
+          "${RUNNER_TEMP}/zizmor/zizmor" --strict-collection --min-severity high .github/workflows
