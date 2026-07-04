@@ -6,5 +6,5 @@
 input=$(cat)
 cmd=$(echo "$input" | jq -r '.tool_input.command // ""' 2>/dev/null)
 case "$cmd" in *"gh pr create"*) ;; *) exit 0;; esac
-( node dist/cli.js pr --post 2>/dev/null || npx -y aireceipts pr --post 2>/dev/null ) &
+( node dist/cli.js pr --post 2>/dev/null || npx -y aireceipts-cli pr --post 2>/dev/null ) &
 exit 0

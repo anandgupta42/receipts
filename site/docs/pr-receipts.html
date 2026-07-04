@@ -331,25 +331,42 @@ footer{
 
 <p><code>aireceipts pr</code> attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment that stays current across pushes. Transcripts live on the developer's machine, never on the CI runner — so generation is local. CI checks for the marked receipt comment and is notice-only by default, with an opt-in setting for maintainers who want same-repo PRs to require a receipt.</p>
 
-<h2 id="for-contributors-30-seconds">For contributors (30 seconds)</h2>
+<h2 id="for-contributors-and-coding-assistants-one-command">For contributors and coding assistants (one command)</h2>
 
 <p>From your checkout (or worktree) with the PR branch checked out:</p>
 
-<pre class="doc-code"><code class="language-sh">npx aireceipts pr            # dry-run: prints the exact comment body to stdout
-npx aireceipts pr --post     # upserts the receipt comment on the PR via gh</code></pre>
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli pr --post</code></pre>
 
-<p><code>--post</code> requires the <a href="https://cli.github.com/"><code>gh</code> CLI</a> authenticated to your repo (<code>gh auth login</code>); no other tokens or servers are involved. Re-running after more commits edits the same comment in place — no comment spam. If auto-selection finds more than one matching session (or you want a specific one), pass <code>--session &lt;id&gt;</code> (an id from <code>aireceipts --list</code>).</p>
+<blockquote><strong>Pre-release note:</strong> until the npm package is published, run the same command from a source checkout: <code>node dist/cli.js pr --post</code> (see the README's install status). The one-command story becomes literal at v0.1.0.</blockquote>
 
-<p>Prefer a git alias so it runs itself:</p>
+<p>That is the finalizer for humans, Codex, Claude Code, OpenCode, Cursor, and any other coding assistant. It discovers supported local agent sessions, matches them to the current repo/worktree and PR branch, renders the exact comment body, then upserts one marked PR comment through <code>gh</code>.</p>
 
-<pre class="doc-code"><code class="language-sh">git config alias.receipt '!npx aireceipts pr --post'
-git receipt                  # after pushing your branch</code></pre>
+<p><code>npx</code> needs Node/npm. Posting needs the <a href="https://cli.github.com/"><code>gh</code> CLI</a> authenticated to your repo (<code>gh auth login</code>); no other tokens or servers are involved. Re-running after more commits edits the same comment in place — no comment spam. If auto-selection finds more than one matching session (or you want a specific one), pass <code>--session &lt;id&gt;</code> (an id from <code>aireceipts --list</code>):</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli pr --post --session &lt;id&gt;</code></pre>
 
 <p>The receipt always prints to stdout first, so even with no <code>gh</code> or no PR yet you can copy the body straight into a comment.</p>
 
+<p>For a dry run without posting:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli pr</code></pre>
+
+<h3 id="assistant-instruction">Assistant instruction</h3>
+
+<p>Use the same instruction for every coding assistant:</p>
+
+<pre class="doc-code"><code class="language-text">Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in the handoff.</code></pre>
+
+<h3 id="optional-convenience-git-alias">Optional convenience: git alias</h3>
+
+<p>This is only a local shortcut. It is not required for adoption and does not replace the one command above.</p>
+
+<pre class="doc-code"><code class="language-sh">git config alias.receipt '!npx aireceipts-cli pr --post'
+git receipt                  # after pushing your branch</code></pre>
+
 <h3 id="optional-publish-a-durable-receipt-page">Optional: publish a durable receipt page</h3>
 
-<pre class="doc-code"><code class="language-sh">npx aireceipts pr --post --artifact</code></pre>
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli pr --post --artifact</code></pre>
 
 <p><code>--artifact</code> (requires <code>--post</code>) additionally writes a self-contained <code>pr-&lt;n&gt;.html</code> — the concise rollup plus every session's full per-tool receipt — to a dedicated <code>aireceipts/artifacts</code> branch of the PR's base repo, and appends one <code>full receipt:</code> link to the comment. The link only appears after the push is confirmed; if you lack push rights the comment still posts, just without the link.</p>
 
@@ -367,7 +384,7 @@ git receipt                  # after pushing your branch</code></pre>
   <li>Add one line to <code>CONTRIBUTING.md</code>:</li>
 </ol>
 
-<p>&gt; Before opening a PR, run <code>npx aireceipts pr --post</code> to attach your build receipt.</p>
+<p>&gt; Before opening a PR, run <code>npx aireceipts-cli pr --post</code> to attach your build receipt.</p>
 
 <p>That's it. By default, the workflow emits a neutral <code>::notice</code> when a PR has no receipt comment and never fails the build. To enforce receipts for same-repo PRs, set the repo variable <code>AIRECEIPTS_REQUIRE_PR_RECEIPT=true</code>; fork PRs stay notice-only because source transcripts remain on the contributor's machine. CI still never generates a receipt itself: the source transcripts stay local. Rolling out across a whole org: <a href="org-rollout.html">docs/adopt/org-rollout.md</a>.</p>
 

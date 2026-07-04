@@ -491,7 +491,7 @@ describe("packed tarball smoke", () => {
     expect(install.code, install.stdout + install.stderr).toBe(0);
 
     const installedPackage = JSON.parse(
-      await readFile(path.join(installDir, "node_modules", "aireceipts", "package.json"), "utf8"),
+      await readFile(path.join(installDir, "node_modules", "aireceipts-cli", "package.json"), "utf8"),
     ) as { dependencies?: Record<string, string> };
     expect(installedPackage.dependencies).toHaveProperty("zod");
     expect(installedPackage.dependencies).toHaveProperty("@resvg/resvg-js");

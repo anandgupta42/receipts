@@ -242,7 +242,7 @@ function totalBlocks(input: PrBodyInput): Block[] {
   // SPEC-0026 R4 (round 2) — the route to the full per-tool story, always the
   // last note: point at the details section when one follows, else the command.
   blocks.push(
-    mutedNote(input.detailsBelow === true ? "full receipts + session ids: section below" : "details: npx aireceipts --session <id>"),
+    mutedNote(input.detailsBelow === true ? "full receipts + session ids: section below" : "details: npx aireceipts-cli --session <id>"),
   );
   return blocks;
 }

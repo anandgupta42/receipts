@@ -333,6 +333,8 @@ footer{
 
 <blockquote><strong>Claude Code only, today.</strong> The <code>install-hook</code> command wires into Claude Code's <code>SessionEnd</code> hook. Other agents (Codex, Cursor, opencode) are fully supported for <em>reading</em> receipts — see <a href="04-read-a-receipt.html">Read a receipt</a> — but don't yet have an equivalent auto-install. For those, run <code>aireceipts</code> yourself or add it to your own shell/CI flow.</blockquote>
 
+<p>For PR receipts across any supported coding assistant, use the universal finalizer instead: <code>npx aireceipts-cli pr --post</code> from the repo worktree. This Claude hook is optional convenience for end-of-session mini receipts, not the PR workflow.</p>
+
 <h2 id="install">Install</h2>
 
 <pre class="doc-code"><code class="language-sh">aireceipts install-hook</code></pre>
@@ -349,7 +351,7 @@ footer{
 +         &quot;hooks&quot;: [
 +           {
 +             &quot;type&quot;: &quot;command&quot;,
-+             &quot;command&quot;: &quot;npx aireceipts --mini&quot;,
++             &quot;command&quot;: &quot;npx aireceipts-cli --mini&quot;,
 +             &quot;timeout&quot;: 10
 +           }
 +         ]
@@ -361,7 +363,7 @@ footer{
 (Existing settings are preserved; formatting may be normalized to 2-space JSON.)
 
 Apply this change? [y/N] y
-Installed. A 6-line receipt now prints when a Claude Code session ends (`npx aireceipts --mini`).</code></pre>
+Installed. A 6-line receipt now prints when a Claude Code session ends (`npx aireceipts-cli --mini`).</code></pre>
 
 <p>Answer anything other than <code>y</code> and it makes no change. Your other Claude Code settings are merged, not overwritten.</p>
 
@@ -376,7 +378,7 @@ run  aireceipts  for the full receipt</code></pre>
 
 <h2 id="where-it-writes">Where it writes</h2>
 
-<p>The hook lands in your Claude Code <code>settings.json</code> — <code>~/.claude/settings.json</code> by default, or wherever <code>$CLAUDE_CONFIG_DIR</code> points. It runs <code>npx aireceipts --mini</code>, capped at a 10-second timeout, so a slow run can never hold up your shell.</p>
+<p>The hook lands in your Claude Code <code>settings.json</code> — <code>~/.claude/settings.json</code> by default, or wherever <code>$CLAUDE_CONFIG_DIR</code> points. It runs <code>npx aireceipts-cli --mini</code>, capped at a 10-second timeout, so a slow run can never hold up your shell.</p>
 
 <h2 id="uninstall">Uninstall</h2>
 

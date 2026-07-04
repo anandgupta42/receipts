@@ -12,7 +12,7 @@ You don't install anything first. One command reads your newest session and
 prices it:
 
 ```sh
-npx aireceipts
+npx aireceipts-cli
 ```
 
 The first time it runs, it prints a one-line note about anonymous diagnostics
@@ -59,7 +59,7 @@ somewhere aireceipts doesn't look yet — jump to [Troubleshooting](12-troublesh
 One session is a number. The trailing week is a habit:
 
 ```sh
-npx aireceipts week
+npx aireceipts-cli week
 ```
 
 ```
@@ -95,7 +95,7 @@ You won't remember to run a command after every session. Let Claude Code run it
 for you:
 
 ```sh
-npx aireceipts install-hook
+npx aireceipts-cli install-hook
 ```
 
 It shows you the exact change, asks before writing, and installs a `SessionEnd`

@@ -6,7 +6,7 @@ account, no API key, no daemon.
 ## The short version: don't install
 
 ```sh
-npx aireceipts
+npx aireceipts-cli
 ```
 
 `npx` fetches and runs the latest published version each time. For an occasional
@@ -17,15 +17,15 @@ receipt, that's the whole story — skip the rest of this page.
 If you run it often, put `aireceipts` on your `PATH`:
 
 ```sh
-npm install -g aireceipts
+npm install -g aireceipts-cli
 aireceipts            # now available directly
 ```
 
 > **Pre-release note.** Until the npm package is published, install from source:
 >
 > ```sh
-> git clone https://github.com/<owner>/aireceipts
-> cd aireceipts
+> git clone https://github.com/<owner>/receipts
+> cd receipts
 > npm install
 > npm run build
 > node dist/cli.js        # this is your `aireceipts`
@@ -36,8 +36,8 @@ aireceipts            # now available directly
 
 ## Upgrade
 
-- **`npx aireceipts`** always runs the latest release — nothing to upgrade.
-- **Global install:** `npm update -g aireceipts`.
+- **`npx aireceipts-cli`** always runs the latest release — nothing to upgrade.
+- **Global install:** `npm update -g aireceipts-cli`.
 - **Source checkout:** `git pull && npm install && npm run build`.
 
 ## Uninstall
@@ -45,7 +45,7 @@ aireceipts            # now available directly
 Remove the global binary:
 
 ```sh
-npm uninstall -g aireceipts
+npm uninstall -g aireceipts-cli
 ```
 
 If you added the automatic Claude Code hook, remove it too — it's a separate,

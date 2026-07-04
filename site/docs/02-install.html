@@ -333,7 +333,7 @@ footer{
 
 <h2 id="the-short-version-dont-install">The short version: don't install</h2>
 
-<pre class="doc-code"><code class="language-sh">npx aireceipts</code></pre>
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli</code></pre>
 
 <p><code>npx</code> fetches and runs the latest published version each time. For an occasional receipt, that's the whole story — skip the rest of this page.</p>
 
@@ -341,16 +341,16 @@ footer{
 
 <p>If you run it often, put <code>aireceipts</code> on your <code>PATH</code>:</p>
 
-<pre class="doc-code"><code class="language-sh">npm install -g aireceipts
+<pre class="doc-code"><code class="language-sh">npm install -g aireceipts-cli
 aireceipts            # now available directly</code></pre>
 
-<blockquote><strong>Pre-release note.</strong> Until the npm package is published, install from source:  <code></code><code>sh git clone https://github.com/&lt;owner&gt;/aireceipts cd aireceipts npm install npm run build node dist/cli.js        # this is your </code>aireceipts<code> </code><code></code>  The commands in these docs are written as <code>aireceipts …</code>; with a source checkout, read that as <code>node dist/cli.js …</code>.</blockquote>
+<blockquote><strong>Pre-release note.</strong> Until the npm package is published, install from source:  <code></code><code>sh git clone https://github.com/&lt;owner&gt;/receipts cd receipts npm install npm run build node dist/cli.js        # this is your </code>aireceipts<code> </code><code></code>  The commands in these docs are written as <code>aireceipts …</code>; with a source checkout, read that as <code>node dist/cli.js …</code>.</blockquote>
 
 <h2 id="upgrade">Upgrade</h2>
 
 <ul>
-  <li><strong><code>npx aireceipts</code></strong> always runs the latest release — nothing to upgrade.</li>
-  <li><strong>Global install:</strong> <code>npm update -g aireceipts</code>.</li>
+  <li><strong><code>npx aireceipts-cli</code></strong> always runs the latest release — nothing to upgrade.</li>
+  <li><strong>Global install:</strong> <code>npm update -g aireceipts-cli</code>.</li>
   <li><strong>Source checkout:</strong> <code>git pull &amp;&amp; npm install &amp;&amp; npm run build</code>.</li>
 </ul>
 
@@ -358,7 +358,7 @@ aireceipts            # now available directly</code></pre>
 
 <p>Remove the global binary:</p>
 
-<pre class="doc-code"><code class="language-sh">npm uninstall -g aireceipts</code></pre>
+<pre class="doc-code"><code class="language-sh">npm uninstall -g aireceipts-cli</code></pre>
 
 <p>If you added the automatic Claude Code hook, remove it too — it's a separate, consent-gated change to your Claude Code settings:</p>
 

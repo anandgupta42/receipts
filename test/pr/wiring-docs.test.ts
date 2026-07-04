@@ -10,16 +10,16 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..")
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), "utf8");
 
 describe("R4 harness wiring", () => {
-  it("build-spec step 7 tells the agent to run `npx aireceipts pr --post`", () => {
+  it("build-spec step 7 tells the agent to run `npx aireceipts-cli pr --post`", () => {
     const skill = read(".claude/skills/build-spec/SKILL.md");
-    expect(skill).toContain("npx aireceipts pr --post");
+    expect(skill).toContain("npx aireceipts-cli pr --post");
     expect(skill).toContain("SPEC-0037");
   });
 
   it("the PR template's Evidence section names the one-command receipt finalizer", () => {
     const tmpl = read(".github/pull_request_template.md");
     const evidence = tmpl.slice(tmpl.indexOf("## Evidence"));
-    expect(evidence).toContain("npx aireceipts pr --post");
+    expect(evidence).toContain("npx aireceipts-cli pr --post");
     expect(evidence).toContain("SPEC-0037");
   });
 
@@ -41,15 +41,15 @@ describe("R6 integration doc", () => {
   it("starts contributor guidance with the one posting command, not the dry-run or alias", () => {
     const section = doc.slice(doc.indexOf("For contributors"));
     const firstFence = section.match(/```sh\n([\s\S]*?)\n```/);
-    expect(firstFence?.[1].trim()).toBe("npx aireceipts pr --post");
-    expect(section.indexOf("npx aireceipts pr --post")).toBeLessThan(section.indexOf("npx aireceipts pr\n"));
-    expect(section.indexOf("npx aireceipts pr --post")).toBeLessThan(section.indexOf("git config alias.receipt"));
+    expect(firstFence?.[1].trim()).toBe("npx aireceipts-cli pr --post");
+    expect(section.indexOf("npx aireceipts-cli pr --post")).toBeLessThan(section.indexOf("npx aireceipts-cli pr\n"));
+    expect(section.indexOf("npx aireceipts-cli pr --post")).toBeLessThan(section.indexOf("git config alias.receipt"));
   });
 
   it("documents one assistant-agnostic instruction snippet", () => {
     expect(doc).toContain("Use the same instruction for every coding assistant");
     expect(doc).toContain(
-      "Before you finish a PR-producing task, run `npx aireceipts pr --post` from the repo worktree and include any failure message in the handoff.",
+      "Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in the handoff.",
     );
     expect(doc).toContain("Codex, Claude Code, OpenCode, Cursor");
   });
@@ -58,7 +58,7 @@ describe("R6 integration doc", () => {
     expect(doc).toContain("Optional convenience: git alias");
     expect(doc).toContain("not required for adoption");
     const hookDoc = read("docs/guide/03-install-hook.md");
-    expect(hookDoc).toContain("npx aireceipts pr --post");
+    expect(hookDoc).toContain("npx aireceipts-cli pr --post");
     expect(hookDoc).toContain("optional");
     expect(hookDoc).toContain("not the PR workflow");
   });
@@ -66,7 +66,7 @@ describe("R6 integration doc", () => {
   it("names the copy-one-workflow file and the one CONTRIBUTING line", () => {
     expect(doc).toContain("pr-receipt-check.yml");
     expect(doc).toContain("CONTRIBUTING");
-    expect(doc).toContain("npx aireceipts pr --post");
+    expect(doc).toContain("npx aireceipts-cli pr --post");
   });
 
   it("the maintainer integration is at most 5 numbered steps", () => {
