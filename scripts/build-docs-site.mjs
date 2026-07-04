@@ -37,12 +37,13 @@ const NAV_SECTIONS = Object.freeze([
       "json-schema.md",
       "statusline.md",
       "pr-receipts.md",
+      "adopt/org-rollout.md",
       "telemetry.md",
     ],
   },
   {
     section: "Why",
-    items: ["guide/13-pricing.md", "guide/14-session-attribution.md"],
+    items: ["guide/13-pricing.md", "guide/14-session-attribution.md", "trust.md"],
   },
 ]);
 

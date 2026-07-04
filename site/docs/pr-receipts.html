@@ -316,18 +316,20 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics telemetry</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
       </ul>
     </aside>
     <article class="doc-content">
 <h1 id="pr-receipts-attach-the-building-sessions-receipt-to-a-pr">PR receipts — attach the building session's receipt to a PR</h1>
 
-<p><code>aireceipts pr</code> attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment that stays current across pushes. Transcripts live on the developer's machine, never on the CI runner — so generation is local, and CI only <em>notices</em> when a PR is missing its receipt.</p>
+<p><code>aireceipts pr</code> attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment that stays current across pushes. Transcripts live on the developer's machine, never on the CI runner — so generation is local. CI checks for the marked receipt comment and is notice-only by default, with an opt-in setting for maintainers who want same-repo PRs to require a receipt.</p>
 
 <h2 id="for-contributors-30-seconds">For contributors (30 seconds)</h2>
 
@@ -345,29 +347,50 @@ git receipt                  # after pushing your branch</code></pre>
 
 <p>The receipt always prints to stdout first, so even with no <code>gh</code> or no PR yet you can copy the body straight into a comment.</p>
 
-<h2 id="for-maintainers-repo-integration-5-minutes">For maintainers (repo integration, 5 minutes)</h2>
+<h3 id="optional-publish-a-durable-receipt-page">Optional: publish a durable receipt page</h3>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts pr --post --artifact</code></pre>
+
+<p><code>--artifact</code> (requires <code>--post</code>) additionally writes a self-contained <code>pr-&lt;n&gt;.html</code> — the concise rollup plus every session's full per-tool receipt — to a dedicated <code>aireceipts/artifacts</code> branch of the PR's base repo, and appends one <code>full receipt:</code> link to the comment. The link only appears after the push is confirmed; if you lack push rights the comment still posts, just without the link.</p>
+
+<p>The comment link opens the artifact through the <strong>aireceipts viewer</strong> (<code>view.html</code> on the project site): a static page that fetches the raw file from GitHub in the reader's browser and renders it in a fully sandboxed frame — no server, no third party, works for any repo's artifacts with zero setup. Two honest limits: the viewer refuses everything except aireceipts artifact paths on GitHub raw/blob URLs (<code>…/aireceipts/artifacts/pr-&lt;n&gt;.html</code> — it must never become a generic HTML renderer), and <strong>private repos can't render</strong>: anonymous raw fetches 404 there, so the viewer shows its error with a direct GitHub link (readable as source by anyone with access) until the repo is public. Publishing writes nothing to your working tree, index, or current branch, and each PR's file is overwritten in place — other PRs' artifacts are never touched. The viewer page itself carries no analytics or beacons and never will (I4's spirit): nobody, including the aireceipts project, learns who viewed which receipt.</p>
+
+<h2 id="for-maintainers-repo-integration-2-minutes">For maintainers (repo integration, 2 minutes)</h2>
 
 <ol>
-  <li>Copy one workflow file into your repo: <code>.github/workflows/pr-receipt-check.yml</code> (the thin caller that runs <code>scripts/check-pr-receipt.mjs</code> — copy that script too).</li>
+  <li>Paste the 3-line caller as <code>.github/workflows/pr-receipt-check.yml</code> (<a href="adopt/pr-receipt-check-caller.yml">template</a>):</li>
+</ol>
+
+<p><code></code><code>yaml name: pr-receipt-check on: [pull_request] jobs: check: uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main </code><code></code></p>
+
+<ol>
   <li>Add one line to <code>CONTRIBUTING.md</code>:</li>
 </ol>
 
 <p>&gt; Before opening a PR, run <code>npx aireceipts pr --post</code> to attach your build receipt.</p>
 
-<p>That's it. The workflow emits a neutral <code>::notice</code> when a PR has no receipt comment and <strong>never fails the build</strong> — external contributors have no local sessions and must not be blocked.</p>
+<p>That's it. By default, the workflow emits a neutral <code>::notice</code> when a PR has no receipt comment and never fails the build. To enforce receipts for same-repo PRs, set the repo variable <code>AIRECEIPTS_REQUIRE_PR_RECEIPT=true</code>; fork PRs stay notice-only because source transcripts remain on the contributor's machine. CI still never generates a receipt itself: the source transcripts stay local. Rolling out across a whole org: <a href="org-rollout.html">docs/adopt/org-rollout.md</a>.</p>
 
 <h2 id="what-the-comment-contains">What the comment contains</h2>
 
 <ul>
   <li>A marker line (<code>&lt;!-- aireceipts-dogfood --&gt;</code>) so the upsert and the CI check can find exactly one comment to keep current.</li>
-  <li>A <code>🧾 aireceipts — session &lt;id&gt;</code> header and a fenced receipt.</li>
-  <li>A slice header: <code>session slice: turns A–B of N</code> when the PR's work is isolated to a commit window, or <code>entire session (slice unavailable)</code> when it can't be cut cleanly (ambiguity is labeled, never presented as PR cost).</li>
-  <li>A <code>SUBAGENTS</code> section rolling up any subagent sessions the PR's work launched, with a combined total.</li>
+  <li>A fenced receipt headed <code>N sessions behind this PR</code>: one row per contributing session (<code>&lt;role&gt; · &lt;model mix&gt; · &lt;cost&gt;</code>), a muted provenance line under each (session id + <code>session slice: turns A–B of N</code>, or <code>entire session (slice unavailable)</code> when the work can't be cut cleanly — ambiguity is labeled, never presented as PR cost), and indented <code>SUBAGENTS</code> sub-rows for any subagent sessions a contributor launched.</li>
+  <li>One combined total. Priced and unpriced sessions are never blended: dollars and tokens total separately.</li>
+  <li>An honest note counting any plausible-but-unproven sessions that were <strong>not</strong> attributed.</li>
 </ul>
 
-<h2 id="how-a-session-is-matched-to-a-pr">How a session is matched to a PR</h2>
+<h2 id="how-sessions-are-matched-to-a-pr">How sessions are matched to a PR</h2>
 
-<p>Auto-selection (no <code>--session</code>) picks the session whose working directory is inside one of this repo's worktrees <strong>and</strong> whose time window overlaps the branch's commit window. Zero matches or more than one → <code>aireceipts pr</code> refuses to guess and asks for <code>--session &lt;id&gt;</code>. The <code>cwd</code>/branch used for matching are attribution-only: they never enter the rendered receipt, <code>--json</code>/<code>--csv</code>, or telemetry.</p>
+<p>Auto-selection (no <code>--session</code>) credits every session that can be tied to the branch, conservatively:</p>
+
+<ul>
+  <li>A session whose recorded git output contains one of the <strong>branch's commit SHAs</strong> is credited wherever it ran — another checkout, another repo's working directory, or an agent-team sidechain. The commit SHA is the primary attribution key; a sidechain is promoted to its own row only when no other credited session already counts it.</li>
+  <li>A session inside one of this repo's worktrees that time-overlaps the branch's commit window gets the softer rules: a Codex session there with <strong>no</strong> git writes at all is credited as a helper on cwd+time.</li>
+  <li>Everything else is excluded. Sessions without SHA proof outside the repo are never credited — and never guessed in.</li>
+</ul>
+
+<p>Zero credited sessions → <code>aireceipts pr</code> refuses to guess and asks for <code>--session &lt;id&gt;</code>. The <code>cwd</code>/branch/SHA signals used for matching are attribution-only: they never enter the rendered receipt, <code>--json</code>/<code>--csv</code>, or telemetry.</p>
     </article>
   </main>
   <footer>

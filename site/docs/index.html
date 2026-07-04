@@ -316,12 +316,14 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics telemetry</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -411,6 +413,11 @@ footer{
     <p>aireceipts pr attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment that stays current across pushes.</p>
   </li>
   <li>
+    <a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a>
+    <span class="path">docs/adopt/org-rollout.md</span>
+    <p>For one repo, adoption is the 3-line caller — see pr-receipt-check-caller.yml and docs/pr-receipts.md.</p>
+  </li>
+  <li>
     <a href="telemetry.html">Diagnostics telemetry</a>
     <span class="path">docs/telemetry.md</span>
     <p>aireceipts can send small, anonymous, content-free diagnostics events to help us find bugs and understand which agent formats and CLI paths are actually used in the wild.</p>
@@ -427,6 +434,11 @@ footer{
     <a href="14-session-attribution.html">How session attribution works</a>
     <span class="path">docs/guide/14-session-attribution.md</span>
     <p>A receipt is only as trustworthy as its answer to one question: *which session is this?* This page explains what aireceipts treats as a session, how it finds them, and why one can…</p>
+  </li>
+  <li>
+    <a href="trust.html">What a receipt proves — and what it can't</a>
+    <span class="path">docs/trust.md</span>
+    <p>aireceipts is local-first: it reads agent transcripts off your disk and prints a receipt.</p>
   </li>
 </ul>
     </article>

@@ -316,12 +316,14 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics telemetry</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -365,6 +367,7 @@ footer{
     <tr><td><code>totalTokens</code></td><td>TokenUsage</td><td>Attributed token totals.</td></tr>
     <tr><td><code>sessionTotalTokens</code></td><td>TokenUsage</td><td>Adapter-reported session totals (the only real number for Cursor).</td></tr>
     <tr><td><code>wasteLines</code></td><td>array</td><td>Fired waste findings; see WasteLine.</td></tr>
+    <tr><td><code>caveats</code></td><td>array</td><td>Time-integrity caveats (SPEC-0028): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code>) + <code>text</code>. Facts only — never affect <code>$</code>. Empty for consistent sessions.</td></tr>
     <tr><td><code>budget</code></td><td>array (optional)</td><td>Advisory budget lines (SPEC-0009); present only when <code>~/.aireceipts/budget.json</code> is configured.</td></tr>
     <tr><td><code>priceDelta</code></td><td>PriceDelta | null</td><td>Cheapest-current-model arithmetic, or null in tokens-only mode.</td></tr>
     <tr><td><code>methodology</code></td><td>string</td><td>The attribution methodology string (I3).</td></tr>
@@ -406,6 +409,16 @@ footer{
     <tr><td><code>tool</code></td><td>string</td><td>Tool name, or &quot;(thinking/reply)&quot; for tool-free turns.</td></tr>
     <tr><td><code>usd</code></td><td>number | null</td><td>Cost attributed to this tool, or null when its turns never priced (I2).</td></tr>
     <tr><td><code>callCount</code></td><td>number</td><td>Number of calls to this tool.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="caveat-spec-0028-time-integrity">Caveat (SPEC-0028 time-integrity)</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>kind</code></td><td>enum</td><td><code>time-mtime</code> (a turn timestamp postdates the transcript file) or <code>time-span</code> (non-positive span carrying usage).</td></tr>
+    <tr><td><code>text</code></td><td>string</td><td>The rendered caveat line, verbatim.</td></tr>
   </tbody>
 </table></div>
 

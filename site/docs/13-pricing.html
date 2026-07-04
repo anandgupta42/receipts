@@ -316,12 +316,14 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics telemetry</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -350,6 +352,19 @@ footer{
   <li><strong>Citations are liveness-checked.</strong> CI fetches every <code>url</code> and requires it to resolve; a source dated recently must carry an excerpt a reviewer can match against the page. No price is ever invented, inferred, or remembered.</li>
   <li><strong>Awkward pricing is omitted, not faked.</strong> A model priced in a shape the flat schema can't hold honestly — tiered by context length, batch, or tool-priced — is listed in an <code>omitted</code> array with the reason, and stays tokens-only. It is never given a fabricated flat rate.</li>
 </ul>
+
+<h2 id="multi-provider-agents">Multi-provider agents</h2>
+
+<p>Some agents, especially opencode, can run any provider or local model the user configures. aireceipts does not treat the agent name as the vendor for those sessions. It prices each assistant turn from the turn's model id:</p>
+
+<ul>
+  <li><code>claude-*</code> resolves to the Anthropic price table.</li>
+  <li><code>gpt-*</code> resolves to the OpenAI price table.</li>
+  <li><code>gemini-*</code> resolves to the Google price table.</li>
+  <li><code>deepseek-*</code> resolves to the DeepSeek price table.</li>
+</ul>
+
+<p>After that, the usual rule still applies: the exact model id and session date must match a cited <code>data/prices/&lt;vendor&gt;.json</code> row. If the model id is custom, local, OpenRouter-style, or simply not in the tables yet, that turn contributes tokens only. Mixed sessions can therefore have priced rows for known turns and tokens-only rows for unknown turns; a fully unknown session renders <code>no price table matched</code>.</p>
 
 <h2 id="same-tokens-on-claude-haiku-4-5">&quot;same tokens on claude-haiku-4-5&quot;</h2>
 

@@ -316,12 +316,14 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics telemetry</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -361,7 +363,7 @@ calls; unpriced models show tokens only, never
 guessed dollars. Full method: aireceipts
 --methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-      aireceipts · local · buy me a samosa 🔺      
+       aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
 
 <p>That's a real session: which models ran, where the tokens went by tool, and what it cost — priced against dated, cited price tables. The <code>same tokens on claude-haiku-4-5</code> line re-prices the identical token counts on a cheaper model; it's arithmetic, not a claim that Haiku would have finished the job.</p>
@@ -394,7 +396,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
   Tokens Δ.............................+93,700 tok
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
-      aireceipts · local · buy me a samosa 🔺      </code></pre>
+       aireceipts · local · buy me a samosa       </code></pre>
 
 <p>Every session on your machine, across every supported agent, totalled for the last seven days — still local, still no upload.</p>
 

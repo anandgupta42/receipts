@@ -223,3 +223,21 @@ Post-merge gates: `tsc` 0, `eslint` 0, `verify-goldens` 0 (90 artifacts),
 timing out on this loaded dev machine — reproduced byte-for-byte on a clean
 `origin/main` worktree with zero SPEC-0034 changes, so they are
 pre-existing environment timeouts, not regressions; CI arbitrates.
+
+**2026-07-04 · maintainer: 🔺 rejected ("not a samosa") — text-only fallback
+activated; Unicode has no samosa emoji and this product does not print
+approximations.** Terminal/PR/week footers now render exactly
+`aireceipts · local · buy me a samosa`, centered by the same `center()`
+math (no hand padding; the line is 2 display columns narrower). The
+footer block's `emoji` field became `samosaMark` — a drawn-glyph request
+graphical renderers honor and terminal output ignores; the SVG/artifact
+samosa glyph stays (it IS a samosa). Golden churn: one shot via
+`goldens.mts --update`, 37 files (39 insertions / 39 deletions —
+terminal/mini/html footers only; `svg/` goldens untouched). README fenced
+receipt re-synced to golden bytes; guard emoji assertion tightened from
+`["🔺"]` to exact `[]`. Repo-wide sweep: no `🔺` remains on any shipped
+surface (the two survivors are an internal evidence doc row, updated, and
+a negative test assertion). Side effect: `build-docs-site.mjs` now throws
+on manifest gaps and `NAV_SECTIONS` was missing `trust.md` +
+`adopt/org-rollout.md` (pre-existing on `origin/main`, blocked this
+regen) — both added to the nav.

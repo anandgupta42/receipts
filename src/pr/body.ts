@@ -54,7 +54,6 @@ const OMITTED_NOTE = "full receipt omitted (comment size limit)";
 
 const WORDMARK = "AIRECEIPTS";
 const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
-const FOOTER_EMOJI = "🔺";
 const NOTE_INDENT = 2;
 
 /** The R1e(e) header line: the turn range, or the honesty label for a full-session fallback. */
@@ -276,7 +275,7 @@ function prBlocks(input: PrBodyInput): Block[] {
   });
   blocks.push(...helperGroupBlocks(helpers, authors.length === 0));
   blocks.push(...totalBlocks(input));
-  blocks.push({ kind: "footer", text: FOOTER_TEXT, emoji: FOOTER_EMOJI });
+  blocks.push({ kind: "footer", text: FOOTER_TEXT });
   return blocks;
 }
 

@@ -109,7 +109,7 @@ export function renderWeek(digest: WeekDigest, opts: RenderWeekOptions = {}): st
   lines.push(...deltaBody(digest));
 
   lines.push(dim("-".repeat(WIDTH)));
-  lines.push(center("aireceipts · local · buy me a samosa 🔺", WIDTH));
+  lines.push(center("aireceipts · local · buy me a samosa", WIDTH));
 
   return lines.join("\n");
 }

@@ -107,8 +107,9 @@ const NOTE_INDENT_PX = 7;
 
 // Emoji deliberately absent from the footer TEXT run: a glyph outside the
 // monospace face poisons the whole text run in resvg-class renderers (tofu).
-// The terminal footer keeps the 🔺; this renderer draws the real samosa
-// shape instead (SPEC-0034 R2 — see samosaGlyphGroup in the footer case).
+// The terminal footer is text-only too (maintainer: 🔺 rejected — "not a
+// samosa"); this renderer draws the real samosa shape when the footer block
+// carries `samosaMark` (SPEC-0034 R2 — see samosaGlyphGroup in the footer case).
 const STAMP_TEXT = "LOCAL · DETERMINISTIC";
 
 // --- Primitives --------------------------------------------------------------
@@ -342,9 +343,9 @@ function layoutBlock(block: Block, cur: Cursor, p: Paints, els: string[]): void 
       els.push(textEl(WIDTH / 2, footerBaseline, block.text, { size: SZ_FOOTER, anchor: "middle", fill: p.muted }));
       // SPEC-0034 R2 — the drawn samosa glyph sits just right of the centered
       // footer text (never in the text run itself — see the tofu note above).
-      // `emoji` presence mirrors the terminal footer's own template gate
-      // (grocery carries none — R1's "grocery untouched").
-      if (block.emoji !== undefined) {
+      // `samosaMark` gates it per template (grocery carries none — R1's
+      // "grocery untouched").
+      if (block.samosaMark) {
         const textWidth = [...block.text].length * charW(SZ_FOOTER);
         const glyphSize = 14;
         const glyphGap = 6;

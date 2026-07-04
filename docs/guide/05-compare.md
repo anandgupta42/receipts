@@ -35,7 +35,7 @@ calls; unpriced models show tokens only, never
 guessed dollars. Full method: aireceipts
 --methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-      aireceipts · local · buy me a samosa 🔺      
+       aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -
 
 === Can you fix the flaky login test in src/auth/login.test.ts? It's failing intermittently in CI. ===
@@ -60,7 +60,7 @@ calls; unpriced models show tokens only, never
 guessed dollars. Full method: aireceipts
 --methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-      aireceipts · local · buy me a samosa 🔺      
+       aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -
 
 Add email format validation to the signup form and add a unit test for it. The signup form is in src/components/SignupF… cost 1.9× Can you fix the flaky login test in src/auth/login.test.ts? It's failing intermittently in CI. ($0.18 vs $0.09)
