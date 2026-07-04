@@ -1,0 +1,2 @@
+{"type":"user","timestamp":"2026-07-01T12:00:00.000Z","cwd":"/home/dev/app5","message":{"role":"user","content":"tidy the readme"}}
+{"type":"assistant","timestamp":"2026-07-01T12:00:04.000Z","message":{"role":"assistant","model":"claude-haiku-4-5","content":[{"type":"text","text":"done"}],"usage":{"input_tokens":900,"output_tokens":40}}}

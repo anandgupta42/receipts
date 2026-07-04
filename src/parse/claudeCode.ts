@@ -1,6 +1,6 @@
 import type { AgentSource, Compaction, ListSessionsOptions, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
 import { claudeCodeFidelity } from "./fidelity/claudeCode.js";
-import { isChildPath, parseChildPath } from "./children.js";
+import { isUnderSubagents, parseChildPath } from "./children.js";
 import { lazyClaudeCodeSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import {
   addUsage,
@@ -389,7 +389,11 @@ export class ClaudeCodeAdapter implements SessionAdapter {
     const all = await listFiles(this.root, (name) => name.endsWith(".jsonl"));
     // R1c: subagent transcripts are excluded from top-level selection — they roll
     // up into their parent's receipt, never appear as standalone sessions.
-    const files = all.filter((file) => !isChildPath(file));
+    // SPEC-0041 R1: the exclusion covers ANY `.jsonl` under `subagents/`, not
+    // just `agent-*.jsonl` — workflow journals etc. are not sessions. Scoped
+    // below the adapter root so an ancestor dir named `subagents` never
+    // excludes the whole corpus.
+    const files = all.filter((file) => !isUnderSubagents(file, this.root));
     const results = await mapWithConcurrency(files, 16, async (file) => {
       try {
         const stat = await this.discoveryFs.stat(file);
