@@ -205,3 +205,14 @@ asserted `<= 2` while R5 pins exactly 2; tightened to exact identity
 (`["🧾", "🔺"]`) plus exact count. Codex's `vitest`/`verify-goldens` failures
 were read-only-sandbox artifacts (Vite temp dir + `mkdtemp` blocked), not
 real: both re-ran green locally before and after the fixes.
+
+**2026-07-04 · merge note (origin/main, post-#79):** the intended base
+branch's PR (#79) merged while this spec was in review, so this branch
+merged `origin/main` and now targets `main` directly. One textual conflict
+(`src/pr/body.ts`): #80's ledger-table header vs R3's samosa-link frame —
+resolved by keeping both (table up top, samosa link still closes the
+section); goldens auto-merged and re-verified byte-identical, no regen
+needed. One matrix deviation: R5 said README "emoji count == 2" (title 🧾 +
+footer 🔺), but #78 replaced the title emoji with the wordmark image after
+this spec was approved — the exact-identity guard now pins the intentional
+set to just `["🔺"]`.

@@ -9,6 +9,8 @@ import {
   checkLineBudgets,
   checkPrTitle,
   checkRootAllowlist,
+  checkWorkflowPins,
+  checkWorkflowPinsText,
   formatFalsePositiveEntry,
   isFalsePositiveEntry,
   LINE_BUDGETS,
@@ -146,6 +148,54 @@ describe("repo hygiene gates", () => {
     expect(isFalsePositiveEntry(entry)).toBe(true);
     expect(log).toContain("YYYY-MM-DD · gate · cause · action");
     expect(log).toContain("_No entries._");
+  });
+
+  it("R9 (SPEC-0033) flags unpinned uses: and ignores local/docker refs", () => {
+    expect(checkWorkflowPinsText("      - uses: actions/checkout@v4\n", "fixture.yml")).toEqual([
+      expect.stringContaining(
+        'fixture.yml:1: "uses: actions/checkout@v4" is not SHA-pinned',
+      ),
+    ]);
+    expect(
+      checkWorkflowPinsText(
+        "      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4\n",
+        "fixture.yml",
+      ),
+    ).toEqual([]);
+    expect(checkWorkflowPinsText("      - uses: ./local-action\n", "fixture.yml")).toEqual([]);
+    expect(checkWorkflowPinsText("      - uses: docker://alpine:3\n", "fixture.yml")).toEqual([]);
+  });
+
+  it("R9 (SPEC-0033) requires the tag comment, flags @-less refs, and bans inline zizmor pragmas", () => {
+    expect(
+      checkWorkflowPinsText(
+        "      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5\n",
+        "fixture.yml",
+      ),
+    ).toEqual([expect.stringContaining('missing the trailing "# <tag>" comment')]);
+    expect(checkWorkflowPinsText("      - uses: actions/checkout\n", "fixture.yml")).toEqual([
+      expect.stringContaining("is not SHA-pinned"),
+    ]);
+    expect(
+      checkWorkflowPinsText(
+        "      - run: echo hi # zizmor: ignore[template-injection]\n",
+        "fixture.yml",
+      ),
+    ).toEqual([expect.stringContaining(".github/zizmor.yml is the only suppression path")]);
+  });
+
+  it("R9 (SPEC-0033) finds zero violations across the repo's real workflows", () => {
+    expect(checkWorkflowPins(process.cwd())).toEqual([]);
+  });
+
+  it("R9 (SPEC-0033) is wired to a checksum-verified zizmor job with the config-file-only suppression path", () => {
+    const workflow = readFileSync(".github/workflows/hygiene.yml", "utf8");
+    const config = readFileSync(".github/zizmor.yml", "utf8");
+
+    expect(workflow).toContain('ZIZMOR_VERSION: "1.26.1"');
+    expect(workflow).toContain("sha256sum -c -");
+    expect(workflow).toContain("--strict-collection --min-severity high .github/workflows");
+    expect(config).toContain("rules: {}");
   });
 
   it("R7 keeps local and CI checks on the same script/rules module", () => {

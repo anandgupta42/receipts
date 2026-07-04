@@ -22,6 +22,51 @@ interface RunResult {
   stderr: string;
 }
 
+interface ReceiptTokenJson {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheCreation: number;
+  total: number;
+}
+
+interface ReceiptToolRowJson {
+  tool: string;
+  usd: number | null;
+  tokens: ReceiptTokenJson;
+  callCount: number;
+}
+
+interface ReceiptJson {
+  source: string;
+  title: string | null;
+  modelMix: Array<{ model: string }>;
+  toolRows: ReceiptToolRowJson[];
+  totalUsd: number | null;
+  totalTokens: ReceiptTokenJson;
+  sessionTotalTokens: ReceiptTokenJson;
+  priceRowsUsed: Array<{ vendor: string; model: string }>;
+}
+
+interface ListRowJson {
+  source: string;
+  title: string | null;
+  model: string | null;
+  totals: {
+    tokens: ReceiptTokenJson;
+    turnCount: number;
+    toolCallCount: number;
+  };
+}
+
+interface OpenCodeE2eSimulation {
+  title: string;
+  model: string;
+  priced: boolean;
+  tools: string[];
+  tokens: ReceiptTokenJson;
+}
+
 function platformCommand(name: string): string {
   return process.platform === "win32" ? `${name}.cmd` : name;
 }
@@ -68,6 +113,7 @@ function cliEnv(home: string): NodeJS.ProcessEnv {
   return {
     HOME: home,
     USERPROFILE: home,
+    LOCALAPPDATA: path.join(home, "AppData", "Local"),
     AIRECEIPTS_HOME: home,
     AIRECEIPTS_TELEMETRY: "off",
     AIRECEIPTS_TELEMETRY_CONNECTION: "",
@@ -89,12 +135,64 @@ function runCli(args: string[], home: string, input?: string): Promise<RunResult
   return runProcess(process.execPath, [cliPath, ...args], { env: cliEnv(home), input });
 }
 
+function expectSuccess(result: RunResult): void {
+  expect(result.code, result.stderr).toBe(0);
+  expect(result.stderr).toBe("");
+}
+
+function readJson<T>(result: RunResult): T {
+  expectSuccess(result);
+  return JSON.parse(result.stdout) as T;
+}
+
 async function stageClaudeSession(home: string, fixtureName: string, destName = fixtureName): Promise<string> {
   const root = path.join(home, ".claude", "projects");
   await mkdir(root, { recursive: true });
   const dest = path.join(root, destName);
   await copyFile(path.join(fixturesDir, "claude-code", fixtureName), dest);
   return dest;
+}
+
+function opencodeRoot(home: string): string {
+  if (process.platform === "win32") {
+    return path.join(home, "AppData", "Local", "opencode");
+  }
+  return path.join(home, ".local", "share", "opencode");
+}
+
+async function stageOpenCodeDb(home: string, fixtureName: string): Promise<string> {
+  const root = opencodeRoot(home);
+  await mkdir(root, { recursive: true });
+  const dest = path.join(root, "opencode.db");
+  await copyFile(path.join(fixturesDir, "opencode", fixtureName), dest);
+  return dest;
+}
+
+function toolRowsByName(rows: ReceiptToolRowJson[]): Record<string, ReceiptToolRowJson> {
+  return Object.fromEntries(rows.map((row) => [row.tool, row])) as Record<string, ReceiptToolRowJson>;
+}
+
+function opencodeE2eSimulation(index: number): OpenCodeE2eSimulation {
+  const knownModels = ["claude-haiku-4-5", "gpt-5.3-codex"];
+  const priced = index % 5 < knownModels.length;
+  const output = 20 + (index % 11);
+  const reasoning = index % 7;
+  const cacheRead = index % 13;
+  const cacheCreation = index % 5;
+  const input = 100 + index;
+  return {
+    title: `Simulated opencode session ${index.toString().padStart(3, "0")}`,
+    model: priced ? knownModels[index % knownModels.length] : `local-sim-${index}`,
+    priced,
+    tools: [[], ["bash"], ["read", "write"], ["bash", "bash"]][index % 4],
+    tokens: {
+      input,
+      output: output + reasoning,
+      cacheRead,
+      cacheCreation,
+      total: input + output + reasoning + cacheRead + cacheCreation,
+    },
+  };
 }
 
 /** Is this platform-specific package installable HERE? Passing an incompatible one
@@ -165,6 +263,131 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain(path.join(home, ".claude", "projects"));
     expect(result.stdout).toContain(path.join(home, ".codex", "sessions"));
   });
+
+  it("discovers and prices opencode multi-provider sessions through built CLI", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "clean-multi-vendor.db");
+
+    const listed = readJson<ListRowJson[]>(await runCli(["--list", "--json"], home));
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({
+      source: "opencode",
+      title: "Port parser adapter",
+      model: "claude-haiku-4-5",
+      totals: {
+        turnCount: 2,
+        toolCallCount: 2,
+      },
+    });
+    expect(listed[0].totals.tokens).toMatchObject({ input: 2200, output: 700, cacheRead: 150, cacheCreation: 90, total: 3140 });
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+    const tools = toolRowsByName(receipt.toolRows);
+
+    expect(receipt.source).toBe("opencode");
+    expect(receipt.title).toBe("Port parser adapter");
+    expect(receipt.totalTokens.total).toBe(3140);
+    expect(receipt.sessionTotalTokens.total).toBe(3140);
+    expect(receipt.totalUsd).toBeCloseTo(0.00975625, 12);
+    expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`).sort()).toEqual([
+      "anthropic:claude-haiku-4-5",
+      "openai:gpt-5.3-codex",
+    ]);
+    expect(receipt.modelMix.map((entry) => entry.model).sort()).toEqual(["claude-haiku-4-5", "gpt-5.3-codex"]);
+    expect(tools.read.usd).toBeCloseTo(0.00301, 12);
+    expect(tools.bash.usd).toBeCloseTo(0.00674625, 12);
+  });
+
+  it("partially prices opencode sessions when only some provider models are known", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "mixed-known-unknown.db");
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+    const tools = toolRowsByName(receipt.toolRows);
+
+    expect(receipt.source).toBe("opencode");
+    expect(receipt.title).toBe("Mixed known and unknown provider");
+    expect(receipt.totalTokens.total).toBe(3140);
+    expect(receipt.totalUsd).toBeCloseTo(0.00301, 12);
+    expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`)).toEqual(["anthropic:claude-haiku-4-5"]);
+    expect(receipt.modelMix.map((entry) => entry.model).sort()).toEqual(["claude-haiku-4-5", "local-big-pickle"]);
+    expect(tools.read.usd).toBeCloseTo(0.00301, 12);
+    expect(tools.bash.usd).toBeNull();
+    expect(tools.bash.tokens.total).toBe(1450);
+  });
+
+  it("keeps unknown opencode provider sessions tokens-only through built CLI", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "legacy-empty-session-message.db");
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+
+    expect(receipt.source).toBe("opencode");
+    expect(receipt.title).toBe("Legacy rows with empty session_message");
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.priceRowsUsed).toEqual([]);
+    expect(receipt.totalTokens.total).toBe(36328);
+    expect(receipt.toolRows.every((row) => row.usd === null)).toBe(true);
+    expect(receipt.toolRows.map((row) => row.tool).sort()).toEqual(["(thinking/reply)", "bash", "write"]);
+
+    const textResult = await runCli([], home);
+
+    expectSuccess(textResult);
+    expect(textResult.stdout).toContain("no price table matched");
+    expect(textResult.stdout).not.toContain("$");
+  });
+
+  it("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "simulated-100.db");
+
+    const listed = readJson<ListRowJson[]>(await runCli(["--list", "--json"], home));
+
+    expect(listed).toHaveLength(100);
+    expect(listed[0].title).toBe("Simulated opencode session 099");
+    expect(listed[99].title).toBe("Simulated opencode session 000");
+
+    for (let index = 0; index < 100; index += 1) {
+      const sim = opencodeE2eSimulation(index);
+      const listedRow = listed[99 - index];
+
+      expect(listedRow).toMatchObject({
+        source: "opencode",
+        title: sim.title,
+        model: sim.model,
+        totals: {
+          turnCount: 1,
+          toolCallCount: sim.tools.length,
+        },
+      });
+      expect(listedRow.totals.tokens).toMatchObject(sim.tokens);
+    }
+
+    for (const index of [0, 1, 2, 3, 99]) {
+      const sim = opencodeE2eSimulation(index);
+      const selector = String(100 - index);
+      const receipt = readJson<ReceiptJson>(await runCli([selector, "--json"], home));
+      const tools = toolRowsByName(receipt.toolRows);
+
+      expect(receipt.source).toBe("opencode");
+      expect(receipt.title).toBe(sim.title);
+      expect(receipt.modelMix.map((entry) => entry.model)).toEqual([sim.model]);
+      expect(receipt.totalTokens).toMatchObject(sim.tokens);
+      expect(receipt.sessionTotalTokens).toMatchObject(sim.tokens);
+      if (sim.priced) {
+        expect(receipt.totalUsd, sim.title).toBeGreaterThan(0);
+        expect(receipt.priceRowsUsed.map((row) => row.model)).toEqual([sim.model]);
+      } else {
+        expect(receipt.totalUsd, sim.title).toBeNull();
+        expect(receipt.priceRowsUsed).toEqual([]);
+      }
+
+      const toolNames = sim.tools.length === 0 ? ["(thinking/reply)"] : [...new Set(sim.tools)];
+      expect(Object.keys(tools).sort()).toEqual(toolNames.sort());
+      expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
+    }
+  }, 45_000);
 
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
     const home = await makeHome();

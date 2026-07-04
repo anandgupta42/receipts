@@ -287,8 +287,10 @@ export function renderPrReceiptText(input: PrBodyInput): string {
 
 /** One pre-rendered per-session full receipt for the R5 details section. */
 export interface DetailReceipt {
-  /** `<role> · <sessionId>` — the same strings the rows already show. */
+  /** Heading over the receipt: `#### <role> · \`<shortId>\`` (markdown; artifact uses its own plain labels). */
   label: string;
+  /** Session-table row cells: [role, id, scope, turns, time, tokens, cached] (round 3 — the ledger table). */
+  row: string[];
   /** `renderReceipt(model, { color: false })` output for the contributor's sliced model. */
   text: string;
 }
@@ -316,7 +318,14 @@ const SAMOSA_LINK = `[buy me a samosa](${SAMOSA_URL})`;
 function detailsSection(details: DetailReceipt[], budget: number): string | null {
   const kept = details.map((d) => `${d.label}\n\n${FENCE}\n${d.text}\n${FENCE}`);
   const omitted = details.map((d) => `${d.label} — ${OMITTED_NOTE}`);
-  const header = `<details><summary>full receipts (${plural(details.length, "session")})</summary>`;
+  // Round 3: a ledger table up top — uniform, scannable — then each receipt
+  // under its own small heading. The table is always kept (cheap bytes).
+  const table = [
+    "| session | id | scope | turns | time | tokens in / out | cached |",
+    "|---|---|---|---|---|---|---|",
+    ...details.map((d) => `| ${d.row.join(" | ")} |`),
+  ].join("\n");
+  const header = `<details><summary>full receipts (${plural(details.length, "session")})</summary>\n\n${table}`;
   // header + blank lines + joins + the closing samosa link and its own blank-line pair
   const frame =
     [...header].length + [...`\n\n${"\n"}\n${SAMOSA_LINK}\n\n</details>`].length + details.length;
