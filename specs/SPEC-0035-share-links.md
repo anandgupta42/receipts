@@ -1,7 +1,7 @@
 ---
 id: SPEC-0035
 title: "Shareable receipts — intent-only share, zero third parties, no leak"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0027]
 ---
@@ -255,3 +255,5 @@ comment's own instruction):** "Maintainer confirmation (in-session,
 the AI agents actually cost.' — is approved verbatim as the one string that
 ships under the author's name." This exact string is what R3/`SHARE_TEXT`
 ships; it is not edited anywhere in this build.
+
+**2026-07-04 · shipped:** merged via #87; ledger sweep pre-release.

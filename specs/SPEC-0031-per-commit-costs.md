@@ -1,7 +1,7 @@
 ---
 id: SPEC-0031
 title: "Per-commit cost attribution — the ledger cut at commit boundaries"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0023, SPEC-0026, SPEC-0027]
 ---
@@ -211,3 +211,5 @@ exit 0.
    `totalTokens`/`totalUsd`, which are pure per-turn sums.
 Critic's independent conclusion: "I did not find a token/USD additivity
 bug in the row math." Gates re-run green after rework.
+
+**2026-07-04 · shipped:** merged via #79; ledger sweep pre-release.
