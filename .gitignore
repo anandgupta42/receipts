@@ -3,6 +3,7 @@ dist/
 *.log
 coverage/
 .stryker-tmp/
+.claude/worktrees/
 reports/
 .review-ok
 .github/meta/

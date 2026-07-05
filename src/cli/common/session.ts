@@ -7,11 +7,15 @@ import type { Session, SessionSummary } from "../../parse/types.js";
 import { TEMPLATE_NAMES, isTemplateName } from "../../receipt/blocks.js";
 import type { TemplateName } from "../../receipt/blocks.js";
 
+// SPEC-0051 R3 — every human "no sessions" message ends with the demo pointer,
+// so a first-run on an empty machine still learns how to see a receipt now.
+const DEMO_POINTER = "No sessions yet? Run `aireceipts --demo` to see a sample receipt.";
+
 export async function noSessionsMessage(): Promise<string> {
   if (!(await anyDetected())) {
-    return `no agent session data detected. Looked in:\n${rootsHint()}`;
+    return `no agent session data detected. Looked in:\n${rootsHint()}\n${DEMO_POINTER}`;
   }
-  return "no sessions found";
+  return `no sessions found\n${DEMO_POINTER}`;
 }
 
 export async function resolveSelector(

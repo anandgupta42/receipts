@@ -27,13 +27,20 @@ const r = (p) => join(ROOT, p);
 export const MAX_TARBALL_FILES = 80;
 export const MAX_UNPACKED_KB = 500;
 // NOTICE ships because Apache-2.0 §4(d) requires redistributions to include it.
-export const FILES_ALLOWLIST = ["dist", "data/prices", "README.md", "LICENSE", "NOTICE"];
+export const FILES_ALLOWLIST = ["dist", "data/prices", "data/demo", "README.md", "LICENSE", "NOTICE"];
 
 /** Committed price tables (the runtime needs every one) → their tarball paths. */
 function priceTablePaths() {
   return readdirSync(r("data/prices"))
     .filter((f) => f.endsWith(".json"))
     .map((f) => `data/prices/${f}`);
+}
+
+/** The bundled demo transcript (SPEC-0051 `--demo` reads it) → its tarball path(s). */
+function demoAssetPaths() {
+  return readdirSync(r("data/demo"))
+    .filter((f) => f.endsWith(".jsonl"))
+    .map((f) => `data/demo/${f}`);
 }
 
 /**
@@ -133,7 +140,7 @@ function main() {
   //    produces, enforced by the manifest prepublishOnly==build check)
   record("tarball: lean + complete", () => {
     const out = sh("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"]);
-    const viol = checkTarball(JSON.parse(out)[0], ["dist/cli.js", "README.md", "LICENSE", "NOTICE", ...priceTablePaths()]);
+    const viol = checkTarball(JSON.parse(out)[0], ["dist/cli.js", "README.md", "LICENSE", "NOTICE", ...priceTablePaths(), ...demoAssetPaths()]);
     if (viol.length) throw new Error(viol.join("\n"));
   });
 

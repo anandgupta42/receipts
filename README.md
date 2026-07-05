@@ -7,7 +7,7 @@
 
 **Your AI coding agent just billed you. Here's the receipt.**
 
-[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/aireceipts-cli.svg)](https://www.npmjs.com/package/aireceipts-cli) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/anandgupta42/receipts/badge)](https://scorecard.dev/viewer/?uri=github.com/anandgupta42/receipts) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
@@ -32,9 +32,15 @@ the bill ([how](docs/pr-receipts.md)).
 
 ```sh
 npx aireceipts-cli          # receipt for your newest session
+npx aireceipts-cli setup    # first-run report + integration next steps
 ```
 
 Or install it: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
+
+<img alt="aireceipts --demo rendering a sample receipt in a terminal" src="site/assets/demo.gif" width="620">
+
+<sub>`aireceipts --demo` — the bundled sample session; recorded by
+[`site/assets/demo.tape`](site/assets/demo.tape)</sub>
 
 What you get back — the hero image above, as the bytes your terminal prints:
 
@@ -70,6 +76,9 @@ guessed dollars. Full method: aireceipts
 | Command | What it does |
 |---|---|
 | `aireceipts` | Receipt for the newest session (`--list` to pick another) |
+| `aireceipts --demo` | See a sample receipt with no sessions of your own — a bundled example, rendered live |
+| `aireceipts setup` | First-run report: found sessions, latest cost, week total, integration options — [guide](docs/guide/01-getting-started.md) |
+| `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, opencode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
 | `aireceipts pr --post` | Attach the receipt of the sessions behind a PR as a comment — [guide](docs/pr-receipts.md) |
 | `aireceipts pr --post --artifact` | Also publish a durable receipt page, linked from the comment — [how](docs/pr-receipts.md) |
 | `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
@@ -135,8 +144,9 @@ pricing, troubleshooting ([hosted docs](https://anandgupta42.github.io/receipts/
 [site](https://anandgupta42.github.io/receipts/)).
 
 [FAQ](docs/faq.md) · [What a receipt proves](docs/trust.md) ·
-[PR receipts](docs/pr-receipts.md) · [JSON schema](docs/json-schema.md) ·
-[statusline](docs/statusline.md) · [telemetry](docs/telemetry.md)
+[PR receipts](docs/pr-receipts.md) · [Integrations](docs/guide/15-integrations.md) ·
+[JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
+[telemetry](docs/telemetry.md)
 
 **Related work.** [claude-receipts](https://github.com/chrishutchinson/claude-receipts)
 prints a beautiful thermal-receipt souvenir of a Claude Code session (numbers via

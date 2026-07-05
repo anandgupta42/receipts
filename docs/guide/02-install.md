@@ -7,10 +7,13 @@ account, no API key, no daemon.
 
 ```sh
 npx aireceipts-cli
+npx aireceipts-cli setup
 ```
 
-`npx` fetches and runs the latest published version each time. For an occasional
-receipt, that's the whole story — skip the rest of this page.
+`npx` fetches and runs the latest published version each time. The first command
+prints the newest receipt; `setup` prints what sessions were found and which
+local integrations are available. For occasional use, that's the whole story —
+skip the rest of this page.
 
 ## Install it globally
 
@@ -19,6 +22,7 @@ If you run it often, put `aireceipts` on your `PATH`:
 ```sh
 npm install -g aireceipts-cli
 aireceipts            # now available directly
+aireceipts setup      # same setup report, without npx
 ```
 
 > **Prefer not to install?** `npx aireceipts-cli` runs the latest release without
@@ -52,5 +56,6 @@ remove it.
 
 ## Next
 
-- **[Get started](01-getting-started.md)** — your first receipt, week, and hook.
+- **[Get started](01-getting-started.md)** — your first receipt, setup report, week, and hook.
 - **[Install the agent hook](03-install-hook.md)** — a receipt after every session.
+- **[Choose an integration](15-integrations.md)** — assistant snippets and GitHub checks.

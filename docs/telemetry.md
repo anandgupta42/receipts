@@ -8,6 +8,7 @@
 - **Never sent**: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.
 - **Pseudonymous install identity**: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete `~/.aireceipts/state.json` to reset it.
 - **Disable anytime**: `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`) or `DO_NOT_TRACK=1`. Either one results in **zero network calls** and prevents install-id creation on a fresh install.
+- **Off by default in CI**: when `CI` or `GITHUB_ACTIONS` is set, telemetry defaults to disabled — no separate opt-out needed. Set `AIRECEIPTS_TELEMETRY=on` to opt a CI environment back in; the kill switches above still win over that.
 - **Inspect before you decide**: `aireceipts --telemetry-show` prints exactly what the current run would send, and sends nothing.
 - **Bounded and fail-safe**: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code.
 
@@ -22,11 +23,11 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `cliVersion` | string | semver | From this package's `package.json`. |
 | `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | Collapsed from `process.platform`. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
-| `commandClass` | enum | `benchmark` \| `check-budget` \| `compare` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
+| `commandClass` | enum | `benchmark` \| `check-budget` \| `compare` \| `demo` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket; never raw milliseconds. |
 | `ok` | boolean | | Whether the command returned exit code 0. |
-| `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. |
+| `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. Note: telemetry is disabled by default in CI (see Kill switches below), so this field is `true` only on the runs where `AIRECEIPTS_TELEMETRY=on` explicitly re-enabled it. |
 | `installHash` | string | 64-hex sha256 or `unavailable` | Salted hash of the random local install id; raw id never leaves disk. |
 | `runOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime run ordinal bucket; never the raw count. |
 | `handoffFormat` | enum (optional) | `text` \| `json` | SPEC-0042: emission mode, present only on handoff-command runs — never content. |
@@ -160,6 +161,16 @@ AIRECEIPTS_TELEMETRY=off aireceipts ...
 
 DO_NOT_TRACK=1 aireceipts ...
 ```
+
+### CI default-off
+
+Telemetry also defaults to disabled whenever `CI` or `GITHUB_ACTIONS` is set (the same detection used for the `isCI` field above) — a fleet of automated runs should not silently dwarf human usage in the data, and CI shouldn't need a separate manual opt-out. This is a default, not a third kill switch: an explicit override re-enables it —
+
+```bash
+AIRECEIPTS_TELEMETRY=on aireceipts ...   # re-enables telemetry even when CI/GITHUB_ACTIONS is set
+```
+
+Precedence is: `AIRECEIPTS_TELEMETRY=off`/`DO_NOT_TRACK=1` (always win) → CI default-off (unless explicitly overridden with `on`) → the connection-string checks below. Outside CI, behavior is unchanged.
 
 ## Inspecting what would be sent
 
