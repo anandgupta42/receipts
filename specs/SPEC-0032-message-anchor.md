@@ -1,7 +1,7 @@
 ---
 id: SPEC-0032
 title: "Commit-message fallback anchor — credit the author whose SHA never printed"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0023, SPEC-0024, SPEC-0028]
 ---
@@ -199,3 +199,5 @@ accepted.**
 4. MEDIUM — the R5 rendering test was decorative — now asserts the note is
    inside the fenced receipt, indented as a provenance note, ≤50 cols, and
    never coexists with a slice note.
+
+**2026-07-04 · shipped:** merged via #86; ledger sweep pre-release.

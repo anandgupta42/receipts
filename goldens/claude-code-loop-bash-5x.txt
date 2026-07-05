@@ -5,7 +5,7 @@
                claude-opus-4-8 100%               
          cache served 88% of input tokens         
 
-Bash..............................$0.08  (5 calls)
+Bash..............................$0.07  (5 calls)
 (thinking/reply)...................$0.02  (1 turn)
 
 ⚠ Bash loop ×5......................$0.08 (3m 45s)

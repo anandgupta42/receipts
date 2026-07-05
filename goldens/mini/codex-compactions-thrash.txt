@@ -1,0 +1,6 @@
+aireceipts · session receipt
+Codex · gpt-5.3-codex · 1m 08s
+total  $0.23
+top    exec_command · $0.23 (3 calls)
+⚠ context thrash ×2 compactions · $0.06
+run  aireceipts  for the full receipt

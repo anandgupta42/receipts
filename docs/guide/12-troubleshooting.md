@@ -1,6 +1,8 @@
 # Troubleshooting & FAQ
 
-Symptom first. Find what you're seeing, then the fix.
+Symptom first. Find what you're seeing, then the fix. For question-first answers —
+how this differs from usage dashboards, what the dollars mean, what leaves your
+machine — see the [FAQ](../faq.md).
 
 ## "no agent session data detected"
 
@@ -57,10 +59,10 @@ means "I won't invent a number," not "something failed." Add a price for the mod
 The very first time you run aireceipts, it prints this once:
 
 ```
-aireceipts sends anonymous, content-free diagnostics (performance, error, and parse-failure signals only — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md
+aireceipts sends anonymous, content-free diagnostics and feature-usage events (command, coarse buckets, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md
 ```
 
-It never prints again after that. To turn diagnostics off entirely (zero network
+It never prints again after that. To turn telemetry off entirely (zero network
 calls — not "less," zero), set either environment variable:
 
 ```sh

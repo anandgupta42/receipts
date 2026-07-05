@@ -84,22 +84,43 @@ export function parseTimestamp(value: unknown): number | undefined {
   return undefined;
 }
 
+// Terminal-escape sanitation (v0.1.0 release-board QA finding): transcript
+// content is untrusted — a title carrying raw ESC/CSI/OSC bytes would other-
+// wise reach the operator’s terminal verbatim (OSC-0 retitle confirmed in the
+// finding). Strip full ANSI/OSC sequences first, then every remaining C0/C1
+// control, tab/CR/newline included (display strings never carry raw
+// line breaks; a CR could redraw a receipt row). DEL included.
+// CSI (ESC [ ... final), OSC (ESC ] ... BEL / ESC-backslash), and the nF/Fe
+// escape forms (ESC + optional intermediates 0x20-0x2F + a final 0x30-0x7E,
+// covering charset designators like ESC ( B). Ordered so CSI/OSC win first.
+const ANSI_SEQUENCE_RE = /\u001B(?:\[[0-?]*[ -/]*[@-~]|\][^\u0007\u001B]*(?:\u0007|\u001B\\)?|[ -/]*[0-~])/g;
+const CONTROL_CHARS_RE = /[\u0000-\u001F\u007F-\u009F]/g;
+
+/** Strip ANSI/OSC escape sequences and control characters from untrusted transcript text. */
+export function sanitizeText(text: string): string {
+  return text.replace(ANSI_SEQUENCE_RE, "").replace(CONTROL_CHARS_RE, "");
+}
+
 export function truncate(text: string, max = 120): string {
-  const clean = text.replace(/\s+/g, " ").trim();
+  const clean = sanitizeText(text).replace(/\s+/g, " ").trim();
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
 /**
- * Read a JSONL file, yielding each parsed record. Malformed lines are skipped.
- * Streams line-by-line so large transcripts don't load fully into memory.
+ * Read a JSONL file, yielding each parsed record. Malformed (non-empty,
+ * unparseable) lines are skipped; the RETURNED count of skipped lines lets a
+ * caller record `session.droppedRecords` so a torn transcript's under-report is
+ * flagged, not silent (SPEC-0044 B3). Streams line-by-line so large transcripts
+ * don't load fully into memory. Blank lines are not records and never counted.
  */
 export async function readJsonl(
   filePath: string,
   onRecord: (record: unknown, lineNo: number) => void,
-): Promise<void> {
+): Promise<number> {
   const stream = fs.createReadStream(filePath, { encoding: "utf8" });
   const rl = readline.createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
   let lineNo = 0;
+  let dropped = 0;
   try {
     for await (const line of rl) {
       lineNo++;
@@ -110,13 +131,14 @@ export async function readJsonl(
       try {
         onRecord(JSON.parse(trimmed), lineNo);
       } catch {
-        // skip malformed line
+        dropped++;
       }
     }
   } finally {
     rl.close();
     stream.close();
   }
+  return dropped;
 }
 
 /** Recursively list files under `dir` matching `predicate`. Returns [] if dir is absent. */

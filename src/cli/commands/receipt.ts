@@ -13,8 +13,15 @@ import { toJsonModel } from "../../receipt/json.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { resolveSelector, resolveTemplate } from "../common/session.js";
 import { svgOutOf, writeSvg, writePng } from "../common/output.js";
+import { receiptTelemetryFromModels, templateTelemetryValue } from "../common/telemetry.js";
+import type { ExportFormatValue } from "../../telemetry/schemas.js";
 
 const CSV_MODE_HINT = "use --csv=session or --csv=tool";
+
+async function recordReceiptExport(ctx: CommandContext, format: ExportFormatValue, wroteFile: boolean): Promise<void> {
+  ctx.telemetry.recordExportGenerated({ surface: "receipt", format, wroteFile, result: "success" });
+  await ctx.telemetry.noteMilestone("first_export", "receipt");
+}
 
 async function run(ctx: CommandContext): Promise<number> {
   const { options } = ctx;
@@ -29,7 +36,9 @@ async function run(ctx: CommandContext): Promise<number> {
     ctx.stderr.write(`${resolved.error}\n`);
     return 1;
   }
-  const session = await loadSession(resolved.summary);
+  // SPEC-0045 R3 — the no-selector default already loaded a readable session
+  // (skipping any unreadable newest); reuse it, no second parse.
+  const session = resolved.session ?? (await loadSession(resolved.summary));
   if (!session) {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
     return 1;
@@ -38,11 +47,35 @@ async function run(ctx: CommandContext): Promise<number> {
   const svgOut = svgOutOf(options);
   if (svgOut.svg) {
     await writeSvg(ctx, renderReceiptSvg(model, { theme: svgOut.theme, template }), svgOut.output ?? "receipt.svg");
+    await ctx.telemetry.noteReceiptGenerated(
+      receiptTelemetryFromModels({
+        surface: "receipt",
+        models: [model],
+        outputMode: "svg",
+        template: templateTelemetryValue(options.template),
+        turnCount: session.totals.turnCount,
+        toolCallCount: session.totals.toolCallCount,
+      }),
+      "receipt",
+    );
+    await recordReceiptExport(ctx, "svg", true);
     return 0;
   }
   if (svgOut.png) {
     const svg = renderReceiptSvg(model, { theme: svgOut.theme, template });
     await writePng(ctx, rasterizeSvgToPng(svg), svgOut.output ?? "receipt.png");
+    await ctx.telemetry.noteReceiptGenerated(
+      receiptTelemetryFromModels({
+        surface: "receipt",
+        models: [model],
+        outputMode: "png",
+        template: templateTelemetryValue(options.template),
+        turnCount: session.totals.turnCount,
+        toolCallCount: session.totals.toolCallCount,
+      }),
+      "receipt",
+    );
+    await recordReceiptExport(ctx, "png", true);
     return 0;
   }
   if (options.csvMode !== undefined) {
@@ -53,6 +86,18 @@ async function run(ctx: CommandContext): Promise<number> {
     }
     // CSV is a data contract — budget advisory lines never ride along (SPEC-0009 x SPEC-0011).
     ctx.stdout.write(`${exporter.export(model)}\n`);
+    await ctx.telemetry.noteReceiptGenerated(
+      receiptTelemetryFromModels({
+        surface: "receipt",
+        models: [model],
+        outputMode: "csv",
+        template: templateTelemetryValue(options.template),
+        turnCount: session.totals.turnCount,
+        toolCallCount: session.totals.toolCallCount,
+      }),
+      "receipt",
+    );
+    await recordReceiptExport(ctx, options.csvMode === "tool" ? "csv_tool" : "csv_session", false);
     return 0;
   }
   // R1/R5: absent or malformed budget.json → `lines` is [] → output below is
@@ -66,9 +111,32 @@ async function run(ctx: CommandContext): Promise<number> {
     const jsonModel = toJsonModel(model);
     const withBudget = budget.lines.length > 0 ? { ...jsonModel, budget: budget.lines } : jsonModel;
     ctx.stdout.write(`${JSON.stringify(withBudget, null, 2)}\n`);
+    await ctx.telemetry.noteReceiptGenerated(
+      receiptTelemetryFromModels({
+        surface: "receipt",
+        models: [model],
+        outputMode: "json",
+        template: templateTelemetryValue(options.template),
+        turnCount: session.totals.turnCount,
+        toolCallCount: session.totals.toolCallCount,
+      }),
+      "receipt",
+    );
+    await recordReceiptExport(ctx, "json", false);
   } else {
     const budgetSuffix = budget.lines.length > 0 ? `\n\n${budget.lines.join("\n")}` : "";
     ctx.stdout.write(`${renderReceipt(model, { template })}${budgetSuffix}\n`);
+    await ctx.telemetry.noteReceiptGenerated(
+      receiptTelemetryFromModels({
+        surface: "receipt",
+        models: [model],
+        outputMode: "text",
+        template: templateTelemetryValue(options.template),
+        turnCount: session.totals.turnCount,
+        toolCallCount: session.totals.toolCallCount,
+      }),
+      "receipt",
+    );
   }
   return 0;
 }

@@ -8,7 +8,7 @@
 // Refuses to run before `aireceipts` is on npm (kill criterion b): a packet
 // telling developers to run an unpublished command is a credibility bug.
 //
-//   node scripts/rollout-dogfood.mjs [--org altimateai] [--days 90]
+//   node scripts/rollout-dogfood.mjs --org <github-org> [--days 90]
 //
 // Exit codes: 0 = packet printed; 1 = usage/api error; 2 = npm gate refused.
 import type { CommandRunner } from "../src/pr/git.js";
@@ -22,7 +22,7 @@ jobs:
     uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
 `;
 export const CONTRIBUTING_LINE =
-  "Before opening a PR, run `npx aireceipts pr --post` to attach your build receipt.";
+  "Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.";
 
 export interface RepoInfo {
   name: string;
@@ -33,7 +33,7 @@ export interface RepoInfo {
 
 /** Kill criterion (b): no packet before the CLI is installable. */
 export function npmPublished(run: CommandRunner): boolean {
-  const res = run("npm", ["view", "aireceipts", "version"]);
+  const res = run("npm", ["view", "aireceipts-cli", "version"]);
   return res.code === 0 && /\d+\.\d+\.\d+/.test(res.stdout);
 }
 
@@ -117,8 +117,25 @@ function argValue(flag: string, fallback: string): string {
   return v ?? fallback;
 }
 
+const ORG_USAGE = "Usage: node scripts/rollout-dogfood.mjs --org <github-org> [--days 90]";
+
+/** `--org` has no default — pure so the missing-arg path is testable without exiting. */
+export function parseOrgArg(argv: string[]): { org: string } | { error: string } {
+  const i = argv.indexOf("--org");
+  const v = i >= 0 ? argv[i + 1] : undefined;
+  if (i < 0 || v === undefined || v.startsWith("--")) {
+    return { error: ORG_USAGE };
+  }
+  return { org: v };
+}
+
 if (process.argv[1]?.endsWith("rollout-dogfood.mjs")) {
-  const org = argValue("--org", "altimateai");
+  const orgResult = parseOrgArg(process.argv);
+  if ("error" in orgResult) {
+    console.error(orgResult.error);
+    process.exit(1);
+  }
+  const org = orgResult.org;
   const days = Number.parseInt(argValue("--days", "90"), 10);
   if (!Number.isInteger(days) || days <= 0) {
     console.error("--days must be a positive integer");

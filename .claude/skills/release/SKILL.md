@@ -14,6 +14,22 @@ or a SHA that doesn't match HEAD → STOP; run `/release-manager` first. No exce
 no maintainer override at this step (overrides live inside the verdict file, written
 and signed there).
 
+## 0.6 Preflight — the packaged artifact must install and run (mechanical gate)
+
+`node scripts/preflight-release.mjs` must exit 0 on the exact SHA being cut. CI
+proves the *source* is green; this proves the *published artifact* is real — it
+builds clean, the tarball is lean and complete (no sourcemaps, `data/prices`
+present, size under ceiling), the real tarball **installs into a clean project and
+the installed `aireceipts` binary runs against a fixture and prints a priced
+receipt**, and goldens/determinism/spec-lint/hygiene hold. A red preflight blocks
+the release — no override, no `--quick` (that mode is explicitly not release-valid).
+
+`release-publish.yml` runs this same preflight itself before `npm publish`, so a
+red SHA cannot ship through the workflow either. Run it here anyway: catching a
+red preflight before the verdict/dispatch dance is cheaper than catching it in
+the publish job, and a SHA you have not seen pass locally is not "ready to
+dispatch".
+
 ## 1. Preconditions
 
 `main`'s CI is green. No open PR is claiming to be part of this release that isn't
@@ -54,8 +70,26 @@ This is the **only** skill allowed to edit that section. Move whatever shipped f
 started" to its real tier, and update the "updated by" note if the format changed.
 Nothing else in this file changes.
 
-## 6. Human clicks publish
+## 6. Publish
 
-Prepare the release (tag, changelog, `AGENTS.md` update) as a PR or a tagged commit, but
-**npm publish is the maintainer's button** (AGENTS.md, button 4) — this skill never runs
-`npm publish` itself. Stop and hand off once the tag and changelog are ready.
+Prepare the release (version bump, changelog, `AGENTS.md` update) as a PR — the
+tag itself is minted by the workflow's `tag-and-release` job after a successful
+publish, never by hand — then **the maintainer publishes** (AGENTS.md, button 4);
+this skill never runs `npm publish` or dispatches the workflow itself.
+
+The full mechanics live in **[docs/internal/releasing.md](../../../docs/internal/releasing.md)** —
+read it before handing off. The short version:
+
+- **Routine release (v0.1.1+):** package is `aireceipts-cli`; publishing is the
+  `release-publish.yml` workflow (Actions → Run workflow on `main`, or
+  `gh workflow run release-publish.yml --ref main`). It publishes with provenance
+  via OIDC — **no token** — then its `tag-and-release` job pushes the annotated
+  `vX.Y.Z` tag and creates the GitHub Release with the version's
+  `docs/CHANGELOG.md` section as notes. Preconditions: repo public, CI green on
+  the exact SHA, `package.json.version` bumped, and the changelog section written
+  (a missing section fails the Release job by design).
+- **This skill's job stops at "ready to dispatch":** version bump + changelog +
+  specs flipped + `AGENTS.md` updated + `/review-docs` clean. Then point the
+  maintainer at the runbook and stop.
+- **Never** publish the bare `aireceipts` name (npm blocks it — see the runbook),
+  and never `npm publish` locally for a routine release (loses provenance).

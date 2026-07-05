@@ -11,6 +11,7 @@ import { emptyUsage, withTotal } from "../../src/parse/util.js";
 import { loadById } from "../../src/parse/load.js";
 import { classifyBranchAnchors } from "../../src/pr/slice.js";
 import { deriveRole, selectContributors, type PoolCandidate } from "../../src/pr/contributors.js";
+import { summarizeConfidence } from "../../src/pr/confidence.js";
 
 const BRANCH_SHA = "b1c2d3e4f5061728394a5b6c7d8e9f0011223344";
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
@@ -138,6 +139,21 @@ describe("R1 contributor selection", () => {
     expect(sel.excludedCount).toBe(1);
   });
 
+  it("writeCount counts each git write EXACTLY (kills a `writeCount++`→`--`/no-op mutant)", () => {
+    // SPEC-0044 M3 — the classic tests only assert writeCount is nonzero, so a
+    // `++`→`--` mutation survived. Two real git-write calls must yield exactly 2
+    // (a `--` mutant gives -2, a deleted increment gives 0). writeCount is
+    // output/SHA-independent, so no branch SHA is needed to count the writes.
+    const twoWrites = makeSession(
+      "cx-two",
+      [bashTurn(0, "git commit -m a", "[featB aaaaaa1] a\n 1 file changed"), bashTurn(1, "git commit -m b", "[featB bbbbbb2] b\n 1 file changed")],
+      "codex",
+    );
+    expect(classifyBranchAnchors(twoWrites.turns, []).writeCount).toBe(2);
+    // And a session with no git verbs is exactly 0 (not -0/underflow).
+    expect(classifyBranchAnchors(makeSession("cx-none", [bashTurn(0, "ls -la", "src")], "codex").turns, []).writeCount).toBe(0);
+  });
+
   it("counts a candidate it can't load as excluded, never guessed in", async () => {
     const owned = ownCommit("owned");
     const ghost = repo(makeSession("ghost", []));
@@ -194,10 +210,30 @@ describe("SPEC-0024 R1 anchor pool (SHA anchor is the only key)", () => {
     expect(sel.contributors.map((c) => c.summary.id)).toEqual(["gem"]);
   });
 
-  it("an unloadable anchor-pool candidate is ignored, never counted in the excluded note", async () => {
+  it("an unloadable anchor-pool candidate is counted as unreadable, never silent (B4)", async () => {
     const ghost = anchor(makeSession("anchor-ghost", []));
     const sel = await selectContributors([ghost], [BRANCH_SHA], loaderFor([]));
     expect(sel.contributors).toHaveLength(0);
+    // Not the classic excluded count (that's "read, no SHA") …
+    expect(sel.excludedCount).toBe(0);
+    // … but its absence is NOT silent: "couldn't read" is counted distinctly so
+    // the total floors `≥` (SPEC-0044 B4 — the honesty red-team gap).
+    expect(summarizeConfidence(sel.events).unreadableSession).toBe(1);
+  });
+
+  it("SPEC-0045 R2 — a degraded (parse-failed) repo candidate flags unreadable-session even when `here`, not the silent excluded count", async () => {
+    // A repo-scoped transcript whose lazy summary built (cwd = CURRENT_ROOT) but
+    // whose full parse fails — `degraded: "unreadable"`, retained through discovery
+    // (R1). Because cwd is the current worktree it is `here`; the pre-0045 path
+    // folded a load-null `here` candidate into the SILENT silenced-git-write
+    // excluded count (S2 CRITICAL). SPEC-0045 routes a degraded candidate to
+    // `unreadable-session` instead. `loaderFor([])` returns null — the same
+    // parse failure that degraded it.
+    const degraded: PoolCandidate = { summary: { ...summaryOf(makeSession("dgr-here", [])), degraded: "unreadable" }, pool: "repo" };
+    const sel = await selectContributors([degraded], [BRANCH_SHA], loaderFor([]));
+    expect(sel.contributors).toHaveLength(0);
+    expect(summarizeConfidence(sel.events).unreadableSession).toBe(1);
+    // NOT the silent excluded count — that's the whole point of the fix.
     expect(sel.excludedCount).toBe(0);
   });
 });

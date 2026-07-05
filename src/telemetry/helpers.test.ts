@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   bucketDuration,
+  bucketCount,
+  bucketInstallAge,
+  bucketOrdinal,
   classifyError,
   getCliVersion,
+  isCiEnv,
   isInPackage,
   toAgentTypeTelemetry,
-  toCommandClass,
+  toCommandTelemetry,
   toOsTelemetry,
 } from "./helpers.js";
 
@@ -54,21 +58,66 @@ describe("bucketDuration: R2 coarse buckets, never the raw millisecond count", (
   });
 });
 
-describe("toCommandClass: R2 closed 3-value taxonomy", () => {
+describe("toCommandTelemetry: R2 closed 19-command taxonomy", () => {
   it.each([
     ["receipt", "receipt"],
-    ["", "receipt"],
     ["RECEIPT", "receipt"],
     ["  receipt  ", "receipt"],
     ["compare", "compare"],
     ["COMPARE", "compare"],
+    ["stats", "stats"],
+    ["version", "version"],
   ] as const)("maps %j to %s", (command, expected) => {
-    expect(toCommandClass(command)).toBe(expected);
+    expect(toCommandTelemetry(command)).toBe(expected);
   });
 
-  it("maps any unrecognized command (or raw argv-like text) to 'other' — never the raw command line", () => {
-    expect(toCommandClass("--verbose --unknown-flag foo.json")).toBe("other");
-    expect(toCommandClass("some-future-subcommand")).toBe("other");
+  it("drops any unrecognized command (or raw argv-like text) — never the raw command line", () => {
+    expect(toCommandTelemetry("")).toBeUndefined();
+    expect(toCommandTelemetry("--verbose --unknown-flag foo.json")).toBeUndefined();
+    expect(toCommandTelemetry("some-future-subcommand")).toBeUndefined();
+  });
+});
+
+describe("SPEC-0043 buckets", () => {
+  it.each([
+    [0, "0"],
+    [1, "1"],
+    [2, "2-3"],
+    [3, "2-3"],
+    [4, "4-10"],
+    [10, "4-10"],
+    [11, "11-50"],
+    [50, "11-50"],
+    [51, ">50"],
+  ] as const)("bucketCount(%i) -> %s", (input, expected) => {
+    expect(bucketCount(input)).toBe(expected);
+  });
+
+  it.each([
+    [undefined, "unavailable"],
+    [1, "1"],
+    [3, "2-3"],
+    [10, "4-10"],
+    [51, ">50"],
+  ] as const)("bucketOrdinal(%s) -> %s", (input, expected) => {
+    expect(bucketOrdinal(input)).toBe(expected);
+  });
+
+  it.each([
+    ["2026-07-04", Date.UTC(2026, 6, 4), "first_day"],
+    ["2026-07-01", Date.UTC(2026, 6, 4), "2-7d"],
+    ["2026-06-14", Date.UTC(2026, 6, 4), "8-30d"],
+    ["2026-03-26", Date.UTC(2026, 6, 4), ">90d"],
+    [undefined, Date.UTC(2026, 6, 4), "unavailable"],
+  ] as const)("bucketInstallAge(%s) -> %s", (firstRunAt, now, expected) => {
+    expect(bucketInstallAge(firstRunAt, now)).toBe(expected);
+  });
+
+  it("detects CI from CI/GITHUB_ACTIONS when set and not false", () => {
+    expect(isCiEnv({ CI: "true" })).toBe(true);
+    expect(isCiEnv({ GITHUB_ACTIONS: "1" })).toBe(true);
+    expect(isCiEnv({ CI: "false", GITHUB_ACTIONS: "" })).toBe(false);
+    expect(isCiEnv({})).toBe(false);
   });
 });
 

@@ -50,6 +50,7 @@ export interface CliOptions {
   readonly list: boolean;
   readonly handoff: boolean;
   readonly mini: boolean;
+  readonly version: boolean;
 }
 
 /** Value-consuming flags: `--theme dark`, `-o out.svg`. Anything else is a boolean flag or positional. */
@@ -64,6 +65,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let template: string | undefined;
   let handoffThreshold: number | undefined;
   let mini = false;
+  let version = false;
   let csvMode: "session" | "tool" | undefined;
   let dryRun = false;
   let checkBudget = false;
@@ -140,6 +142,8 @@ export function parseOptions(argv: string[]): CliOptions {
       output = argv[++i];
     } else if (arg === "--help" || arg === "-h") {
       help = true;
+    } else if (arg === "--version" || arg === "-v") {
+      version = true;
     } else {
       positional.push(arg);
     }
@@ -171,5 +175,6 @@ export function parseOptions(argv: string[]): CliOptions {
     list,
     handoff,
     mini,
+    version,
   };
 }

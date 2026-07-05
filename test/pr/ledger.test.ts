@@ -7,9 +7,9 @@
 //  - exact: the displayed TOTAL must equal the formatted sum of the RAW atom
 //    values (catches missed/double-counted atoms anywhere in the pipeline);
 //    token totals are integers and must be exact to the digit.
-//  - display bound: each priced row shows its own rounded cents, so the sum
-//    of displayed rows may drift from the displayed total by at most half a
-//    cent per priced atom — never more (more means a structural bug).
+//  - display equality (B1): every priced row is cent-reconciled against the
+//    total (largest-remainder method), so the sum of displayed rows must
+//    equal the displayed total EXACTLY — never merely "close."
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
@@ -47,8 +47,11 @@ const arbContributor: fc.Arbitrary<ContributorView> = fc
     slice: { kind: "full" as const, startTurn: 0, endTurn: 0, turnCount: 1 },
     modelMix: [{ model: "m-x", tokens: r.tokens, tokenShare: 1 }],
     ...r,
-    // Helpers never carry subagents in practice; keep the shape realistic.
-    subagents: r.basis === "helper" ? [] : r.subagents,
+    // SPEC-0044/B1: helpers keep their generated subagents here (not forced to
+    // []) so the property exercises them — helper subagents are counted in the
+    // TOTAL and are now drawn as their own rows (helperGroupBlocks), so the
+    // displayed rows must still sum to the TOTAL. (In production, Codex helpers
+    // carry none; this proves the invariant holds regardless.)
   }));
 
 const arbInput = fc.record({
@@ -77,7 +80,7 @@ function displayedTotal(fence: string, label: string): { floored: boolean; text:
 }
 
 describe("SPEC-0028 · the ledger check (math always maths, through the renderer)", () => {
-  it("displayed TOTAL priced equals the formatted raw sum; tokens are exact; row drift stays under half a cent per atom", () => {
+  it("displayed TOTAL priced equals the formatted raw sum; tokens are exact; rows sum to the total exactly (B1)", () => {
     fc.assert(
       fc.property(arbInput, (input) => {
         const body = renderPrBody(input);
@@ -104,12 +107,12 @@ describe("SPEC-0028 · the ledger check (math always maths, through the renderer
           expect(shown).toBe(tokensOnly.reduce((sum, a) => sum + a.tokens.total, 0));
         }
 
-        // Tier 2 — display bound: rows each round independently; their sum may
-        // drift from the shown total by at most ceil(N/2)+1 cents, never more.
+        // Tier 2 — display equality (B1): rows are cent-reconciled against the
+        // total, so their sum must equal the shown total exactly, no drift.
         if (priced.length > 0 && total !== null) {
           const rowSum = displayedRowCents(body).reduce((a, b) => a + b, 0);
           const totalCents = Math.round(Number(total.text.replace(/[$,]/g, "")) * 100);
-          expect(Math.abs(rowSum - totalCents)).toBeLessThanOrEqual(Math.ceil(priced.length / 2) + 1);
+          expect(rowSum).toBe(totalCents);
         }
 
         // Floors mark incompleteness, never change arithmetic (SPEC-0028 R1).

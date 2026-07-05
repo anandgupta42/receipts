@@ -7,6 +7,7 @@
 // rolled-up `SubagentRow`) is skipped, so no token is ever counted twice (I3).
 import type { Session, SessionSummary } from "../parse/types.js";
 import type { RawContributor } from "./contributors.js";
+import type { ConfidenceEvent } from "./confidence.js";
 import { classifyBranchAnchors, computeSlice } from "./slice.js";
 
 /**
@@ -21,8 +22,9 @@ export async function promoteOrphanSidechains(
   branchShas: readonly string[],
   coveredFilePaths: ReadonlySet<string>,
   loadSession: (summary: SessionSummary) => Promise<Session | null>,
-): Promise<RawContributor[]> {
+): Promise<{ promoted: RawContributor[]; events: ConfidenceEvent[] }> {
   const promoted: RawContributor[] = [];
+  const events: ConfidenceEvent[] = [];
   const ordered = [...sidechains].sort(
     (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0) || a.id.localeCompare(b.id),
   );
@@ -32,9 +34,15 @@ export async function promoteOrphanSidechains(
     }
     const session = await loadSession(summary);
     if (!session) {
+      // SPEC-0044 B4 — a sidechain we couldn't READ (vs. read-and-found-no-own-
+      // anchor below): "couldn't read" ≠ "not ours", so count its absence
+      // rather than dropping it silently. Floors the total `≥`.
+      events.push({ kind: "unreadable-session", sessionId: summary.filePath });
       continue;
     }
     if (!classifyBranchAnchors(session.turns, branchShas).hasOwn) {
+      // Read fine, but no own branch-SHA — genuinely another parent's work, not
+      // ours; a silent skip here is correct (never noise).
       continue;
     }
     // SPEC-0038 R2b — promotion requires a sliceable commit anchor: `hasOwn`
@@ -42,9 +50,12 @@ export async function promoteOrphanSidechains(
     // computeSlice's own rule); a full-fallback sidechain is a silent miss.
     const slice = computeSlice(session.turns, branchShas);
     if (slice.kind === "full") {
+      // SPEC-0044 A1 parity: a branch-touching sidechain that can't be sliced is
+      // counted-absent, never a silent drop (filePath is the file-unique key).
+      events.push({ kind: "unattributable-anchor-pool", sessionId: summary.filePath });
       continue;
     }
     promoted.push({ summary, session, slice, basis: "anchor" });
   }
-  return promoted;
+  return { promoted, events };
 }

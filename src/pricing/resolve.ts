@@ -65,6 +65,31 @@ function cacheWriteCost(usage: TokenUsage, row: PriceRow): number {
 }
 
 /**
+ * SPEC-0044 A3 — true when `cacheWriteCost` actually falls back to the base
+ * `input` rate for some cache-write tokens because `row` doesn't cite the
+ * applicable tier rate. That fallback may *understate* the true cost (see
+ * `cacheWriteCost`), so this signals "the resulting `$` is a lower bound" for
+ * the caller.
+ *
+ * This is deliberately row-aware, not usage-only: an unsplit (or partially
+ * split) write is priced at the *5m* rate by `cacheWriteCost`'s documented
+ * assumption, so it only under-reports when `row.input_cache_write_5m` is
+ * itself uncited. A vendor that cites the 5m rate (e.g. Anthropic) prices an
+ * unsplit write exactly — no caveat — even though the transcript never split
+ * it. Symmetrically, a known 1h-tier chunk only under-reports when
+ * `row.input_cache_write_1h` is uncited, independent of the 5m citation.
+ */
+export function cacheWriteIsLowerBound(usage: TokenUsage, row: PriceRow): boolean {
+  const known5m = usage.cacheCreation5m ?? 0;
+  const known1h = usage.cacheCreation1h ?? 0;
+  const unsplit = usage.cacheCreation - known5m - known1h;
+  const fallback5mTokens = unsplit + known5m;
+  const fallback5mTaken = fallback5mTokens > 0 && row.input_cache_write_5m === undefined;
+  const fallback1hTaken = known1h > 0 && row.input_cache_write_1h === undefined;
+  return fallback5mTaken || fallback1hTaken;
+}
+
+/**
  * Dollar cost of `usage` at `row`'s rates.
  *
  * Cached-read tokens use `input_cached` when the row cites one, otherwise
@@ -166,6 +191,11 @@ export function isoDateOf(epochMs: number | undefined): string | undefined {
  * Shared low-level "price one turn" helper used by both `attribution.ts`
  * (R3) and `waste.ts` (R4a/R4b): guards every missing input to `null`
  * rather than throwing, then resolves + costs the turn's usage.
+ *
+ * Also carries `cacheWriteLowerBound` (SPEC-0044 A3) alongside the priced
+ * `usd` figure — computed here, where the resolved `row` is in scope, so
+ * callers never have to re-resolve the price row themselves just to check
+ * whether the cache-write portion fell back to an uncited rate.
  */
 export async function priceTurn(
   vendor: string | undefined,
@@ -173,10 +203,13 @@ export async function priceTurn(
   dateISO: string | undefined,
   usage: TokenUsage | undefined,
   dataDir: string,
-): Promise<number | null> {
+): Promise<{ usd: number; cacheWriteLowerBound: boolean } | null> {
   if (!vendor || !modelId || !dateISO || !usage) {
     return null;
   }
   const row = await resolvePrice(vendor, modelId, dateISO, dataDir);
-  return row ? costOf(usage, row) : null;
+  if (!row) {
+    return null;
+  }
+  return { usd: costOf(usage, row), cacheWriteLowerBound: cacheWriteIsLowerBound(usage, row) };
 }

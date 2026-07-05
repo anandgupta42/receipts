@@ -313,17 +313,20 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -332,6 +335,8 @@ footer{
 <p>Goal: get a short receipt automatically, every time a Claude Code session ends, without running a command yourself.</p>
 
 <blockquote><strong>Claude Code only, today.</strong> The <code>install-hook</code> command wires into Claude Code's <code>SessionEnd</code> hook. Other agents (Codex, Cursor, opencode) are fully supported for <em>reading</em> receipts — see <a href="04-read-a-receipt.html">Read a receipt</a> — but don't yet have an equivalent auto-install. For those, run <code>aireceipts</code> yourself or add it to your own shell/CI flow.</blockquote>
+
+<p>For PR receipts across any supported coding assistant, use the universal finalizer instead: <code>npx aireceipts-cli pr --post</code> from the repo worktree. This Claude hook is optional convenience for end-of-session mini receipts, not the PR workflow.</p>
 
 <h2 id="install">Install</h2>
 
@@ -349,7 +354,7 @@ footer{
 +         &quot;hooks&quot;: [
 +           {
 +             &quot;type&quot;: &quot;command&quot;,
-+             &quot;command&quot;: &quot;npx aireceipts --mini&quot;,
++             &quot;command&quot;: &quot;npx aireceipts-cli --mini&quot;,
 +             &quot;timeout&quot;: 10
 +           }
 +         ]
@@ -361,7 +366,7 @@ footer{
 (Existing settings are preserved; formatting may be normalized to 2-space JSON.)
 
 Apply this change? [y/N] y
-Installed. A 6-line receipt now prints when a Claude Code session ends (`npx aireceipts --mini`).</code></pre>
+Installed. A 6-line receipt now prints when a Claude Code session ends (`npx aireceipts-cli --mini`).</code></pre>
 
 <p>Answer anything other than <code>y</code> and it makes no change. Your other Claude Code settings are merged, not overwritten.</p>
 
@@ -376,7 +381,7 @@ run  aireceipts  for the full receipt</code></pre>
 
 <h2 id="where-it-writes">Where it writes</h2>
 
-<p>The hook lands in your Claude Code <code>settings.json</code> — <code>~/.claude/settings.json</code> by default, or wherever <code>$CLAUDE_CONFIG_DIR</code> points. It runs <code>npx aireceipts --mini</code>, capped at a 10-second timeout, so a slow run can never hold up your shell.</p>
+<p>The hook lands in your Claude Code <code>settings.json</code> — <code>~/.claude/settings.json</code> by default, or wherever <code>$CLAUDE_CONFIG_DIR</code> points. It runs <code>npx aireceipts-cli --mini</code>, capped at a 10-second timeout, so a slow run can never hold up your shell.</p>
 
 <h2 id="uninstall">Uninstall</h2>
 

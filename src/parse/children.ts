@@ -50,6 +50,23 @@ export function isChildPath(filePath: string): boolean {
 }
 
 /**
+ * SPEC-0041 R1 — true for ANY path under a `subagents/` directory, regardless
+ * of basename. `parseChildPath()` only recognizes `agent-<id>.jsonl` children,
+ * which let non-session artifacts that live under the same tree (e.g.
+ * `<session>/subagents/workflows/wf_x/journal.jsonl`) leak into top-level
+ * listings as sessions. Top-level discovery excludes on this predicate; parent
+ * linkage and rollup discovery still use `parseChildPath`/`discoverChildFiles`.
+ *
+ * When `rootDir` is given, only segments BELOW the root are considered — an
+ * ancestor directory that happens to be named `subagents` (e.g. a home dir
+ * `/Users/subagents/...`) must never exclude a whole corpus.
+ */
+export function isUnderSubagents(filePath: string, rootDir?: string): boolean {
+  const scoped = rootDir !== undefined ? path.relative(rootDir, filePath) : filePath;
+  return scoped.split(path.sep).includes(SUBAGENTS_SEGMENT);
+}
+
+/**
  * Discover the subagent transcripts of a parent transcript on disk, in sorted
  * path order (deterministic). Returns absolute file paths under
  * `<parentDir>/<parentStem>/subagents/`. Empty when the parent has no children.

@@ -16,11 +16,20 @@ function listLine(index: number, summary: SessionSummary): string {
 async function run(ctx: CommandContext): Promise<number> {
   const sessions = await listFullSessions();
   if (sessions.length === 0) {
+    // v0.1.0 release-board QA finding: `--json` must keep the JSON contract —
+    // an empty LIST is valid JSON (`[]`, exit 0); the human message goes to
+    // stderr so `--list --json | jq` never chokes on prose.
+    if (ctx.options.json) {
+      ctx.stderr.write(`${await noSessionsMessage()}\n`);
+      ctx.stdout.write("[]\n");
+      return 0;
+    }
     ctx.stdout.write(`${await noSessionsMessage()}\n`);
     return 0;
   }
   if (ctx.options.json) {
     ctx.stdout.write(`${JSON.stringify(sessions.map(summaryToJson), null, 2)}\n`);
+    ctx.telemetry.recordExportGenerated({ surface: "list", format: "json", wroteFile: false, result: "success" });
   } else {
     ctx.stdout.write(`${sessions.map((s, i) => listLine(i, s)).join("\n")}\n`);
   }

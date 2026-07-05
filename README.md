@@ -21,17 +21,20 @@
 **Why this exists.** AI coding agents spend real money invisibly — you see the diff,
 never the bill. aireceipts reads the transcripts your agent already writes to disk and
 turns them into receipts: what a session cost, tool by tool; what a PR cost, across
-every agent that built it; where tokens were wasted. Local and deterministic — no
-accounts, no servers, nothing leaves your machine.
+every supported agent session it can attribute; where tokens were wasted. Local and
+deterministic — no accounts, no servers; your transcripts and code never leave your
+machine (anonymous, content-free diagnostics are on by default and opt-out — see
+[docs/telemetry.md](docs/telemetry.md)). This repo runs on it: every pull request here
+carries the receipt of the agent sessions that built it — open any merged PR and read
+the bill ([how](docs/pr-receipts.md)).
 
 ## Install
 
 ```sh
-npx aireceipts          # receipt for your newest session
+npx aireceipts-cli          # receipt for your newest session
 ```
 
-> **Status**: source-first pre-release. Until the npm package is published:
-> `git clone … && npm install && npm run build && node dist/cli.js`
+Or install it: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
 
 What you get back — the hero image above, as the bytes your terminal prints:
 
@@ -67,8 +70,8 @@ guessed dollars. Full method: aireceipts
 | Command | What it does |
 |---|---|
 | `aireceipts` | Receipt for the newest session (`--list` to pick another) |
-| `npx aireceipts pr --post` | Attach the receipt of the sessions behind a PR as a comment — [guide](docs/pr-receipts.md) |
-| `npx aireceipts pr --post --artifact` | Also publish a durable receipt page, linked from the comment — [how](docs/pr-receipts.md) |
+| `aireceipts pr --post` | Attach the receipt of the sessions behind a PR as a comment — [guide](docs/pr-receipts.md) |
+| `aireceipts pr --post --artifact` | Also publish a durable receipt page, linked from the comment — [how](docs/pr-receipts.md) |
 | `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
 | `aireceipts week` | Trailing-7-day digest: totals, per-agent split, top waste — [guide](docs/guide/06-week.md) |
 | `aireceipts --svg -o r.svg` | The receipt as a shareable image, light/dark themes |
@@ -81,12 +84,12 @@ guessed dollars. Full method: aireceipts
 
 ## What you get
 
-- **A per-tool cost anatomy** of every session: models, cache tiers, tool-by-tool spend.
-- **Waste lines, precision-gated**: stuck tool loops and trivial spans a cheaper model
-  could run — each priced, each conservative (a false positive fails our CI).
 - **PR receipts**: every pull request can carry the receipt of the agent sessions that
   built it — totals across leads, builders, and helpers, floors when anything is
   unattributed.
+- **A per-tool cost anatomy** of every session: models, cache tiers, tool-by-tool spend.
+- **Waste lines, precision-gated**: stuck tool loops and trivial spans a cheaper model
+  could run — each priced, each conservative (a false positive fails our CI).
 - **An honest cheaper-model line**: "same tokens on X" is arithmetic on your real token
   counts, never a claim that X would have done the job.
 - **Exports**: SVG/PNG images, JSON with a versioned schema, CSV.
@@ -114,12 +117,13 @@ Full methodology: `aireceipts --methodology`.
 |---|---|
 | Claude Code | Full: per-turn models, tools, cache tiers |
 | Codex CLI | Full per-turn parsing |
+| Gemini CLI | Full: per-turn models, tools, cache tokens |
 | Cursor | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
 | opencode | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
 
 ## Telemetry, disclosed
 
-Anonymous diagnostics only — error classes, duration buckets, parse-failure signatures.
+Anonymous diagnostics and usage signals — error classes, duration buckets, parse-failure signatures, feature enums, and coarse buckets.
 Never code, prompts, paths, titles, or dollar amounts. See exactly what a run would
 send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 `DO_NOT_TRACK=1`. Schema and rationale: [docs/telemetry.md](docs/telemetry.md).
@@ -130,15 +134,28 @@ send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 pricing, troubleshooting ([hosted docs](https://anandgupta42.github.io/receipts/docs/) ·
 [site](https://anandgupta42.github.io/receipts/)).
 
-[What a receipt proves](docs/trust.md) · [PR receipts](docs/pr-receipts.md) ·
-[JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
-[telemetry](docs/telemetry.md)
+[FAQ](docs/faq.md) · [What a receipt proves](docs/trust.md) ·
+[PR receipts](docs/pr-receipts.md) · [JSON schema](docs/json-schema.md) ·
+[statusline](docs/statusline.md) · [telemetry](docs/telemetry.md)
 
 **Related work.** [claude-receipts](https://github.com/chrishutchinson/claude-receipts)
 prints a beautiful thermal-receipt souvenir of a Claude Code session (numbers via
 [ccusage](https://github.com/ryoppippi/ccusage)); [Infracost](https://github.com/infracost/infracost)
 does cost-as-a-PR-comment for Terraform. aireceipts is the bookkeeping sibling:
 multi-agent parsing, cited prices, and PR-level attribution with an honesty model.
+[ccusage](https://github.com/ryoppippi/ccusage) is the standard for daily and weekly
+usage dashboards across coding agents; aireceipts answers a different question — what
+a specific session or PR cost, with every number traceable.
+
+## Versioning & stability
+
+Pre-1.0 (`0.x`): **minor** versions may change behavior or output, **patch**
+versions are fixes only. The receipt's byte-stability contract (I5) is the
+compatibility surface — a change that breaks byte-stability for existing golden
+receipts is a **major** bump, and won't happen inside `0.x` minors without a
+changelog callout. Every release is tagged, with notes on the
+[Releases page](https://github.com/anandgupta42/receipts/releases) and in
+[the changelog](docs/CHANGELOG.md).
 
 ## Contributing
 

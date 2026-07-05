@@ -1,8 +1,18 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  noteReceiptGenerated,
+  noteMilestone,
+  noteRunStart,
   recordCliError,
   recordCliRun,
+  recordExportGenerated,
+  recordHookConfigured,
+  recordIntegrationSurfaceRendered,
   recordParseFailure,
+  recordPrFlowCompleted,
   showTelemetryPayload,
   type RecordCliErrorInput,
   type RecordCliRunInput,
@@ -12,18 +22,34 @@ import { EVENT_NAMES, validateEvent, type TelemetryEvent } from "./schemas.js";
 import { __resetQueueForTests, peekQueuedEvents } from "./sender.js";
 
 const VALID_CONN = "InstrumentationKey=abc-123;IngestionEndpoint=https://example.in.applicationinsights.azure.com/";
+const HASH = "a".repeat(64);
 
-beforeEach(() => {
+const RUN_BASE = {
+  installHash: HASH,
+  runOrdinalBucket: "1",
+  isCI: false,
+} as const;
+
+let home: string;
+let savedHome: string | undefined;
+
+beforeEach(async () => {
   __resetQueueForTests();
+  home = await mkdtemp(join(tmpdir(), "aireceipts-telemetry-index-"));
+  savedHome = process.env.AIRECEIPTS_HOME;
+  process.env.AIRECEIPTS_HOME = home;
 });
 
-afterEach(() => {
+afterEach(async () => {
   __resetQueueForTests();
+  if (savedHome === undefined) delete process.env.AIRECEIPTS_HOME;
+  else process.env.AIRECEIPTS_HOME = savedHome;
+  await rm(home, { recursive: true, force: true });
 });
 
 describe("recordCliRun builds a valid cli_run event from raw runtime inputs", () => {
   it("enqueues one event that passes schema validation", () => {
-    const input: RecordCliRunInput = { command: "receipt", agentType: "claude-code", durationMs: 250, ok: true };
+    const input: RecordCliRunInput = { command: "receipt", agentType: "claude-code", durationMs: 250, ok: true, ...RUN_BASE };
     recordCliRun(input);
 
     const queued = peekQueuedEvents();
@@ -32,12 +58,32 @@ describe("recordCliRun builds a valid cli_run event from raw runtime inputs", ()
     expect(validateEvent(queued[0] as TelemetryEvent)).toBe(true);
   });
 
-  it("never includes the raw command string or raw duration in the queued event", () => {
-    recordCliRun({ command: "receipt --verbose /Users/anand/secret.json", agentType: "claude-code", durationMs: 1234, ok: false });
+  it("drops an unknown raw command string rather than queueing it", () => {
+    recordCliRun({
+      command: "receipt --verbose /Users/anand/secret.json",
+      agentType: "claude-code",
+      durationMs: 1234,
+      ok: false,
+      ...RUN_BASE,
+    });
+    expect(peekQueuedEvents()).toHaveLength(0);
+  });
+});
+
+describe("SPEC-0042 R5 — handoffFormat pass-through", () => {
+  it("records the enum for handoff runs and validates against the strict schema", () => {
+    recordCliRun({ command: "handoff", agentType: undefined, durationMs: 10, ok: true, handoffFormat: "json", ...RUN_BASE });
     const [event] = peekQueuedEvents();
-    const serialized = JSON.stringify(event);
-    expect(serialized).not.toContain("/Users/anand/secret.json");
-    expect(serialized).not.toContain("1234");
+    expect((event?.properties as Record<string, unknown>).commandClass).toBe("handoff");
+    expect((event?.properties as Record<string, unknown>).handoffFormat).toBe("json");
+    expect(validateEvent(event as TelemetryEvent)).toBe(true);
+  });
+
+  it("omits the field entirely when not supplied (absent, not null)", () => {
+    recordCliRun({ command: "receipt", agentType: undefined, durationMs: 10, ok: true, ...RUN_BASE });
+    const [event] = peekQueuedEvents();
+    expect("handoffFormat" in (event?.properties as Record<string, unknown>)).toBe(false);
+    expect(validateEvent(event as TelemetryEvent)).toBe(true);
   });
 });
 
@@ -82,14 +128,111 @@ describe("recordParseFailure builds a valid parse_failure event and hashes the s
   });
 });
 
-describe("R2: exactly three event names, exhaustively, via the public recorder functions", () => {
-  it("recordCliRun, recordCliError, and recordParseFailure together cover every name in EVENT_NAMES", () => {
-    recordCliRun({ command: "receipt", agentType: undefined, durationMs: 10, ok: true });
+describe("SPEC-0043 recorders", () => {
+  it("the public recorders cover every event name", async () => {
+    recordCliRun({ command: "receipt", agentType: undefined, durationMs: 10, ok: true, ...RUN_BASE });
     recordCliError({ command: "receipt", agentType: undefined, err: new Error("x") });
     recordParseFailure({ agentType: "claude-code", adapterVersion: "1", shape: "x" });
+    await noteReceiptGenerated({
+      surface: "receipt",
+      agentType: "claude-code",
+      multiAgent: false,
+      outputMode: "text",
+      template: "none",
+      pricedRowCoverage: "all",
+      hasStuckLoopWaste: false,
+      hasTrivialSpansWaste: false,
+      hasContextThrashWaste: false,
+      hasPriceDelta: false,
+      turnCount: 1,
+      toolCallCount: 2,
+    });
+    recordExportGenerated({ surface: "receipt", format: "json", wroteFile: false, result: "success" });
+    recordPrFlowCompleted({
+      mode: "dry_run",
+      artifactRequested: false,
+      shareRequested: false,
+      contributorCount: 1,
+      commentResult: "skipped",
+      artifactResult: "skipped",
+      shareResult: "skipped",
+      result: "success",
+    });
+    recordHookConfigured({ operation: "install", promptOutcome: "accepted", result: "success" });
+    recordIntegrationSurfaceRendered({ integration: "statusline", inputMode: "stdin_payload", payloadValid: true, result: "success" });
 
     const names = peekQueuedEvents().map((e) => e.name);
     expect(new Set(names)).toEqual(new Set(EVENT_NAMES));
+    for (const event of peekQueuedEvents()) {
+      expect(validateEvent(event)).toBe(true);
+    }
+  });
+
+  it("recordReceiptGenerated uses buckets only, never raw counts", async () => {
+    await noteReceiptGenerated({
+      surface: "receipt",
+      agentType: "claude-code",
+      multiAgent: false,
+      outputMode: "text",
+      template: "none",
+      pricedRowCoverage: "some",
+      hasStuckLoopWaste: true,
+      hasTrivialSpansWaste: false,
+      hasContextThrashWaste: true,
+      hasPriceDelta: true,
+      turnCount: 7,
+      toolCallCount: 60,
+    });
+    const serialized = JSON.stringify(peekQueuedEvents());
+    expect(serialized).toContain('"turnCountBucket":"4-10"');
+    expect(serialized).toContain('"toolCallCountBucket":">50"');
+    expect(serialized).not.toContain('"turnCount":7');
+    expect(serialized).not.toContain('"toolCallCount":60');
+  });
+});
+
+describe("SPEC-0043 noteRunStart", () => {
+  it("returns a 64-hex install hash when telemetry is enabled", async () => {
+    const result = await noteRunStart("receipt", { AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }, Date.UTC(2026, 6, 4));
+    expect(result.installHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(result.runOrdinalBucket).toBe("1");
+    expect(result.isCI).toBe(false);
+  });
+
+  it("does not create an install hash under a kill switch", async () => {
+    const result = await noteRunStart("receipt", { DO_NOT_TRACK: "1", AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }, Date.UTC(2026, 6, 4));
+    expect(result.installHash).toBe("unavailable");
+  });
+
+  it("records the first_run activation milestone only once", async () => {
+    const env = { AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN };
+
+    await noteRunStart("receipt", env, Date.UTC(2026, 6, 4));
+    await noteRunStart("receipt", env, Date.UTC(2026, 6, 4));
+
+    const milestones = peekQueuedEvents().filter((event) => event.name === "activation_milestone");
+    expect(milestones).toHaveLength(1);
+    expect(milestones[0]?.properties).toMatchObject({
+      milestone: "first_run",
+      command: "receipt",
+      installAgeBucket: "first_day",
+    });
+  });
+
+  it("records named activation milestones only once", async () => {
+    await noteRunStart("receipt", { AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }, Date.UTC(2026, 6, 4));
+    __resetQueueForTests();
+
+    await noteMilestone("first_export", "receipt", Date.UTC(2026, 6, 4));
+    await noteMilestone("first_export", "receipt", Date.UTC(2026, 6, 4));
+
+    const milestones = peekQueuedEvents().filter((event) => event.name === "activation_milestone");
+    expect(milestones).toHaveLength(1);
+    expect(milestones[0]?.properties).toMatchObject({
+      milestone: "first_export",
+      command: "receipt",
+      installAgeBucket: "first_day",
+    });
   });
 });
 
@@ -100,7 +243,7 @@ describe("showTelemetryPayload: R5 --telemetry-show backing function", () => {
   });
 
   it("reports enabled and returns the queued (unsent) events without sending them", () => {
-    recordCliRun({ command: "receipt", agentType: "claude-code", durationMs: 10, ok: true });
+    recordCliRun({ command: "receipt", agentType: "claude-code", durationMs: 10, ok: true, ...RUN_BASE });
     const result = showTelemetryPayload({ AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN });
 
     expect(result.enabled).toBe(true);
@@ -109,7 +252,7 @@ describe("showTelemetryPayload: R5 --telemetry-show backing function", () => {
   });
 
   it("respects the kill switches", () => {
-    recordCliRun({ command: "receipt", agentType: "claude-code", durationMs: 10, ok: true });
+    recordCliRun({ command: "receipt", agentType: "claude-code", durationMs: 10, ok: true, ...RUN_BASE });
     const result = showTelemetryPayload({ DO_NOT_TRACK: "1", AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN });
     expect(result.enabled).toBe(false);
   });

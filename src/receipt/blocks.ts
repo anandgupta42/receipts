@@ -12,7 +12,7 @@
 // (I2/I3) are non-removable by construction rather than by renderer politeness.
 import { METHODOLOGY_BRIEF } from "../pricing/attribution.js";
 import type { ReceiptModel } from "./model.js";
-import { formatUsd } from "./format.js";
+import { formatCentsAmount, formatUsd, reconcileCents } from "./format.js";
 
 export type TemplateName = "classic" | "grocery" | "datavis";
 
@@ -162,8 +162,12 @@ function addDollar(out: Set<string>, usd: number | null | undefined): void {
 function tracedDollarAmounts(model: ReceiptModel): Set<string> {
   const out = new Set<string>();
   addDollar(out, model.totalUsd);
-  for (const row of model.toolRows) {
-    addDollar(out, row.usd);
+  // Rows render the reconciled (largest-remainder) cents, not each row's own
+  // naive rounding — B1. The allowed set must match what present.ts actually
+  // draws, so it's built the same way: reconcile the priced rows together.
+  const pricedRowUsd = model.toolRows.filter((row) => row.usd !== null).map((row) => row.usd as number);
+  for (const cents of reconcileCents(pricedRowUsd)) {
+    out.add(`$${formatCentsAmount(cents)}`);
   }
   for (const waste of model.wasteLines) {
     addDollar(out, waste.usd);

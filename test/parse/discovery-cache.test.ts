@@ -9,6 +9,44 @@ import type { SessionSummary } from "../../src/parse/types.js";
 
 const tmpRoots: string[] = [];
 
+const ZERO_USAGE = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 };
+
+describe("SPEC-0045 R1 — degraded retention", () => {
+  const lazy: SessionSummary = {
+    id: "/x/broken.jsonl",
+    source: "claude-code",
+    filePath: "/x/broken.jsonl",
+    cwd: "/repo/app",
+    startedAt: 1000,
+    endedAt: 2000,
+    totals: { tokens: ZERO_USAGE, turnCount: 0, toolCallCount: 0 },
+  };
+
+  it("retains a lazy summary whose FULL parse fails, marked degraded (not dropped)", async () => {
+    const cachePath = path.join(await tempRoot("dc-r1-"), "cache.json");
+    // load() returns null — the deterministic parse failure that degrades it.
+    const result = await completeSummariesWithCache([lazy], {
+      cachePath,
+      stat: async () => ({ size: 100, mtimeMs: 42 }),
+      load: async () => null,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].degraded).toBe("unreadable");
+    expect(result[0].filePath).toBe("/x/broken.jsonl");
+    expect(result[0].cwd).toBe("/repo/app"); // metadata survives → PR layer can scope it
+  });
+
+  it("does NOT mark an empty (size 0) file degraded — that's transient, dropped", async () => {
+    const cachePath = path.join(await tempRoot("dc-r1e-"), "cache.json");
+    const result = await completeSummariesWithCache([lazy], {
+      cachePath,
+      stat: async () => ({ size: 0, mtimeMs: 42 }),
+      load: async () => null,
+    });
+    expect(result).toHaveLength(0);
+  });
+});
+
 afterEach(async () => {
   await Promise.all(tmpRoots.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });

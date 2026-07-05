@@ -42,7 +42,7 @@ All must exit 0 before a PR merges. `AGENTS.md` is the operating manual if you
 want the full picture (invariants, file ownership, verification commands).
 
 If your session built the change, attach its receipt before opening the PR:
-`npx aireceipts pr --post` (see `docs/pr-receipts.md`). Humans without a
+`npx aireceipts-cli pr --post` (see `docs/pr-receipts.md`). Humans without a
 session to attach can skip this.
 
 Found a security issue instead? Don't open a PR or public issue for it —
@@ -64,4 +64,5 @@ Skills themselves are maintainer-curated, not something agents add unprompted.
 
 ## Code of conduct
 
-Be direct, be kind, cite your sources.
+Be direct, be kind, cite your sources. Full text:
+[`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md).

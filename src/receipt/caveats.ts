@@ -15,7 +15,8 @@ import type { Session } from "../parse/types.js";
 export const CAVEAT_MTIME_SLACK_MS = 2 * 60 * 1000;
 
 export interface CaveatFinding {
-  kind: "time-mtime" | "time-span";
+  /** A3's `cost-lower-bound-cache-tier` and B3's `dropped-transcript-records` are constructed by `buildReceiptModel` directly (they need the attribution result / session drop-count, not a session/mtime fact) — not by `detectTimeCaveats` below. */
+  kind: "time-mtime" | "time-span" | "cost-lower-bound-cache-tier" | "dropped-transcript-records";
   text: string;
 }
 

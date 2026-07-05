@@ -14,8 +14,17 @@ export async function listSessions(agent?: AgentSource): Promise<SessionSummary[
   return sortMostRecentFirst(lists.flat());
 }
 
-/** Full summaries across every adapter, most-recent-first, with an incremental file-summary cache for JSONL transcripts. */
-export async function listFullSessions(agent?: AgentSource): Promise<SessionSummary[]> {
+/**
+ * Full summaries across every adapter, most-recent-first, with an incremental
+ * file-summary cache for JSONL transcripts.
+ *
+ * SPEC-0045 R3 — a `degraded: "unreadable"` summary (retained by R1 so the PR layer
+ * can flag an unreadable session) has no reliable totals, so it is EXCLUDED by
+ * default: every non-PR consumer (`week`, `compare`, token budget, `--list`)
+ * calls this without opting in and never sees a degraded summary's zero total.
+ * Only the PR flow passes `includeDegraded: true`.
+ */
+export async function listFullSessions(agent?: AgentSource, opts?: { includeDegraded?: boolean }): Promise<SessionSummary[]> {
   const pool = agent ? adapters().filter((a) => a.id === agent) : adapters();
   const cache = await SummaryCache.load();
   const lists = await Promise.all(
@@ -36,7 +45,9 @@ export async function listFullSessions(agent?: AgentSource): Promise<SessionSumm
     }),
   );
   await cache.save();
-  return sortMostRecentFirst(lists.flat());
+  const all = lists.flat();
+  const filtered = opts?.includeDegraded ? all : all.filter((s) => s.degraded === undefined);
+  return sortMostRecentFirst(filtered);
 }
 
 /** The mtime-newest lazy summary, used before full-parsing exactly one default receipt session. */

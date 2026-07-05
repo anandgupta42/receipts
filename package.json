@@ -1,6 +1,6 @@
 {
-  "name": "aireceipts",
-  "version": "0.1.0",
+  "name": "aireceipts-cli",
+  "version": "0.2.0",
   "description": "Your AI coding agent just billed you. Here's the receipt.",
   "license": "Apache-2.0",
   "type": "module",
@@ -12,13 +12,16 @@
     "dist",
     "data/prices",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "tsup",
+    "preflight": "node scripts/preflight-release.mjs",
+    "prepublishOnly": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

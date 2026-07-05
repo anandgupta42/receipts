@@ -21,6 +21,7 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     methodology: "",
     priceRowsUsed: [],
     unpriceable: false,
+    costLowerBoundCacheTier: false,
     ...overrides,
   };
 }

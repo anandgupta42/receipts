@@ -55,12 +55,14 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 - **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
   its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
   and no line ever claims another model would have completed the task.
-- **I4 — Local-first; diagnostics-only telemetry, disclosed and escapable.** The product
-  works fully offline. The only network call is anonymous diagnostics/performance
-  telemetry (Azure App Insights): command, duration bucket, versions, agent type, error
-  class, adapter parse-failure signature — NEVER transcript content, prompts, file
-  paths, repo names, or dollar amounts. First-run notice; `--telemetry-show` prints the
-  exact payload; `AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1` kills it. (SPEC-0002.)
+- **I4 — Local-first; diagnostics + adoption telemetry, disclosed and escapable.** The
+  product works fully offline. The only network call is content-free telemetry (Azure
+  App Insights): command, coarse buckets, versions, agent type, error class, parse-failure
+  signature, feature-usage enums, and a random (never machine-derived) install identifier
+  sent only as a salted hash — NEVER transcript content, prompts, file paths, repo names,
+  or dollar amounts; raw counts/timestamps never ship as payload fields. First-run notice;
+  `--telemetry-show` prints the exact payload; `AIRECEIPTS_TELEMETRY=off` or
+  `DO_NOT_TRACK=1` kills it. (SPEC-0002, SPEC-0043.)
 
 - **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.
 - **I6 — Facts, not rankings.** Report what a session cost; never rank models or agents
@@ -78,11 +80,23 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 *Updated only by the `release` skill. Keep this section, and only this section, current
 after each release — don't hand-edit it elsewhere.*
 
-- **Tier 0 (now):** harness only — AGENTS.md, spec system, skills, hooks, CI gates. No
-  product code yet.
-- **Tier 1 (M1, not started):** receipt engine — parse adapters, price tables, per-tool
-  attribution, waste lines, price-delta + routable-spend lines, compare, handoff, goldens.
-- **Tier 2+ (M2–M4, not started):** compare/handoff polish, PNG export, opt-in benchmark.
+- **Shipped (npm `aireceipts-cli`, v0.2.0):** the receipt engine and its whole surface
+  are live — parse adapters (Claude Code, Codex, Cursor, Gemini, opencode), cited price
+  tables, per-tool attribution, waste lines (stuck-loop, trivial-spans, context-thrash
+  incl. Codex compactions), price-delta + routable-spend, `compare`, `week`, `--handoff`
+  (resume packet + standing rules), local budget line, quota context, statusline, PR
+  receipts (multi-session, SHA-anchored, artifact/share), SVG/PNG export, receipt
+  templates, the landing + docs sites, adoption telemetry + a local `stats`
+  counter command (SPEC-0043), and disclosed opt-out diagnostics telemetry. 21
+  specs at `status: shipped`.
+- **In progress (`building`):** SPEC-0044 cost-attribution confidence — its
+  implemented slices ship in v0.2.0 (ConfidenceEvent contract + no-silent-drop,
+  cost matrix, rows-sum-to-total, cache-write caveat, parse-skip/load-failure
+  drops, subagent double-count fix, mutation-gated PR path); the spec stays
+  `building` until its `--self-check` kill-criterion and cost-model docs land.
+- **Approved, not yet shipped:** the opt-in benchmark (SPEC-0015) client contract only —
+  actual send disabled; `benchmark` is otherwise reachable from `--help`.
+- **Draft:** SPEC-0039 (human-authored PRs).
 
 ## Working here
 

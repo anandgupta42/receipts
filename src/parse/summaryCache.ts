@@ -5,7 +5,7 @@ import { AGENT_SOURCES, type AgentSource, type Session, type SessionSummary, typ
 import type { DiscoveryStat } from "./discovery.js";
 import { mapWithConcurrency } from "./util.js";
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2; // v0.1.1: titles are now escape-sanitized; invalidate pre-sanitizer entries
 const SOURCES = new Set<AgentSource>(AGENT_SOURCES);
 
 interface CacheEntry {
@@ -192,7 +192,13 @@ export async function completeSummariesWithCache(
       }
       const full = await opts.load(summary);
       if (!full) {
-        return null;
+        // SPEC-0045 R1 — the lazy summary built but the full transcript can't be
+        // read (loadSession returned null — a corrupt transcript, or a file that
+        // vanished/errored after stat; all honestly "unreadable"). Retain it marked
+        // degraded so the PR layer can flag a repo-scoped unreadable session
+        // (R2) instead of it vanishing at discovery. NOT cached — a fixed file
+        // should re-parse cleanly next run.
+        return { ...summary, degraded: "unreadable" as const };
       }
       const fullSummary = stripTurns(full);
       cache.set(summary.filePath, stat, fullSummary);

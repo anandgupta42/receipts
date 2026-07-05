@@ -4,7 +4,7 @@ Goal: total every session from the last seven days, across every agent, with an
 honest comparison to the week before.
 
 ```sh
-aireceipts week
+aireceipts week --since 2026-06-18
 ```
 
 ```
@@ -55,8 +55,9 @@ which also makes the output reproducible:
 aireceipts week --since 2026-06-18
 ```
 
-That's the invocation behind the digest above — the `· since override` in the
-header marks it.
+That's the invocation shown at the top — the `· since override` in the header
+marks it. A bare `aireceipts week` (no `--since`) instead prints a trailing-7-days
+header ending at the current moment.
 
 ## Split by project
 

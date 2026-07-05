@@ -44,6 +44,16 @@ jobs:
           node-version: "22.14"
           registry-url: "https://registry.npmjs.org"
 
+      - name: upgrade npm to the trusted-publishing floor
+        # Node 22.14 only *permits* npm >= 11.5.1 — it ships npm 10.x. Trusted
+        # publishing (OIDC) needs 11.5.1+, so install it explicitly before the
+        # floor assert below (which would otherwise fail-closed, as it did on
+        # the first v0.1.1 dispatch). Pinned exactly: everything else in this
+        # workflow is SHA-pinned, and `npm@latest` was the one mutable input
+        # left in the publish path. Bump deliberately, with the floor assert
+        # below as the backstop.
+        run: npm install -g npm@11.18.0
+
       - name: assert package.json.repository matches this repository
         # Exact match, not substring: parse the URL and require the github.com
         # host with exactly this owner/repo path (Codex review finding 2 — a
@@ -81,7 +91,12 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run build
+      # Preflight is the release gate: build + lean-tarball shape + install the
+      # real tarball and run the installed binary (priced receipt) + full suite +
+      # goldens + determinism + cite-check liveness. A red SHA cannot publish.
+      # (It builds internally, so the separate `npm run build` step is gone.)
+      - name: preflight — the packaged artifact must install and run
+        run: npm run preflight
 
       - name: publish with provenance (trusted publishing, OIDC)
         # --provenance is explicit on purpose: a no-op on the trusted-publishing
@@ -89,3 +104,74 @@ jobs:
         # fallback (a short-lived granular token) so provenance is never silently
         # skipped either way.
         run: npm publish --provenance --access public
+
+  # The public record of the release: an annotated tag + a GitHub Release whose
+  # notes are the version's section of docs/CHANGELOG.md. Separate job so the
+  # publish job keeps `contents: read` — only this job can write to the repo,
+  # and it runs only after npm actually has the version. v0.1.0–v0.2.0 shipped
+  # with neither tag nor Release (npm was the only record); this job closes
+  # that gap for every release after.
+  tag-and-release:
+    runs-on: ubuntu-latest
+    needs: publish
+    if: github.repository == 'anandgupta42/receipts' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: extract release notes from docs/CHANGELOG.md
+        # The changelog section is mandatory: a release without notes fails here
+        # rather than shipping a bare tag. Slice runs from the version's `## v`
+        # heading to the next one.
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+          awk -v ver="v${VERSION}" '
+            $0 ~ "^## " ver " " || $0 ~ "^## " ver "$" { found = 1; next }
+            found && /^## v/ { exit }
+            found { print }
+          ' docs/CHANGELOG.md > /tmp/release-notes.md
+          if ! grep -q "[^[:space:]]" /tmp/release-notes.md; then
+            echo "docs/CHANGELOG.md has no section for v${VERSION} — write the changelog before releasing." >&2
+            exit 1
+          fi
+
+      - name: create annotated tag v${{ env.VERSION }}
+        # Idempotent on re-run: an existing tag is fine if it points at this
+        # SHA (a rerun after a transient Release failure), fatal if it doesn't
+        # (that version was cut from a different commit — never move a tag).
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            # Peel via ls-remote's `^{}` entry: the local clone is shallow and has
+            # no tag objects, so `rev-parse <tag-sha>^{commit}` can't work here.
+            TARGET_SHA=$(git ls-remote --tags origin | awk -v t="refs/tags/${TAG}" '$2 == t"^{}" { peeled = $1 } $2 == t { unpeeled = $1 } END { print (peeled ? peeled : unpeeled) }')
+            if [ "${TARGET_SHA}" != "${GITHUB_SHA}" ]; then
+              echo "tag ${TAG} already exists at ${TARGET_SHA}, not ${GITHUB_SHA} — refusing to move it." >&2
+              exit 1
+            fi
+            echo "tag ${TAG} already at ${GITHUB_SHA}; skipping tag push."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${TAG}" -m "aireceipts-cli ${VERSION}" "${GITHUB_SHA}"
+            git push origin "refs/tags/${TAG}"
+          fi
+
+      - name: create GitHub Release v${{ env.VERSION }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "release ${TAG} already exists; skipping." >&2
+          else
+            gh release create "${TAG}" \
+              --title "${TAG}" \
+              --notes-file /tmp/release-notes.md \
+              --verify-tag
+          fi

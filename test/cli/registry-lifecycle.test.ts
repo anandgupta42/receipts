@@ -2,8 +2,8 @@
 // first-run notice → run → record → bounded flush. These tests spy the telemetry
 // seam and drive main() through each outcome (success, nonzero exit, command
 // throw, telemetry-show), asserting exactly one run/error event as appropriate,
-// the first-run notice skipped only for telemetry-show, and flushTelemetry always
-// awaited.
+// the first-run notice skipped only for telemetry-show, and flushTelemetry awaited
+// only when telemetry is allowed to send.
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -38,6 +38,11 @@ describe("SPEC-0018 R6 · main() telemetry lifecycle", () => {
     // main() must still call it exactly as the contract requires.
     vi.spyOn(telemetry, "recordCliRun").mockImplementation(() => {});
     vi.spyOn(telemetry, "recordCliError").mockImplementation(() => {});
+    vi.spyOn(telemetry, "noteRunStart").mockResolvedValue({
+      installHash: "unavailable",
+      runOrdinalBucket: "1",
+      isCI: false,
+    });
     vi.spyOn(telemetry, "flushTelemetry").mockResolvedValue(undefined);
     vi.spyOn(telemetry, "ensureFirstRunNotice").mockResolvedValue(true);
   });
@@ -60,11 +65,12 @@ describe("SPEC-0018 R6 · main() telemetry lifecycle", () => {
     expect(code).toBe(0);
     expect(telemetry.recordCliRun).toHaveBeenCalledTimes(1);
     expect(telemetry.recordCliRun).toHaveBeenCalledWith(
-      expect.objectContaining({ command: "templates", ok: true }),
+      expect.objectContaining({ command: "templates", ok: true, runOrdinalBucket: "1" }),
     );
     expect(telemetry.recordCliError).not.toHaveBeenCalled();
     expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(1);
     expect(telemetry.ensureFirstRunNotice).toHaveBeenCalledTimes(1);
+    expect(telemetry.noteRunStart).toHaveBeenCalledWith("templates", process.env);
   });
 
   it("command nonzero exit → one run event (ok:false), no error event, flush awaited", async () => {
@@ -73,7 +79,7 @@ describe("SPEC-0018 R6 · main() telemetry lifecycle", () => {
     expect(code).toBe(1);
     expect(telemetry.recordCliRun).toHaveBeenCalledTimes(1);
     expect(telemetry.recordCliRun).toHaveBeenCalledWith(
-      expect.objectContaining({ command: "receipt", ok: false }),
+      expect.objectContaining({ command: "receipt", ok: false, runOrdinalBucket: "1" }),
     );
     expect(telemetry.recordCliError).not.toHaveBeenCalled();
     expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(1);
@@ -94,15 +100,16 @@ describe("SPEC-0018 R6 · main() telemetry lifecycle", () => {
     expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(1);
   });
 
-  it("telemetry-show → run event recorded, flush awaited, first-run notice SKIPPED", async () => {
+  it("telemetry-show → records NOTHING, flushes NOTHING, notice skipped (SPEC-0002 R5 / SPEC-0043 R10: the preview command must itself send nothing)", async () => {
     const code = await main(["--telemetry-show"]);
     expect(code).toBe(0);
-    expect(telemetry.recordCliRun).toHaveBeenCalledTimes(1);
-    expect(telemetry.recordCliRun).toHaveBeenCalledWith(
-      expect.objectContaining({ command: "telemetry-show", ok: true }),
-    );
-    expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(1);
-    // R6: the notice is skipped only for telemetry-show.
+    // v0.1.0 docs-board BLOCKER: previewing telemetry must not itself emit
+    // telemetry. SPEC-0002 R5 ("payload printed, nothing sent") governs over
+    // SPEC-0018 R6's vaguer "as the lifecycle requires".
+    expect(telemetry.noteRunStart).not.toHaveBeenCalled();
+    expect(telemetry.recordCliRun).not.toHaveBeenCalled();
+    expect(telemetry.recordCliError).not.toHaveBeenCalled();
+    expect(telemetry.flushTelemetry).not.toHaveBeenCalled();
     expect(telemetry.ensureFirstRunNotice).not.toHaveBeenCalled();
   });
 });

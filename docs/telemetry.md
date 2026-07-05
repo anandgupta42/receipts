@@ -1,76 +1,165 @@
-# Diagnostics telemetry
+# Diagnostics and adoption telemetry
 
-`aireceipts` can send small, anonymous, content-free diagnostics events to help us find bugs and understand which agent formats and CLI paths are actually used in the wild. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here ever disagrees with the code in `src/telemetry/`, that's a bug — please file an issue.
+`aireceipts` can send small, content-free telemetry events to help us find bugs and understand which CLI features are actually used. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here disagrees with `src/telemetry/`, that is a bug.
 
 ## tl;dr
 
-- **On by default**, but every event is one of exactly three fixed-shape records — never transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, or raw model strings.
-- **Disable anytime**: `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`) or `DO_NOT_TRACK=1`. Either one results in **zero network calls** — not "send less," zero.
+- **On by default**, but every event is one of a fixed nine-event catalog: `cli_run`, `cli_error`, `parse_failure`, `receipt_generated`, `export_generated`, `pr_flow_completed`, `hook_configured`, `integration_surface_rendered`, `activation_milestone`.
+- **Never sent**: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.
+- **Pseudonymous install identity**: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete `~/.aireceipts/state.json` to reset it.
+- **Disable anytime**: `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`) or `DO_NOT_TRACK=1`. Either one results in **zero network calls** and prevents install-id creation on a fresh install.
 - **Inspect before you decide**: `aireceipts --telemetry-show` prints exactly what the current run would send, and sends nothing.
-- **Bounded and fail-safe**: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code. A slow or failed network call is simply abandoned.
-- **First-run notice**: the very first time you run `aireceipts`, it prints a one-line disclosure pointing here. It never prints again after that.
+- **Bounded and fail-safe**: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code.
 
-## What is sent
+## Event catalog
 
-There are exactly three event types. Nothing else is ever recorded.
+Every field below is validated against a `.strict()` zod schema before it is queued. Extra keys are rejected, so a bug elsewhere cannot smuggle a new field into a payload.
 
-### `cli_run` — one per CLI invocation
+### `cli_run` — one per normal CLI invocation
 
 | Field | Type | Values | Notes |
 |---|---|---|---|
-| `cliVersion` | string | semver, e.g. `"0.3.1"` | From this package's own `package.json`. |
-| `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | `process.platform`, collapsed to a closed set — never the raw platform string. |
+| `cliVersion` | string | semver | From this package's `package.json`. |
+| `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | Collapsed from `process.platform`. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
-| `commandClass` | enum | `receipt` \| `compare` \| `other` | Which subcommand ran — never the raw argv or any flag values. |
-| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
-| `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket — never the raw millisecond count. |
-| `ok` | boolean | | Whether the run succeeded. |
+| `commandClass` | enum | `benchmark` \| `check-budget` \| `compare` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
+| `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket; never raw milliseconds. |
+| `ok` | boolean | | Whether the command returned exit code 0. |
+| `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. |
+| `installHash` | string | 64-hex sha256 or `unavailable` | Salted hash of the random local install id; raw id never leaves disk. |
+| `runOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime run ordinal bucket; never the raw count. |
+| `handoffFormat` | enum (optional) | `text` \| `json` | SPEC-0042: emission mode, present only on handoff-command runs — never content. |
 
-### `cli_error` — one per uncaught error at the CLI's top level
-
-| Field | Type | Values | Notes |
-|---|---|---|---|
-| `errorClass` | enum | `parse_error` \| `io_error` \| `network_error` \| `validation_error` \| `unknown_error` | A small fixed taxonomy derived from the error's constructor name or a well-known Node error code — **never `error.message`**, which can contain a file path or other identifying text. |
-| `command` | enum | `receipt` \| `compare` \| `other` | Same closed taxonomy as `cli_run.commandClass`. |
-| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` \| `unknown` | |
-| `inPackage` | boolean | | Whether the error's top stack frame originated inside `aireceipts`'s own installed code (helps us tell "our bug" from "your environment") — the stack trace text itself is inspected internally and never leaves the process. |
-
-### `parse_failure` — one per transcript-parsing failure
+### `cli_error` — one per uncaught top-level CLI error
 
 | Field | Type | Values | Notes |
 |---|---|---|---|
-| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` | |
-| `adapterVersion` | string | short opaque token, e.g. `"1"` | An internal per-adapter constant, not anything read from a transcript. |
-| `signatureHash` | string | 64-character sha256 hex digest | A hash of a content-free description of *where* parsing broke (e.g. `"claude-code:turn.usage.missing"`). The raw description is hashed before it ever reaches a payload — you cannot recover it from the hash, and it never contains transcript content. |
+| `errorClass` | enum | `parse_error` \| `io_error` \| `network_error` \| `validation_error` \| `unknown_error` | Derived from bounded error metadata; never `error.message`. |
+| `command` | enum | same 19-command enum as `cli_run.commandClass` | Never raw argv. |
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | |
+| `inPackage` | boolean | | Whether the top stack frame is inside aireceipts; the stack text never leaves the process. |
 
-Every field above is validated against a `zod` schema in `.strict()` mode before it's ever queued (`src/telemetry/schemas.ts`). `.strict()` rejects any payload carrying an extra, unlisted key, so a bug elsewhere in the codebase cannot silently smuggle a new field (a path, a prompt, a dollar amount) into a payload — it would have to be added here, deliberately, and reviewed.
+### `parse_failure` — one per transcript parsing failure
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | |
+| `adapterVersion` | string | short opaque token | Internal adapter version, not read from a transcript. |
+| `signatureHash` | string | 64-hex sha256 | Hash of a content-free structural failure descriptor. |
+
+### `receipt_generated` — one per rendered cost receipt
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `surface` | enum | `receipt` \| `compare` \| `mini` \| `pr` | Statusline/quota/template previews are not receipts. |
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | `unknown` for mixed-agent/multi-session surfaces. |
+| `multiAgent` | boolean | | True when the rendered surface combines more than one session/model. |
+| `outputMode` | enum | `text` \| `json` \| `csv` \| `svg` \| `png` \| `markdown` | |
+| `template` | enum | `classic` \| `grocery` \| `datavis` \| `none` | `none` when no template flag drove the render. |
+| `pricedRowCoverage` | enum | `none` \| `some` \| `all` | Share of rendered tool rows with resolved prices; no dollars are sent. |
+| `hasStuckLoopWaste` | boolean | | |
+| `hasTrivialSpansWaste` | boolean | | |
+| `hasContextThrashWaste` | boolean | | |
+| `hasPriceDelta` | boolean | | Whether the receipt had an arithmetic cheaper-model delta line. |
+| `turnCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw turn count. |
+| `toolCallCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw tool-call count. |
+| `receiptOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime local receipt ordinal bucket. |
+
+### `export_generated` — one per successful export path
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `surface` | enum | `receipt` \| `compare` \| `week` \| `list` \| `pr` | |
+| `format` | enum | `json` \| `csv_session` \| `csv_tool` \| `svg` \| `png` \| `markdown` \| `html` | |
+| `wroteFile` | boolean | | False for stdout exports. |
+| `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
+
+### `pr_flow_completed` — one per `aireceipts pr` flow
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `mode` | enum | `dry_run` \| `post` | |
+| `artifactRequested` | boolean | | |
+| `shareRequested` | boolean | | |
+| `contributorCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw contributor count. |
+| `commentResult` | enum | `success` \| `failed` \| `skipped` | |
+| `artifactResult` | enum | `success` \| `failed` \| `skipped` | |
+| `shareResult` | enum | `success` \| `failed` \| `skipped` | |
+| `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
+
+### `hook_configured` — one per hook install/uninstall command
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `operation` | enum | `install` \| `uninstall` | |
+| `promptOutcome` | enum | `accepted` \| `declined` \| `not_prompted` | |
+| `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
+
+### `integration_surface_rendered` — one per passive integration render
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `integration` | enum | `statusline` \| `quota` | `mini` is a receipt, not an integration event. |
+| `inputMode` | enum | `stdin_payload` \| `disk_fallback` \| `none` | |
+| `payloadValid` | boolean | | Whether the stdin payload was usable for the integration. |
+| `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
+
+### `activation_milestone` — once per milestone per local state file
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `milestone` | enum | `first_run` \| `first_receipt` \| `third_receipt` \| `tenth_receipt` \| `first_export` \| `first_compare` \| `first_week` \| `first_hook_install` \| `first_pr` \| `first_pr_post` \| `first_artifact` | |
+| `command` | enum | same 19-command enum as `cli_run.commandClass` | Command that caused the milestone. |
+| `installAgeBucket` | enum | `first_day` \| `2-7d` \| `8-30d` \| `31-90d` \| `>90d` \| `unavailable` | Derived locally from `firstRunAt`; raw date is not sent. |
+
+## Install identifier
+
+On the first telemetry-enabled run, aireceipts creates a random UUID in `~/.aireceipts/state.json`. It is never derived from hostname, username, MAC address, machine id, repo, path, or transcript data. The wire payload carries only:
+
+```text
+sha256("aireceipts-install-v1:" + installId)
+```
+
+That hash intentionally links events from the same install over time so adoption and retention can be counted. It does not identify a person, machine, or repo. To reset it, delete `~/.aireceipts/state.json`. If `AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1` is active on a fresh install, no install id is created.
+
+## Local counters
+
+`~/.aireceipts/state.json` also stores local counters:
+
+- `runCount`
+- `receiptCount`
+- `firstRunAt`
+- once-only activation milestone booleans
+
+These exact counts stay on your machine. The `aireceipts stats` command prints the local receipt/run counters and labels them "on this machine." Telemetry payloads use only buckets.
 
 ## What is never sent
 
-Permanently, structurally banned — there is no field for any of these anywhere in the schema, and adding one would require an explicit, reviewed change to this document and to `src/telemetry/schemas.ts`:
+Permanently, structurally banned:
 
 - Transcript content or any excerpt of it
-- Prompts or any user/assistant message text
-- File paths (yours or the CLI's own, beyond the fixed `inPackage` boolean)
+- Prompts or user/assistant message text
+- File paths
 - Repo names or URLs
 - Hostnames
 - Usernames
 - Session IDs
-- Dollar amounts or any cost/pricing data
-- Raw model strings (only the coarse `agentType` enum is sent)
+- Dollar amounts or cost/pricing data
+- Raw model strings
+- Raw counts
+- Raw timestamps
 
 ## Kill switches
 
-Either of the following disables telemetry completely. When disabled, `flushTelemetry()` returns immediately without making any network call — this is verified by tests that stub the network layer and assert it is never invoked.
+Either of the following disables telemetry completely. When disabled, `flushTelemetry()` returns immediately without making any network call, and fresh installs do not create an install id.
 
 ```bash
-AIRECEIPTS_TELEMETRY=off aireceipts receipt ...
+AIRECEIPTS_TELEMETRY=off aireceipts ...
 # or: AIRECEIPTS_TELEMETRY=0 / AIRECEIPTS_TELEMETRY=false (case-insensitive)
 
-DO_NOT_TRACK=1 aireceipts receipt ...
+DO_NOT_TRACK=1 aireceipts ...
 ```
-
-To disable permanently, export one of these in your shell profile.
 
 ## Inspecting what would be sent
 
@@ -78,28 +167,26 @@ To disable permanently, export one of these in your shell profile.
 aireceipts --telemetry-show
 ```
 
-This prints whether telemetry is currently enabled and the exact events queued for the current run — the same objects that would be sent — without sending anything.
+This prints whether telemetry is currently enabled and the exact events queued for the current run without sending anything. The command itself records nothing and skips the flush.
 
 ## How sending works
 
 - Events are queued in-process as they occur and sent as a single batched request at CLI shutdown.
-- The send is bounded to **300ms** via `Promise.race` against a timeout. If the network call is slow or hangs, it is abandoned in place; the CLI does not wait for it, and nothing is retried in the background.
-- Every failure mode — telemetry disabled, an invalid event, a network error, a timeout — is swallowed inside the telemetry module. Telemetry can never throw, never block the CLI, and never change its exit code.
+- The send is bounded to **300ms**. If the network call is slow or hangs, it is abandoned; the CLI does not wait for it, and nothing is retried in the background.
+- Every failure mode is swallowed inside the telemetry module. Telemetry can never throw, block the CLI, or change its exit code.
 - The transport is Azure Application Insights, reached via a connection string (`InstrumentationKey=...;IngestionEndpoint=https://.../`) POSTed to `<ingestionEndpoint>/v2/track`.
+- Like any HTTPS/App Insights request, the transport stamps an arrival time for the batch. The "no raw timestamps" rule covers payload fields chosen by aireceipts, not transport metadata created by the service.
 
 ## Connection-string honesty
 
-This section exists so the code and this document can never quietly disagree.
-
-- The ingestion key this package ships with is **not a secret** — Application Insights instrumentation keys are write-only and are commonly embedded in open-source clients. The shipped key, plainly: `InstrumentationKey=394da360-a50c-4700-bcf9-87b8d9d6e0ee` (ingestion endpoint `eastus-8.in.applicationinsights.azure.com`).
-- **Current status**: a real Azure Application Insights resource is wired up as of 2026-07-02, so the diagnostics events documented above are sent by default (subject to the kill switches and the 300 ms bounded flush). Run `aireceipts --telemetry-show` to see exactly what a run would send before it sends anything.
-- `AIRECEIPTS_TELEMETRY_CONNECTION` overrides the shipped default. Set it to point at your own Application Insights resource (e.g. for local development or a private fork), or set it to an empty string to force-disable telemetry independent of the kill switches.
-- A malformed connection string (missing either `InstrumentationKey` or `IngestionEndpoint`) also degrades to `enabled: false` rather than sending to an incomplete endpoint.
+- The ingestion key this package ships with is **not a secret**; Application Insights instrumentation keys are write-only and are commonly embedded in open-source clients. The shipped key: `InstrumentationKey=394da360-a50c-4700-bcf9-87b8d9d6e0ee` (ingestion endpoint `eastus-8.in.applicationinsights.azure.com`). <!-- gitleaks:allow -->
+- `AIRECEIPTS_TELEMETRY_CONNECTION` overrides the shipped default. Set it to your own Application Insights resource or to an empty string to force-disable telemetry.
+- A malformed connection string also degrades to `enabled: false` rather than sending to an incomplete endpoint.
 
 ## First-run notice
 
-The first time `aireceipts` runs for a given user, it prints a one-line disclosure (pointing here) before doing anything else, then persists that fact to `~/.aireceipts/telemetry.json` so it never prints again. If that file can't be read or written (no home directory, read-only filesystem), the notice is simply shown again on the next run rather than the CLI failing.
+The first time `aireceipts` runs for a given user, it prints a one-line disclosure pointing here, then persists `{ "shown": true }` to `~/.aireceipts/telemetry.json` so it never prints again. If that file cannot be read or written, the notice is shown again on the next run rather than failing the CLI.
 
 ## Source of truth
 
-The schemas in `src/telemetry/schemas.ts` are the actual source of truth; this document is kept in sync with them by hand and reviewed alongside any change to that file. If you find a discrepancy, please open an issue.
+The schemas in `src/telemetry/schemas.ts` are the actual source of truth. This document is kept in sync with them and reviewed alongside any schema change.

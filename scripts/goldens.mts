@@ -11,6 +11,7 @@ import type { ReceiptModel } from "../src/receipt/model.js";
 import { renderReceipt } from "../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../src/receipt/svg.js";
 import { renderMiniReceipt } from "../src/receipt/mini.js";
+import { renderHandoff } from "../src/receipt/handoff.js";
 import { TEMPLATE_NAMES } from "../src/receipt/blocks.js";
 import { renderPrArtifactHtml } from "../src/pr/html.js";
 import { renderPerCommitLines } from "../src/pr/perCommit.js";
@@ -77,6 +78,22 @@ for (const theme of ["light", "dark"] as const) {
 }
 const loopModel = await modelFor(LOOP.source, LOOP.path);
 check(`goldens/svg/compare-${nameOf(PRICED.path)}-vs-${nameOf(LOOP.path)}.svg`, renderCompareSvg(pricedModel, loopModel));
+
+// SPEC-0042 R1/R2 — the resume packet's state-header + coverage wording is
+// golden-pinned on the loop fixture (has waste, so the packet renders).
+{
+  const loopSession = await loadById(LOOP.source, LOOP.path);
+  if (!loopSession) {
+    console.error("goldens: failed to load loop session for handoff golden");
+    process.exit(1);
+  }
+  const counts = {
+    turns: loopSession.turns.length,
+    toolCalls: loopSession.totals.toolCallCount,
+    compactions: loopSession.compactions?.length ?? 0,
+  };
+  check(`goldens/handoff-${LOOP.source}-${nameOf(LOOP.path)}.txt`, renderHandoff(loopModel, [], counts) + "\n");
+}
 
 // SPEC-0020 R5: {grocery, datavis} × {terminal, SVG light} on the priced fixture
 // (4 new artifacts). classic's existing goldens above are the refactor's

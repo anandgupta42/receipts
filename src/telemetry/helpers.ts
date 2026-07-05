@@ -2,7 +2,17 @@ import { existsSync, readFileSync } from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { AgentSource } from "../parse/types.js";
-import type { AgentTypeValue, CommandClassValue, DurationBucketValue, ErrorClassValue, OsValue } from "./schemas.js";
+import {
+  COMMAND_VALUES,
+  type AgentTypeValue,
+  type CommandValue,
+  type CountBucketValue,
+  type DurationBucketValue,
+  type ErrorClassValue,
+  type InstallAgeBucketValue,
+  type OrdinalBucketValue,
+  type OsValue,
+} from "./schemas.js";
 
 /**
  * Derives every telemetry field from raw runtime data (errors, stack
@@ -32,16 +42,54 @@ export function bucketDuration(ms: number): DurationBucketValue {
   return ">10s";
 }
 
-/** Maps a CLI subcommand name to R2's closed 3-value taxonomy — never the raw command line or its arguments. */
-export function toCommandClass(command: string): CommandClassValue {
+/** Maps a CLI command name to R2's closed command enum — never the raw command line or its arguments. */
+export function toCommandTelemetry(command: string): CommandValue | undefined {
   const normalized = command.trim().toLowerCase();
-  if (normalized === "receipt" || normalized === "") {
-    return "receipt";
+  return (COMMAND_VALUES as readonly string[]).includes(normalized) ? (normalized as CommandValue) : undefined;
+}
+
+/** Coarse count buckets (SPEC-0043 R3/R4) — never the raw count. */
+export function bucketCount(n: number): CountBucketValue {
+  if (n <= 0) return "0";
+  if (n === 1) return "1";
+  if (n <= 3) return "2-3";
+  if (n <= 10) return "4-10";
+  if (n <= 50) return "11-50";
+  return ">50";
+}
+
+/** Coarse ordinal buckets (SPEC-0043 R2/R3) — `undefined` means the counter could not be trusted. */
+export function bucketOrdinal(n: number | undefined): OrdinalBucketValue {
+  if (n === undefined || n <= 0) return "unavailable";
+  if (n === 1) return "1";
+  if (n <= 3) return "2-3";
+  if (n <= 10) return "4-10";
+  if (n <= 50) return "11-50";
+  return ">50";
+}
+
+/** Install age buckets (SPEC-0043 R5) — the raw first-run date never appears in telemetry. */
+export function bucketInstallAge(firstRunAt: string | undefined, now: number | Date = Date.now()): InstallAgeBucketValue {
+  if (!firstRunAt) {
+    return "unavailable";
   }
-  if (normalized === "compare") {
-    return "compare";
+  const first = Date.parse(firstRunAt);
+  if (Number.isNaN(first)) {
+    return "unavailable";
   }
-  return "other";
+  const nowMs = now instanceof Date ? now.getTime() : now;
+  const days = Math.max(0, Math.floor((nowMs - first) / 86_400_000));
+  if (days === 0) return "first_day";
+  if (days <= 7) return "2-7d";
+  if (days <= 30) return "8-30d";
+  if (days <= 90) return "31-90d";
+  return ">90d";
+}
+
+/** CI detection for R2: set-and-not-false `CI` or `GITHUB_ACTIONS` separates automation from human CLI use. */
+export function isCiEnv(env: NodeJS.ProcessEnv = process.env): boolean {
+  const active = (value: string | undefined): boolean => value !== undefined && value !== "" && value.toLowerCase() !== "false";
+  return active(env.CI) || active(env.GITHUB_ACTIONS);
 }
 
 /**

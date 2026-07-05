@@ -114,6 +114,15 @@ export interface SessionSummary {
    * the receipt renders a tokens-only note instead (I2). */
   unpriceable?: boolean;
   /**
+   * SPEC-0045 R1 — the lazy summary built (this carries `filePath`/timestamps/
+   * `cwd`) but the FULL transcript failed to parse (`loadSession` returns null).
+   * Retained through discovery rather than silently dropped so the PR layer can
+   * flag a repo-scoped unreadable session (R2). Only a *deterministic* parse
+   * failure sets this — never a transient stat/cache miss. A degraded summary
+   * has no reliable totals; every non-PR surface excludes it (R3).
+   */
+  degraded?: "unreadable";
+  /**
    * SPEC-0019 R1a — attribution-only. The raw session's working directory and
    * git branch (first seen in the transcript). Used solely to match a session
    * to the current repo/worktree for `aireceipts pr`. Absent in the raw
@@ -144,8 +153,11 @@ export interface SessionSummary {
  * assistant turn is retained with `turnIndex = turns.length` and is
  * thrash-ineligible (no following turns to prove refill). `atMs` is the raw
  * record's own timestamp, absent (not synthesized) when the record carried none.
- * Only the Claude Code adapter populates this — other agents record no
- * compaction signal, so their sessions never carry compactions and never thrash.
+ * Populated by the adapters whose raw formats carry a verified compaction
+ * signal: Claude Code (SPEC-0017 summary/boundary shapes) and Codex (SPEC-0040
+ * `compacted` records + `context_compacted` markers, paired per event).
+ * Adapters without a verified signal (Cursor, Gemini, opencode) leave it
+ * absent, so their sessions never carry compactions.
  */
 export interface Compaction {
   turnIndex: number;
@@ -156,6 +168,13 @@ export interface Session extends SessionSummary {
   turns: Turn[];
   /** SPEC-0017 — raw compaction events, ordered by `turnIndex`. Absent when the adapter records none. */
   compactions?: Compaction[];
+  /**
+   * SPEC-0044 B3 — count of transcript records the adapter skipped because they
+   * were malformed/truncated (a crash-torn JSONL line, a corrupt DB row). `> 0`
+   * means this session's totals under-report by the dropped records' usage, so
+   * a receipt that credits it must floor `≥` and say so. Absent/0 → clean.
+   */
+  droppedRecords?: number;
 }
 
 export interface ListSessionsOptions {

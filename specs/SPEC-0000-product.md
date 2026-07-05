@@ -45,11 +45,13 @@ doubt, this file wins.
 - **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
   its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
   and no line ever claims another model would have completed the task.
-- **I4 — Local-first; diagnostics-only telemetry, disclosed and escapable.** Offline-
-  complete product; anonymous diagnostics to App Insights (perf + error + parse-failure
-  signals only — the format-drift sensor). Never content/paths/repos/prompts/$ amounts.
-  First-run notice, payload inspectable, `AIRECEIPTS_TELEMETRY=off` / `DO_NOT_TRACK=1`.
-  Details + schema: SPEC-0002.
+- **I4 — Local-first; diagnostics + adoption telemetry, disclosed and escapable.** Offline-
+  complete product; content-free diagnostics and feature-adoption events to App Insights
+  (perf + error + parse-failure signals, feature-usage enums/buckets, and a random install
+  identifier sent only as a salted hash — the pseudonymous key for adoption/retention
+  counts). Never content/paths/repos/prompts/$ amounts; raw counts/timestamps never ship
+  as payload fields. First-run notice, payload inspectable, `AIRECEIPTS_TELEMETRY=off` /
+  `DO_NOT_TRACK=1`. Details + schema: SPEC-0002, SPEC-0043.
 
 - **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.
 - **I6 — Facts, not rankings.** Report what a session cost; never rank models or agents
@@ -66,9 +68,10 @@ doubt, this file wins.
 
 ## OSS / indie / zero-telemetry stance
 
-aireceipts is built in the open by one person, as OSS, MIT-licensed. It is not a company
-product and is not gated behind a signup. It never phones home: no analytics, no crash
-reporting beyond the I4 diagnostics contract. If a future opt-in feature
+aireceipts is built in the open by one person, as OSS, Apache-2.0-licensed. It is not a company
+product and is not gated behind a signup. Beyond the disclosed, one-switch-escapable I4
+telemetry contract (diagnostics plus pseudonymous feature-adoption events), it never
+phones home: no third-party analytics, no crash uploads, no update pings. If a future opt-in feature
 needs the network (e.g. a hosted benchmark corpus), it is off by default, named clearly,
 and documented as the one exception. Price tables are maintained in the open via cited
 PRs (`data/prices/`, the `update-prices` skill) — anyone can audit where a number came

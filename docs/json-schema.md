@@ -39,8 +39,7 @@ JSON export.
 |---|---|---|
 | `schemaVersion` | number (literal `1`) | This schema's major version. Bumped only on a breaking change. |
 | `agentLabel` | string | Human label for the agent, e.g. "Claude Code". |
-| `source` | enum | One of `claude-code`, `codex`, `cursor`, `gemini`. |
-| `source` | enum | One of `claude-code`, `codex`, `cursor`, `opencode`. |
+| `source` | enum | One of `claude-code`, `codex`, `cursor`, `gemini`, `opencode`. |
 | `sessionId` | string | Adapter-local id (an absolute file path for file-based adapters). |
 | `title` | string \| null | Session title, or null when the adapter reports none. |
 | `startedAtMs` | number \| null | Session start, epoch milliseconds, or null. |
@@ -52,7 +51,7 @@ JSON export.
 | `totalTokens` | TokenUsage | Attributed token totals. |
 | `sessionTotalTokens` | TokenUsage | Adapter-reported session totals (the only real number for Cursor). |
 | `wasteLines` | array | Fired waste findings; see WasteLine. |
-| `caveats` | array | Time-integrity caveats (SPEC-0028): `kind` (`time-mtime` \| `time-span`) + `text`. Facts only — never affect `$`. Empty for consistent sessions. |
+| `caveats` | array | Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier`) + `text`. Never affects `$` itself. Empty when nothing to flag. |
 | `budget` | array (optional) | Advisory budget lines (SPEC-0009); present only when `~/.aireceipts/budget.json` is configured. |
 | `priceDelta` | PriceDelta \| null | Cheapest-current-model arithmetic, or null in tokens-only mode. |
 | `methodology` | string | The attribution methodology string (I3). |
@@ -86,11 +85,11 @@ JSON export.
 | `usd` | number \| null | Cost attributed to this tool, or null when its turns never priced (I2). |
 | `callCount` | number | Number of calls to this tool. |
 
-### Caveat (SPEC-0028 time-integrity)
+### Caveat (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound)
 
 | Field | Type | Meaning |
 |---|---|---|
-| `kind` | enum | `time-mtime` (a turn timestamp postdates the transcript file) or `time-span` (non-positive span carrying usage). |
+| `kind` | enum | `time-mtime` (a turn timestamp postdates the transcript file), `time-span` (non-positive span carrying usage), or `cost-lower-bound-cache-tier` (a priced turn's cache-write fell back to the base `input` rate because the vendor's price row cites no cache-write rate — row-aware, not just "unsplit": an unsplit write against a row that cites the 5m rate, e.g. Anthropic, is priced exactly and never sets this). |
 | `text` | string | The rendered caveat line, verbatim. |
 
 ### WasteLine (discriminated on `kind`)
@@ -150,6 +149,34 @@ Also carries `model`, `input`, and `output` (rates in USD per MTok) as documente
 
 `compare` also carries `schemaVersion` on its root.
 
+### Handoff envelope (`handoffJsonSchema`) — SPEC-0042
+
+`aireceipts --handoff <selector> --json`: the machine-readable resume packet. Always
+emits the full structure (empty arrays included). The attribution-only privacy fields
+(`cwd`, `gitBranch`, sidechain linkage) are structurally absent, same as every export.
+
+| Field | Type | Notes |
+|---|---|---|
+| `schemaVersion` | number | Same envelope as receipt/compare. |
+| `source` | string | Agent source enum. |
+| `sessionId` | string | Adapter-local session id. |
+| `title` | string \| null | Session title when known. |
+| `startedAtMs` | number \| null | Session start, epoch ms. |
+| `durationMs` | number \| null | Wall-clock span. |
+| `totals` | object | `tokens` (TokenUsage object) + `turnCount` + `toolCallCount`. |
+| `turnCount` | number | (totals) Assistant turns in the session. |
+| `toolCallCount` | number | (totals) Tool calls in the session. |
+| `wasteLines` | array | Same WasteLine union as the receipt. |
+| `suggestions` | array | Standing-rule suggestion strings (SPEC-0013), possibly empty. |
+| `threshold` | number | The distinct-session recurrence threshold in effect. |
+| `coverage` | object | What the packet covers, checkably: `turns`, `toolCalls`, `compactions`, `wasteLines` (all numbers). |
+| `turns` | number | (coverage) Turn count the packet covers. |
+| `toolCalls` | number | (coverage) Tool-call count the packet covers. |
+| `compactions` | number | (coverage) Compaction events in the session. |
+| `aggregates` | array | `{class, distinctSessionCount}` — exactly the waste classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent). |
+| `class` | string | (aggregates) Waste class name. |
+| `distinctSessionCount` | number | (aggregates) Distinct recent sessions the class fired in. |
+
 <!-- json-fields:end -->
 
 ## CSV
@@ -188,9 +215,12 @@ cacheCreationTokens, totalTokens, callCount`
 
 ## Weekly digest (SPEC-0008 integration point)
 
-`week --json` (SPEC-0008's weekly digest) is not yet implemented on this branch. When it
-lands, it MUST wrap its payload with the same `schemaVersion` constant
-(`SCHEMA_VERSION` from `src/receipt/exportSchema.ts`) rather than inventing a second,
-undocumented shape (R5, single-source-of-truth). Add a `weekJsonSchema` alongside the
-existing schemas, document its fields inside the `json-fields` markers above, and the
-parity test will hold it to the same contract automatically.
+`week --json` (SPEC-0008's weekly digest) **is** implemented (`weekToJson` in
+`src/receipt/week.ts`) and emits a `{window, priorWindow, sinceOverride, byProject, current, prior, delta,
+topWaste}` digest (waste lines are under `topWaste`). It does **not** yet carry a `schemaVersion` wrapper or a `weekJsonSchema` in
+`exportSchema.ts`, so it is not covered by the field-parity test — a known gap tracked
+for a follow-up: it MUST gain the same `schemaVersion` constant (from
+`src/receipt/exportSchema.ts`) and a `weekJsonSchema` documented inside the
+`json-fields` markers above, rather than a second undocumented shape (R5,
+single-source-of-truth). Until then, treat `week --json` as an unversioned convenience
+surface, not part of the versioned contract.

@@ -9,7 +9,7 @@
 // data (I1 — never model-generated); no line judges the agent or names a
 // model (I6).
 import type { WasteClassAggregate } from "../aggregate/waste.js";
-import { formatDuration, formatInt, formatUsd } from "./format.js";
+import { formatAbsoluteUtc, formatDuration, formatInt, formatUsd } from "./format.js";
 import type { ReceiptModel, WasteLine } from "./model.js";
 
 const TRIVIAL_SPANS_LABEL = "≈ re-priced eligible trivial spans";
@@ -73,26 +73,90 @@ export function standingRuleSuggestions(
 }
 
 /**
+ * SPEC-0042 R1/R2 — the session counts the resume-packet header and coverage
+ * line quote. Computed by the CLI from the loaded `Session` (turn/tool-call/
+ * compaction counts live there, not on `ReceiptModel`); the render stays pure.
+ */
+export interface HandoffCounts {
+  turns: number;
+  toolCalls: number;
+  compactions: number;
+}
+
+/**
+ * SPEC-0042 R1 — the state-header lines, rendered only when waste renders and
+ * counts were supplied. Every line quotes an existing model field or count —
+ * extraction, never narration (I1). A missing field omits its line, never a
+ * placeholder. Wording is golden-pinned.
+ */
+function stateHeaderLines(model: ReceiptModel, counts: HandoffCounts): string[] {
+  // R1 omission contract: unknown start/duration are OMITTED from the line —
+  // never a placeholder (deliberately NOT the receipt masthead's
+  // `start time unknown` treatment, and no width compaction).
+  const agentParts = [model.agentLabel];
+  if (model.startedAtMs !== undefined) {
+    agentParts.push(formatAbsoluteUtc(model.startedAtMs));
+  }
+  if (model.durationMs !== undefined) {
+    agentParts.push(formatDuration(model.durationMs));
+  }
+  const lines: string[] = [agentParts.join(" · ")];
+  if (model.modelMix.length > 0) {
+    lines.push(model.modelMix.map((m) => `${m.model} ${Math.round(m.tokenShare * 100)}%`).join(" · "));
+  }
+  const totalPart = model.totalUsd !== null ? `total $${formatUsd(model.totalUsd)}` : `total ${formatInt(model.sessionTotalTokens.total)} tok`;
+  lines.push(`${totalPart} · ${formatInt(counts.turns)} turns · ${formatInt(counts.toolCalls)} tool calls`);
+  if (counts.compactions > 0) {
+    lines.push(`compactions: ${formatInt(counts.compactions)}`);
+  }
+  return lines;
+}
+
+/** Pluralize a count with its noun (`1 waste line`, `2 waste lines`) — matches the receipt's row-label singular/plural discipline. */
+function countNoun(n: number, singular: string): string {
+  return `${formatInt(n)} ${singular}${n === 1 ? "" : "s"}`;
+}
+
+/** SPEC-0042 R2 — the packet states what it covers, checkably (fixed format, counts only). */
+function coverageLine(model: ReceiptModel, counts: HandoffCounts): string {
+  return `covers: ${countNoun(counts.turns, "turn")} · ${countNoun(counts.toolCalls, "tool call")} · ${countNoun(counts.compactions, "compaction")} · ${countNoun(model.wasteLines.length, "waste line")}`;
+}
+
+/**
  * Exactly `"nothing to hand off"` when nothing fired and nothing is suggested —
  * caller exits 0, per spec. `suggestions` (SPEC-0013 R3) appends a trailing,
  * clearly-labeled section only when non-empty; when it is empty the output is
  * byte-identical to pre-SPEC-0013 behavior (R5).
+ *
+ * SPEC-0042 R1/R2/R6: when `counts` is supplied AND at least one waste line
+ * renders, the block opens with the state header and closes with the coverage
+ * line. Suggestions-only output (zero waste) stays byte-identical to
+ * SPEC-0013 — the packet is a briefing about this session's problems, not a
+ * second receipt.
  */
-export function renderHandoff(model: ReceiptModel, suggestions: string[] = []): string {
+export function renderHandoff(model: ReceiptModel, suggestions: string[] = [], counts?: HandoffCounts): string {
   const hasWaste = model.wasteLines.length > 0;
   if (!hasWaste && suggestions.length === 0) {
     return "nothing to hand off";
   }
+  const packet = counts !== undefined && hasWaste;
   const lines: string[] = [];
   if (hasWaste) {
     const label = model.title ?? model.sessionId;
-    lines.push(`handoff: ${label}`, ...model.wasteLines.map(handoffBullet));
+    lines.push(`handoff: ${label}`);
+    if (packet && counts !== undefined) {
+      lines.push(...stateHeaderLines(model, counts));
+    }
+    lines.push(...model.wasteLines.map(handoffBullet));
   }
   if (suggestions.length > 0) {
     if (hasWaste) {
       lines.push("");
     }
     lines.push(SUGGESTION_HEADER, ...suggestions.map((s) => `- ${s}`));
+  }
+  if (packet && counts !== undefined) {
+    lines.push("", coverageLine(model, counts));
   }
   return lines.join("\n");
 }

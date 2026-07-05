@@ -12,10 +12,10 @@ import { dirname, join } from "node:path";
  */
 
 export const FIRST_RUN_NOTICE =
-  "aireceipts sends anonymous, content-free diagnostics (performance, error, " +
-  "and parse-failure signals only — never transcript content, prompts, file " +
-  "paths, repo names, or dollar amounts). Disable anytime with " +
-  "AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see " +
+  "aireceipts sends anonymous, content-free diagnostics and feature-usage " +
+  "events (command, coarse buckets, and a random install identifier — never " +
+  "transcript content, prompts, file paths, repo names, or dollar amounts). " +
+  "Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see " +
   "exactly what a run would send. Details: docs/telemetry.md";
 
 interface NoticeState {

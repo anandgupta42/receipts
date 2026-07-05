@@ -24,6 +24,7 @@ export const ROOT_ALLOWLIST = Object.freeze([
   ".gitleaksignore",
   ".gitignore",
   "AGENTS.md",
+  "CHANGELOG.md",
   "CONTRIBUTING.md",
   "LICENSE",
   "NOTICE",
@@ -229,6 +230,60 @@ export function getTrackedFiles(rootDir = process.cwd()) {
   return output.split("\n").filter(Boolean);
 }
 
+/**
+ * SPEC-0044 R1 — no silent contributor drop. The receipt's incompleteness is a
+ * typed ConfidenceEvent, never a bare `excludedCount++`. That antipattern (a
+ * count bumped without a routed event) is exactly the silent-drop this spec
+ * closes; banning it in the PR path keeps a future change from re-introducing it.
+ */
+export function checkNoSilentDrop(rootDir = process.cwd(), files = ["src/pr/contributors.ts", "src/pr/rollup.ts", "src/pr/promote.ts"]) {
+  const violations = [];
+  for (const rel of files) {
+    let text;
+    try {
+      text = readFileSync(join(rootDir, rel), "utf8");
+    } catch {
+      continue; // a file the refactor may rename — not this check's job to require existence
+    }
+    // Ban any silent MUTATION of excludedCount (++, +=, --, self-reassign) — a
+    // contributor drop must route through a ConfidenceEvent. `const excludedCount
+    // = new Set(...).size` (a DERIVATION from events) is allowed. A backstop for
+    // the specific known antipattern; the exhaustive-switch test + the A1
+    // behavioral tests are the primary proof.
+    if (/excludedCount\s*(\+\+|--|\+=|-=)|excludedCount\s*=\s*excludedCount/.test(text)) {
+      violations.push(`${rel}: mutated \`excludedCount\` — route contributor drops through a ConfidenceEvent (SPEC-0044 R1), don't bump a silent count`);
+    }
+    // SPEC-0044 M1 — a LOAD-FAILURE guard that drops a candidate must emit a
+    // ConfidenceEvent (this is the B4 shape). Narrowly matches a guard on the
+    // loaded `session` var (`if (!session …)`) — NOT the pool-candidate skip
+    // `if (!l.session …)`, which is a legitimate eligibility continue handled
+    // elsewhere, so this stays low-noise. If the guard's block (up to its
+    // `continue`/`return`) carries no event emission, flag it.
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      if (!/^\s*if \(!session\b/.test(lines[i])) {
+        continue;
+      }
+      const block = [];
+      for (let j = i; j < Math.min(i + 8, lines.length); j++) {
+        block.push(lines[j]);
+        if (/\b(continue|return)\b/.test(lines[j])) {
+          break;
+        }
+      }
+      const blockText = block.join("\n");
+      // Valid handling of a load failure: an inline ConfidenceEvent
+      // (contributors.ts/promote.ts) OR a rollup `unreadable: true` row, which
+      // is a visible signal and itself emits `unreadable-subagent` in the cost
+      // loop (SPEC-0044 M2). Either satisfies "not silently dropped".
+      if (!/events\.push|excludeHere|kind:\s*"|unreadable:\s*true/.test(blockText)) {
+        violations.push(`${rel}:${i + 1}: load-failure guard drops a candidate with no ConfidenceEvent — a failed-to-load session must be flagged (SPEC-0044 B4/R1), not silently skipped`);
+      }
+    }
+  }
+  return violations;
+}
+
 export function runHygiene({ rootDir = process.cwd(), title, trackedFiles } = {}) {
   const files = trackedFiles ?? getTrackedFiles(rootDir);
   return [
@@ -236,6 +291,7 @@ export function runHygiene({ rootDir = process.cwd(), title, trackedFiles } = {}
     ...checkRootAllowlist(files),
     ...checkGitleaksIgnore(rootDir),
     ...checkWorkflowPins(rootDir),
+    ...checkNoSilentDrop(rootDir),
     ...(title === undefined ? [] : checkPrTitle(title)),
   ];
 }

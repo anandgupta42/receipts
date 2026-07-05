@@ -4,7 +4,7 @@
 // they only format what's already here.
 import type { AgentSource, Session, TokenUsage } from "../parse/types.js";
 import { SOURCE_LABELS } from "../parse/types.js";
-import { addUsage, emptyUsage } from "../parse/util.js";
+import { addUsage, emptyUsage, sanitizeText } from "../parse/util.js";
 import { attributeByTool, METHODOLOGY } from "../pricing/attribution.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
 import { isoDateOf, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
@@ -84,6 +84,8 @@ export interface ReceiptModel {
   priceRowsUsed: PriceRowUsed[];
   /** Cursor's degraded mode (R1): no per-turn model/usage, session totals only. */
   unpriceable: boolean;
+  /** SPEC-0044 A3 — true when `totalUsd` includes a cache-write fallback price (unsplit TTL remainder), so the total is a lower bound. Mirrored into `caveats` as a rendered note; also folded into a `ConfidenceEvent` at the PR layer (src/pr/index.ts). */
+  costLowerBoundCacheTier: boolean;
 }
 
 /**
@@ -149,7 +151,7 @@ async function buildModelMix(session: Session): Promise<ModelMixEntry[]> {
   }
   const grandTotal = [...mixMap.values()].reduce((sum, t) => sum + t.total, 0);
   return [...mixMap.entries()]
-    .map(([model, tokens]) => ({ model, tokens, tokenShare: grandTotal > 0 ? tokens.total / grandTotal : 0 }))
+    .map(([model, tokens]) => ({ model: sanitizeText(model), tokens, tokenShare: grandTotal > 0 ? tokens.total / grandTotal : 0 }))
     .sort((a, b) => b.tokenShare - a.tokenShare || a.model.localeCompare(b.model));
 }
 
@@ -246,6 +248,29 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
 
   const priceRowsUsed = await collectPriceRowsUsed(session, dataDir);
   const caveats = detectTimeCaveats(session);
+  // SPEC-0044 A3 — `costLowerBoundCacheTier` is only ever set from a PRICED
+  // turn whose cache-write actually fell back to an uncited rate
+  // (attribution.ts guards on `priced !== null && priced.cacheWriteLowerBound`,
+  // row-aware via `cacheWriteIsLowerBound` — not fired for every unsplit
+  // write, only when the vendor's price row lacks the applicable cache-write
+  // rate), so `totalUsd` is guaranteed non-null here; the caveat is meaningful
+  // only once a `$` exists for it to bound.
+  if (attribution.costLowerBoundCacheTier) {
+    caveats.push({
+      kind: "cost-lower-bound-cache-tier",
+      text: "caveat: cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)",
+    });
+  }
+  // SPEC-0044 B3 — the parse layer skipped malformed/truncated transcript
+  // records (a crash-torn JSONL line, a corrupt DB row); their token usage is
+  // lost, so this session's total is a lower bound, not exact.
+  if ((session.droppedRecords ?? 0) > 0) {
+    const n = session.droppedRecords as number;
+    caveats.push({
+      kind: "dropped-transcript-records",
+      text: `caveat: ${n} unreadable transcript record${n === 1 ? "" : "s"} skipped — total may be incomplete`,
+    });
+  }
 
   const durationMs =
     session.totals.durationMs ??
@@ -271,5 +296,6 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     methodology: attribution.methodology ?? METHODOLOGY,
     priceRowsUsed,
     unpriceable: session.unpriceable === true,
+    costLowerBoundCacheTier: attribution.costLowerBoundCacheTier,
   };
 }

@@ -18,9 +18,11 @@ async function run(ctx: CommandContext): Promise<number> {
   const digest = await buildWeekDigest({ sinceMs, byProject: options.byProject });
   if (options.json) {
     ctx.stdout.write(`${JSON.stringify(weekToJson(digest), null, 2)}\n`);
+    ctx.telemetry.recordExportGenerated({ surface: "week", format: "json", wroteFile: false, result: "success" });
   } else {
     ctx.stdout.write(`${renderWeek(digest)}\n`);
   }
+  await ctx.telemetry.noteMilestone("first_week", "week");
   return 0;
 }
 

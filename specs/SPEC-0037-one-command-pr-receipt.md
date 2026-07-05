@@ -1,7 +1,7 @@
 ---
 id: SPEC-0037
 title: "One-command PR receipt finalizer"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0019, SPEC-0036]
 ---
@@ -244,3 +244,5 @@ branch.** 6 findings:
 6. MEDIUM — the wiring test pins prose ordering, not the operational story —
    **accepted as scoped**: that is exactly what a docs-slice test can pin;
    the operational assertions live in the unbuilt e2e slice's rows.
+
+**2026-07-04 · shipped:** merged via #90; ledger sweep pre-release.

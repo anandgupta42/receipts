@@ -46,6 +46,20 @@ jobs:
       - name: hygiene
         run: node scripts/hygiene.mjs
 
+  preflight:
+    # The consolidated pre-release gate, --quick (skips the heavy re-runs other
+    # jobs already do). Its unique coverage: the publish-shape manifest (name,
+    # bin, exact files allowlist, no prepack/prepare) and tarball leanness
+    # (no sourcemaps, size/count) — caught on every PR, not just at release.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22.14"
+      - run: npm ci
+      - run: npm run preflight -- --quick
+
   prices:
     # Mechanical enforcement of I2/I3: any PR touching data/prices/** must pass
     # cite-check (schema + non-empty cited sources). The Claude Code hook is UX;

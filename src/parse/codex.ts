@@ -1,4 +1,4 @@
-import type { AgentSource, ListSessionsOptions, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
+import type { AgentSource, Compaction, ListSessionsOptions, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
 import { codexFidelity } from "./fidelity/codex.js";
 import { lazyCodexSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import {
@@ -11,8 +11,7 @@ import {
   pathExists,
   readJsonl,
   truncate,
-  withTotal,
-} from "./util.js";
+  withTotal, sanitizeText } from "./util.js";
 
 /** Raw usage shape from a Codex `rollout-*.jsonl` `token_count` event. */
 interface CodexUsage {
@@ -47,6 +46,16 @@ function mapUsage(usage: CodexUsage | undefined) {
     total: 0,
   });
 }
+
+/**
+ * SPEC-0040 R1 — max spacing for a `compacted` record and its
+ * `context_compacted` marker to merge as ONE event. Real pairs sit ~2-3ms
+ * apart (sampled 2026-07-04); distinct compactions in the same rollout are
+ * minutes apart (96 events over ~38h). 5s cleanly separates the two regimes
+ * without a mushy heuristic; events missing a timestamp fall back to
+ * same-`turnIndex` pairing alone.
+ */
+const COMPACTION_PAIR_WINDOW_MS = 5_000;
 
 /** Codex nests the interesting payload under one of a few keys depending on event type. */
 function unwrap(top: Record<string, unknown>): Record<string, unknown> {
@@ -114,6 +123,23 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   const toolCallById = new Map<string, ToolCall>();
   let current: Turn | null = null;
 
+  // SPEC-0040 R1/R2 — one entry per DISTINCT compaction event. A `compacted`
+  // record and its `context_compacted` marker describe the same event and
+  // merge when they are OPPOSITE forms at the same next-turn position: real
+  // streams (sampled 2026-07-04) emit the marker a few records and ~2-3ms
+  // after its `compacted` record, so neither timestamp equality nor strict
+  // adjacency holds — but the pair always shares its `turnIndex` and forms
+  // alternate per event. Distinct same-form events sharing a next-turn index
+  // are ALL retained — collapsing them would undercount thrash. Extraction
+  // never touches turn segmentation.
+  interface CompactionEvent {
+    turnIndex: number;
+    atMs?: number;
+    form: "compacted" | "context_compacted";
+    paired: boolean;
+  }
+  const compactionEvents: CompactionEvent[] = [];
+
   function ensureTurn(ts?: number): Turn {
     if (!current) {
       current = { index: turns.length, timestamp: ts, toolCalls: [] };
@@ -122,7 +148,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     return current;
   }
 
-  await readJsonl(filePath, (record) => {
+  const droppedRecords = await readJsonl(filePath, (record) => {
     if (!record || typeof record !== "object") {
       return;
     }
@@ -135,6 +161,28 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
 
     const item = unwrap(top);
     const type = String(item.type ?? top.type ?? "");
+
+    // SPEC-0040 R1/R2 — `turnIndex` is the index the NEXT assistant turn will
+    // receive (`turns.length` — an open turn is already in `turns`, so this is
+    // `current.index + 1`); after-final compactions land at `turns.length` and
+    // are thrash-ineligible (SPEC-0017 R2 semantics).
+    if (type === "compacted" || type === "context_compacted") {
+      const last = compactionEvents[compactionEvents.length - 1];
+      const pairsWithLast =
+        last !== undefined &&
+        !last.paired &&
+        last.form !== type &&
+        last.turnIndex === turns.length &&
+        (last.atMs === undefined || ts === undefined || Math.abs(ts - last.atMs) <= COMPACTION_PAIR_WINDOW_MS);
+      if (pairsWithLast) {
+        last.paired = true;
+        last.atMs ??= ts;
+      } else {
+        compactionEvents.push({ turnIndex: turns.length, atMs: ts, form: type, paired: false });
+      }
+      return;
+    }
+
     if (typeof item.model === "string") {
       model ??= item.model;
     }
@@ -197,7 +245,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     if (type === "function_call" || type === "tool_call" || type === "custom_tool_call") {
       toolCallCount++;
       const callId = String(item.call_id ?? item.id ?? "");
-      const name = String(item.name ?? "tool");
+      const name = sanitizeText(String(item.name ?? "tool"));
       const call: ToolCall = {
         name,
         input: parseMaybeJson(item.arguments ?? item.input),
@@ -249,7 +297,15 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     cwd,
   };
 
-  return withTurns ? { summary, turns } : { summary, turns: [] as Turn[] };
+  // SPEC-0040 — stream order is nondecreasing in `turnIndex`, so no re-sort;
+  // `atMs` stays absent (never 0) when the record carried no timestamp.
+  const compactions: Compaction[] = compactionEvents.map((e) =>
+    e.atMs === undefined ? { turnIndex: e.turnIndex } : { turnIndex: e.turnIndex, atMs: e.atMs },
+  );
+
+  return withTurns
+    ? { summary, turns, compactions, droppedRecords }
+    : { summary, turns: [] as Turn[], compactions: [] as Compaction[], droppedRecords: 0 };
 }
 
 const ROOT = "~/.codex/sessions";
@@ -302,8 +358,13 @@ export class CodexAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns } = await parseTranscript(id, true);
-      return { ...summary, turns };
+      const { summary, turns, compactions, droppedRecords } = await parseTranscript(id, true);
+      // SPEC-0040 R5 — compactions absent (not `[]`) when none; SPEC-0044 B3 —
+      // droppedRecords present only when > 0 (absent → clean).
+      const dropped = droppedRecords > 0 ? { droppedRecords } : {};
+      return compactions.length > 0
+        ? { ...summary, turns, compactions, ...dropped }
+        : { ...summary, turns, ...dropped };
     } catch {
       return null;
     }

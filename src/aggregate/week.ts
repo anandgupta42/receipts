@@ -42,14 +42,29 @@ export interface PartitionedWindows {
 }
 
 /**
+ * SPEC-0041 R2 — the "real session" floor for aggregate windows: false exactly
+ * when a summary is empty on EVERY axis (no turns, no tool calls, no tokens).
+ * An all-zero artifact cannot contribute waste, cost, tokens, or duration —
+ * dropping it changes only session counts, never a priced number. A session
+ * with any tokens or tool calls stays in, even with zero turns. `--list` does
+ * NOT apply this (listing is inventory; windows are statistics).
+ */
+export function isAggregatableSession(s: SessionSummary): boolean {
+  const t = s.totals;
+  return t.turnCount > 0 || t.toolCallCount > 0 || t.tokens.total > 0;
+}
+
+/**
  * R1: bucket summaries into the current/prior windows by `endedAt`. A session
  * with no `endedAt` is excluded from both windows — never guessed into one.
+ * SPEC-0041 R2: all-zero artifacts are floored out here, the single seam both
+ * window consumers (week digest, handoff recurrence) route through.
  */
 export function partitionWindows(summaries: SessionSummary[], bounds: WindowBounds): PartitionedWindows {
   const current: SessionSummary[] = [];
   const prior: SessionSummary[] = [];
   for (const s of summaries) {
-    if (s.endedAt === undefined) {
+    if (s.endedAt === undefined || !isAggregatableSession(s)) {
       continue;
     }
     if (s.endedAt >= bounds.curStart && s.endedAt < bounds.curEnd) {

@@ -13,6 +13,7 @@ import { classifyBranchAnchors, computeSlice, type BranchAnchorSummary, type Sli
 import { cwdInsideRoots } from "./git.js";
 import { isCodexExec, toolCallInvocations } from "./gitWrite.js";
 import { claimedBranchShas, eligibleSubjects, hasForeignShaWrites, sessionCommitSubjects } from "./messageAnchor.js";
+import type { ConfidenceEvent } from "./confidence.js";
 
 export type Role = "orchestrator" | "builder" | "codex";
 
@@ -44,6 +45,13 @@ export interface ContributorSelection {
   contributors: RawContributor[];
   /** Plausible (this-worktree) candidates that were NOT credited — surfaced, never hidden (R4). */
   excludedCount: number;
+  /**
+   * SPEC-0044 R1 — every drop/degrade routed as a typed ConfidenceEvent. The
+   * source of truth behind the receipt's incompleteness signals; `excludedCount`
+   * is retained (well-tested) and mirrored as `silenced-git-write` events, while
+   * A1's anchor-pool full-fallback drops surface ONLY here (never silent).
+   */
+  events: ConfidenceEvent[];
 }
 
 export interface ContributorDeps {
@@ -74,7 +82,14 @@ export async function selectContributors(
   deps: ContributorDeps,
 ): Promise<ContributorSelection> {
   const contributors: RawContributor[] = [];
-  let excludedCount = 0;
+  const events: ConfidenceEvent[] = [];
+  // excludedCount derives from the silenced-git-write events (kept as a field
+  // for the well-tested body wiring); the events are the R1 source of truth.
+  // filePath is the file-unique identity; summary.id collides across nested
+  // candidates (nestedCandidates synthesizes id: agentId) — S2 finding 3.
+  const excludeHere = (summary: SessionSummary): void => {
+    events.push({ kind: "silenced-git-write", sessionId: summary.filePath });
+  };
 
   // Pass 1 — load and classify EVERYTHING first, so SHA claims are computed
   // from the full candidate list before any message credit is considered:
@@ -148,9 +163,23 @@ export async function selectContributors(
   for (const l of loaded) {
     const { summary, here, session, anchors } = l;
     if (!session || !anchors) {
-      // A candidate we can't load can't be proven — count it only if it's plausibly ours.
+      // SPEC-0045 R2 — a repo-scoped transcript we couldn't PARSE (degraded at
+      // discovery). Only repo-scoped degraded files reach here (index.ts keeps
+      // no-cwd degraded out of the pools), so "couldn't read" ≠ "unproven repo
+      // candidate": flag it via the typed event even when `here`, never fold it
+      // into the silent silenced-git-write excluded count.
+      if (summary.degraded === "unreadable") {
+        events.push({ kind: "unreadable-session", sessionId: summary.filePath });
+        continue;
+      }
+      // A candidate we can't load can't be proven. In the current worktree it's
+      // the classic excluded count; OUTSIDE it (anchor pool / sibling worktree)
+      // it used to vanish silently — SPEC-0044 B4: "couldn't read" ≠ "not ours",
+      // so its absence is now counted via a typed event (floors the total).
       if (here) {
-        excludedCount++;
+        excludeHere(summary);
+      } else {
+        events.push({ kind: "unreadable-session", sessionId: summary.filePath });
       }
       continue;
     }
@@ -171,6 +200,11 @@ export async function selectContributors(
       // semantics (never excludedCount — the fence's "in repo + branch
       // window" copy stays true).
       if (l.pool === "anchor" && slice.kind === "full") {
+        // SPEC-0044 A1 — too uncertain to credit (a full-session fallback landing
+        // cross-project was PR #87's max-misstatement shape), but its absence is
+        // NEVER silent: it emits a typed event so the total floors `≥` and the
+        // receipt counts it (the coverage-map C.2 hole, the mirror of #87).
+        events.push({ kind: "unattributable-anchor-pool", sessionId: summary.filePath });
         continue;
       }
       contributors.push({
@@ -190,7 +224,7 @@ export async function selectContributors(
       });
     } else if (here) {
       // Plausibly ours (this worktree) but unproven — surface it in the honest note.
-      excludedCount++;
+      excludeHere(summary);
     }
     // else: a sibling-worktree or anchor-pool candidate with no branch-SHA proof — not ours, ignored.
   }
@@ -198,7 +232,10 @@ export async function selectContributors(
   contributors.sort(
     (a, b) => (a.session.startedAt ?? 0) - (b.session.startedAt ?? 0) || a.summary.id.localeCompare(b.summary.id),
   );
-  return { contributors, excludedCount };
+  const excludedCount = new Set(
+    events.filter((e) => e.kind === "silenced-git-write").map((e) => e.sessionId),
+  ).size;
+  return { contributors, excludedCount, events };
 }
 
 /** True if the session spawned subagents or launched another agent (the orchestration signal, R3). */

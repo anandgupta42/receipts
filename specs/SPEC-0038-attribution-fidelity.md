@@ -1,7 +1,7 @@
 ---
 id: SPEC-0038
 title: "Attribution fidelity — anchors are authorship, receipts never double-count"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0024, SPEC-0032]
 ---
@@ -274,3 +274,5 @@ committed. (b) not triggered: the fork marker is reliable (P3) — forks
 render post-fork turns, not exclusions. The two vitest failures on this
 loaded machine are upstream #69 stress timeouts, reproduced byte-identically
 on an unmodified baseline tree mid-build.
+
+**2026-07-04 · shipped:** merged via #94 (backfill demonstrated); ledger sweep pre-release.

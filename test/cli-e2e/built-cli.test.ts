@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { handoffJsonSchema, receiptJsonSchema } from "../../src/receipt/exportSchema.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
@@ -252,6 +253,41 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("Per-turn cost split");
   });
 
+  // SPEC-0044 A3 (e2e through the real built CLI, not just runPr): the caveat
+  // is row-aware, not usage-only — it fires only when the vendor's price row
+  // doesn't cite a cache-write rate, so the fallback to base `input` actually
+  // understates cost. `cache-tier-fallback-unsplit.jsonl` uses an openai model
+  // (no `input_cache_write_5m`/`1h` cited in data/prices/openai.json), so its
+  // unsplit cache-write falls back to the base rate — genuine lower bound.
+  // `cache-tier-fallback-split.jsonl` uses an Anthropic model whose row cites
+  // both TTL tiers, so it prices exactly — no caveat — the negative control.
+  // (test/fixtures/claude-code/cache-tier-fallback-*.jsonl; through the actual
+  // dist/cli.js binary: parse → attributeByTool → buildReceiptModel → render.)
+  it("SPEC-0044 A3: an unsplit cache-write session on a vendor with no cited cache-write rate renders the lower-bound caveat on the text receipt and the schema-valid `--json` export", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "cache-tier-fallback-unsplit.jsonl");
+
+    const textResult = await runCli([], home);
+    expectSuccess(textResult);
+    expect(textResult.stdout).toContain("caveat: cache-write cost is a lower bound for this session");
+
+    const receipt = readJson<ReceiptJson & { caveats: Array<{ kind: string; text: string }> }>(await runCli(["--json"], home));
+    expect(receipt.caveats.some((c) => c.kind === "cost-lower-bound-cache-tier")).toBe(true);
+    expect(receiptJsonSchema.safeParse(receipt).success).toBe(true);
+  });
+
+  it("SPEC-0044 A3 negative control: an Anthropic session (cited 5m/1h rates) renders NO caveat even with cache-write tokens (no false positive)", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "cache-tier-fallback-split.jsonl");
+
+    const textResult = await runCli([], home);
+    expectSuccess(textResult);
+    expect(textResult.stdout).not.toContain("cache-write cost is a lower bound");
+
+    const receipt = readJson<ReceiptJson & { caveats: Array<{ kind: string; text: string }> }>(await runCli(["--json"], home));
+    expect(receipt.caveats.some((c) => c.kind === "cost-lower-bound-cache-tier")).toBe(false);
+  });
+
   it("prints the no-session message with the searched sandbox roots and exit 0", async () => {
     const home = await makeHome();
 
@@ -262,6 +298,16 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("no agent session data detected. Looked in:");
     expect(result.stdout).toContain(path.join(home, ".claude", "projects"));
     expect(result.stdout).toContain(path.join(home, ".codex", "sessions"));
+  });
+
+  it("SPEC v0.1.1: `--list --json` on zero sessions emits valid JSON `[]` on stdout, message on stderr", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["--list", "--json"], home);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual([]);
+    expect(result.stderr).toContain("no agent session data detected");
   });
 
   it("discovers and prices opencode multi-provider sessions through built CLI", async () => {
@@ -338,7 +384,12 @@ describe("built CLI e2e", () => {
     expect(textResult.stdout).not.toContain("$");
   });
 
-  it("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
+  // Children spawned from vitest fork workers inherit macOS background QoS and
+  // run I/O-throttled ~20x on loaded dev Macs (measured: an identical spawn is
+  // 3.4s outside vitest, ~70s inside). CI (Linux) is unaffected. Ceiling sized
+  // for the throttled worst case; the test asserts correctness, not speed.
+  // AIRECEIPTS_SKIP_STRESS=1 skips on a loaded dev machine; CI never sets it.
+  it.skipIf(process.env.AIRECEIPTS_SKIP_STRESS === "1")("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "simulated-100.db");
 
@@ -387,7 +438,7 @@ describe("built CLI e2e", () => {
       expect(Object.keys(tools).sort()).toEqual(toolNames.sort());
       expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
     }
-  }, 45_000);
+  }, 600_000);
 
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
     const home = await makeHome();
@@ -424,6 +475,39 @@ describe("built CLI e2e", () => {
     expect(parsed.schemaVersion).toBe(1);
     expect(Object.keys(parsed).sort()).toEqual(["a", "b", "delta", "schemaVersion"]);
     expect(String(parsed.delta)).not.toMatch(/better|worse|winner|superior|inferior/i);
+  });
+
+  it("SPEC-0042: --handoff --json emits the schema-valid resume packet; text form carries header + coverage", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "loop-bash-5x.jsonl", "loop.jsonl");
+
+    const jsonRun = await runCli(["--handoff", "--json"], home);
+    expect(jsonRun.code, jsonRun.stderr).toBe(0);
+    const parsed = JSON.parse(jsonRun.stdout) as Record<string, unknown>;
+    expect(() => handoffJsonSchema.parse(parsed)).not.toThrow();
+    expect(parsed.coverage).toEqual({ turns: 6, toolCalls: 5, compactions: 0, wasteLines: 1 });
+    expect(parsed.schemaVersion).toBe(1);
+    expect(Object.keys(parsed)).toEqual([
+      "schemaVersion",
+      "source",
+      "sessionId",
+      "title",
+      "startedAtMs",
+      "durationMs",
+      "totals",
+      "wasteLines",
+      "suggestions",
+      "threshold",
+      "coverage",
+      "aggregates",
+    ]);
+    expect(jsonRun.stdout).not.toMatch(/"(cwd|gitBranch|isSidechain|parentSessionId|agentId|parentFilePath)"/);
+
+    const textRun = await runCli(["--handoff"], home);
+    expect(textRun.code, textRun.stderr).toBe(0);
+    expect(textRun.stdout).toContain("handoff: ");
+    expect(textRun.stdout).toContain("total $");
+    expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
   });
 
   it("treats malformed budget config as stderr-only advisory and still renders the receipt", async () => {
@@ -491,7 +575,7 @@ describe("packed tarball smoke", () => {
     expect(install.code, install.stdout + install.stderr).toBe(0);
 
     const installedPackage = JSON.parse(
-      await readFile(path.join(installDir, "node_modules", "aireceipts", "package.json"), "utf8"),
+      await readFile(path.join(installDir, "node_modules", "aireceipts-cli", "package.json"), "utf8"),
     ) as { dependencies?: Record<string, string> };
     expect(installedPackage.dependencies).toHaveProperty("zod");
     expect(installedPackage.dependencies).toHaveProperty("@resvg/resvg-js");
@@ -504,5 +588,8 @@ describe("packed tarball smoke", () => {
     expect(run.stdout).toContain("AIRECEIPTS");
     expect(run.stdout).toContain("Claude Code");
     expect(run.stdout).toContain("TOTAL");
+    // The fixture is a priced session: a `$` on the TOTAL line proves the
+    // installed package loaded its data/prices tables (not a tokens-only fall).
+    expect(run.stdout).toMatch(/TOTAL[.\s]*\$\d/);
   });
 }, 90_000);

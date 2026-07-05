@@ -128,7 +128,7 @@ Conventional commit subject, backticked code terms, bullets for multiple changes
 the PR against `main`; wait for CI green (ci.yml matrix + goldens + mutation if
 `src/pricing/**` touched).
 
-Then, from your worktree, run `npx aireceipts pr --post` before handing the PR over — it
+Then, from your worktree, run `npx aireceipts-cli pr --post` before handing the PR over — it
 attaches this building session's receipt as a marked PR comment (SPEC-0037). Every PR
 carries the receipt of the session that built it; the `pr-receipt-check` workflow only
 *notices* a skip, so this step is on you.

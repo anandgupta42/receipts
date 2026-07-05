@@ -26,7 +26,7 @@ runs `npx aireceipts` within 60 seconds.
   matrix incl. Cursor's degraded mode, stated honestly), what it will never claim
   (the honesty ladder in one sentence), the telemetry sentence linking
   docs/telemetry.md, quickstart for `compare` and `--handoff`, samosa placeholder,
-  MIT. ≤120 lines.
+  Apache-2.0. ≤120 lines.
 - **R2 — docs/telemetry.md.** Field-by-field schema exactly mirroring SPEC-0002's zod
   schemas (SPEC-0002's parity test binds this file), kill switches, the open
   embedded-key note, first-run notice text reproduced.
@@ -40,7 +40,7 @@ runs `npx aireceipts` within 60 seconds.
   README quickstart commands verbatim against a fixture — the honest prepublish stand-in
   for `npx aireceipts` (S2 finding). Public-npx verification stays a release-day check.
 - **R6 — Docs lint.** A script asserts: README ≤120 lines with required sections
-  (hero/quickstart/supported/telemetry/license), telemetry link present, MIT + samosa
+  (hero/quickstart/supported/telemetry/license), telemetry link present, Apache-2.0 + samosa
   placeholders present, assets referenced by README exist and byte-match regeneration,
   and the voice grep (zero `founder|Altimate|internal` in README/docs/CONTRIBUTING).
 

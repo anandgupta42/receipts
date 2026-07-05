@@ -1,7 +1,7 @@
 ---
 id: SPEC-0029
 title: "Launch README — evidence-shaped first screen, receipt parity enforced"
-status: building
+status: shipped
 milestone: M4
 depends: []
 ---
@@ -263,3 +263,5 @@ accepted, fixed; (7) npm README will render degraded (files: excludes
 goldens/docs) — accepted as a recorded publish-day decision in Non-goals,
 not solved here. Red-then-green for receipt parity demonstrated live
 (mutated dollar → guard names the exact failure → restored green).
+
+**2026-07-04 · shipped:** merged via #68 #71(guard evolution) #78; ledger sweep pre-release.

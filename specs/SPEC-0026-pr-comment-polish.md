@@ -1,7 +1,7 @@
 ---
 id: SPEC-0026
 title: "PR comment polish — leaner N=1, cache line, honest helper label, details on demand"
-status: building
+status: shipped
 milestone: M3
 depends: [SPEC-0023, SPEC-0024]
 ---
@@ -306,3 +306,5 @@ cache-formatter extraction behaviorally identical, R5 assembly order correct.
 **2026-07-03 · approved (button 1):** maintainer, in-session — *"SPEC-0026 -
 approved."* Status → building. Build base: PR #63's branch (SPEC-0027 impl),
 so R5's details section can also give 0027's link line its final home.
+
+**2026-07-04 · shipped:** merged via #63 #66; ledger sweep pre-release.

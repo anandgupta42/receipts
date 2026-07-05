@@ -113,3 +113,61 @@ If you need a stronger guarantee than an author's disclosure — billing-grade
 attribution across a team — use your vendor's console. aireceipts will not
 pretend to be that, and a receipt that pretended would be worth less than one
 that tells you exactly what it knows.
+
+13. **An anchor-pool session that only full-falls-back** (SPEC-0044 A1). A
+    session from another repo/worktree that touched this branch but resolves only
+    to "entire session" (push-only or rebased anchor, no sliceable commit) is too
+    uncertain to credit. *Direction:* under-credit. *Marker:* the total floors
+    `≥` and a **distinct** note — "N session(s) touched this branch but couldn't
+    be attributed precisely" — counts it, separate from the "candidate session
+    not attributed" note. Previously such a session vanished with no trace: the
+    silent mirror of #87's over-credit. Details: [cost-model.md](cost-model.md).
+
+14. **Cursor Background Agents are not read** (SPEC-0044 A2, known gap). The
+    Cursor adapter reads inline Composer sessions but not Background Agent
+    sessions (`agentKv:`/`glass.` keys). *Direction:* under-report a whole
+    contributor. *Marker:* none yet — a documented blind spot pending its own
+    spec (PR-scoping needs the background-agent schema). Details:
+    [cost-model.md](cost-model.md).
+
+15. **Cache-write cost is a lower bound when the vendor's price row cites no
+    cache-write rate** (SPEC-0044 A3, row-aware). An unsplit (or partially
+    split) cache-write turn is priced under the assumed 5m-tier rate — and
+    that's *exact*, not a caveat, whenever the price row cites
+    `input_cache_write_5m` (every Anthropic model does, so Claude Code sessions
+    never trip this, split or not). It's a genuine under-report only for
+    vendors whose price row cites no cache-write rate at all (openai, google,
+    deepseek today — every opencode session touching one of those models
+    inherits the gap; opencode's own schema has no tier-split concept, but that
+    alone isn't the trigger). *Direction:* under-report. *Marker:* the total
+    floors `≥`, the single-session receipt carries a muted "cache-write cost is
+    a lower bound for this session" caveat, and the PR body's confidence
+    summary counts affected sessions. Fires only on the fallback's actual use
+    against an uncited rate — a session priced entirely against vendors that
+    cite the applicable tier rate, or with no cache-write at all, never trips
+    it. Details: [cost-model.md](cost-model.md).
+15. **A session we couldn't read** (SPEC-0044 B4). A candidate in the branch
+    window whose transcript failed to load, sitting outside the current
+    worktree, used to vanish silently — "couldn't read" is not the same as
+    "read and found it isn't ours". It is now counted: the total floors `≥` and
+    a note reads "N session(s) touched this branch but couldn't be read". (A
+    read-but-unproven session is still a correct silent skip; only a genuine
+    read *failure* trips this.)
+16. **A transcript with records skipped at parse time** (SPEC-0044 B3). A
+    malformed or crash-truncated record (a torn JSONL line, a corrupt DB row)
+    is skipped while the rest of the session parses fine. When such a session is
+    credited, its total is a lower bound: the receipt says "N unreadable
+    transcript record(s) skipped — total may be incomplete" and the PR total
+    floors `≥`. A clean transcript never trips it.
+17. **A session that failed to parse before it was even a candidate**
+    (SPEC-0045). B4 (#15) catches a candidate whose full transcript won't load;
+    this catches the same failure one layer earlier — at *discovery*, where a
+    file that can't be parsed would otherwise be dropped before the PR flow sees
+    it. If its lazy metadata places it in **this repo**, it is flagged exactly
+    like #15 (floors `≥`, counted as an unreadable session). **The honest
+    limit:** a transcript so corrupt that even its lazy metadata (the working
+    directory) is lost cannot be tied to any particular repo, so it is excluded
+    without a per-receipt note — flagging it would fire on any corrupt file
+    anywhere under your agent's data directory, PR-relevant or not. A degraded
+    file is likewise excluded from every non-PR view (`week`, `compare`,
+    `--list`, budget), which never render an incomplete total for it.

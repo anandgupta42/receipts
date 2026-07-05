@@ -1,15 +1,17 @@
 name: Mutation
 
-# Runs Stryker mutation testing on src/pricing/** — the anti-gaming moat
-# (AGENTS.md): agent-written tests routinely hit ~100% coverage but only
-# ~91% mutation score, so coverage alone doesn't prove the tests assert
-# anything real. Gate is placeholder-only until src/pricing/ and a Stryker
-# config exist (Tier 0 — harness only, no product code yet).
+# Runs Stryker mutation testing on the money paths — src/pricing/** AND
+# src/pr/** (the PR-attribution path, added SPEC-0044 M3) — the anti-gaming
+# moat (AGENTS.md): agent-written tests routinely hit ~100% coverage but a
+# lower mutation score, so coverage alone doesn't prove the tests assert
+# anything real. The break threshold in stryker.config.json fails CI if the
+# combined score drops below it.
 
 on:
   pull_request:
     paths:
       - "src/pricing/**"
+      - "src/pr/**"
 
 # SPEC-0033 R2 — least-privilege baseline; this job only reads and runs tests.
 permissions:
@@ -41,4 +43,9 @@ jobs:
             exit 1
           fi
           npx stryker run
-        # TODO(M1+): extend to score-not-decreased vs. the baseline on main.
+        # break=60 (stryker.config.json) is the enforced FLOOR — the same
+        # standard as src/pricing/, now extended (SPEC-0044 M3) to src/pr/**,
+        # which previously had ZERO mutation enforcement. It prevents the money
+        # paths' combined score from regressing below 60%. A tighter
+        # score-not-decreased ratchet against a stored main baseline is a
+        # follow-up (needs baseline persistence in CI).

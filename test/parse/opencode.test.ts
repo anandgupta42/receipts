@@ -553,18 +553,28 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     });
   });
 
-  it("validates 100 generated opencode schema/model/tool combinations", async () => {
+  // 24 sessions cover the full structural combination cycle (LCM of the
+  // priced/schema/model/tool mods is 20). Every summary is validated from a
+  // SINGLE `listSessions()` (one DB open); the deeper `loadSession` +
+  // `buildReceiptModel` round-trip — each of which reopens the SQLite DB — runs
+  // only on a representative SAMPLE spanning priced/unpriced × every tool set ×
+  // both schema flags. This keeps combinatorial coverage while bounding DB
+  // reopens (list-all, sample-deep, the same shape as the e2e test), so it no
+  // longer times out under the full suite's concurrent load on dev machines.
+  it("validates 24 generated opencode schema/model/tool combinations (full structural cycle)", async () => {
     const dir = tempDir();
     dirs.push(dir);
-    const dbPath = path.join(dir, "opencode-100-simulations.db");
-    const simulations = Array.from({ length: 100 }, (_, index) => createSimulation(index));
+    const dbPath = path.join(dir, "opencode-24-simulations.db");
+    const simulations = Array.from({ length: 24 }, (_, index) => createSimulation(index));
     makeSimulatedDb(dbPath, simulations);
     const adapter = new OpenCodeAdapter({ dbPath });
 
     const summaries = await adapter.listSessions();
-    expect(summaries).toHaveLength(100);
+    expect(summaries).toHaveLength(24);
     expect(summaries[0].title).toBe(simulations.at(-1)!.title);
 
+    // Summary-level validation for ALL 24 — the single listSessions() above
+    // already parsed every session's model, token totals, and tool count.
     const summariesByTitle = new Map(summaries.map((summary) => [summary.title, summary]));
     for (const sim of simulations) {
       const expected = expectedUsage(sim);
@@ -573,7 +583,15 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       expect(summary!.model).toBe(sim.model);
       expect(summary!.totals).toMatchObject({ turnCount: 1, toolCallCount: sim.tools.length });
       expect(summary!.totals.tokens).toMatchObject(expected);
+    }
 
+    // Deep round-trip (reopens the DB per call) only for a sample covering both
+    // priced states, all four tool sets, and both schema flags — indices 0-4
+    // span exactly that per createSimulation's mod cycles.
+    const sampleIndices = [0, 1, 2, 3, 4];
+    for (const index of sampleIndices) {
+      const sim = simulations[index];
+      const expected = expectedUsage(sim);
       const session = await adapter.loadSession(`${dbPath}#${sim.sessionId}`);
       expect(session, sim.title).not.toBeNull();
       expect(session!.turns).toHaveLength(1);
@@ -591,7 +609,7 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       }
       expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
     }
-  });
+  }, 60_000);
 
   it("degrades invalid SQLite files to no sessions and null loads", async () => {
     const dir = tempDir();

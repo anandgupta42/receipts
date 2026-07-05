@@ -8,6 +8,7 @@ import { loadById } from "../../src/parse/load.js";
 import type { CommandResult, CommandRunner } from "../../src/pr/git.js";
 import { DOGFOOD_MARKER } from "../../src/pr/body.js";
 import { runPr, type PrDeps } from "../../src/pr/index.js";
+import type { SessionSummary } from "../../src/parse/types.js";
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
 const ANCHORS = path.join(FIX, "claude-anchors.jsonl");
@@ -80,6 +81,29 @@ describe("R3 render-first ordering", () => {
     expect(ghCalled).toBe(false);
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
     expect(out[0]).toContain("session slice: turns 2–4 of 6");
+  });
+
+  it("SPEC-0045 R2 anti-wallpaper — a degraded no-cwd session that only overlaps the window does NOT flag unreadable-session", async () => {
+    // A transcript that failed to parse (degraded) with NO cwd, whose timestamps
+    // merely overlap the branch window. Without repo-cwd proof it isn't ours, so
+    // index.ts keeps it OUT of the anchor pool (the `if (s.degraded) continue`
+    // guard) — it must NOT fire `unreadable-session`, or every corrupt file
+    // anywhere would floor unrelated PRs.
+    const real = (await loadById("claude-code", ANCHORS))!;
+    const degradedNoCwd: SessionSummary = {
+      id: "/elsewhere/ghost.jsonl",
+      source: "claude-code",
+      filePath: "/elsewhere/ghost.jsonl",
+      startedAt: Date.parse("2026-06-28T10:02:20.000Z"),
+      endedAt: Date.parse("2026-06-28T10:02:40.000Z"),
+      totals: { tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 }, turnCount: 0, toolCallCount: 0 },
+      degraded: "unreadable", // no cwd → not repo-scoped
+    };
+    const { deps, out } = await makeDeps({ listSessions: async () => [real, degradedNoCwd] });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(0);
+    // The real session still renders; the no-cwd degraded file is silent.
+    expect(out[0]).not.toContain("couldn't be read");
   });
 
   it("explicit --session can select a subagent by stem, render, and post", async () => {
@@ -592,5 +616,50 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
       expect(code).toBe(0);
       expect(err.join("\n")).not.toContain("twitter.com");
     });
+  });
+});
+
+// SPEC-0044 A3 (e2e through runPr) — the real bug this closes: a session whose
+// cache-write cost took the unsplit-tier fallback rendered an exact-looking
+// dollar total with no signal it was a floor. These two fixtures are IDENTICAL
+// in shape/tokens (see test/fixtures/claude-code/cache-tier-fallback-*.jsonl) —
+// only whether the remainder is split into a nested cache_creation object
+// differs — so this is a true positive/negative pair through the FULL pipeline
+// (parse → attributeByTool → buildContributorView → the costEvents collection
+// in src/pr/index.ts → summarizeConfidence → renderPrReceiptText), not just the
+// unit-level summarizeConfidence/renderPrReceiptText tests in confidence.test.ts.
+describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e through runPr)", () => {
+  const CACHE_TIER_UNSPLIT = path.join(FIX, "..", "claude-code", "cache-tier-fallback-unsplit.jsonl");
+  const CACHE_TIER_SPLIT = path.join(FIX, "..", "claude-code", "cache-tier-fallback-split.jsonl");
+
+  it("RED-then-GREEN positive: an unsplit cache-write session floors the total and renders the caveat + docs pointer", async () => {
+    const session = (await loadById("claude-code", CACHE_TIER_UNSPLIT))!;
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [session],
+      loadSession: async (summary) => loadById(summary.source, summary.id),
+    });
+    const code = await runPr({ post: false, session: session.id }, deps);
+    expect(code).toBe(0);
+    expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
+    expect(out[0]).toContain("1 session had a cache-write cost that is a lower bound");
+    expect(out[0]).toContain("(see docs/cost-model.md)");
+    // The `≥` floor prefix (isFloored) fires for this event kind (A3's own
+    // "at least this much" meaning matches the existing floor semantics —
+    // see the floor-semantics decision recorded in the PR description).
+    expect(out[0]).toMatch(/TOTAL priced\.+≥/);
+  });
+
+  it("negative control: the SAME shape/tokens fully split into 5m/1h tiers renders NO caveat (no false positive)", async () => {
+    const session = (await loadById("claude-code", CACHE_TIER_SPLIT))!;
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [session],
+      loadSession: async (summary) => loadById(summary.source, summary.id),
+    });
+    const code = await runPr({ post: false, session: session.id }, deps);
+    expect(code).toBe(0);
+    expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
+    expect(out[0]).not.toContain("cache-write cost that is a lower bound");
+    expect(out[0]).not.toContain("cost-model.md");
+    expect(out[0]).not.toMatch(/TOTAL priced\.+≥/);
   });
 });

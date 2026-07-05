@@ -1,7 +1,9 @@
 # Get started in 60 seconds
 
 aireceipts reads the transcripts your AI coding agent already writes to disk and
-prints a priced receipt of what a session cost. No account, no API key, no upload.
+prints a priced receipt of what a session cost. No account, no API key; your
+transcripts and code are never uploaded (anonymous diagnostics are opt-out — see
+[docs/telemetry.md](../telemetry.md)).
 
 This page takes you from nothing to a receipt, a weekly total, and an automatic
 receipt after every session — in about a minute.
@@ -12,7 +14,7 @@ You don't install anything first. One command reads your newest session and
 prices it:
 
 ```sh
-npx aireceipts
+npx aireceipts-cli
 ```
 
 The first time it runs, it prints a one-line note about anonymous diagnostics
@@ -59,7 +61,7 @@ somewhere aireceipts doesn't look yet — jump to [Troubleshooting](12-troublesh
 One session is a number. The trailing week is a habit:
 
 ```sh
-npx aireceipts week
+npx aireceipts-cli week
 ```
 
 ```
@@ -95,7 +97,7 @@ You won't remember to run a command after every session. Let Claude Code run it
 for you:
 
 ```sh
-npx aireceipts install-hook
+npx aireceipts-cli install-hook
 ```
 
 It shows you the exact change, asks before writing, and installs a `SessionEnd`
@@ -107,3 +109,6 @@ Full walkthrough: [Install the agent hook](03-install-hook.md).
 - **[Install](02-install.md)** — run it without `npx` on every invocation.
 - **[Read a receipt](04-read-a-receipt.md)** — pick any session, not just the newest.
 - **[Set a budget](08-budget.md)** — get an exit code when the week crosses a cap.
+- **[FAQ](../faq.md)** — how this differs from usage dashboards, what the dollars
+  mean on a subscription, what leaves your machine (nothing but disclosed,
+  content-free telemetry), and more.

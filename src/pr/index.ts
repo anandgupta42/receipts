@@ -24,13 +24,15 @@ import { deriveRole, selectContributors, type PoolCandidate, type RawContributor
 import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
 import { nestedCandidates } from "./nested.js";
-import { isChildPath } from "../parse/children.js";
+import { discoverChildFiles, isChildPath } from "../parse/children.js";
 import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
+import { summarizeConfidence, type ConfidenceEvent } from "./confidence.js";
 import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
 import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
 import { buildShareLines } from "./share.js";
 import type { ReceiptModel } from "../receipt/model.js";
+import type { ResultValue, StepResultValue } from "../telemetry/schemas.js";
 
 export interface PrOptions {
   post: boolean;
@@ -54,9 +56,29 @@ export interface PrDeps {
   err: (s: string) => void;
 }
 
+export interface PrReceiptTelemetry {
+  models: ReceiptModel[];
+  turnCount: number;
+  toolCallCount: number;
+}
+
+export interface PrRunResult {
+  code: number;
+  bodyRendered: boolean;
+  contributorCount: number;
+  receipt?: PrReceiptTelemetry;
+  commentResult: StepResultValue;
+  artifactResult: StepResultValue;
+  shareResult: StepResultValue;
+  result: ResultValue;
+}
+
 export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
   return {
-    listSessions: async () => (await import("../parse/load.js")).listFullSessions(),
+    // SPEC-0045 R3 — only the PR flow opts into degraded summaries (so it can
+    // flag a repo-scoped unreadable session, R2); every other surface excludes
+    // them by default.
+    listSessions: async () => (await import("../parse/load.js")).listFullSessions(undefined, { includeDegraded: true }),
     loadSession: async (summary) => (await import("../parse/load.js")).loadSession(summary),
     runGit: defaultRunner,
     runGh: defaultRunner,
@@ -70,13 +92,39 @@ export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
 
 const NO_MATCH = "no session matches this repo + branch; re-run with --session <id> to pick one explicitly";
 
+function prResult(input: Partial<PrRunResult> & { code: number; result: ResultValue }): PrRunResult {
+  return {
+    bodyRendered: false,
+    contributorCount: 0,
+    commentResult: "skipped",
+    artifactResult: "skipped",
+    shareResult: "skipped",
+    ...input,
+  };
+}
+
 function stemOf(filePath: string): string {
   return path.basename(filePath).replace(/\.jsonl$/, "");
+}
+
+/**
+ * SPEC-0044 B5 — true if `candidate`'s file lives anywhere under
+ * `ancestorFilePath`'s own `subagents/` subtree (any depth). Used to scope a
+ * promoted contributor's territory to whichever OTHER contributor is its
+ * actual ancestor, so a deeper promoted grandchild's territory is carved out
+ * of its immediate promoted parent's exclusion set too (not just the
+ * top-level ancestor's) — see `exclusionsFor` below.
+ */
+function isDescendantOfContributor(candidate: string, ancestorFilePath: string): boolean {
+  const root = path.join(ancestorFilePath.replace(/\.jsonl$/, ""), "subagents") + path.sep;
+  return candidate.startsWith(root);
 }
 
 interface Resolved {
   contributors: RawContributor[];
   excludedCount: number;
+  /** SPEC-0044 R1 — typed drop/degrade events (A1 anchor-pool absences etc.). */
+  events: ConfidenceEvent[];
   /** Time-overlapping listed sidechains — SPEC-0024 R2 promotion candidates, judged after rollups. */
   sidechains: SessionSummary[];
 }
@@ -119,6 +167,7 @@ async function resolveContributors(
       // Explicitly-selected sessions are the user's own attribution claim — anchor-grade.
       contributors: [{ summary, session, slice: computeSlice(session.turns, shas), basis: "anchor" }],
       excludedCount: 0,
+      events: [],
       sidechains: [],
     };
   }
@@ -133,6 +182,14 @@ async function resolveContributors(
     if (isBranchCandidate(s, roots, commitMs)) {
       candidates.push({ summary: s, pool: "repo" });
     } else if (overlapsBranchWindow(s, commitMs)) {
+      // SPEC-0045 R2 anti-wallpaper — a degraded (unparseable) file that only
+      // overlaps the branch window, with no repo cwd match, is NOT proven ours;
+      // admitting it to the anchor pool would fire `unreadable-session` on time
+      // overlap alone (wallpaper). Unscopeable → excluded, documented (R4). A
+      // degraded file WITH a repo cwd took the isBranchCandidate branch above.
+      if (s.degraded) {
+        continue;
+      }
       // SPEC-0024 R1/R2 — time-overlapping but outside the repo pool: flagged
       // sidechains queue for promotion; everything else (cross-repo leads,
       // no-cwd sessions) joins the anchor pool, credited on SHA proof only.
@@ -146,7 +203,9 @@ async function resolveContributors(
   for (const n of nested) {
     if (isBranchCandidate(n.summary, roots, commitMs)) {
       candidates.push({ summary: n.summary, pool: "repo" });
-    } else if (overlapsBranchWindow(n.summary, commitMs)) {
+    } else if (overlapsBranchWindow(n.summary, commitMs) && !n.summary.degraded) {
+      // SPEC-0045 R2 anti-wallpaper — same rule as the top-level pool: a degraded
+      // nested candidate only joins the pools when repo-scoped (branch above).
       candidates.push({ summary: n.summary, pool: "anchor" });
     }
   }
@@ -166,6 +225,33 @@ async function resolveContributors(
  * renders (R2/R3). The sliced `ReceiptModel` is returned alongside the view —
  * SPEC-0027's artifact page renders it in full instead of discarding it.
  */
+/**
+ * SPEC-0044 B3 + M2 — per-session/subagent ConfidenceEvents raised in the cost
+ * loop (like A3's emitter), so the explicit `pr --session` path — which flows
+ * through the SAME loop — is covered without a separate site:
+ *  - `dropped-transcript-records` (B3): a credited session or rolled-up subagent
+ *    whose transcript had records skipped at parse time under-reports its cost.
+ *  - `unreadable-subagent` (M2): a rolled-up subagent transcript that couldn't be
+ *    read. This routes the long-standing legacy `SubagentRow.unreadable` floor
+ *    (body.ts `totals.unreadableCount`) through the typed contract too, so the
+ *    "single typed enumeration" claim holds. Both agree by construction (same
+ *    `row.unreadable`); the legacy count still renders the note, the event floors
+ *    — no double note, so output is byte-identical.
+ */
+export function pushSessionSubagentEvents(events: ConfidenceEvent[], raw: RawContributor, subagents: SubagentRow[]): void {
+  if ((raw.session.droppedRecords ?? 0) > 0) {
+    events.push({ kind: "dropped-transcript-records", sessionId: raw.summary.filePath });
+  }
+  for (const row of subagents) {
+    if ((row.droppedRecords ?? 0) > 0) {
+      events.push({ kind: "dropped-transcript-records", sessionId: row.filePath });
+    }
+    if (row.unreadable) {
+      events.push({ kind: "unreadable-subagent", sessionId: row.filePath });
+    }
+  }
+}
+
 async function buildContributorView(raw: RawContributor, deps: PrDeps, excludedChildren?: ReadonlySet<string>): Promise<{ view: ContributorView; model: ReceiptModel }> {
   const rendered = raw.slice.kind === "slice" ? sliceSessionForReceipt(raw.session, raw.slice) : raw.session;
   const model = await buildReceiptModel(rendered);
@@ -285,17 +371,30 @@ function detailHeading(view: ContributorView): string {
   return `#### ${view.role} · \`${shortSessionId(view.sessionId)}\``;
 }
 
-/** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns the process exit code. */
-export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<number> {
+function countedTurns(raw: RawContributor): number {
+  return raw.slice.kind === "slice" ? raw.slice.endTurn - raw.slice.startTurn + 1 : raw.session.totals.turnCount;
+}
+
+function countedToolCalls(raw: RawContributor): number {
+  if (raw.slice.kind !== "slice") {
+    return raw.session.totals.toolCallCount;
+  }
+  return raw.session.turns
+    .slice(raw.slice.startTurn, raw.slice.endTurn + 1)
+    .reduce((sum, turn) => sum + turn.toolCalls.length, 0);
+}
+
+/** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns structured telemetry-safe outcome facts. */
+export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<PrRunResult> {
   // R4 (SPEC-0027): the artifact exists to be linked — reject before rendering.
   if (opts.artifact && !opts.post) {
     deps.err("--artifact requires --post");
-    return 1;
+    return prResult({ code: 1, result: "invalid_args" });
   }
   // SPEC-0035 R5: the share hint targets the artifact link — same shape as the guard above.
   if (opts.share && !opts.artifact) {
     deps.err("--share requires --artifact");
-    return 1;
+    return prResult({ code: 1, result: "invalid_args" });
   }
 
   // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
@@ -305,7 +404,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   const resolved = await resolveContributors(opts, deps, shas, commitMs, branchInfo.subjects);
   if ("error" in resolved) {
     deps.err(resolved.error);
-    return 1;
+    return prResult({ code: 1, result: "no_data" });
   }
 
   // SPEC-0024 R3 ordering: base views first (their rollups define what is
@@ -315,25 +414,81 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   const covered = new Set<string>();
   // SPEC-0038 R3 dedup — nested sessions credited as contributors must not
   // ALSO appear inside their parent's SUBAGENTS rollup (filePath key).
-  const nestedContributorPaths = new Set(
-    resolved.contributors.filter((r) => isChildPath(r.summary.filePath)).map((r) => r.summary.filePath),
-  );
+  //
+  // SPEC-0044 B5 — that alone only covers ONE level: a promoted contributor
+  // (say A, a subagent of P that made its own branch commit) owns its ENTIRE
+  // subtree, not just its own row. `discoverChildFiles` walks recursively, so
+  // P's rollup call flattens A's descendants (e.g. grandchild B) in too —
+  // B then prices once under P's rollup AND once under A's own rollup.
+  // Fixed by computing, per contributor being rolled up, an exclusion set
+  // that also carves out any OTHER promoted contributor's subtree when that
+  // promoted contributor is nested underneath the one currently rolling up
+  // (this generalizes: if a further-promoted grandchild ever existed, its
+  // territory would be carved out of its promoted parent too, not just the
+  // top ancestor — though `nestedCandidates` currently only promotes direct
+  // children of top-level sessions, so chains deeper than P→A→B don't arise
+  // in practice; the subtree logic is correct regardless). The promoted
+  // contributor itself still rolls up its own direct subtree normally:
+  // `exclusionsFor(X)` never subtracts X's own descendants.
+  // Kept as the ONE dedup site; `rollupChildren`'s exact-file exclusion check
+  // is unchanged — callers just hand it a subtree-aware set now.
+  const promotedChildPaths = resolved.contributors
+    .filter((r) => isChildPath(r.summary.filePath))
+    .map((r) => r.summary.filePath);
+  const promotedDescendants = new Map<string, string[]>();
+  for (const promotedPath of promotedChildPaths) {
+    promotedDescendants.set(promotedPath, await discoverChildFiles(promotedPath));
+  }
+  function exclusionsFor(contributorFilePath: string): ReadonlySet<string> {
+    const excluded = new Set<string>(promotedChildPaths);
+    for (const promotedPath of promotedChildPaths) {
+      if (promotedPath === contributorFilePath || !isDescendantOfContributor(promotedPath, contributorFilePath)) {
+        continue;
+      }
+      for (const descendant of promotedDescendants.get(promotedPath) ?? []) {
+        excluded.add(descendant);
+      }
+    }
+    return excluded;
+  }
+  // SPEC-0044 A3 — collected across BOTH contributor loops below (main +
+  // promoted sidechains) and folded into `allEvents` before any
+  // `summarizeConfidence` call sees it.
+  const costEvents: ConfidenceEvent[] = [];
   for (const raw of resolved.contributors) {
-    const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
+    const { view, model } = await buildContributorView(raw, deps, exclusionsFor(raw.summary.filePath));
     covered.add(raw.summary.filePath);
     for (const row of view.subagents) {
       covered.add(row.filePath);
     }
+    if (model.costLowerBoundCacheTier) {
+      costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
+    }
+    pushSessionSubagentEvents(costEvents, raw, view.subagents);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
-  const promoted = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
+  const { promoted, events: promoteEvents } = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
   for (const raw of promoted) {
-    const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
+    const { view, model } = await buildContributorView(raw, deps, exclusionsFor(raw.summary.filePath));
+    if (model.costLowerBoundCacheTier) {
+      costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
+    }
+    pushSessionSubagentEvents(costEvents, raw, view.subagents);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
+  const allEvents = [...resolved.events, ...promoteEvents, ...costEvents];
   if (entries.length === 0) {
-    deps.err(NO_MATCH);
-    return 1;
+    // SPEC-0044 A1 (S2 finding 1): if the ONLY thing that touched the branch was
+    // an unattributable anchor-pool session, don't claim "no match" — say so.
+    const summary = summarizeConfidence(allEvents);
+    if (summary.unattributableAnchorPool > 0) {
+      deps.err(
+        `${summary.unattributableAnchorPool} session(s) touched this branch but couldn't be attributed precisely (no sliceable commit); nothing to receipt. See docs/trust.md.`,
+      );
+    } else {
+      deps.err(NO_MATCH);
+    }
+    return prResult({ code: 1, result: "no_data" });
   }
   entries.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
   // Round 2: the fence renders authors first, helpers grouped after — the
@@ -341,13 +496,19 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // size-cap's drop-from-END sheds helpers before authors.
   const fenceOrdered = [...entries.filter((e) => e.view.basis !== "helper"), ...entries.filter((e) => e.view.basis === "helper")];
   const views = entries.map((e) => e.view);
-  const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount };
+  const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount, confidence: summarizeConfidence(allEvents) };
+  const receipt: PrReceiptTelemetry = {
+    models: entries.map((e) => e.model),
+    turnCount: entries.reduce((sum, e) => sum + countedTurns(e.raw), 0),
+    toolCallCount: entries.reduce((sum, e) => sum + countedToolCalls(e.raw), 0),
+  };
 
   // SPEC-0027 R3: push the artifact BEFORE rendering the one final body, so
   // the printed and posted bodies are identical and the link only renders
   // after a confirmed push. A failed publish still posts (additive-only).
   let artifactFailed = false;
   let link: { fileName: string; url: string; ownerRepo: string } | null = null;
+  let artifactResult: StepResultValue = "skipped";
   if (opts.artifact) {
     // SPEC-0031 R3a — per-commit tables for sliced sessions; everything else
     // (helpers, full fallbacks) lands in the labeled bucket. The slicer's own
@@ -372,6 +533,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
       perCommitJson: islandData.length > 0 ? JSON.stringify(islandData) : undefined,
     });
     artifactFailed = link === null;
+    artifactResult = link === null ? "failed" : "success";
   }
   // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
   // --no-details. The label is the stat line: everything the fence dropped
@@ -383,15 +545,30 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   deps.out(body);
 
   if (!opts.post) {
-    return 0;
+    return prResult({
+      code: 0,
+      bodyRendered: true,
+      contributorCount: entries.length,
+      receipt,
+      artifactResult,
+      result: "success",
+    });
   }
 
-  const result = upsertPrComment(body, deps.runGh);
-  if (!result.ok) {
-    deps.err(result.error);
-    return 1;
+  const comment = upsertPrComment(body, deps.runGh);
+  if (!comment.ok) {
+    deps.err(comment.error);
+    return prResult({
+      code: 1,
+      bodyRendered: true,
+      contributorCount: entries.length,
+      receipt,
+      commentResult: "failed",
+      artifactResult,
+      result: comment.missing ? "external_missing" : "external_failed",
+    });
   }
-  deps.err(`posted receipt (${result.action}) to PR #${result.prNumber}`);
+  deps.err(`posted receipt (${comment.action}) to PR #${comment.prNumber}`);
   // SPEC-0035 R5: only after BOTH the push (link !== null) AND the upsert
   // (result.ok, just confirmed above) succeed — never advertise a receipt
   // whose comment failed to post. Text only; no network from this branch.
@@ -404,15 +581,17 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // Tightened per that review's Codex round: intent URLs print only on a
   // POSITIVE public answer (one gh call, --share path only); an errored
   // check skips neutrally, and the match guard covers owner/repo too.
+  let shareResult: StepResultValue = "skipped";
   if (opts.share && link !== null) {
-    if (link.fileName !== artifactFileName(result.prNumber) || link.ownerRepo !== result.ownerRepo) {
-      deps.err(`share hint skipped: artifact ${link.ownerRepo}/${link.fileName} does not match comment PR ${result.ownerRepo}#${result.prNumber}`);
+    if (link.fileName !== artifactFileName(comment.prNumber) || link.ownerRepo !== comment.ownerRepo) {
+      deps.err(`share hint skipped: artifact ${link.ownerRepo}/${link.fileName} does not match comment PR ${comment.ownerRepo}#${comment.prNumber}`);
     } else {
       const visibility = repoVisibility(link.ownerRepo, deps.runGh);
       if (visibility === "public") {
         for (const line of buildShareLines(link.url)) {
           deps.err(line);
         }
+        shareResult = "success";
       } else if (visibility === "private") {
         deps.err("share: skipped — repo is private; the viewer cannot render this for readers (works automatically once the repo is public)");
       } else {
@@ -420,5 +599,19 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
       }
     }
   }
-  return artifactFailed ? 1 : 0;
+  return prResult({
+    code: artifactFailed ? 1 : 0,
+    bodyRendered: true,
+    contributorCount: entries.length,
+    receipt,
+    commentResult: "success",
+    artifactResult,
+    shareResult,
+    result: artifactFailed ? "external_failed" : "success",
+  });
+}
+
+/** `aireceipts pr [--post] [--session <id>]`. Returns the process exit code. */
+export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<number> {
+  return (await runPrDetailed(opts, deps)).code;
 }

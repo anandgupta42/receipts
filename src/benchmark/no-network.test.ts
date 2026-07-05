@@ -20,6 +20,7 @@ const SAMPLE_MODEL: ReceiptModel = {
   methodology: "",
   priceRowsUsed: [],
   unpriceable: false,
+  costLowerBoundCacheTier: false,
 };
 
 function inputStream(line: string): Readable {

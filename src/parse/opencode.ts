@@ -12,7 +12,7 @@ import type {
   ToolCall,
   Turn,
 } from "./types.js";
-import { addUsage, emptyUsage, parseTimestamp, pathExists, truncate, withTotal } from "./util.js";
+import { addUsage, emptyUsage, parseTimestamp, pathExists, truncate, withTotal, sanitizeText } from "./util.js";
 
 /**
  * opencode stores sessions in SQLite DBs under `~/.local/share/opencode`.
@@ -244,7 +244,8 @@ function summaryFromRow(dbPath: string, row: SessionRow): SessionSummary {
 }
 
 function toToolCall(part: RawPartData): ToolCall | null {
-  const name = typeof part.tool === "string" && part.tool ? part.tool : part.name;
+  const rawName = typeof part.tool === "string" && part.tool ? part.tool : part.name;
+  const name = typeof rawName === "string" ? sanitizeText(rawName) : rawName;
   if (part.type !== "tool" || typeof name !== "string" || !name) {
     return null;
   }
@@ -561,10 +562,14 @@ export class OpenCodeAdapter implements SessionAdapter {
     let firstUserText: string | undefined;
     let startedAt: number | undefined;
     let endedAt: number | undefined;
+    let droppedRecords = 0;
 
     for (const row of messages) {
       const msg = parseJsonObject<RawMessageData>(row.data);
       if (!msg) {
+        // SPEC-0044 B3 — a message row whose JSON is torn/corrupt (a partial DB
+        // write), not a normal non-assistant row: its usage is lost, so count it.
+        droppedRecords++;
         continue;
       }
       if (row.type === "user") {
@@ -614,6 +619,8 @@ export class OpenCodeAdapter implements SessionAdapter {
         toolCallCount,
       },
       turns,
+      // SPEC-0044 B3: present only when > 0 (absent → clean).
+      ...(droppedRecords > 0 ? { droppedRecords } : {}),
     };
   }
 
@@ -648,10 +655,17 @@ export class OpenCodeAdapter implements SessionAdapter {
     let totalUsage = emptyUsage();
     let startedAt: number | undefined;
     let endedAt: number | undefined;
+    let droppedRecords = 0;
 
     for (const row of messages) {
       const msg = parseJsonObject<RawMessageData>(row.data);
-      if (msg?.role !== "assistant") {
+      if (!msg) {
+        // SPEC-0044 B3 — torn/corrupt row (distinct from a valid non-assistant
+        // row below): its usage is lost, so count it rather than skip silently.
+        droppedRecords++;
+        continue;
+      }
+      if (msg.role !== "assistant") {
         continue;
       }
       const ts = timestampOf(msg.time?.created, row.time_created);
@@ -691,6 +705,8 @@ export class OpenCodeAdapter implements SessionAdapter {
         toolCallCount,
       },
       turns,
+      // SPEC-0044 B3: present only when > 0 (absent → clean).
+      ...(droppedRecords > 0 ? { droppedRecords } : {}),
     };
   }
 

@@ -1,7 +1,7 @@
 ---
 id: SPEC-0027
 title: "Published receipt artifact — opt-in HTML page on a dedicated branch, linked from the comment"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0023, SPEC-0026]
 ---
@@ -242,3 +242,5 @@ with spec-27 implementation."* Status → building. Build note: SPEC-0026 is
 still a draft, so the R3 link line lands directly after the fenced receipt
 until 0026 ships its details section (placement-only deviation, flagged in
 the implementation PR).
+
+**2026-07-04 · shipped:** merged via #63; ledger sweep pre-release.
