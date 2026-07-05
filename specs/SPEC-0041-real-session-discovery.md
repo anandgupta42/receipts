@@ -1,7 +1,7 @@
 ---
 id: SPEC-0041
 title: Real-session discovery filter
-status: approved
+status: shipped
 milestone: M5
 depends: [SPEC-0019, SPEC-0022]
 ---
@@ -120,9 +120,9 @@ recorded here.
 
 ## Success criteria
 
-- [ ] Maintainer-corpus before/after row counts for `--list` and the week window
+- [x] Maintainer-corpus before/after row counts for `--list` and the week window
       attached to the PR (dogfood evidence).
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
 
 ## Validation
