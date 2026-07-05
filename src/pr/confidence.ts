@@ -6,12 +6,17 @@
 //
 // Every drop/degrade/lower-bound decision in src/pr/{contributors,rollup,
 // promote}.ts and the pricing path routes through here by emitting one of these
-// events. Enforcement is two-pronged:
-//   (i)  summarizeConfidence()'s exhaustive switch — a new variant that renders
-//        no signal fails to compile (the `never` check below);
-//   (ii) scripts/hygiene.mjs greps those files for contributor-dropping control
-//        flow not accompanied by a ConfidenceEvent emission (a silent drop
-//        fails CI).
+// events. Enforcement is three-pronged (honest about what each actually does):
+//   (i)   summarizeConfidence()'s exhaustive switch — the compile-time guard: a
+//         new variant that renders no signal fails to compile (`never` below).
+//   (ii)  the src/pr/** mutation gate (SPEC-0044 M3, stryker.config.json) — the
+//         systematic guard: a test suite that doesn't observe a drop/floor lets
+//         its mutant survive and fails the mutation threshold in CI.
+//   (iii) scripts/hygiene.mjs — a narrow regex BACKSTOP, not a general proof: it
+//         bans the known silent-drop antipatterns (a bumped `excludedCount`, and
+//         a load-failure guard that drops a candidate with no event emission). It
+//         cannot catch every possible silent drop; (i) and (ii) are the real
+//         guards.
 /**
  * A reason a receipt total may be incomplete/uncertain. Discriminated on `kind`.
  * `sessionId` is the session's file-unique key (the transcript filePath — NOT

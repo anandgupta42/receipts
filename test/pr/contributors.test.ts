@@ -139,6 +139,21 @@ describe("R1 contributor selection", () => {
     expect(sel.excludedCount).toBe(1);
   });
 
+  it("writeCount counts each git write EXACTLY (kills a `writeCount++`→`--`/no-op mutant)", () => {
+    // SPEC-0044 M3 — the classic tests only assert writeCount is nonzero, so a
+    // `++`→`--` mutation survived. Two real git-write calls must yield exactly 2
+    // (a `--` mutant gives -2, a deleted increment gives 0). writeCount is
+    // output/SHA-independent, so no branch SHA is needed to count the writes.
+    const twoWrites = makeSession(
+      "cx-two",
+      [bashTurn(0, "git commit -m a", "[featB aaaaaa1] a\n 1 file changed"), bashTurn(1, "git commit -m b", "[featB bbbbbb2] b\n 1 file changed")],
+      "codex",
+    );
+    expect(classifyBranchAnchors(twoWrites.turns, []).writeCount).toBe(2);
+    // And a session with no git verbs is exactly 0 (not -0/underflow).
+    expect(classifyBranchAnchors(makeSession("cx-none", [bashTurn(0, "ls -la", "src")], "codex").turns, []).writeCount).toBe(0);
+  });
+
   it("counts a candidate it can't load as excluded, never guessed in", async () => {
     const owned = ownCommit("owned");
     const ghost = repo(makeSession("ghost", []));

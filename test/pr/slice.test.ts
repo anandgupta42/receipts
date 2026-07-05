@@ -83,4 +83,16 @@ describe("R1e fallbacks (ambiguity → labeled full session)", () => {
     const slice = computeSlice(session.turns, ["d4d4d4d4e5e5e5e5f6f6f6f60000000000000000"]);
     expect(slice.kind).toBe("full");
   });
+
+  // SPEC-0044 M3 — pin the full-fallback boundary EXACTLY (not just kind/label):
+  // the fallback must span the whole session, turn 0 through turnCount-1. This
+  // kills the `Math.max(0, turnCount - 1)` mutants (→ `Math.min`, → `+ 1`) that
+  // survived because the other fallback tests only checked `.kind`.
+  it("full fallback spans the entire session: startTurn 0, endTurn turnCount-1", async () => {
+    const session = (await loadById("claude-code", path.join(FIX, "claude-anchors.jsonl")))!;
+    const n = session.turns.length;
+    expect(n).toBeGreaterThan(1); // guard: turnCount-1 must differ from 0 and from turnCount+1
+    const slice = computeSlice(session.turns, []); // no branch SHAs → no own anchor → full
+    expect(slice).toEqual({ kind: "full", startTurn: 0, endTurn: n - 1, turnCount: n, label: FULL_FALLBACK_LABEL });
+  });
 });
