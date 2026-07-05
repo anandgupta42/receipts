@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Read the docs first
+    url: https://anandgupta42.github.io/receipts/
+    about: Most "how do I..." questions are already answered there.
+  - name: Report a security or privacy issue privately
+    url: https://github.com/anandgupta42/receipts/security/advisories/new
+    about: Don't open a public issue for this — see SECURITY.md for the reporting bar.

@@ -34,6 +34,7 @@ export const COMMAND_VALUES = [
   "telemetry-show",
   "templates",
   "uninstall-hook",
+  "version",
   "week",
 ] as const;
 export type CommandValue = (typeof COMMAND_VALUES)[number];

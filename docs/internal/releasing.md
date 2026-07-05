@@ -52,14 +52,20 @@ npm version patch --no-git-tag-version    # edits package.json + lockfile only
 
 The workflow (`.github/workflows/release-publish.yml`) does the rest: asserts the
 repo/ref, asserts `package.json.repository` matches, asserts the npm floor,
-`npm ci`, `npm run build`, then `npm publish --provenance --access public`. OIDC
-means no token anywhere.
+`npm ci`, `npm run preflight` (build + tarball shape + install-and-run + full
+suite), then `npm publish --provenance --access public`. OIDC means no token
+anywhere. After the publish succeeds, its `tag-and-release` job pushes the
+annotated `vX.Y.Z` tag and creates the GitHub Release, with the version's
+section of `docs/CHANGELOG.md` as the notes — a missing changelog section fails
+that job on purpose. (v0.1.0–v0.2.0 predate this job; their tags and Releases
+were backfilled by hand on 2026-07-05.)
 
 ### After it succeeds
 
 ```sh
 npm view aireceipts-cli version            # confirm the new version resolves
 npx aireceipts-cli@latest --version        # from a clean shell / machine
+gh release view v<X.Y.Z>                   # tag + Release + notes exist
 ```
 
 ## The trusted-publisher config (one-time, on npmjs.com)
@@ -78,8 +84,9 @@ package. If it's ever lost, the workflow fails with an auth error — re-add it 
 
 ## What ships in the tarball (kept lean)
 
-`package.json`'s `files` allowlist: `dist`, `data/prices`, `README.md`, `LICENSE`.
-Nothing else — no tests, specs, goldens, source, or sourcemaps.
+`package.json`'s `files` allowlist: `dist`, `data/prices`, `README.md`, `LICENSE`,
+`NOTICE` (Apache-2.0 §4(d) requires NOTICE in redistributions). Nothing else — no
+tests, specs, goldens, source, or sourcemaps.
 
 - **Sourcemaps are off** (`tsup.config.ts` `sourcemap: false`) — they were 70% of
   the package. `npm pack --dry-run` should show ~48 files, ~294 KB unpacked.
