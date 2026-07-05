@@ -109,3 +109,6 @@ Full walkthrough: [Install the agent hook](03-install-hook.md).
 - **[Install](02-install.md)** — run it without `npx` on every invocation.
 - **[Read a receipt](04-read-a-receipt.md)** — pick any session, not just the newest.
 - **[Set a budget](08-budget.md)** — get an exit code when the week crosses a cap.
+- **[FAQ](../faq.md)** — how this differs from usage dashboards, what the dollars
+  mean on a subscription, what leaves your machine (nothing but disclosed,
+  content-free telemetry), and more.

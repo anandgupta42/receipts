@@ -313,17 +313,20 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -334,9 +337,20 @@ footer{
 <pre class="doc-code"><code class="language-sh">aireceipts --handoff &quot;intermittently&quot;</code></pre>
 
 <pre class="doc-code"><code>handoff: Can you fix the flaky login test in src/auth/login.test.ts? It's failing intermittently in CI.
-- Bash loop ×5: $0.08, 3m 45s wall-clock</code></pre>
+Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s
+claude-opus-4-8 100%
+total $0.09 · 6 turns · 5 tool calls
+- Bash loop ×5: $0.08, 3m 45s wall-clock
 
-<p>The block names the session and lists the waste lines that fired, with what each one cost. Paste it into your next prompt (or your <code>CLAUDE.md</code>) so the agent knows what to avoid — here, a Bash command it re-ran five times over nearly four minutes.</p>
+covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line</code></pre>
+
+<p>The block opens with the session's state — agent, when, how long, which models, what it cost, how many turns and tool calls (plus a compaction count when any fired) — then lists the waste lines with what each one cost, and closes with a <code>covers:</code> line stating exactly what the packet accounts for. Everything is extracted from the transcript, never summarized, so nothing can be paraphrased away. Paste it into your next prompt (or your <code>CLAUDE.md</code>) so the agent knows what to avoid — here, a Bash command it re-ran five times over nearly four minutes.</p>
+
+<h2 id="machine-readable-form">Machine-readable form</h2>
+
+<p>Pass <code>--json</code> for the same packet as versioned JSON (schema in <a href="json-schema.html">docs/json-schema.md</a>) — for hooks, CI gates, or another agent's harness. It also carries <code>aggregates</code>: every waste class that fired in your trailing week with its distinct-session count, including classes still below the suggestion threshold — a near-miss is a fact, not a secret.</p>
+
+<pre class="doc-code"><code class="language-sh">aireceipts --handoff &quot;intermittently&quot; --json</code></pre>
 
 <h2 id="when-theres-nothing-to-say">When there's nothing to say</h2>
 
