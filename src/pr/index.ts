@@ -26,6 +26,7 @@ import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js
 import { nestedCandidates } from "./nested.js";
 import { isChildPath } from "../parse/children.js";
 import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
+import { summarizeConfidence, type ConfidenceEvent } from "./confidence.js";
 import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
 import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
@@ -106,6 +107,8 @@ function stemOf(filePath: string): string {
 interface Resolved {
   contributors: RawContributor[];
   excludedCount: number;
+  /** SPEC-0044 R1 — typed drop/degrade events (A1 anchor-pool absences etc.). */
+  events: ConfidenceEvent[];
   /** Time-overlapping listed sidechains — SPEC-0024 R2 promotion candidates, judged after rollups. */
   sidechains: SessionSummary[];
 }
@@ -148,6 +151,7 @@ async function resolveContributors(
       // Explicitly-selected sessions are the user's own attribution claim — anchor-grade.
       contributors: [{ summary, session, slice: computeSlice(session.turns, shas), basis: "anchor" }],
       excludedCount: 0,
+      events: [],
       sidechains: [],
     };
   }
@@ -368,13 +372,23 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     }
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
-  const promoted = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
+  const { promoted, events: promoteEvents } = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
+  const allEvents = [...resolved.events, ...promoteEvents];
   for (const raw of promoted) {
     const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   if (entries.length === 0) {
-    deps.err(NO_MATCH);
+    // SPEC-0044 A1 (S2 finding 1): if the ONLY thing that touched the branch was
+    // an unattributable anchor-pool session, don't claim "no match" — say so.
+    const summary = summarizeConfidence(allEvents);
+    if (summary.unattributableAnchorPool > 0) {
+      deps.err(
+        `${summary.unattributableAnchorPool} session(s) touched this branch but couldn't be attributed precisely (no sliceable commit); nothing to receipt. See docs/trust.md.`,
+      );
+    } else {
+      deps.err(NO_MATCH);
+    }
     return prResult({ code: 1, result: "no_data" });
   }
   entries.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
@@ -383,7 +397,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   // size-cap's drop-from-END sheds helpers before authors.
   const fenceOrdered = [...entries.filter((e) => e.view.basis !== "helper"), ...entries.filter((e) => e.view.basis === "helper")];
   const views = entries.map((e) => e.view);
-  const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount };
+  const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount, confidence: summarizeConfidence(allEvents) };
   const receipt: PrReceiptTelemetry = {
     models: entries.map((e) => e.model),
     turnCount: entries.reduce((sum, e) => sum + countedTurns(e.raw), 0),

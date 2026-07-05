@@ -229,6 +229,33 @@ export function getTrackedFiles(rootDir = process.cwd()) {
   return output.split("\n").filter(Boolean);
 }
 
+/**
+ * SPEC-0044 R1 — no silent contributor drop. The receipt's incompleteness is a
+ * typed ConfidenceEvent, never a bare `excludedCount++`. That antipattern (a
+ * count bumped without a routed event) is exactly the silent-drop this spec
+ * closes; banning it in the PR path keeps a future change from re-introducing it.
+ */
+export function checkNoSilentDrop(rootDir = process.cwd(), files = ["src/pr/contributors.ts", "src/pr/rollup.ts", "src/pr/promote.ts"]) {
+  const violations = [];
+  for (const rel of files) {
+    let text;
+    try {
+      text = readFileSync(join(rootDir, rel), "utf8");
+    } catch {
+      continue; // a file the refactor may rename — not this check's job to require existence
+    }
+    // Ban any silent MUTATION of excludedCount (++, +=, --, self-reassign) — a
+    // contributor drop must route through a ConfidenceEvent. `const excludedCount
+    // = new Set(...).size` (a DERIVATION from events) is allowed. A backstop for
+    // the specific known antipattern; the exhaustive-switch test + the A1
+    // behavioral tests are the primary proof.
+    if (/excludedCount\s*(\+\+|--|\+=|-=)|excludedCount\s*=\s*excludedCount/.test(text)) {
+      violations.push(`${rel}: mutated \`excludedCount\` — route contributor drops through a ConfidenceEvent (SPEC-0044 R1), don't bump a silent count`);
+    }
+  }
+  return violations;
+}
+
 export function runHygiene({ rootDir = process.cwd(), title, trackedFiles } = {}) {
   const files = trackedFiles ?? getTrackedFiles(rootDir);
   return [
@@ -236,6 +263,7 @@ export function runHygiene({ rootDir = process.cwd(), title, trackedFiles } = {}
     ...checkRootAllowlist(files),
     ...checkGitleaksIgnore(rootDir),
     ...checkWorkflowPins(rootDir),
+    ...checkNoSilentDrop(rootDir),
     ...(title === undefined ? [] : checkPrTitle(title)),
   ];
 }
