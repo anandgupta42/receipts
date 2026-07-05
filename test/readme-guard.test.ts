@@ -104,14 +104,20 @@ describe("SPEC-0029 · README guard", () => {
 
   it("SPEC-0053 R1: the PR-receipt proof image is committed and linked to a live comment on this repo", () => {
     const wrapped =
-      /<a href="https:\/\/github\.com\/anandgupta42\/receipts\/pull\/\d+#issuecomment-\d+">\s*<img [^>]*src="(docs\/assets\/pr-receipt-comment\.png)"/.exec(readme);
+      /<a href="(https:\/\/github\.com\/anandgupta42\/receipts\/pull\/\d+#issuecomment-\d+)">\s*<img [^>]*src="(docs\/assets\/pr-receipt-comment\.png)"/.exec(readme);
     expect(wrapped, "README must show the proof image wrapped in a PR-comment permalink").not.toBeNull();
-    expect(existsSync(wrapped![1]), `proof image missing on disk: ${wrapped![1]}`).toBe(true);
-    const tagIdx = lines.findIndex((l) => /^\*\*.+\*\*$/.test(l.trim()));
+    expect(existsSync(wrapped![2]), `proof image missing on disk: ${wrapped![2]}`).toBe(true);
+    // The caption's "read it live" link must point at the same comment as the image wrapper.
+    const permalinks = [...readme.matchAll(/href="(https:\/\/github\.com\/anandgupta42\/receipts\/pull\/\d+#issuecomment-\d+)"/g)].map((m) => m[1]);
+    expect(permalinks.length).toBeGreaterThanOrEqual(2);
+    expect(new Set(permalinks).size, "image wrapper and caption must link the same comment").toBe(1);
+    // Placement: directly under the badges (inside the hero div), before the first prose paragraph.
+    const badgeIdx = lines.findIndex((l) => l.includes("shields.io") || l.includes("badge.svg"));
     const imgLine = lines.findIndex((l) => l.includes("pr-receipt-comment.png"));
-    const installAt = lines.findIndex((l) => l.trim().toLowerCase().startsWith("## install"));
-    expect(imgLine, "proof image must sit between the tagline and Install").toBeGreaterThan(tagIdx);
-    expect(imgLine).toBeLessThan(installAt);
+    const proseIdx = lines.findIndex((l) => l.startsWith("**Why this exists.**"));
+    expect(imgLine, "proof image must sit directly under the badges").toBeGreaterThan(badgeIdx);
+    expect(imgLine - badgeIdx, "proof image must be the first thing after the badges").toBeLessThanOrEqual(3);
+    expect(imgLine).toBeLessThan(proseIdx);
   });
 
   it("SPEC-0053 R3: the install section is exactly four numbered steps and step 1 names --demo", () => {
@@ -122,6 +128,11 @@ describe("SPEC-0029 · README guard", () => {
     expect(stepIdx.map((i) => section[i].trim().slice(0, 2))).toEqual(["1.", "2.", "3.", "4."]);
     const stepOne = section.slice(stepIdx[0], stepIdx[1]).join(" ");
     expect(stepOne).toContain("--demo");
+    const stepTwo = section.slice(stepIdx[1], stepIdx[2]).join(" ");
+    expect(stepTwo).toContain("setup");
+    const stepThree = section.slice(stepIdx[2], stepIdx[3]).join(" ");
+    expect(stepThree).toContain("install-hook");
+    expect(stepThree).toContain("statusline");
     const stepFour = section.slice(stepIdx[3]).join(" ");
     expect(stepFour).toContain("pr --post");
     expect(stepFour, "the CI workflow verifies receipts; posting is local").toContain("local");

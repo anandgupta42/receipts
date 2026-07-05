@@ -149,9 +149,10 @@ Full methodology: `aireceipts --methodology`.
 | Cursor | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
 | opencode | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
 
-Model prices move. A daily CI tripwire watches `data/prices/` for drift and flags
-stale rows, and every table update lands as a cited price-table PR — watch or star
-the repo to catch price changes and new releases.
+Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
+independent dataset and opens an issue when they disagree; every table change lands
+as a cited price-table PR — watch or star the repo to catch price updates and new
+releases.
 
 ## Telemetry, disclosed
 
