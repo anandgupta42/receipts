@@ -7,7 +7,7 @@
 import type { TokenUsage } from "../parse/types.js";
 import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry } from "../receipt/model.js";
-import { formatInt, formatUsd } from "../receipt/format.js";
+import { formatCentsAmount, formatInt, formatUsd, reconcileCents } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
 import { MESSAGE_BASIS_LABEL } from "./messageAnchor.js";
 import { formatDuration } from "../receipt/format.js";
@@ -92,9 +92,15 @@ function formatModelMix(modelMix: ModelMixEntry[]): string {
   return modelMix.map((m) => `${m.model} ${sharePct(m.tokenShare)}`).join(" · ");
 }
 
-/** A priced atom renders `$`; an unpriced one falls back to tokens (I2). */
-function costText(usd: number | null, tokens: TokenUsage): string {
-  return usd !== null ? `$${formatUsd(usd)}` : `${formatInt(tokens.total)} tokens`;
+/**
+ * A priced atom renders `$`; an unpriced one falls back to tokens (I2). `reconciled`
+ * (B1) is this atom's cent-reconciled string — every priced row on the fence must
+ * use it so displayed rows sum to the displayed total; falls back to `formatUsd`
+ * only when no reconciliation map was threaded through (should not happen on any
+ * real render path, kept only so a future caller can't crash on a missing entry).
+ */
+function costText(usd: number | null, tokens: TokenUsage, reconciled?: string): string {
+  return usd !== null ? `$${reconciled ?? formatUsd(usd)}` : `${formatInt(tokens.total)} tokens`;
 }
 
 function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
@@ -129,17 +135,17 @@ function subagentLabel(row: SubagentRow): string {
   return row.model ? `${row.name} · ${row.model}` : row.name;
 }
 
-function subagentValue(row: SubagentRow): string {
-  return row.unreadable ? "(unreadable)" : costText(row.usd, row.tokens);
+function subagentValue(row: SubagentRow, reconciled?: string): string {
+  return row.unreadable ? "(unreadable)" : costText(row.usd, row.tokens, reconciled);
 }
 
 /** One contributor: role/model dotted row (role only when rows need telling apart — SPEC-0026 R1), muted provenance line, then any SUBAGENTS sub-rows. */
-function contributorBlocks(view: ContributorView, spaceBefore: boolean, showRole: boolean): Block[] {
+function contributorBlocks(view: ContributorView, spaceBefore: boolean, showRole: boolean, reconciled: ReconciledAtoms): Block[] {
   const blocks: Block[] = [
     {
       kind: "row",
       label: showRole ? `${view.role} · ${formatModelMix(view.modelMix)}` : formatModelMix(view.modelMix),
-      value: costText(view.usd, view.tokens),
+      value: costText(view.usd, view.tokens, reconciled.get(view)),
       spaceBefore,
     },
     ...provenanceBlocks(view),
@@ -147,7 +153,7 @@ function contributorBlocks(view: ContributorView, spaceBefore: boolean, showRole
   if (view.subagents.length > 0) {
     blocks.push(mutedNote(`SUBAGENTS (${view.subagents.length})`));
     for (const row of view.subagents) {
-      blocks.push({ kind: "row", label: `  ${subagentLabel(row)}`, value: subagentValue(row), muted: true });
+      blocks.push({ kind: "row", label: `  ${subagentLabel(row)}`, value: subagentValue(row, reconciled.get(row)), muted: true });
     }
   }
   return blocks;
@@ -193,6 +199,37 @@ function totalsFor(contributors: ContributorView[]): Totals {
     unreadableCount: atoms.filter((a) => a.unreadable).length,
     childCount,
   };
+}
+
+/** B1 — every priced contributor/subagent's cent-reconciled display string, keyed by object reference (a `Map`, not a position — helper rows and subagent loops iterate their own subsets). */
+type ReconciledAtoms = Map<ContributorView | SubagentRow, string>;
+
+/**
+ * SPEC-0044/B1 — reconcile every priced atom (contributor + subagent, any
+ * basis — the same universe {@link totalsFor} sums into "TOTAL priced") so the
+ * rows this comment actually RENDERS sum exactly to that total. Rows and the
+ * total used to round independently; this computes the split once, up front,
+ * over largest-remainder cents (see `reconcileCents`).
+ */
+function reconciledAtomText(contributors: ContributorView[]): ReconciledAtoms {
+  const keys: (ContributorView | SubagentRow)[] = [];
+  const amounts: number[] = [];
+  for (const c of contributors) {
+    if (c.usd !== null) {
+      keys.push(c);
+      amounts.push(c.usd);
+    }
+    for (const s of c.subagents) {
+      if (s.usd !== null) {
+        keys.push(s);
+        amounts.push(s.usd);
+      }
+    }
+  }
+  const cents = reconcileCents(amounts);
+  const map: ReconciledAtoms = new Map();
+  keys.forEach((k, i) => map.set(k, formatCentsAmount(cents[i])));
+  return map;
 }
 
 function countLine(sessionCount: number, totals: Totals): string {
@@ -269,7 +306,7 @@ function totalBlocks(input: PrBodyInput): Block[] {
 }
 
 /** Round 2: one muted row per helper — model + duration + cost; the group header explains them once. */
-function helperGroupBlocks(helpers: ContributorView[], spaceBefore: boolean): Block[] {
+function helperGroupBlocks(helpers: ContributorView[], spaceBefore: boolean, reconciled: ReconciledAtoms): Block[] {
   if (helpers.length === 0) {
     return [];
   }
@@ -279,7 +316,14 @@ function helperGroupBlocks(helpers: ContributorView[], spaceBefore: boolean): Bl
   for (const h of helpers) {
     const dur = h.durationMs !== undefined ? compactDuration(formatDuration(h.durationMs)) : undefined;
     const label = dur !== undefined ? `${formatModelMix(h.modelMix)} · ${dur}` : formatModelMix(h.modelMix);
-    blocks.push({ kind: "row", label: `  ${label}`, value: costText(h.usd, h.tokens), muted: true });
+    blocks.push({ kind: "row", label: `  ${label}`, value: costText(h.usd, h.tokens, reconciled.get(h)), muted: true });
+    // SPEC-0044/B1: a helper's subagents are counted in the TOTAL (collectAtoms)
+    // and cent-reconciled (reconciledAtomText), so they must also be DRAWN as
+    // rows — otherwise the displayed rows would not sum to the total. Codex
+    // helpers carry none in practice; this keeps the invariant true regardless.
+    for (const row of h.subagents) {
+      blocks.push({ kind: "row", label: `    ${subagentLabel(row)}`, value: subagentValue(row, reconciled.get(row)), muted: true });
+    }
   }
   return blocks;
 }
@@ -296,10 +340,11 @@ function prBlocks(input: PrBodyInput): Block[] {
   const authors = input.contributors.filter((v) => v.basis !== "helper");
   const helpers = input.contributors.filter((v) => v.basis === "helper");
   const showRole = authors.length > 1;
+  const reconciled = reconciledAtomText(input.contributors);
   authors.forEach((view, i) => {
-    blocks.push(...contributorBlocks(view, i === 0, showRole));
+    blocks.push(...contributorBlocks(view, i === 0, showRole, reconciled));
   });
-  blocks.push(...helperGroupBlocks(helpers, authors.length === 0));
+  blocks.push(...helperGroupBlocks(helpers, authors.length === 0, reconciled));
   blocks.push(...totalBlocks(input));
   blocks.push({ kind: "footer", text: FOOTER_TEXT });
   return blocks;

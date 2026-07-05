@@ -131,3 +131,54 @@ export function formatShortTokens(n: number): string {
     `${v < 9.95 ? v.toFixed(1).replace(/\.0$/u, "") : String(Math.round(v))}${suffix}`;
   return n < 999_500 ? unit(n / 1000, "k") : unit(n / 1_000_000, "M");
 }
+
+/**
+ * B1 fix — largest-remainder apportionment (Hamilton's method). Rows and the
+ * TOTAL they belong to used to round independently (each row through
+ * `formatUsd`, the total over the raw sum), so a receipt could visibly show
+ * rows that don't add up to its own total. This splits a raw total's cents
+ * across its rows so the DISPLAYED rows always sum to the DISPLAYED total,
+ * without changing the total's own value: each amount floors to its own
+ * cents first, then the whole cent(s) lost to flooring are handed to the
+ * items with the largest fractional cent, one cent each — ties broken by
+ * input order, so output stays deterministic (I5). `amounts` are this
+ * codebase's dollar costs, always >= 0 in practice; the negative branch below
+ * (clawing cents back from the smallest remainders) exists only so a
+ * degenerate/adversarial input degrades gracefully instead of crashing.
+ */
+export function reconcileCents(amounts: number[]): number[] {
+  if (amounts.length === 0) {
+    return [];
+  }
+  const rawSum = amounts.reduce((sum, a) => sum + a, 0);
+  // Mirrors `formatUsd`'s own rounding exactly (round the magnitude, then sign
+  // it) so the total this apportions to is byte-identical to what the TOTAL
+  // line already renders — this fix changes row splits, never the total.
+  const totalCents = rawSum < 0 ? -Math.round(-rawSum * 100) : Math.round(rawSum * 100);
+  const rawCents = amounts.map((a) => a * 100);
+  const floors = rawCents.map((c) => Math.floor(c));
+  const remainders = rawCents.map((c, i) => c - floors[i]);
+  const leftover = totalCents - floors.reduce((sum, c) => sum + c, 0);
+
+  const cents = [...floors];
+  const order = amounts.map((_, i) => i);
+  if (leftover >= 0) {
+    order.sort((a, b) => remainders[b] - remainders[a] || a - b);
+    for (let i = 0; i < leftover; i++) {
+      cents[order[i]] += 1;
+    }
+  } else {
+    order.sort((a, b) => remainders[a] - remainders[b] || a - b);
+    for (let i = 0; i < -leftover; i++) {
+      cents[order[i]] -= 1;
+    }
+  }
+  return cents;
+}
+
+/** An exact integer cent amount (e.g. from {@link reconcileCents}) as a `formatUsd`-style string — no rounding left to do, the split already landed on whole cents. */
+export function formatCentsAmount(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  return `${sign}${commaGroup(Math.floor(abs / 100))}.${pad2(abs % 100)}`;
+}
