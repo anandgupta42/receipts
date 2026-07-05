@@ -113,3 +113,19 @@ If you need a stronger guarantee than an author's disclosure — billing-grade
 attribution across a team — use your vendor's console. aireceipts will not
 pretend to be that, and a receipt that pretended would be worth less than one
 that tells you exactly what it knows.
+
+13. **An anchor-pool session that only full-falls-back** (SPEC-0044 A1). A
+    session from another repo/worktree that touched this branch but resolves only
+    to "entire session" (push-only or rebased anchor, no sliceable commit) is too
+    uncertain to credit. *Direction:* under-credit. *Marker:* the total floors
+    `≥` and a **distinct** note — "N session(s) touched this branch but couldn't
+    be attributed precisely" — counts it, separate from the "candidate session
+    not attributed" note. Previously such a session vanished with no trace: the
+    silent mirror of #87's over-credit. Details: [cost-model.md](cost-model.md).
+
+14. **Cursor Background Agents are not read** (SPEC-0044 A2, known gap). The
+    Cursor adapter reads inline Composer sessions but not Background Agent
+    sessions (`agentKv:`/`glass.` keys). *Direction:* under-report a whole
+    contributor. *Marker:* none yet — a documented blind spot pending its own
+    spec (PR-scoping needs the background-agent schema). Details:
+    [cost-model.md](cost-model.md).

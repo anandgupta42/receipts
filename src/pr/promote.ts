@@ -7,6 +7,7 @@
 // rolled-up `SubagentRow`) is skipped, so no token is ever counted twice (I3).
 import type { Session, SessionSummary } from "../parse/types.js";
 import type { RawContributor } from "./contributors.js";
+import type { ConfidenceEvent } from "./confidence.js";
 import { classifyBranchAnchors, computeSlice } from "./slice.js";
 
 /**
@@ -21,8 +22,9 @@ export async function promoteOrphanSidechains(
   branchShas: readonly string[],
   coveredFilePaths: ReadonlySet<string>,
   loadSession: (summary: SessionSummary) => Promise<Session | null>,
-): Promise<RawContributor[]> {
+): Promise<{ promoted: RawContributor[]; events: ConfidenceEvent[] }> {
   const promoted: RawContributor[] = [];
+  const events: ConfidenceEvent[] = [];
   const ordered = [...sidechains].sort(
     (a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0) || a.id.localeCompare(b.id),
   );
@@ -42,9 +44,12 @@ export async function promoteOrphanSidechains(
     // computeSlice's own rule); a full-fallback sidechain is a silent miss.
     const slice = computeSlice(session.turns, branchShas);
     if (slice.kind === "full") {
+      // SPEC-0044 A1 parity: a branch-touching sidechain that can't be sliced is
+      // counted-absent, never a silent drop (filePath is the file-unique key).
+      events.push({ kind: "unattributable-anchor-pool", sessionId: summary.filePath });
       continue;
     }
     promoted.push({ summary, session, slice, basis: "anchor" });
   }
-  return promoted;
+  return { promoted, events };
 }

@@ -39,12 +39,16 @@ export interface ContributorView {
   durationMs?: number;
 }
 
+import { isFloored, type ConfidenceSummary } from "./confidence.js";
+
 export interface PrBodyInput {
   contributors: ContributorView[];
   /** Candidates that were in repo + window but not credited (R1) — reported honestly (R4). */
   excludedCount: number;
   /** Round 2: true → the hint points at the details section below; false/absent → the command hint (--no-details, unit callers). */
   detailsBelow?: boolean;
+  /** SPEC-0044 — folded confidence counts (A1 anchor-pool absences etc.); absent for legacy callers. */
+  confidence?: ConfidenceSummary;
 }
 
 /** SPEC-0026 R3 (round 2) — the helper explainer, now the group header's and details stat line's phrasing. */
@@ -208,7 +212,11 @@ function countLine(sessionCount: number, totals: Totals): string {
  */
 function totalBlocks(input: PrBodyInput): Block[] {
   const totals = totalsFor(input.contributors);
-  const floor = input.excludedCount > 0 || totals.unreadableCount > 0 ? "≥ " : "";
+  // SPEC-0044 R1/S2-finding-5 — floor on ANY incompleteness/lower-bound event
+  // (not just excludedCount): every ConfidenceEvent kind that can under-state
+  // the total drives the `≥`. excludedCount/unreadable kept for legacy callers
+  // that don't pass a confidence summary.
+  const floor = input.excludedCount > 0 || totals.unreadableCount > 0 || (input.confidence !== undefined && isFloored(input.confidence)) ? "≥ " : "";
   const blocks: Block[] = [{ kind: "rule" }];
   if (totals.pricedCount > 0) {
     blocks.push({ kind: "total", label: "TOTAL priced", value: `${floor}$${formatUsd(totals.pricedSubtotal)}` });
@@ -238,6 +246,19 @@ function totalBlocks(input: PrBodyInput): Block[] {
       spaceBefore: true,
     });
     blocks.push({ kind: "note", text: "(in repo + branch window, no branch commit)", muted: true });
+  }
+  // SPEC-0044 A1 — anchor-pool sessions that touched the branch but couldn't be
+  // sliced precisely: counted-absence, DISTINCT from the excluded note above
+  // (the coverage-map C.2 hole — never a silent drop).
+  const unattributable = input.confidence?.unattributableAnchorPool ?? 0;
+  if (unattributable > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(unattributable, "session")} touched this branch but couldn't be attributed precisely`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(see docs/trust.md)", muted: true });
   }
   // SPEC-0026 R4 (round 2) — the route to the full per-tool story, always the
   // last note: point at the details section when one follows, else the command.

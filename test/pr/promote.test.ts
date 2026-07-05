@@ -38,6 +38,16 @@ function sidechain(id: string, turns: Turn[], startedAt = 1000): Session {
 const anchored = (id: string, startedAt = 1000) =>
   sidechain(id, [commitTurn(0, "[featB b1c2d3e] x\n 1 file changed")], startedAt);
 
+function pushTurn(index: number): Turn {
+  return {
+    index,
+    timestamp: 1000 + index,
+    model: "claude-opus-4-8",
+    usage,
+    toolCalls: [{ name: "Bash", shell: true, input: { command: "git push origin featB" }, output: `   0000000..${BRANCH_SHA.slice(0, 8)}  featB -> featB`, status: "ok" }],
+  };
+}
+
 function loader(sessions: Session[]) {
   const byId = new Map(sessions.map((s) => [s.id, s]));
   return async (summary: SessionSummary) => byId.get(summary.id) ?? null;
@@ -46,7 +56,7 @@ function loader(sessions: Session[]) {
 describe("SPEC-0024 R2 orphan sidechain promotion", () => {
   it("promotes an anchored sidechain no rollup covers, with its own PR slice", async () => {
     const teammate = anchored("teammate");
-    const promoted = await promoteOrphanSidechains([teammate], [BRANCH_SHA], new Set(), loader([teammate]));
+    const { promoted } = await promoteOrphanSidechains([teammate], [BRANCH_SHA], new Set(), loader([teammate]));
     expect(promoted.map((c) => c.summary.id)).toEqual(["teammate"]);
     expect(promoted[0].slice.kind).toBe("slice");
   });
@@ -54,25 +64,25 @@ describe("SPEC-0024 R2 orphan sidechain promotion", () => {
   it("skips a candidate whose filePath is already covered — the dedup guard (counted once)", async () => {
     const teammate = anchored("teammate");
     const covered = new Set([teammate.filePath]);
-    const promoted = await promoteOrphanSidechains([teammate], [BRANCH_SHA], covered, loader([teammate]));
+    const { promoted } = await promoteOrphanSidechains([teammate], [BRANCH_SHA], covered, loader([teammate]));
     expect(promoted).toHaveLength(0);
   });
 
   it("never promotes an anchorless sidechain (no cwd+time credit for sidechains)", async () => {
     const idle = sidechain("idle", [commitTurn(0, "nothing to commit, working tree clean")]);
-    const promoted = await promoteOrphanSidechains([idle], [BRANCH_SHA], new Set(), loader([idle]));
+    const { promoted } = await promoteOrphanSidechains([idle], [BRANCH_SHA], new Set(), loader([idle]));
     expect(promoted).toHaveLength(0);
   });
 
   it("never promotes a sidechain whose only SHA is foreign (another branch's commit)", async () => {
     const foreign = sidechain("foreign", [commitTurn(0, "[other deadbee1] y\n 1 file changed")]);
-    const promoted = await promoteOrphanSidechains([foreign], [BRANCH_SHA], new Set(), loader([foreign]));
+    const { promoted } = await promoteOrphanSidechains([foreign], [BRANCH_SHA], new Set(), loader([foreign]));
     expect(promoted).toHaveLength(0);
   });
 
   it("silently skips an unloadable sidechain", async () => {
     const ghost = anchored("ghost");
-    const promoted = await promoteOrphanSidechains([ghost], [BRANCH_SHA], new Set(), loader([]));
+    const { promoted } = await promoteOrphanSidechains([ghost], [BRANCH_SHA], new Set(), loader([]));
     expect(promoted).toHaveLength(0);
   });
 
@@ -82,7 +92,14 @@ describe("SPEC-0024 R2 orphan sidechain promotion", () => {
     const tieB = anchored("tie-b", 3000);
     const tieA = anchored("tie-a", 3000);
     const all = [late, tieB, early, tieA];
-    const promoted = await promoteOrphanSidechains(all, [BRANCH_SHA], new Set(), loader(all));
+    const { promoted } = await promoteOrphanSidechains(all, [BRANCH_SHA], new Set(), loader(all));
     expect(promoted.map((c) => c.summary.id)).toEqual(["early", "tie-a", "tie-b", "late"]);
   });
+  it("SPEC-0044 A1: a push-only (full-fallback) sidechain is COUNTED-ABSENT, not silently dropped", async () => {
+    const pushOnly = sidechain("push-only-teammate", [pushTurn(0)]);
+    const { promoted, events } = await promoteOrphanSidechains([pushOnly], [BRANCH_SHA], new Set(), loader([pushOnly]));
+    expect(promoted).toHaveLength(0);
+    expect(events).toContainEqual({ kind: "unattributable-anchor-pool", sessionId: "push-only-teammate.jsonl" });
+  });
+
 });

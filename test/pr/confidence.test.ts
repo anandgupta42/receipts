@@ -1,0 +1,65 @@
+// SPEC-0044 R1/R2 — the ConfidenceEvent contract: distinct-session counting,
+// the floor rule, and that A1's counted-absence surfaces on the rendered
+// receipt (the coverage-map C.2 hole — never a silent drop).
+import { describe, expect, it } from "vitest";
+import { summarizeConfidence, isFloored, type ConfidenceEvent } from "../../src/pr/confidence.js";
+import { renderPrReceiptText, type ContributorView } from "../../src/pr/body.js";
+
+const mix = (model: string, share: number) => ({ model, share });
+const tokens = (input: number, output: number) => ({ input, output, cacheRead: 0, cacheCreation: 0, total: input + output });
+function builder(over: Partial<ContributorView> = {}): ContributorView {
+  return {
+    role: "builder",
+    sessionId: "abc123",
+    slice: { kind: "slice", startTurn: 1, endTurn: 3, turnCount: 6 },
+    modelMix: [mix("claude-opus-4-8", 1)],
+    usd: 1.5,
+    tokens: tokens(900, 100),
+    subagents: [],
+    ...over,
+  };
+}
+
+describe("SPEC-0044 · summarizeConfidence", () => {
+  it("counts DISTINCT sessions per kind, not raw events", () => {
+    const events: ConfidenceEvent[] = [
+      { kind: "unattributable-anchor-pool", sessionId: "a" },
+      { kind: "unattributable-anchor-pool", sessionId: "a" }, // dup session — counts once
+      { kind: "unattributable-anchor-pool", sessionId: "b" },
+      { kind: "silenced-git-write", sessionId: "c" },
+      { kind: "cost-lower-bound-cache-tier", sessionId: "d" },
+    ];
+    const s = summarizeConfidence(events);
+    expect(s.unattributableAnchorPool).toBe(2);
+    expect(s.silencedGitWrite).toBe(1);
+    expect(s.costLowerBoundCacheTier).toBe(1);
+    expect(s.unreadableSubagent).toBe(0);
+  });
+
+  it("isFloored is true iff any incompleteness/lower-bound event exists", () => {
+    expect(isFloored(summarizeConfidence([]))).toBe(false);
+    expect(isFloored(summarizeConfidence([{ kind: "cost-lower-bound-cache-tier", sessionId: "x" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "unattributable-anchor-pool", sessionId: "y" }]))).toBe(true);
+  });
+});
+
+describe("SPEC-0044 A1 · counted-absence renders (not silent)", () => {
+  it("floors the total AND renders a distinct note, separate from excludedCount", () => {
+    const body = renderPrReceiptText({
+      contributors: [builder()],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "unattributable-anchor-pool", sessionId: "cross-repo-lead" }]),
+    });
+    expect(body).toMatch(/TOTAL priced\.+≥/); // the total is floored
+    expect(body).toContain("1 session touched this branch but couldn't be attributed precisely");
+    expect(body).toContain("see docs/trust.md");
+    // NOT conflated with the excluded-candidates note
+    expect(body).not.toContain("candidate session not attributed");
+  });
+
+  it("with excludedCount==0 and no confidence, the note is absent (no false positive)", () => {
+    const body = renderPrReceiptText({ contributors: [builder()], excludedCount: 0 });
+    expect(body).not.toContain("couldn't be attributed precisely");
+    expect(body).not.toMatch(/TOTAL priced\.+≥/);
+  });
+});

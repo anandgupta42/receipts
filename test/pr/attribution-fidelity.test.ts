@@ -96,8 +96,9 @@ describe("R2 — fallback bounding", () => {
     session: { id, source: "claude-code" as const, filePath: `/tmp/${id}.jsonl`, cwd, startedAt: 1, endedAt: 2, turns, totals: { tokens: usage, turnCount: turns.length, toolCallCount: 1 }, title: id, model: "m" },
   });
 
-  it("R2a: an anchor-pool session with only a push anchor (full fallback) is silently ignored", async () => {
-    // push-anchored but no commit anchor → computeSlice returns "full" → anchor pool must drop it
+  it("R2a / SPEC-0044 A1: an anchor-pool full-fallback session is COUNTED-ABSENT, not silently dropped", async () => {
+    // push-anchored but no commit anchor → computeSlice returns "full" → anchor pool won't credit it,
+    // but SPEC-0044 A1 forbids the old SILENT drop: it must leave a typed trace so the total floors.
     const pushTurn = turn(0, [{ name: "Bash", shell: true, input: { command: PUSH }, output: `   0000000..${BRANCH_SHA.slice(0, 8)}  feat -> feat`, status: "ok" }]);
     const s = session("cross-repo-lead", [pushTurn], "/elsewhere/other-repo");
     expect(computeSlice(s.session.turns, [BRANCH_SHA]).kind).toBe("full");
@@ -107,7 +108,9 @@ describe("R2 — fallback bounding", () => {
       currentWorktreeRoot: "/home/dev/repo",
     });
     expect(sel.contributors).toHaveLength(0);
-    expect(sel.excludedCount).toBe(0); // silent miss — SPEC-0024 semantics, fence copy stays true
+    expect(sel.excludedCount).toBe(0); // distinct from `excluded` (repo+window, no commit) — SPEC-0024 fence copy stays true
+    // The fix: no longer silent — a typed unattributable-anchor-pool event is emitted (the coverage-map C.2 hole).
+    expect(sel.events).toContainEqual({ kind: "unattributable-anchor-pool", sessionId: "/tmp/cross-repo-lead.jsonl" });
   });
 
   it("R2a: an anchor-pool session with a sliceable commit anchor still contributes", async () => {
@@ -135,14 +138,14 @@ describe("R2 — fallback bounding", () => {
   it("R2b: a push-only sidechain is no longer promoted", async () => {
     const pushTurn = turn(0, [{ name: "Bash", shell: true, input: { command: PUSH }, output: `   0000000..${BRANCH_SHA.slice(0, 8)}  feat -> feat`, status: "ok" }]);
     const s = session("teammate", [pushTurn], "/elsewhere");
-    const promoted = await promoteOrphanSidechains([s.summary as never], [BRANCH_SHA], new Set(), async () => s.session as never);
+    const { promoted: promoted } = await promoteOrphanSidechains([s.summary as never], [BRANCH_SHA], new Set(), async () => s.session as never);
     expect(promoted).toHaveLength(0);
   });
 
   it("R2b: a commit-anchored sidechain still promotes, sliced", async () => {
     const commitTurn = turn(0, [{ name: "Bash", shell: true, input: { command: "git commit -m x" }, output: `[feat ${BRANCH_SHA.slice(0, 7)}] x`, status: "ok" }]);
     const s = session("teammate2", [commitTurn], "/elsewhere");
-    const promoted = await promoteOrphanSidechains([s.summary as never], [BRANCH_SHA], new Set(), async () => s.session as never);
+    const { promoted: promoted } = await promoteOrphanSidechains([s.summary as never], [BRANCH_SHA], new Set(), async () => s.session as never);
     expect(promoted).toHaveLength(1);
     expect(promoted[0].slice.kind).toBe("slice");
   });
