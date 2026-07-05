@@ -11,8 +11,7 @@ import {
   pathExists,
   readJsonl,
   truncate,
-  withTotal,
-} from "./util.js";
+  withTotal, sanitizeText } from "./util.js";
 
 /** Raw usage shape from a Codex `rollout-*.jsonl` `token_count` event. */
 interface CodexUsage {
@@ -246,7 +245,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     if (type === "function_call" || type === "tool_call" || type === "custom_tool_call") {
       toolCallCount++;
       const callId = String(item.call_id ?? item.id ?? "");
-      const name = String(item.name ?? "tool");
+      const name = sanitizeText(String(item.name ?? "tool"));
       const call: ToolCall = {
         name,
         input: parseMaybeJson(item.arguments ?? item.input),

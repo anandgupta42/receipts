@@ -12,8 +12,7 @@ import {
   pathExists,
   readJsonl,
   truncate,
-  withTotal,
-} from "./util.js";
+  withTotal, sanitizeText } from "./util.js";
 
 /** Raw shapes from a Claude Code `.jsonl` transcript line. Only the fields we use. */
 interface RawUsage {
@@ -269,7 +268,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
           if (block.type === "tool_use") {
             toolCallCount++;
             const call: ToolCall = {
-              name: block.name ?? "tool",
+              name: sanitizeText(block.name ?? "tool"),
               input: block.input,
               status: "running",
               startedAt: ts,
@@ -339,7 +338,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   const summary: SessionSummary = {
     id: filePath,
     source: "claude-code",
-    title: aiTitle || (firstUserText ? truncate(firstUserText) : undefined),
+    title: (aiTitle ? truncate(aiTitle) : undefined) || (firstUserText ? truncate(firstUserText) : undefined),
     model,
     startedAt,
     endedAt,

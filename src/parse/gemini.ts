@@ -1,7 +1,7 @@
 import { sep } from "node:path";
 import type { AgentSource, ListSessionsOptions, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
 import { lazyGeminiSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
-import { addUsage, emptyUsage, expandHome, listFiles, mapWithConcurrency, parseTimestamp, pathExists, readJsonl, truncate, withTotal } from "./util.js";
+import { addUsage, emptyUsage, expandHome, listFiles, mapWithConcurrency, parseTimestamp, pathExists, readJsonl, truncate, withTotal, sanitizeText } from "./util.js";
 
 /**
  * Gemini CLI (`ChatRecordingService`) writes an append-only JSONL transcript
@@ -105,7 +105,7 @@ function extractText(content: unknown): string | undefined {
 
 function toToolCall(raw: GeminiToolCall): ToolCall {
   return {
-    name: typeof raw.name === "string" && raw.name ? raw.name : "tool",
+    name: typeof raw.name === "string" && raw.name ? sanitizeText(raw.name) : "tool",
     // No per-tool-call timestamp is recorded (only the message's) — startedAt/
     // endedAt stay undefined rather than fabricating precision (I3, R4a).
     status: raw.status === "error" ? "error" : "ok",

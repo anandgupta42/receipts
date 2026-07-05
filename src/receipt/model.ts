@@ -4,7 +4,7 @@
 // they only format what's already here.
 import type { AgentSource, Session, TokenUsage } from "../parse/types.js";
 import { SOURCE_LABELS } from "../parse/types.js";
-import { addUsage, emptyUsage } from "../parse/util.js";
+import { addUsage, emptyUsage, sanitizeText } from "../parse/util.js";
 import { attributeByTool, METHODOLOGY } from "../pricing/attribution.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
 import { isoDateOf, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
@@ -149,7 +149,7 @@ async function buildModelMix(session: Session): Promise<ModelMixEntry[]> {
   }
   const grandTotal = [...mixMap.values()].reduce((sum, t) => sum + t.total, 0);
   return [...mixMap.entries()]
-    .map(([model, tokens]) => ({ model, tokens, tokenShare: grandTotal > 0 ? tokens.total / grandTotal : 0 }))
+    .map(([model, tokens]) => ({ model: sanitizeText(model), tokens, tokenShare: grandTotal > 0 ? tokens.total / grandTotal : 0 }))
     .sort((a, b) => b.tokenShare - a.tokenShare || a.model.localeCompare(b.model));
 }
 
