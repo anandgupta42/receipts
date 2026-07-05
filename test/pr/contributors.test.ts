@@ -220,6 +220,22 @@ describe("SPEC-0024 R1 anchor pool (SHA anchor is the only key)", () => {
     // the total floors `≥` (SPEC-0044 B4 — the honesty red-team gap).
     expect(summarizeConfidence(sel.events).unreadableSession).toBe(1);
   });
+
+  it("SPEC-0045 R2 — a degraded (parse-failed) repo candidate flags unreadable-session even when `here`, not the silent excluded count", async () => {
+    // A repo-scoped transcript whose lazy summary built (cwd = CURRENT_ROOT) but
+    // whose full parse fails — `degraded: "unreadable"`, retained through discovery
+    // (R1). Because cwd is the current worktree it is `here`; the pre-0045 path
+    // folded a load-null `here` candidate into the SILENT silenced-git-write
+    // excluded count (S2 CRITICAL). SPEC-0045 routes a degraded candidate to
+    // `unreadable-session` instead. `loaderFor([])` returns null — the same
+    // parse failure that degraded it.
+    const degraded: PoolCandidate = { summary: { ...summaryOf(makeSession("dgr-here", [])), degraded: "unreadable" }, pool: "repo" };
+    const sel = await selectContributors([degraded], [BRANCH_SHA], loaderFor([]));
+    expect(sel.contributors).toHaveLength(0);
+    expect(summarizeConfidence(sel.events).unreadableSession).toBe(1);
+    // NOT the silent excluded count — that's the whole point of the fix.
+    expect(sel.excludedCount).toBe(0);
+  });
 });
 
 describe("R3 role derivation (descriptive, not ranking)", () => {

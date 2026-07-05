@@ -163,6 +163,15 @@ export async function selectContributors(
   for (const l of loaded) {
     const { summary, here, session, anchors } = l;
     if (!session || !anchors) {
+      // SPEC-0045 R2 — a repo-scoped transcript we couldn't PARSE (degraded at
+      // discovery). Only repo-scoped degraded files reach here (index.ts keeps
+      // no-cwd degraded out of the pools), so "couldn't read" ≠ "unproven repo
+      // candidate": flag it via the typed event even when `here`, never fold it
+      // into the silent silenced-git-write excluded count.
+      if (summary.degraded === "unreadable") {
+        events.push({ kind: "unreadable-session", sessionId: summary.filePath });
+        continue;
+      }
       // A candidate we can't load can't be proven. In the current worktree it's
       // the classic excluded count; OUTSIDE it (anchor pool / sibling worktree)
       // it used to vanish silently — SPEC-0044 B4: "couldn't read" ≠ "not ours",
