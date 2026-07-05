@@ -12,6 +12,14 @@ import { CursorAdapter } from "../../src/parse/cursor.js";
 import type { ReceiptModel } from "../../src/receipt/model.js";
 import { AGENTS, MATRIX, SCENARIOS, cellKey, type Cell } from "./cost-matrix.js";
 
+// node:sqlite is absent on Node 20 and pre-22.5. The cursor "unpriceable" cell
+// BUILDS a fixture DB via makeCursorDb (which imports node:sqlite), so gate only
+// that cell — the opencode .db cells read through the production sqlite.js
+// spawnSync fallback and stay covered on every Node. The cell stays POPULATED in
+// MATRIX, so the completeness guard passes regardless of runtime skip.
+const hasNodeSqlite = (await import("node:sqlite").then((m) => m).catch(() => null)) !== null;
+const CURSOR_BUILD = "cursor:unpriceable";
+
 const EPS = 1e-9;
 const tmp: string[] = [];
 afterAll(() => tmp.forEach((d) => rmSync(d, { force: true, recursive: true })));
@@ -60,8 +68,11 @@ describe("SPEC-0044 · cost matrix — every populated cell reconciles + matches
       const cell = MATRIX[cellKey(scenario, agent)] as Cell | undefined;
       if (!cell) continue; // caught by the completeness guard
       if ("na" in cell) continue;
-      it(`${scenario} · ${agent}`, async () => {
-        const m = cell.fixture === "cursor:unpriceable" ? await cursorUnpriceable() : await receiptFor(agent, cell.fixture);
+      // The cursor DB-build cell needs node:sqlite; skip it (not fail) on runners
+      // that lack it. The cell remains covered in MATRIX (completeness stays green).
+      const runner = cell.fixture === CURSOR_BUILD ? it.skipIf(!hasNodeSqlite) : it;
+      runner(`${scenario} · ${agent}`, async () => {
+        const m = cell.fixture === CURSOR_BUILD ? await cursorUnpriceable() : await receiptFor(agent, cell.fixture);
         const exp = cell.expected;
         expect(m.unpriceable, "unpriceable flag").toBe(exp.unpriceable);
         expect(m.totalUsd !== null, "priced (has a $ total)").toBe(exp.priced);
