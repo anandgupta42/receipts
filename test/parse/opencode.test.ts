@@ -553,6 +553,10 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     });
   });
 
+  // 100 SQLite round-trips run I/O-throttled under vitest fork workers on macOS
+  // (background QoS inheritance; also slow when the adapter takes the sqlite3
+  // CLI path and shells out per query). Ceiling sized for the throttled worst
+  // case — release preflight runs this locally, not just on CI's fast path.
   it("validates 100 generated opencode schema/model/tool combinations", async () => {
     const dir = tempDir();
     dirs.push(dir);
@@ -591,7 +595,7 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       }
       expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
     }
-  });
+  }, 300_000);
 
   it("degrades invalid SQLite files to no sessions and null loads", async () => {
     const dir = tempDir();
