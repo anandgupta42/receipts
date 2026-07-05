@@ -32,6 +32,7 @@ the bill ([how](docs/pr-receipts.md)).
 
 ```sh
 npx aireceipts-cli          # receipt for your newest session
+npx aireceipts-cli setup    # first-run report + integration next steps
 ```
 
 Or install it: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
@@ -71,6 +72,8 @@ guessed dollars. Full method: aireceipts
 |---|---|
 | `aireceipts` | Receipt for the newest session (`--list` to pick another) |
 | `aireceipts --demo` | See a sample receipt with no sessions of your own — a bundled example, rendered live |
+| `aireceipts setup` | First-run report: found sessions, latest cost, week total, integration options — [guide](docs/guide/01-getting-started.md) |
+| `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, opencode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
 | `aireceipts pr --post` | Attach the receipt of the sessions behind a PR as a comment — [guide](docs/pr-receipts.md) |
 | `aireceipts pr --post --artifact` | Also publish a durable receipt page, linked from the comment — [how](docs/pr-receipts.md) |
 | `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
@@ -136,8 +139,9 @@ pricing, troubleshooting ([hosted docs](https://anandgupta42.github.io/receipts/
 [site](https://anandgupta42.github.io/receipts/)).
 
 [FAQ](docs/faq.md) · [What a receipt proves](docs/trust.md) ·
-[PR receipts](docs/pr-receipts.md) · [JSON schema](docs/json-schema.md) ·
-[statusline](docs/statusline.md) · [telemetry](docs/telemetry.md)
+[PR receipts](docs/pr-receipts.md) · [Integrations](docs/guide/15-integrations.md) ·
+[JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
+[telemetry](docs/telemetry.md)
 
 **Related work.** [claude-receipts](https://github.com/chrishutchinson/claude-receipts)
 prints a beautiful thermal-receipt souvenir of a Claude Code session (numbers via

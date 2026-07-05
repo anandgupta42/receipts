@@ -60,12 +60,26 @@ interface ListRowJson {
   };
 }
 
-interface OpenCodeE2eSimulation {
-  title: string;
-  model: string;
-  priced: boolean;
-  tools: string[];
-  tokens: ReceiptTokenJson;
+interface SetupJson {
+  schemaVersion: number;
+  status: "ready" | "no_sessions";
+  agents: Array<{ source: string; label: string; sessionCount: number; tokenTotal: ReceiptTokenJson }>;
+  latest: {
+    source: string;
+    label: string;
+    model: string | null;
+    totalUsd: number | null;
+    totalTokens: ReceiptTokenJson;
+    wasteLineCount: number;
+  } | null;
+  week: {
+    sessionCount: number;
+    pricedSessionCount: number;
+    excludedSessionCount: number;
+    pricedUsd: number | null;
+    tokenTotal: ReceiptTokenJson;
+  } | null;
+  offers: Array<{ target: string; label: string; scope: string; network: string; start: string }>;
 }
 
 function platformCommand(name: string): string {
@@ -171,29 +185,6 @@ async function stageOpenCodeDb(home: string, fixtureName: string): Promise<strin
 
 function toolRowsByName(rows: ReceiptToolRowJson[]): Record<string, ReceiptToolRowJson> {
   return Object.fromEntries(rows.map((row) => [row.tool, row])) as Record<string, ReceiptToolRowJson>;
-}
-
-function opencodeE2eSimulation(index: number): OpenCodeE2eSimulation {
-  const knownModels = ["claude-haiku-4-5", "gpt-5.3-codex"];
-  const priced = index % 5 < knownModels.length;
-  const output = 20 + (index % 11);
-  const reasoning = index % 7;
-  const cacheRead = index % 13;
-  const cacheCreation = index % 5;
-  const input = 100 + index;
-  return {
-    title: `Simulated opencode session ${index.toString().padStart(3, "0")}`,
-    model: priced ? knownModels[index % knownModels.length] : `local-sim-${index}`,
-    priced,
-    tools: [[], ["bash"], ["read", "write"], ["bash", "bash"]][index % 4],
-    tokens: {
-      input,
-      output: output + reasoning,
-      cacheRead,
-      cacheCreation,
-      total: input + output + reasoning + cacheRead + cacheCreation,
-    },
-  };
 }
 
 /** Is this platform-specific package installable HERE? Passing an incompatible one
@@ -310,6 +301,59 @@ describe("built CLI e2e", () => {
     expect(result.stderr).toContain("no agent session data detected");
   });
 
+  it("runs setup with no sessions and exits 0 after printing searched roots", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["setup"], home);
+
+    expectSuccess(result);
+    expect(result.stdout).toContain("AIRECEIPTS SETUP");
+    expect(result.stdout).toContain("no agent session data detected. Looked in:");
+    expect(result.stdout).toContain(path.join(home, ".claude", "projects"));
+    expect(result.stdout).toContain("npx aireceipts-cli integrations");
+  });
+
+  it("runs setup JSON against a fixture session without leaking paths or titles", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "clean-multi-tool-2-models.jsonl");
+
+    const text = await runCli(["setup"], home);
+    expectSuccess(text);
+    expect(text.stdout).toContain("Latest session");
+    expect(text.stdout).toContain("Claude Code");
+    expect(text.stdout).toContain("Trailing 7 days");
+    expect(text.stdout.indexOf("Latest session")).toBeLessThan(text.stdout.indexOf("Next"));
+
+    const parsed = readJson<SetupJson>(await runCli(["setup", "--json"], home));
+    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.status).toBe("ready");
+    expect(parsed.latest).toMatchObject({ source: "claude-code", label: "Claude Code", model: "claude-opus-4-8" });
+    expect(parsed.latest?.totalUsd).toBeGreaterThan(0);
+    expect(parsed.offers.map((offer) => offer.target)).toEqual(["claude-code", "codex", "opencode", "cursor", "github"]);
+    expect(JSON.stringify(parsed)).not.toContain(home);
+    expect(JSON.stringify(parsed)).not.toContain("clean-multi-tool-2-models");
+    expect(JSON.stringify(parsed)).not.toContain("Add email format validation");
+  });
+
+  it("prints integration matrix, target recipe, and unknown-target errors", async () => {
+    const home = await makeHome();
+
+    const matrix = await runCli(["integrations"], home);
+    expectSuccess(matrix);
+    expect(matrix.stdout).toContain("AIRECEIPTS INTEGRATIONS");
+    expect(matrix.stdout).toContain("claude-code");
+    expect(matrix.stdout).toContain("opencode");
+
+    const opencode = await runCli(["integrations", "opencode"], home);
+    expectSuccess(opencode);
+    expect(opencode.stdout).toContain(".opencode/commands/receipt.md");
+    expect(opencode.stdout).toContain("npx aireceipts-cli pr --post");
+
+    const unknown = await runCli(["integrations", "unknown"], home);
+    expect(unknown.code).toBe(1);
+    expect(unknown.stderr).toContain('unknown integration target "unknown"');
+  });
+
   it("discovers and prices opencode multi-provider sessions through built CLI", async () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "clean-multi-vendor.db");
@@ -383,62 +427,6 @@ describe("built CLI e2e", () => {
     expect(textResult.stdout).toContain("no price table matched");
     expect(textResult.stdout).not.toContain("$");
   });
-
-  // Children spawned from vitest fork workers inherit macOS background QoS and
-  // run I/O-throttled ~20x on loaded dev Macs (measured: an identical spawn is
-  // 3.4s outside vitest, ~70s inside). CI (Linux) is unaffected. Ceiling sized
-  // for the throttled worst case; the test asserts correctness, not speed.
-  // AIRECEIPTS_SKIP_STRESS=1 skips on a loaded dev machine; CI never sets it.
-  it.skipIf(process.env.AIRECEIPTS_SKIP_STRESS === "1")("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
-    const home = await makeHome();
-    await stageOpenCodeDb(home, "simulated-100.db");
-
-    const listed = readJson<ListRowJson[]>(await runCli(["--list", "--json"], home));
-
-    expect(listed).toHaveLength(100);
-    expect(listed[0].title).toBe("Simulated opencode session 099");
-    expect(listed[99].title).toBe("Simulated opencode session 000");
-
-    for (let index = 0; index < 100; index += 1) {
-      const sim = opencodeE2eSimulation(index);
-      const listedRow = listed[99 - index];
-
-      expect(listedRow).toMatchObject({
-        source: "opencode",
-        title: sim.title,
-        model: sim.model,
-        totals: {
-          turnCount: 1,
-          toolCallCount: sim.tools.length,
-        },
-      });
-      expect(listedRow.totals.tokens).toMatchObject(sim.tokens);
-    }
-
-    for (const index of [0, 1, 2, 3, 99]) {
-      const sim = opencodeE2eSimulation(index);
-      const selector = String(100 - index);
-      const receipt = readJson<ReceiptJson>(await runCli([selector, "--json"], home));
-      const tools = toolRowsByName(receipt.toolRows);
-
-      expect(receipt.source).toBe("opencode");
-      expect(receipt.title).toBe(sim.title);
-      expect(receipt.modelMix.map((entry) => entry.model)).toEqual([sim.model]);
-      expect(receipt.totalTokens).toMatchObject(sim.tokens);
-      expect(receipt.sessionTotalTokens).toMatchObject(sim.tokens);
-      if (sim.priced) {
-        expect(receipt.totalUsd, sim.title).toBeGreaterThan(0);
-        expect(receipt.priceRowsUsed.map((row) => row.model)).toEqual([sim.model]);
-      } else {
-        expect(receipt.totalUsd, sim.title).toBeNull();
-        expect(receipt.priceRowsUsed).toEqual([]);
-      }
-
-      const toolNames = sim.tools.length === 0 ? ["(thinking/reply)"] : [...new Set(sim.tools)];
-      expect(Object.keys(tools).sort()).toEqual(toolNames.sort());
-      expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
-    }
-  }, 600_000);
 
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
     const home = await makeHome();

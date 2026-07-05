@@ -5,8 +5,8 @@ prints a priced receipt of what a session cost. No account, no API key; your
 transcripts and code are never uploaded (anonymous diagnostics are opt-out — see
 [docs/telemetry.md](../telemetry.md)).
 
-This page takes you from nothing to a receipt, a weekly total, and an automatic
-receipt after every session — in about a minute.
+This page takes you from nothing to a receipt, a setup report, a weekly total,
+and optional automation — in about a minute.
 
 ## 1. Run it
 
@@ -66,7 +66,30 @@ It renders a bundled example session through the same pipeline your real
 sessions use — a genuine receipt, not a mockup — so you can see the output
 before your first run.
 
-## 2. Add up the week
+## 2. Run setup
+
+Ask aireceipts what it found and what to do next:
+
+```sh
+npx aireceipts-cli setup
+```
+
+The setup report is read-only. It shows supported-agent session counts, the
+latest session's priced-or-token total, the trailing-week total, and local
+integration options. It does not post to GitHub, install hooks, or upload
+transcripts. If no sessions are found, it exits 0, lists the searched roots, and
+tells you to run a supported agent session first.
+
+For exact snippets by assistant or CI surface:
+
+```sh
+npx aireceipts-cli integrations
+npx aireceipts-cli integrations opencode
+```
+
+See [Choose an integration](15-integrations.md).
+
+## 3. Add up the week
 
 One session is a number. The trailing week is a habit:
 
@@ -101,7 +124,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
 Every session on your machine, across every supported agent, totalled for the
 last seven days — still local, still no upload.
 
-## 3. Make it automatic
+## 4. Make it automatic
 
 You won't remember to run a command after every session. Let Claude Code run it
 for you:
@@ -118,6 +141,7 @@ Full walkthrough: [Install the agent hook](03-install-hook.md).
 
 - **[Install](02-install.md)** — run it without `npx` on every invocation.
 - **[Read a receipt](04-read-a-receipt.md)** — pick any session, not just the newest.
+- **[Choose an integration](15-integrations.md)** — local hooks, assistant snippets, and GitHub checks.
 - **[Set a budget](08-budget.md)** — get an exit code when the week crosses a cap.
 - **[FAQ](../faq.md)** — how this differs from usage dashboards, what the dollars
   mean on a subscription, what leaves your machine (nothing but disclosed,
