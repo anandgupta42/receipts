@@ -30,8 +30,7 @@ accounts, no servers, nothing leaves your machine.
 npx aireceipts-cli          # receipt for your newest session
 ```
 
-> **Status**: source-first pre-release. Until the npm package is published:
-> `git clone … && npm install && npm run build && node dist/cli.js`
+Or install it: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
 
 What you get back — the hero image above, as the bytes your terminal prints:
 
