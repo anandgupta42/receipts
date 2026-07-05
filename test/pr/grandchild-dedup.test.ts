@@ -137,7 +137,9 @@ describe("B5 — grandchild subagent counted once, not twice", () => {
     // this sum would diverge from `total`.
     const contributorAmounts = [...body.matchAll(/orchestrator · claude-opus-4-8\.+\$([\d.]+)/g)].map((m) => Number(m[1]));
     expect(contributorAmounts).toHaveLength(2);
-    const subagentMatch = body.match(/SUBAGENTS \(1\)\s*\n\s*\S.*?\$([\d.]+)/);
+    // SPEC-0054: the fence draws one aggregate row — B is its only member, so
+    // the aggregate's dollars ARE B's dollars.
+    const subagentMatch = body.match(/SUBAGENTS \(1\)\.+\$([\d.]+)/);
     expect(subagentMatch).not.toBeNull();
     const bAmount = Number(subagentMatch![1]);
 

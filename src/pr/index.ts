@@ -25,7 +25,7 @@ import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
 import { nestedCandidates } from "./nested.js";
 import { discoverChildFiles, isChildPath } from "../parse/children.js";
-import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
+import { renderPrBody, subagentDetailsTable, type ContributorView, type PrBodyInput } from "./body.js";
 import { summarizeConfidence, type ConfidenceEvent } from "./confidence.js";
 import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
@@ -538,7 +538,15 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
   // --no-details. The label is the stat line: everything the fence dropped
   // (id, slice reason) plus the session's anatomy, in one place.
-  const details = opts.details === false ? undefined : fenceOrdered.map((e) => ({ label: detailHeading(e.view), row: detailRow(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
+  const details = opts.details === false
+    ? undefined
+    : fenceOrdered.map((e) => ({
+        label: detailHeading(e.view),
+        row: detailRow(e.view, e.model),
+        text: renderReceipt(e.model, { color: false }),
+        // SPEC-0054 R3 — the per-child breakdown the fence no longer draws.
+        subagents: e.view.subagents.length > 0 ? subagentDetailsTable(e.view.subagents) : undefined,
+      }));
   const body = renderPrBody(bodyInput, { artifactLink: link ?? undefined, details });
 
   // R3 (SPEC-0019): render before the comment upsert, unconditionally.
