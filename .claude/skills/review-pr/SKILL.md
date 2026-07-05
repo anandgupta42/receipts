@@ -6,13 +6,15 @@ trigger: /review-pr
 
 # /review-pr — the critic (generator ≠ critic)
 
-Run as a **different model family** from whoever built the PR — a same-family review
-tends to share the same blind spots as the build. **For coding PRs the default critic is
-Codex at deep reasoning effort** (maintainer directive 2026-07-02): invoke
-`codex exec --sandbox read-only -C <repo> "<review brief>"` with sections 1–4 below as
-the brief; Codex's reasoning effort should be its deepest available tier for anything
-touching src/. If you built the PR yourself, say so explicitly and flag the review as
-same-author, not independent — then STILL run the Codex pass before merge.
+Run as a **different model family or independent context** from whoever built the PR — a
+same-context review tends to share the same blind spots as the build. **For maintainer
+coding PRs the preferred critic is Codex at deep reasoning effort** (maintainer
+directive 2026-07-02): invoke `codex exec --sandbox read-only -C <repo> "<review brief>"`
+with sections 1–4 below as the brief; Codex's reasoning effort should be its deepest
+available tier for anything touching src/. If Codex is unavailable, use the strongest
+available independent reviewer and record the substitution in the PR. If you built the
+PR yourself, say so explicitly and flag the review as same-author, not independent —
+then still get a separate critic before merge.
 
 No coding PR merges without a recorded deep review. The review (or its verdict summary)
 is pasted into the PR as a comment so the record survives.
@@ -66,11 +68,13 @@ The PR description must follow the template: missing "What to review" ordering,
 or a user-visible change without a "See it" output capture, is a finding — a PR
 you can't evaluate in 30 seconds wastes every reviewer after you.
 
-## 4.7 Record the review (unblocks gh pr create)
+## 4.7 Record the review (maintainer-local hook marker)
 
 On completion write the reviewed sha: `git rev-parse HEAD > .review-ok` (untracked;
-any new commit invalidates it — re-review the delta). The PreToolUse hook BLOCKS
-`gh pr create` without it.
+any new commit invalidates it — re-review the delta). In canonical maintainer checkouts,
+the Claude Code PreToolUse hook blocks `gh pr create`, `gh pr merge`, and feature-branch
+`git push` without it. Fork contributors do not need this local marker; their PRs are
+reviewed through normal GitHub review.
 
 ## 5. Post the review
 

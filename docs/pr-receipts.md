@@ -32,6 +32,11 @@ npx aireceipts-cli pr --post --session <id>
 The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
 copy the body straight into a comment.
 
+If the command finds no matching local agent session, do not invent one. For a
+human-written PR, a fork without posting rights, or a branch built on a machine whose
+transcripts are unavailable, note that in the PR's **Evidence** section. The public check
+is notice-only by default because CI cannot see transcripts on your machine.
+
 For a dry run without posting:
 
 ```sh

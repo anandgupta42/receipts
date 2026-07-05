@@ -6,6 +6,12 @@ document explains the machinery (the "harness"), how a change flows through it, 
 each piece exists. The maintainer's standing job is four buttons — everything else is
 supposed to run under gates that don't trust anyone, human or model.
 
+This is the **maintainer harness**, not a prerequisite for external contributors.
+Fork contributors do not need Claude Code, Codex, repo-local skills, or tool-use hooks.
+Their public contract is `CONTRIBUTING.md`: green CI gates, cited facts, docs/tests with
+behavior changes, and maintainer review. The harness is how this repo's maintainer-agent
+work satisfies that same contract without relying on memory or goodwill.
+
 ## Motivation
 
 Agent-written code fails in patterned, well-documented ways, and every structure here
@@ -37,12 +43,13 @@ disclosed and escapable; byte-stable output; facts, never rankings). The invaria
 every spec and skill — repetition is the point; it is what keeps dozens of independent
 agent sessions from drifting.
 
-**The spec system — `specs/`.** Every change starts as a spec: machine-readable
-frontmatter (`status: draft|approved|building|shipped|rejected|superseded`), numbered
-testable requirements, Given/When/Then scenarios, a test matrix (every requirement must
-have rows — `scripts/spec-lint.mjs` fails the build otherwise), success criteria, and a
-kill criterion. Rejected specs are kept as tombstones with their reasoning: the harness
-treats a well-evidenced *no* as an artifact worth as much as a yes.
+**The spec system — `specs/`.** Every non-trivial behavior change starts as a spec:
+machine-readable frontmatter
+(`status: draft|approved|building|shipped|rejected|superseded`), numbered testable
+requirements, Given/When/Then scenarios, a test matrix (every requirement must have rows
+— `scripts/spec-lint.mjs` fails the build otherwise), success criteria, and a kill
+criterion. Rejected specs are kept as tombstones with their reasoning: the harness treats
+a well-evidenced *no* as an artifact worth as much as a yes.
 
 **Validation — S1–S4, before approval.** A draft cannot reach the maintainer without a
 recorded validation: **S1** self-audit (is every promised line computable from local
@@ -58,6 +65,8 @@ operating procedures: `write-spec`, `validate-spec`, `build-spec`, `review-pr`,
 `review-docs`, `release`, `fix-issue`, `ci-fix`, `improve`, plus the extension-surface
 guides (`add-vendor-adapter`, `add-waste-check`, `update-prices`, `use-aireceipts`).
 Agents cannot add or edit skills — curating this surface is one of the four buttons.
+The files are committed for transparency and as useful recipes; they are not tools an
+outside contributor must have installed.
 
 **Milestone builds — agent teams with directory ownership.** Large specs (M-files)
 embed their own team plan: roles own *directories*, never features (no write
@@ -74,8 +83,9 @@ receipts (byte-equal) → property tests → **mutation testing** on `src/pricin
 (goldens re-run ×20 under frozen `NO_COLOR`/TZ/locale) → an eval corpus asserting
 **precision 1.0** for the waste detectors (any false positive fails the build) →
 independent PR review, recorded. Data has its own gates: every price row must carry a
-cited source (a Claude Code hook blocks uncited writes at the tool level; a CI job is
-the authoritative check — the hook is UX, the exit code is law).
+cited source. CI is the authoritative check. Claude Code hooks are maintainer-local UX:
+they fail fast during agent work, but a contributor without those hooks is not bypassing
+the harness.
 
 **The docs loop.** Any user-visible change updates the docs in the same PR
 (`build-spec` refuses "docs later"). Before a release, `review-docs` runs a two-lens
@@ -107,10 +117,12 @@ close it:
    template. The lead reviews *opened PRs*, never ferries work — the courier role is
    abolished.
 
-Enforcement backstop: a PreToolUse hook blocks `gh pr create`, `gh pr merge`, and
-feature-branch `git push` unless a review marker exists for the exact HEAD sha —
-so speed can never quietly drop the review step (it was dropped twice under
-deadline pressure before this hook existed; hence the hook).
+Maintainer-local enforcement backstop: in this repo's canonical Claude Code checkout, a
+PreToolUse hook blocks `gh pr create`, `gh pr merge`, and feature-branch `git push`
+unless a review marker exists for the exact HEAD sha. That keeps maintainer-agent work
+from quietly dropping the review step (it was dropped twice under deadline pressure
+before this hook existed; hence the hook). It is not a normal Git hook and is not a fork
+contributor requirement; public enforcement remains CI plus maintainer review.
 
 ## How a feature flows
 
@@ -136,6 +148,11 @@ one-click cited price-table PRs, **(3)** curate the skill surface, **(4)** cut r
 Everything else — building, testing, reviewing, doc-keeping, dependency hygiene, price
 freshness — is the harness's job. When the harness catches its own operator skipping a
 step (it has), that is the system working.
+
+External contributors enter through issues and pull requests, not through these buttons.
+Small patches can go straight to PR; substantial behavior changes are turned into specs
+before they merge. That keeps the repo open to humans without weakening the harness's
+core rule: important changes are specified, tested, reviewed, and traceable.
 
 ## Lineage
 

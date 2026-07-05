@@ -24,8 +24,8 @@ turns them into receipts: what a session cost, tool by tool; what a PR cost, acr
 every supported agent session it can attribute; where tokens were wasted. Local and
 deterministic — no accounts, no servers; your transcripts and code never leave your
 machine (anonymous, content-free diagnostics are on by default and opt-out — see
-[docs/telemetry.md](docs/telemetry.md)). This repo runs on it: every pull request here
-carries the receipt of the agent sessions that built it — open any merged PR and read
+[docs/telemetry.md](docs/telemetry.md)). This repo runs on it: agent-built pull requests
+carry the receipt of the sessions that built them — open any merged agent PR and read
 the bill ([how](docs/pr-receipts.md)).
 
 ## Install
@@ -151,9 +151,10 @@ a specific session or PR cost, with every number traceable.
 
 aireceipts is designed and largely built by AI agents under a spec-driven harness —
 adversarially validated specs, mutation-tested money paths, byte-golden outputs, and
-PRs that carry the receipt of the session that built them
-([how and why](docs/internal/harness.md)). Human PRs are welcome and run the same
-gates: see [CONTRIBUTING.md](CONTRIBUTING.md).
+agent-built PRs that carry the receipt of the session that built them
+([how and why](docs/internal/harness.md)). Human PRs are welcome; they do not need the
+maintainer's local Claude/Codex harness, but they do run the same merge gates: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

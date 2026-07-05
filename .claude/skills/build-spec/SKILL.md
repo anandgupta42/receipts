@@ -18,8 +18,11 @@ never edits a spec's status to `approved`; that's the maintainer's button (AGENT
 - NEVER read real transcripts from `~/.claude/projects` or any user data dir — they are
   megabytes and will thrash your context. Fixtures in `test/fixtures/**` only.
 - Before any Read: `ls -la` the file; >100KB → read targeted ranges or grep, never whole.
-- Pipe every command's output through a filter (`| tail -20`, `grep -c`, `--reporter=dot`) —
-  raw vitest/npm/build output is a context bomb.
+- For exploratory high-volume commands, prefer targeted commands or compact reporters
+  (`--reporter=dot`, file-scoped tests, exact `rg` patterns) so raw output does not
+  consume the context window.
+- Do **not** pipe the verification gate through `tail`, `head`, or `grep`; AGENTS.md's
+  unmasked commands are the source of truth.
 - If you feel context pressure (repeated compaction), STOP and report progress to the lead
   instead of pushing through — a partial report beats a dead builder.
 

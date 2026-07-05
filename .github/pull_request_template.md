@@ -20,9 +20,11 @@
 
 ## Evidence
 <!-- Gates one-liner (tsc/eslint/vitest N/N/goldens/spec-lint), spec link
-     (specs/SPEC-NNNN) + its Validation record. Attach this PR's build receipt by
-     running `npx aireceipts-cli pr --post` from your worktree (SPEC-0037) — it upserts a
-     marked receipt comment; link or note it here. -->
+     (specs/SPEC-NNNN) + its Validation record when applicable. For agent-built
+     changes, attach this PR's build receipt by running `npx aireceipts-cli pr --post`
+     from your worktree (SPEC-0037) — it upserts a marked receipt comment; link it here.
+     For human-written changes, forks without posting rights, or no matching local
+     session, note that instead. -->
 
 ## Notes
 <!-- Builder/process notes, deviations, follow-ups spawned. -->

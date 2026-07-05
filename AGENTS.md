@@ -104,5 +104,5 @@ after each release — don't hand-edit it elsewhere.*
   `specs/SPEC-0000-product.md`.
 - One skill per task type, under `.claude/skills/`. Agents pick the matching skill; they
   do not improvise a workflow.
-- Hooks are law: a hook exit code of 2 blocks the action. Don't work around a hook —
-  fix what it's rejecting.
+- In maintainer/agent checkouts, hooks are law: exit 2 blocks the action. Don't work
+  around a hook — fix what it's rejecting.
