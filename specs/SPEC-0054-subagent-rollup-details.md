@@ -36,10 +36,13 @@ drawn-row granularity.
   contributor with subagents gets a `##### subagents (N)` markdown table under its
   session receipt: one `| name · model | cost |` row per child (unreadable →
   `(unreadable)`, unpriced → tokens), sorted by cost descending, capped at 20 rows
-  with a final `| N more subagents | $rest |` row that accounts for the remainder
-  (a capped list never silently drops value — the cap row carries the leftover
-  sum). Priced cells are cent-reconciled within the table so the column sums to
-  the aggregate the table claims.
+  with a final `| N more subagents | … |` row that states the remainder's priced
+  dollars, unpriced tokens, and unreadable count separately (a capped list never
+  silently drops value, and dollars/tokens never blend into one number — I2).
+  Priced cells are cent-reconciled within the table so the column sums to the
+  children's rounded dollar total — the table's own target; the fence aggregate
+  reconciles against `TOTAL priced` instead and may differ by a cent, exactly as
+  each session receipt in this section re-renders its own independent total.
 - **R4 — Size budget still holds.** The subagent table is part of its session's
   kept-block for the details size cap; when the budget forces omission, the
   session degrades to its existing one-line omission note (table included), never
@@ -78,6 +81,9 @@ drawn-row granularity.
 | R2 counts unchanged | 1 session + 2 subagents (1 unreadable) | `counted: 1 session + 2 subagents`, floor `≥`, unreadable note |
 | R3 table | 3 subagents, mixed priced/unpriced/unreadable | details has `##### subagents (3)` table, sorted, cost column reconciled |
 | R3 cap row | 25 subagents | 20 rows: 19 children + `6 more subagents` row carrying the remaining sum |
+| R3 cap boundary | exactly 20 subagents / 21 subagents | 20 → all 20 children, no remainder row; 21 → 19 children + `2 more subagents` |
+| R3 mixed remainder | remainder holds priced + tokens-only + unreadable children | remainder cell states `$X + N tokens + M unreadable` — nothing dropped |
+| R3 column sums | shown cells + remainder dollars | equal the children's rounded dollar total |
 | R3 escaping | child name containing `|` and newline | table cell escaped, single-line |
 | R4 budget | details budget too small for lead receipt+table | session degrades to omission note; no partial table |
 | R5 no-details | `--no-details` | aggregate row present; no `##### subagents` anywhere |

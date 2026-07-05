@@ -404,6 +404,35 @@ describe("SPEC-0054 R3 · subagentDetailsTable", () => {
     expect(table).toContain("##### subagents (25)");
   });
 
+  it("cap boundary: exactly 20 children render whole, 21 fold into a 2-row remainder", () => {
+    const twenty = subagentDetailsTable(Array.from({ length: 20 }, (_, i) => row(`agent-${i}`, 1.0)));
+    expect(twenty.split("\n").filter((l) => l.startsWith("| agent-")).length).toBe(20);
+    expect(twenty).not.toContain("more subagent");
+    const twentyOne = subagentDetailsTable(Array.from({ length: 21 }, (_, i) => row(`agent-${i}`, 1.0)));
+    expect(twentyOne.split("\n").filter((l) => l.startsWith("| agent-")).length).toBe(19);
+    expect(twentyOne).toContain("| 2 more subagents | $2.00 |");
+  });
+
+  it("a mixed remainder states dollars, tokens, and unreadable count separately — nothing dropped (I2)", () => {
+    const rows = [
+      ...Array.from({ length: 19 }, (_, i) => row(`agent-${i}`, 1.0)),
+      row("late-priced", 0.5),
+      row("late-tokens", null, { tokens: tokens(500) }),
+      row("late-ghost", null, { unreadable: true, tokens: emptyUsage() }),
+    ];
+    const table = subagentDetailsTable(rows);
+    expect(table).toContain("| 3 more subagents | $0.50 + 500 tokens + 1 unreadable |");
+  });
+
+  it("the priced column (shown cells + remainder dollars) sums to the children's rounded total", () => {
+    // 21 children at $0.335: raw sum $7.035 → $7.04 (formatUsd rounding). Naive
+    // per-cell rounding gives 20 × $0.34 + remainder — largest-remainder must
+    // land the column exactly on 704 cents.
+    const table = subagentDetailsTable(Array.from({ length: 21 }, (_, i) => row(`agent-${i}`, 0.335)));
+    const cents = [...table.matchAll(/\$(\d+\.\d\d)/g)].map((m) => Math.round(Number(m[1]) * 100));
+    expect(cents.reduce((a, b) => a + b, 0)).toBe(704);
+  });
+
   it("escapes pipes and flattens newlines in prompt-derived names", () => {
     const table = subagentDetailsTable([row("a|b\nc", 0.5, { model: undefined })]);
     expect(table).toContain("| a\\|b c | $0.50 |");

@@ -426,9 +426,13 @@ function tableCell(s: string): string {
 /**
  * SPEC-0054 R3 — the per-child breakdown the fence no longer draws: a markdown
  * table sorted by cost, capped at {@link SUBAGENT_TABLE_CAP} rows where the
- * final row aggregates the remainder (a capped list never silently drops
- * value). Priced cells are cent-reconciled within the table so the column sums
- * to the same rounded dollars the fence aggregate row displays.
+ * final row accounts for the remainder's priced dollars, unpriced tokens, and
+ * unreadable count (a capped list never silently drops value). Priced cells
+ * are cent-reconciled within the table so the column sums to the CHILDREN'S
+ * rounded dollar total. That target is the table's own — the fence aggregate
+ * row is reconciled against `TOTAL priced` instead, so the two can differ by a
+ * cent, exactly as each session's full receipt in this section re-renders its
+ * own independently rounded total.
  */
 export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_CAP): string {
   const sorted = [...rows].sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1));
@@ -439,19 +443,28 @@ export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_C
   const amounts = [...shown.filter((r) => r.usd !== null).map((r) => r.usd ?? 0), ...(restPriced.length > 0 ? [restUsd] : [])];
   const cents = reconcileCents(amounts);
   let next = 0;
-  const cell = (usd: number | null, tokens: TokenUsage, unreadable: boolean): string => {
-    if (unreadable) {
-      return "(unreadable)";
-    }
-    return usd !== null ? `$${formatCentsAmount(cents[next++])}` : `${formatInt(tokens.total)} tokens`;
-  };
   const lines = ["| subagent | cost |", "|---|---|"];
   for (const r of shown) {
-    lines.push(`| ${tableCell(subagentLabel(r))} | ${cell(r.usd, r.tokens, r.unreadable)} |`);
+    const cell = r.unreadable ? "(unreadable)" : r.usd !== null ? `$${formatCentsAmount(cents[next++])}` : `${formatInt(r.tokens.total)} tokens`;
+    lines.push(`| ${tableCell(subagentLabel(r))} | ${cell} |`);
   }
   if (rest.length > 0) {
-    const restTokens = rest.reduce((acc, r) => addUsage(acc, r.tokens), emptyUsage());
-    lines.push(`| ${plural(rest.length, "more subagent")} | ${cell(restPriced.length > 0 ? restUsd : null, restTokens, false)} |`);
+    // Every kind of remainder value is stated separately (I2 — dollars and
+    // tokens never blend into one number; unknowns are counted, not guessed).
+    const restTokensOnly = rest.filter((r) => r.usd === null && !r.unreadable);
+    const restUnreadable = rest.filter((r) => r.unreadable);
+    const parts: string[] = [];
+    if (restPriced.length > 0) {
+      parts.push(`$${formatCentsAmount(cents[next++])}`);
+    }
+    if (restTokensOnly.length > 0) {
+      const restTokens = restTokensOnly.reduce((acc, r) => addUsage(acc, r.tokens), emptyUsage());
+      parts.push(`${formatInt(restTokens.total)} tokens`);
+    }
+    if (restUnreadable.length > 0) {
+      parts.push(`${restUnreadable.length} unreadable`);
+    }
+    lines.push(`| ${plural(rest.length, "more subagent")} | ${parts.join(" + ")} |`);
   }
   return `##### subagents (${rows.length})\n\n${lines.join("\n")}`;
 }
