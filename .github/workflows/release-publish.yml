@@ -44,6 +44,13 @@ jobs:
           node-version: "22.14"
           registry-url: "https://registry.npmjs.org"
 
+      - name: upgrade npm to the trusted-publishing floor
+        # Node 22.14 only *permits* npm >= 11.5.1 — it ships npm 10.x. Trusted
+        # publishing (OIDC) needs 11.5.1+, so install it explicitly before the
+        # floor assert below (which would otherwise fail-closed, as it did on
+        # the first v0.1.1 dispatch).
+        run: npm install -g npm@latest
+
       - name: assert package.json.repository matches this repository
         # Exact match, not substring: parse the URL and require the github.com
         # host with exactly this owner/repo path (Codex review finding 2 — a
