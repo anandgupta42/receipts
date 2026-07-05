@@ -1,14 +1,41 @@
 #!/bin/bash
-# PreToolUse gate: `gh pr create` requires a Codex review of the CURRENT HEAD.
-# The review step (review-pr skill / codex exec) writes HEAD's sha to .review-ok;
-# any new commit invalidates it. Exit 2 blocks the tool call with guidance.
-cmd=$(jq -r '.tool_input.command // ""' 2>/dev/null)
-case "$cmd" in *"gh pr create"*|*"gh pr merge"*) ;; *"git push"*)
-  # pushes of feature branches carry PR commits — same review requirement; main is chore-lane
-  branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
-  [ "$branch" = "main" ] && exit 0 ;; *) exit 0;; esac
+# PreToolUse gate: maintainer harness checkouts require an independent review of
+# CURRENT HEAD before publishing or merging. The review step writes HEAD's sha to
+# .review-ok; any new commit invalidates it. Fork contributors do not need this
+# repo-local Claude Code marker; public enforcement is CI + maintainer review.
+#
+# Enforcement is EXPLICIT LOCAL OPT-IN, never inferred from the remote: an external
+# contributor can clone upstream as origin, and a maintainer's origin URL varies
+# (token-embedded, insteadOf-rewritten, trailing slash). Turn it on per checkout:
+#   git config --local aireceipts.maintainerHarness true
+
+if ! command -v jq >/dev/null 2>&1; then
+  exit 0
+fi
+
+payload=$(cat)
+cmd=$(printf '%s' "$payload" | jq -r '.tool_input.command // ""' 2>/dev/null)
+case "$cmd" in
+  *"gh pr create"*|*"gh pr merge"*) ;;
+  *"git push"*)
+    # pushes of feature branches carry PR commits — same review requirement; main is chore-lane
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    [ "$branch" = "main" ] && exit 0
+    ;;
+  *) exit 0 ;;
+esac
+
+if [ "$(git config --bool --get aireceipts.maintainerHarness 2>/dev/null || true)" != "true" ] \
+   && [ "${AIRECEIPTS_REQUIRE_REVIEW_MARKER:-}" != "1" ]; then
+  exit 0
+fi
+
 head=$(git rev-parse HEAD 2>/dev/null)
 ok=$(cat .review-ok 2>/dev/null)
 if [ -n "$head" ] && [ "$head" = "$ok" ]; then exit 0; fi
-echo "BLOCKED: no Codex review recorded for HEAD ($head). Run the review-pr skill via codex against this diff, fix accepted findings, then: git rev-parse HEAD > .review-ok — and retry." >&2
+echo "BLOCKED: no independent review recorded for HEAD ($head)." >&2
+echo "Maintainer harness checkouts require a .review-ok marker before publish/merge." >&2
+echo "Run review-pr with an independent critic (Codex preferred when available), fix accepted findings, then:" >&2
+echo "  git rev-parse HEAD > .review-ok" >&2
+echo "Fork contributors do not need this local marker; see CONTRIBUTING.md." >&2
 exit 2

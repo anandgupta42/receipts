@@ -14,10 +14,14 @@ From your checkout (or worktree) with the PR branch checked out:
 npx aireceipts-cli pr --post
 ```
 
-That is the finalizer for humans, Codex, Claude Code, OpenCode, Cursor, and any other
-coding assistant. It discovers supported local agent sessions, matches them to the
-current repo/worktree and PR branch, renders the exact comment body, then upserts one
-marked PR comment through `gh`.
+That is the finalizer for work driven by a coding assistant.
+It works the same for Codex, Claude Code, OpenCode, Cursor, and any other assistant:
+it discovers supported local agent sessions, matches them to the current
+repo/worktree and PR branch, renders the exact comment body, then upserts one marked
+PR comment through `gh`. A human-written PR with no local agent session has nothing to
+discover, so `pr --post` finds no session to attribute — that's expected; note the
+absence in the PR instead (see [CONTRIBUTING.md](../CONTRIBUTING.md)). A declared-human
+receipt is a separate, not-yet-shipped flow (SPEC-0039).
 
 `npx` needs Node/npm. Posting needs the [`gh` CLI](https://cli.github.com/) authenticated
 to your repo (`gh auth login`); no other tokens or servers are involved. Re-running after
@@ -31,6 +35,11 @@ npx aireceipts-cli pr --post --session <id>
 
 The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
 copy the body straight into a comment.
+
+If the command finds no matching local agent session, do not invent one. For a
+human-written PR, a fork without posting rights, or a branch built on a machine whose
+transcripts are unavailable, note that in the PR's **Evidence** section. The public check
+is notice-only by default because CI cannot see transcripts on your machine.
 
 For a dry run without posting:
 

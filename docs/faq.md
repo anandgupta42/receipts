@@ -73,8 +73,9 @@ attributed per agent: [session attribution](guide/14-session-attribution.md).
 
 Largely, yes — under a spec-driven harness that doesn't trust them: mutation
 testing on the money paths, byte-golden outputs re-run under a frozen environment,
-cited-price checks in CI, and independent review before merge. Every pull request
-in the repo carries the receipt of the agent sessions that built it. Human PRs are
-welcome and run the same gates:
+cited-price checks in CI, and independent review before merge. Agent-built pull
+requests in the repo carry the receipt of the sessions that built them. Human PRs are
+welcome; they do not need the maintainer's local Claude/Codex harness, and they run the
+same merge gates:
 [CONTRIBUTING](https://github.com/anandgupta42/receipts/blob/main/CONTRIBUTING.md) ·
 [how the harness works](https://github.com/anandgupta42/receipts/blob/main/docs/internal/harness.md).

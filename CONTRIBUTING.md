@@ -1,53 +1,75 @@
 # Contributing
 
 aireceipts is mostly built by AI coding agents under a spec-driven harness —
-`docs/internal/harness.md` has the full design. This file is the practical version.
+`docs/internal/harness.md` has the full design. You do **not** need Claude Code,
+Codex, the repo-local skills, or the maintainer hooks to contribute. This file is the
+public contract: what makes a patch reviewable and mergeable.
 
-## The pipeline
+## Contribution lanes
 
-Most changes start as a spec, not a PR:
+- **Small, obvious fixes** can be opened directly: typos, broken links, focused tests,
+  documentation clarifications, small CLI bugs with a reproduction.
+- **Bug fixes** should include the failing case first: a fixture, unit test, golden, or
+  CLI repro that fails before the fix and passes after it.
+- **Price corrections** need a dated vendor source URL and quoted price text. Invariant
+  I2 bans guessed dollars, and CI rejects uncited price rows.
+- **Non-trivial features or behavior changes** start with an issue and usually become a
+  spec under `specs/` before code. A maintainer owns spec approval.
 
-1. **Issue** — file one of the templates below and label it.
-2. **Spec** — drafted under `specs/`, then validated (self-audit, an independent
-   critic, a value-gate check, mechanical lint) before a maintainer approves it.
-3. **Build** — implemented on a branch; docs ride in the same PR, not "later."
-4. **Review** — an independent critic runs the gates and records a review. A
-   tool-use hook blocks `gh pr create`/`gh pr merge` without one — there's no
-   way around this step, for an agent or a human.
-5. **PR** — opened with `.github/pull_request_template.md` filled in, carrying
-   the build receipt of the session that wrote it (see below).
-6. **Merge** — a maintainer's call.
+If you are unsure which lane fits, open an issue with the smallest reproduction or
+problem statement you have. The maintainer can turn it into a spec or ask for a narrower
+PR.
 
-**PRs that skip the gates** get this, verbatim, then get closed: "Thanks for
-the PR — this repo merges on green gates only (see the command below); happy
-to reopen once `npx tsc --noEmit && npx eslint . --max-warnings 0 && npx
-vitest run && node scripts/verify-goldens.mjs && node scripts/spec-lint.mjs &&
-node scripts/hygiene.mjs` passes locally." Written once so it's never
-re-litigated per submission — curl's public bounty postmortem is the argument
-for having this ready rather than improvised.
+## What must be true before merge
 
-## Humans are welcome
-
-You don't need to be an agent to send a patch. File an issue, or open a PR
-directly for something small and obviously in scope — a typo, a broken link, a
-price correction. The gates don't know or care who wrote the diff:
+Install dependencies once with `npm ci`, then run the same core gate CI runs. Keep the
+commands unmasked; do not pipe them through `tail`, `grep`, or `head`.
 
 ```sh
-npx tsc --noEmit && npx eslint . --max-warnings 0 && npx vitest run \
-  && node scripts/verify-goldens.mjs && node scripts/spec-lint.mjs \
-  && node scripts/hygiene.mjs
+npx tsc --noEmit;                    echo $?
+npx eslint . --max-warnings 0;       echo $?
+npx vitest run;                      echo $?
+node scripts/verify-goldens.mjs;     echo $?
+node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs; echo $?
+node scripts/spec-lint.mjs;          echo $?
+node scripts/hygiene.mjs;            echo $?
 ```
 
-All must exit 0 before a PR merges. `AGENTS.md` is the operating manual if you
-want the full picture (invariants, file ownership, verification commands).
+All must exit 0 before merge. CI also runs package/preflight checks, CLI e2e tests, and
+mutation testing when money-path files (`src/pricing/**` or `src/pr/**`) change.
 
-If your session built the change, attach its receipt before opening the PR:
-`npx aireceipts-cli pr --post` (see `docs/pr-receipts.md`). Humans without a
-session to attach can skip this.
+User-visible changes update docs/help/goldens in the same PR. Receipt output changes
+must update goldens deliberately and explain the diff. Price table changes must cite the
+source row-by-row.
 
-Found a security issue instead? Don't open a PR or public issue for it —
-`SECURITY.md` has the private reporting path, and it requires a working
-reproduction.
+## Specs, review, and the local harness
+
+The maintainer harness adds stricter automation around the public contract: S1-S4 spec
+validation, independent critic review, `.review-ok` markers, Claude Code tool hooks, and
+automatic PR receipts. Those are maintainer-local guardrails, not prerequisites for a
+fork contributor.
+
+The goal still applies to everyone: specs for substantial work, green gates, cited
+numbers, byte-stable receipts, docs with behavior changes, and a maintainer review before
+merge. If a maintainer asks for a spec or a deeper review on your PR, they will say what
+is missing and help translate the harness requirement into normal GitHub steps.
+
+## PR receipts
+
+If an AI-agent session built the change, attach its receipt before review:
+
+```sh
+npx aireceipts-cli pr --post
+```
+
+Posting needs the `gh` CLI and a pull request. If you are on a fork, do not have `gh`, or
+the command finds no matching local session, paste the command's failure message or note
+that no local agent session is available in the PR's **Evidence** section. Human-written
+PRs can skip the receipt until the declared-human receipt flow in SPEC-0039 ships.
+
+The public PR receipt check is notice-only by default, especially for forks, because
+transcripts live on the contributor's machine and CI cannot generate them. Maintainers
+may enforce receipts for same-repo agent branches.
 
 ## Adding to the extension surfaces
 
@@ -60,7 +82,12 @@ Three things people usually ask for, each with its own recipe:
   needs a real citation — invariant I2 bans fallback or guessed prices, and a
   hook rejects uncited edits at the tool level.
 
-Skills themselves are maintainer-curated, not something agents add unprompted.
+These skill files are maintainer recipes and useful reference material. They are not
+tools you need installed to contribute. Skills themselves are maintainer-curated, not
+something agents add unprompted.
+
+Found a security issue instead? Don't open a PR or public issue for it —
+`SECURITY.md` has the private reporting path, and it requires a working reproduction.
 
 ## Code of conduct
 
