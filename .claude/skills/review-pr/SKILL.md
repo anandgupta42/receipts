@@ -71,10 +71,11 @@ you can't evaluate in 30 seconds wastes every reviewer after you.
 ## 4.7 Record the review (maintainer-local hook marker)
 
 On completion write the reviewed sha: `git rev-parse HEAD > .review-ok` (untracked;
-any new commit invalidates it — re-review the delta). In canonical maintainer checkouts,
-the Claude Code PreToolUse hook blocks `gh pr create`, `gh pr merge`, and feature-branch
-`git push` without it. Fork contributors do not need this local marker; their PRs are
-reviewed through normal GitHub review.
+any new commit invalidates it — re-review the delta). In a checkout that opted in with
+`git config --local aireceipts.maintainerHarness true`, the Claude Code PreToolUse hook
+blocks `gh pr create`, `gh pr merge`, and feature-branch `git push` without it. Fork
+contributors do not need this local marker; their PRs are reviewed through normal GitHub
+review.
 
 ## 5. Post the review
 

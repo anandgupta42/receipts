@@ -117,12 +117,15 @@ close it:
    template. The lead reviews *opened PRs*, never ferries work — the courier role is
    abolished.
 
-Maintainer-local enforcement backstop: in this repo's canonical Claude Code checkout, a
-PreToolUse hook blocks `gh pr create`, `gh pr merge`, and feature-branch `git push`
-unless a review marker exists for the exact HEAD sha. That keeps maintainer-agent work
-from quietly dropping the review step (it was dropped twice under deadline pressure
-before this hook existed; hence the hook). It is not a normal Git hook and is not a fork
-contributor requirement; public enforcement remains CI plus maintainer review.
+Maintainer-local enforcement backstop: in a checkout that opts in with
+`git config --local aireceipts.maintainerHarness true`, a PreToolUse hook blocks
+`gh pr create`, `gh pr merge`, and feature-branch `git push` unless a review marker
+exists for the exact HEAD sha. That keeps maintainer-agent work from quietly dropping the
+review step (it was dropped twice under deadline pressure before this hook existed; hence
+the hook). Enforcement is an explicit local opt-in, never inferred from the remote — so a
+fork contributor who cloned upstream is never blocked, and a maintainer's URL format
+never silently disables it. It is not a normal Git hook and is not a fork contributor
+requirement; public enforcement remains CI plus maintainer review.
 
 ## How a feature flows
 

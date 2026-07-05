@@ -1,8 +1,13 @@
 #!/bin/bash
-# PreToolUse gate: canonical maintainer checkouts require an independent review of
+# PreToolUse gate: maintainer harness checkouts require an independent review of
 # CURRENT HEAD before publishing or merging. The review step writes HEAD's sha to
 # .review-ok; any new commit invalidates it. Fork contributors do not need this
 # repo-local Claude Code marker; public enforcement is CI + maintainer review.
+#
+# Enforcement is EXPLICIT LOCAL OPT-IN, never inferred from the remote: an external
+# contributor can clone upstream as origin, and a maintainer's origin URL varies
+# (token-embedded, insteadOf-rewritten, trailing slash). Turn it on per checkout:
+#   git config --local aireceipts.maintainerHarness true
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
@@ -20,15 +25,10 @@ case "$cmd" in
   *) exit 0 ;;
 esac
 
-origin_url=$(git remote get-url --push origin 2>/dev/null || git remote get-url origin 2>/dev/null || true)
-case "$origin_url" in
-  git@github.com:anandgupta42/receipts.git|git@github.com:anandgupta42/receipts|https://github.com/anandgupta42/receipts.git|https://github.com/anandgupta42/receipts|ssh://git@github.com/anandgupta42/receipts.git) ;;
-  *)
-    if [ "${AIRECEIPTS_REQUIRE_REVIEW_MARKER:-}" != "1" ]; then
-      exit 0
-    fi
-    ;;
-esac
+if [ "$(git config --bool --get aireceipts.maintainerHarness 2>/dev/null || true)" != "true" ] \
+   && [ "${AIRECEIPTS_REQUIRE_REVIEW_MARKER:-}" != "1" ]; then
+  exit 0
+fi
 
 head=$(git rev-parse HEAD 2>/dev/null)
 ok=$(cat .review-ok 2>/dev/null)
