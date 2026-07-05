@@ -1,7 +1,9 @@
 # Get started in 60 seconds
 
 aireceipts reads the transcripts your AI coding agent already writes to disk and
-prints a priced receipt of what a session cost. No account, no API key, no upload.
+prints a priced receipt of what a session cost. No account, no API key; your
+transcripts and code are never uploaded (anonymous diagnostics are opt-out — see
+[docs/telemetry.md](../telemetry.md)).
 
 This page takes you from nothing to a receipt, a weekly total, and an automatic
 receipt after every session — in about a minute.

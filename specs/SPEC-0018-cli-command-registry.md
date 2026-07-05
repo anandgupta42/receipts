@@ -62,9 +62,12 @@ each add one command merge conflict-free and have zero overlapping production fi
 - **R6 — Telemetry lifecycle remains one wrapper.** Parsing, command selection, command
   execution, telemetry recording, first-run notice, and bounded flush remain owned by
   `main()`. Lifecycle tests cover parse failure, command throw, command nonzero exit,
-  command success, and `telemetry-show`: exactly one run/error event as appropriate,
-  first-run notice skipped only for `telemetry-show`, and `flushTelemetry()` always
-  awaited.
+  command success, and `telemetry-show`: exactly one run/error event as appropriate for
+  real commands, and `flushTelemetry()` awaited for them. **`telemetry-show` is the sole
+  exception on all three axes** — no first-run notice, no `cli_run`/`cli_error` record,
+  and no flush — because it is the preview-what-would-be-sent command and must itself
+  send nothing (SPEC-0002 R5 governs; the scenario below has always said so, and a
+  fetch-spy test with telemetry *enabled* proves it).
 - **R7 — Shared helpers are allowed under common ownership.** Commands may import
   shared CLI helpers from explicit common modules such as `src/cli/common/*` or existing
   domain modules. The rule is not "commands never import helpers"; the rule is that a

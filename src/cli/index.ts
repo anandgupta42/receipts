@@ -18,27 +18,38 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const options = parseOptions(argv);
   const commands = await loadCommands();
   const command = selectCommand(commands, options);
-  if (command.name !== "telemetry-show") {
+  // `telemetry-show` is the inspect-what-would-be-sent command: it must itself
+  // send nothing and record nothing, or the privacy-preview surface becomes a
+  // privacy leak (v0.1.0 docs-board BLOCKER). It's exempt from the first-run
+  // notice, the `cli_run` record, AND the flush below.
+  const isTelemetryShow = command.name === "telemetry-show";
+  if (!isTelemetryShow) {
     await ensureFirstRunNotice((text) => process.stderr.write(text + "\n"), undefined);
   }
   const ctx = createContext(options, commands);
   const started = Date.now();
   try {
     const code = await command.run(ctx);
-    recordCliRun({
-      command: command.name,
-      agentType: undefined,
-      durationMs: Date.now() - started,
-      ok: code === 0,
-      // SPEC-0042 R5 — emission mode for the handoff command only (enum, never content).
-      ...(command.name === "handoff" ? { handoffFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
-    });
+    if (!isTelemetryShow) {
+      recordCliRun({
+        command: command.name,
+        agentType: undefined,
+        durationMs: Date.now() - started,
+        ok: code === 0,
+        // SPEC-0042 R5 — emission mode for the handoff command only (enum, never content).
+        ...(command.name === "handoff" ? { handoffFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
+      });
+    }
     return code;
   } catch (err) {
-    recordCliError({ command: command.name, agentType: undefined, err });
+    if (!isTelemetryShow) {
+      recordCliError({ command: command.name, agentType: undefined, err });
+    }
     process.stderr.write(String(err instanceof Error ? err.message : err) + "\n");
     return 1;
   } finally {
-    await flushTelemetry();
+    if (!isTelemetryShow) {
+      await flushTelemetry();
+    }
   }
 }

@@ -39,8 +39,7 @@ JSON export.
 |---|---|---|
 | `schemaVersion` | number (literal `1`) | This schema's major version. Bumped only on a breaking change. |
 | `agentLabel` | string | Human label for the agent, e.g. "Claude Code". |
-| `source` | enum | One of `claude-code`, `codex`, `cursor`, `gemini`. |
-| `source` | enum | One of `claude-code`, `codex`, `cursor`, `opencode`. |
+| `source` | enum | One of `claude-code`, `codex`, `cursor`, `gemini`, `opencode`. |
 | `sessionId` | string | Adapter-local id (an absolute file path for file-based adapters). |
 | `title` | string \| null | Session title, or null when the adapter reports none. |
 | `startedAtMs` | number \| null | Session start, epoch milliseconds, or null. |
@@ -216,9 +215,12 @@ cacheCreationTokens, totalTokens, callCount`
 
 ## Weekly digest (SPEC-0008 integration point)
 
-`week --json` (SPEC-0008's weekly digest) is not yet implemented on this branch. When it
-lands, it MUST wrap its payload with the same `schemaVersion` constant
-(`SCHEMA_VERSION` from `src/receipt/exportSchema.ts`) rather than inventing a second,
-undocumented shape (R5, single-source-of-truth). Add a `weekJsonSchema` alongside the
-existing schemas, document its fields inside the `json-fields` markers above, and the
-parity test will hold it to the same contract automatically.
+`week --json` (SPEC-0008's weekly digest) **is** implemented (`weekToJson` in
+`src/receipt/week.ts`) and emits a `{window, priorWindow, sinceOverride, byProject, current, prior, delta,
+topWaste}` digest (waste lines are under `topWaste`). It does **not** yet carry a `schemaVersion` wrapper or a `weekJsonSchema` in
+`exportSchema.ts`, so it is not covered by the field-parity test — a known gap tracked
+for a follow-up: it MUST gain the same `schemaVersion` constant (from
+`src/receipt/exportSchema.ts`) and a `weekJsonSchema` documented inside the
+`json-fields` markers above, rather than a second undocumented shape (R5,
+single-source-of-truth). Until then, treat `week --json` as an unversioned convenience
+surface, not part of the versioned contract.
