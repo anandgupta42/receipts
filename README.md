@@ -21,8 +21,10 @@
 **Why this exists.** AI coding agents spend real money invisibly — you see the diff,
 never the bill. aireceipts reads the transcripts your agent already writes to disk and
 turns them into receipts: what a session cost, tool by tool; what a PR cost, across
-every agent that built it; where tokens were wasted. Local and deterministic — no
-accounts, no servers, nothing leaves your machine.
+every supported agent session it can attribute; where tokens were wasted. Local and
+deterministic — no accounts, no servers; your transcripts and code never leave your
+machine (anonymous, content-free diagnostics are on by default and opt-out — see
+[docs/telemetry.md](docs/telemetry.md)).
 
 ## Install
 

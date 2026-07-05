@@ -94,15 +94,15 @@ describe("SPEC-0018 R6 · main() telemetry lifecycle", () => {
     expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(1);
   });
 
-  it("telemetry-show → run event recorded, flush awaited, first-run notice SKIPPED", async () => {
+  it("telemetry-show → records NOTHING, flushes NOTHING, notice skipped (SPEC-0002 R5: the preview command must itself send nothing)", async () => {
     const code = await main(["--telemetry-show"]);
     expect(code).toBe(0);
-    expect(telemetry.recordCliRun).toHaveBeenCalledTimes(1);
-    expect(telemetry.recordCliRun).toHaveBeenCalledWith(
-      expect.objectContaining({ command: "telemetry-show", ok: true }),
-    );
-    expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(1);
-    // R6: the notice is skipped only for telemetry-show.
+    // v0.1.0 docs-board BLOCKER: previewing telemetry must not itself emit
+    // telemetry. SPEC-0002 R5 ("payload printed, nothing sent") governs over
+    // SPEC-0018 R6's vaguer "as the lifecycle requires".
+    expect(telemetry.recordCliRun).not.toHaveBeenCalled();
+    expect(telemetry.recordCliError).not.toHaveBeenCalled();
+    expect(telemetry.flushTelemetry).not.toHaveBeenCalled();
     expect(telemetry.ensureFirstRunNotice).not.toHaveBeenCalled();
   });
 });

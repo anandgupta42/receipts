@@ -14,10 +14,6 @@ From your checkout (or worktree) with the PR branch checked out:
 npx aireceipts-cli pr --post
 ```
 
-> **Pre-release note:** until the npm package is published, run the same command
-> from a source checkout: `node dist/cli.js pr --post` (see the README's install
-> status). The one-command story becomes literal at v0.1.0.
-
 That is the finalizer for humans, Codex, Claude Code, OpenCode, Cursor, and any other
 coding assistant. It discovers supported local agent sessions, matches them to the
 current repo/worktree and PR branch, renders the exact comment body, then upserts one
@@ -85,8 +81,8 @@ anonymous raw fetches 404 there, so the viewer shows its error with a direct
 GitHub link (readable as source by anyone with access) until the repo is
 public. Publishing writes nothing to your working tree, index, or current
 branch, and each PR's file is overwritten in place — other PRs' artifacts are
-never touched. The viewer page itself carries no analytics or beacons and
-never will (I4's spirit): nobody, including the aireceipts project, learns
+never touched. The viewer page itself carries no analytics or beacons (I4's
+spirit): nobody, including the aireceipts project, learns
 who viewed which receipt.
 
 ## For maintainers (repo integration, 2 minutes)

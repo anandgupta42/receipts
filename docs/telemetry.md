@@ -22,7 +22,7 @@ There are exactly three event types. Nothing else is ever recorded.
 | `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | `process.platform`, collapsed to a closed set — never the raw platform string. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
 | `commandClass` | enum | `receipt` \| `compare` \| `handoff` \| `other` | Which subcommand ran — never the raw argv or any flag values. |
-| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket — never the raw millisecond count. |
 | `ok` | boolean | | Whether the run succeeded. |
 | `handoffFormat` | enum (optional) | `text` \| `json` | SPEC-0042: emission mode, present only on handoff-command runs — never content. |
@@ -33,14 +33,14 @@ There are exactly three event types. Nothing else is ever recorded.
 |---|---|---|---|
 | `errorClass` | enum | `parse_error` \| `io_error` \| `network_error` \| `validation_error` \| `unknown_error` | A small fixed taxonomy derived from the error's constructor name or a well-known Node error code — **never `error.message`**, which can contain a file path or other identifying text. |
 | `command` | enum | `receipt` \| `compare` \| `handoff` \| `other` | Same closed taxonomy as `cli_run.commandClass`. |
-| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` \| `unknown` | |
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | |
 | `inPackage` | boolean | | Whether the error's top stack frame originated inside `aireceipts`'s own installed code (helps us tell "our bug" from "your environment") — the stack trace text itself is inspected internally and never leaves the process. |
 
 ### `parse_failure` — one per transcript-parsing failure
 
 | Field | Type | Values | Notes |
 |---|---|---|---|
-| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `opencode` | |
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | |
 | `adapterVersion` | string | short opaque token, e.g. `"1"` | An internal per-adapter constant, not anything read from a transcript. |
 | `signatureHash` | string | 64-character sha256 hex digest | A hash of a content-free description of *where* parsing broke (e.g. `"claude-code:turn.usage.missing"`). The raw description is hashed before it ever reaches a payload — you cannot recover it from the hash, and it never contains transcript content. |
 
@@ -65,10 +65,10 @@ Permanently, structurally banned — there is no field for any of these anywhere
 Either of the following disables telemetry completely. When disabled, `flushTelemetry()` returns immediately without making any network call — this is verified by tests that stub the network layer and assert it is never invoked.
 
 ```bash
-AIRECEIPTS_TELEMETRY=off aireceipts receipt ...
+AIRECEIPTS_TELEMETRY=off aireceipts ...
 # or: AIRECEIPTS_TELEMETRY=0 / AIRECEIPTS_TELEMETRY=false (case-insensitive)
 
-DO_NOT_TRACK=1 aireceipts receipt ...
+DO_NOT_TRACK=1 aireceipts ...
 ```
 
 To disable permanently, export one of these in your shell profile.
