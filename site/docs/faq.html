@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Show a statusline in your shell — aireceipts docs</title>
+<title>FAQ — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,8 +286,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Show a statusline in your shell</h1>
-      <p class="sub">Rendered from <code>docs/guide/07-statusline.md</code>.</p>
+      <h1>FAQ</h1>
+      <p class="sub">Rendered from <code>docs/faq.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -330,51 +330,41 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="show-a-statusline-in-your-shell">Show a statusline in your shell</h1>
+<h1 id="faq">FAQ</h1>
 
-<p>Goal: see the current session's cost on <em>every</em> Claude Code prompt, without running a command yourself.</p>
+<p>Seeing an error or an odd receipt? That's <a href="12-troubleshooting.html">troubleshooting</a> — symptom-first. This page is question-first. (SPEC-0046.)</p>
 
-<p><code>aireceipts statusline</code> prints exactly one line, meant to be wired into Claude Code's <code>statusLine</code> config:</p>
+<h2 id="how-is-this-different-from-ccusage-or-my-agents-built-in-usage">How is this different from ccusage or my agent's built-in <code>/usage</code>?</h2>
 
-<pre class="doc-code"><code>[Claude Code] $0.18 · 147k tok</code></pre>
+<p>Those are usage dashboards: they aggregate what you spent over time (today, this week, this billing window), and they do that job well. aireceipts prints a receipt for a <strong>unit of work</strong> — one session or one pull request — with cost attributed per tool call, prices taken from cited and dated tables, and byte-deterministic output. Use a dashboard to watch a trend; use a receipt to answer &quot;what did <em>this</em> cost, and can I check the number?&quot; What a receipt can and can't prove: <a href="trust.html">trust.md</a>.</p>
 
-<h2 id="set-it-up">Set it up</h2>
+<h2 id="im-on-a-flat-rate-subscription-what-do-the-dollar-figures-mean-for-me">I'm on a flat-rate subscription — what do the dollar figures mean for me?</h2>
 
-<p>Add a <code>statusLine</code> block to your Claude Code <code>settings.json</code> — global (<code>~/.claude/settings.json</code>) or project-local (<code>.claude/settings.json</code>):</p>
+<p>They are <strong>API-equivalent arithmetic</strong> on your real token counts — what the same tokens would cost at the cited list prices — never a claim about your bill. On a subscription, the receipt's plan-independent lines are the useful ones: per-tool anatomy, cache economics, and waste lines. <code>aireceipts --quota</code> shows the official rate-limit window state, which is the ceiling that actually constrains a subscriber. How every dollar is computed: <a href="13-pricing.html">pricing</a>.</p>
 
-<pre class="doc-code"><code class="language-json">{
-  &quot;statusLine&quot;: {
-    &quot;type&quot;: &quot;command&quot;,
-    &quot;command&quot;: &quot;aireceipts statusline&quot;
-  }
-}</code></pre>
+<h2 id="does-aireceipts-send-anything-off-my-machine">Does aireceipts send anything off my machine?</h2>
 
-<p>Claude Code runs that command on its own schedule and pipes a small JSON payload on stdin — including the <code>transcript_path</code> of the active session. aireceipts reads that payload, prices the referenced transcript, and prints the line. No polling, no daemon, one disk read per invocation.</p>
+<p>The product path is fully offline. The only network call is content-free telemetry from a fixed nine-event catalog — never transcript content, prompts, file paths, repo names, or dollar amounts. It is on by default; <code>aireceipts --telemetry-show</code> prints exactly what the current run would send (and sends nothing), and <code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code> means zero network calls. The authoritative schema, field by field: <a href="telemetry.html">telemetry.md</a>.</p>
 
-<p>If <code>aireceipts</code> isn't on your <code>PATH</code>, put the absolute path (the output of <code>which aireceipts</code>) in the <code>command</code> field.</p>
+<h2 id="can-i-trust-the-numbers-could-someone-fake-a-receipt">Can I trust the numbers? Could someone fake a receipt?</h2>
 
-<h2 id="what-the-line-shows">What the line shows</h2>
+<p>A receipt is the <strong>author's disclosure</strong> — verifiable in its arithmetic (anyone with the transcript can re-render it and compare bytes), but not cryptographic evidence: transcripts are plain files on the author's disk. Incompleteness is labeled — totals floor with <code>≥</code> when a session couldn't be attributed — and reconciliation checks plus time-integrity caveats make fabrication visible, not impossible. The full statement of what a receipt proves, what it can't, and the living list of ways the numbers can go wrong: <a href="trust.html">trust.md</a>.</p>
 
-<ul>
-  <li><code>$X.XX · Nk tok</code> when the session is priced; <code>Nk tok</code> alone when it isn't — never a fabricated dollar amount.</li>
-  <li>A waste flag (<code>⚠ Bash loop ×5</code>) appears only when a detector actually fired.</li>
-  <li>Outside a piped call, or when the payload carries no session, it falls back to the newest session on disk, and prints a neutral placeholder rather than an error if there are none — so your statusline layout never breaks.</li>
-</ul>
+<h2 id="why-does-my-receipt-show-tokens-but-no-dollars">Why does my receipt show tokens but no dollars?</h2>
 
-<h2 id="rate-limit-window-quota">Rate-limit window (<code>--quota</code>)</h2>
+<p>No cited, dated price row matched that session's model and date, and aireceipts never guesses a dollar — that's an invariant, not a gap. The price tables live in <a href="https://github.com/anandgupta42/receipts/tree/main/data/prices"><code>data/prices/</code></a>, one JSON per vendor, each row carrying the vendor page it was copied from and the date it was observed. Add or update a row (with its citation) and the same transcript re-prices. Method details: <a href="13-pricing.html">pricing</a>.</p>
 
-<p>If you're on a Claude Code subscription, <code>aireceipts --quota</code> reports your current rate-limit window when Claude Code provides it on stdin. It runs in statusline stdin mode only and stays silent when that data isn't available, so it's safe to include in a statusline command that also prints cost.</p>
+<h2 id="why-doesnt-the-receipt-match-my-vendors-invoice">Why doesn't the receipt match my vendor's invoice?</h2>
 
-<h2 id="full-reference">Full reference</h2>
+<p>The receipt is a <strong>local estimate</strong>: token counts from your transcript × cited price tables, computed at render time. It is not a feed from your vendor's billing system, and every fallback in the method is chosen to understate rather than overstate. <code>aireceipts --methodology</code> prints the exact attribution rules the tool applies. The full explanation of where estimate and invoice can diverge: <a href="13-pricing.html">pricing</a>.</p>
 
-<p>The authoritative statusline reference — every output shape and fallback — is <a href="statusline.html">docs/statusline.md</a>.</p>
+<h2 id="why-does-my-cursor-receipt-show-session-totals-only">Why does my Cursor receipt show session totals only?</h2>
 
-<h2 id="next">Next</h2>
+<p>Cursor's local logs carry no per-turn usage, so splitting the total across tools would be guesswork — and the receipt says &quot;session totals only&quot; instead of guessing. That's the honest degraded mode: real numbers at the granularity the transcript supports, nothing invented below it. How sessions are discovered and attributed per agent: <a href="14-session-attribution.html">session attribution</a>.</p>
 
-<ul>
-  <li><strong><a href="03-install-hook.html">Install the agent hook</a></strong> — a full receipt at session end.</li>
-  <li><strong><a href="08-budget.html">Set a budget</a></strong> — a threshold, not just a number.</li>
-</ul>
+<h2 id="who-builds-this-is-it-really-ai-agents">Who builds this — is it really AI agents?</h2>
+
+<p>Largely, yes — under a spec-driven harness that doesn't trust them: mutation testing on the money paths, byte-golden outputs re-run under a frozen environment, cited-price checks in CI, and independent review before merge. Every pull request in the repo carries the receipt of the agent sessions that built it. Human PRs are welcome and run the same gates: <a href="https://github.com/anandgupta42/receipts/blob/main/CONTRIBUTING.md">CONTRIBUTING</a> · <a href="https://github.com/anandgupta42/receipts/blob/main/docs/internal/harness.md">how the harness works</a>.</p>
     </article>
   </main>
   <footer>

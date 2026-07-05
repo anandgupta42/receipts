@@ -313,23 +313,26 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
 <h1 id="get-started-in-60-seconds">Get started in 60 seconds</h1>
 
-<p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost. No account, no API key, no upload.</p>
+<p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost. No account, no API key; your transcripts and code are never uploaded (anonymous diagnostics are opt-out — see <a href="telemetry.html">docs/telemetry.md</a>).</p>
 
 <p>This page takes you from nothing to a receipt, a weekly total, and an automatic receipt after every session — in about a minute.</p>
 
@@ -414,6 +417,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
   <li><strong><a href="02-install.html">Install</a></strong> — run it without <code>npx</code> on every invocation.</li>
   <li><strong><a href="04-read-a-receipt.html">Read a receipt</a></strong> — pick any session, not just the newest.</li>
   <li><strong><a href="08-budget.html">Set a budget</a></strong> — get an exit code when the week crosses a cap.</li>
+  <li><strong><a href="faq.html">FAQ</a></strong> — how this differs from usage dashboards, what the dollars mean on a subscription, what leaves your machine (nothing but disclosed, content-free telemetry), and more.</li>
 </ul>
     </article>
   </main>

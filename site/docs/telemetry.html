@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Diagnostics telemetry — aireceipts docs</title>
+<title>Diagnostics and adoption telemetry — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,7 +286,7 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Diagnostics telemetry</h1>
+      <h1>Diagnostics and adoption telemetry</h1>
       <p class="sub">Rendered from <code>docs/telemetry.md</code>.</p>
     </div>
   </header>
@@ -313,138 +313,246 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="diagnostics-telemetry">Diagnostics telemetry</h1>
+<h1 id="diagnostics-and-adoption-telemetry">Diagnostics and adoption telemetry</h1>
 
-<p><code>aireceipts</code> can send small, anonymous, content-free diagnostics events to help us find bugs and understand which agent formats and CLI paths are actually used in the wild. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here ever disagrees with the code in <code>src/telemetry/</code>, that's a bug — please file an issue.</p>
+<p><code>aireceipts</code> can send small, content-free telemetry events to help us find bugs and understand which CLI features are actually used. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here disagrees with <code>src/telemetry/</code>, that is a bug.</p>
 
 <h2 id="tldr">tl;dr</h2>
 
 <ul>
-  <li><strong>On by default</strong>, but every event is one of exactly three fixed-shape records — never transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, or raw model strings.</li>
-  <li><strong>Disable anytime</strong>: <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code>. Either one results in <strong>zero network calls</strong> — not &quot;send less,&quot; zero.</li>
+  <li><strong>On by default</strong>, but every event is one of a fixed nine-event catalog: <code>cli_run</code>, <code>cli_error</code>, <code>parse_failure</code>, <code>receipt_generated</code>, <code>export_generated</code>, <code>pr_flow_completed</code>, <code>hook_configured</code>, <code>integration_surface_rendered</code>, <code>activation_milestone</code>.</li>
+  <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.</li>
+  <li><strong>Pseudonymous install identity</strong>: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete <code>~/.aireceipts/state.json</code> to reset it.</li>
+  <li><strong>Disable anytime</strong>: <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code>. Either one results in <strong>zero network calls</strong> and prevents install-id creation on a fresh install.</li>
   <li><strong>Inspect before you decide</strong>: <code>aireceipts --telemetry-show</code> prints exactly what the current run would send, and sends nothing.</li>
-  <li><strong>Bounded and fail-safe</strong>: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code. A slow or failed network call is simply abandoned.</li>
-  <li><strong>First-run notice</strong>: the very first time you run <code>aireceipts</code>, it prints a one-line disclosure pointing here. It never prints again after that.</li>
+  <li><strong>Bounded and fail-safe</strong>: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code.</li>
 </ul>
 
-<h2 id="what-is-sent">What is sent</h2>
+<h2 id="event-catalog">Event catalog</h2>
 
-<p>There are exactly three event types. Nothing else is ever recorded.</p>
+<p>Every field below is validated against a <code>.strict()</code> zod schema before it is queued. Extra keys are rejected, so a bug elsewhere cannot smuggle a new field into a payload.</p>
 
-<h3 id="clirun-one-per-cli-invocation"><code>cli_run</code> — one per CLI invocation</h3>
+<h3 id="clirun-one-per-normal-cli-invocation"><code>cli_run</code> — one per normal CLI invocation</h3>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>cliVersion</code></td><td>string</td><td>semver, e.g. <code>&quot;0.3.1&quot;</code></td><td>From this package's own <code>package.json</code>.</td></tr>
-    <tr><td><code>os</code></td><td>enum</td><td><code>darwin</code> | <code>linux</code> | <code>win32</code> | <code>other</code></td><td><code>process.platform</code>, collapsed to a closed set — never the raw platform string.</td></tr>
+    <tr><td><code>cliVersion</code></td><td>string</td><td>semver</td><td>From this package's <code>package.json</code>.</td></tr>
+    <tr><td><code>os</code></td><td>enum</td><td><code>darwin</code> | <code>linux</code> | <code>win32</code> | <code>other</code></td><td>Collapsed from <code>process.platform</code>.</td></tr>
     <tr><td><code>nodeMajor</code></td><td>integer</td><td>e.g. <code>22</code></td><td>Major Node version only.</td></tr>
-    <tr><td><code>commandClass</code></td><td>enum</td><td><code>receipt</code> | <code>compare</code> | <code>other</code></td><td>Which subcommand ran — never the raw argv or any flag values.</td></tr>
-    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>opencode</code> | <code>unknown</code></td><td>Which agent format was parsed, if known.</td></tr>
-    <tr><td><code>durationBucket</code></td><td>enum</td><td><code>&lt;100ms</code> | <code>100-500ms</code> | <code>500ms-2s</code> | <code>2-10s</code> | <code>&gt;10s</code></td><td>Coarse bucket — never the raw millisecond count.</td></tr>
-    <tr><td><code>ok</code></td><td>boolean</td><td></td><td>Whether the run succeeded.</td></tr>
+    <tr><td><code>commandClass</code></td><td>enum</td><td><code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>handoff</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
+    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td>Which agent format was parsed, if known.</td></tr>
+    <tr><td><code>durationBucket</code></td><td>enum</td><td><code>&lt;100ms</code> | <code>100-500ms</code> | <code>500ms-2s</code> | <code>2-10s</code> | <code>&gt;10s</code></td><td>Coarse bucket; never raw milliseconds.</td></tr>
+    <tr><td><code>ok</code></td><td>boolean</td><td></td><td>Whether the command returned exit code 0.</td></tr>
+    <tr><td><code>isCI</code></td><td>boolean</td><td></td><td>True when <code>CI</code> or <code>GITHUB_ACTIONS</code> is set and not false.</td></tr>
+    <tr><td><code>installHash</code></td><td>string</td><td>64-hex sha256 or <code>unavailable</code></td><td>Salted hash of the random local install id; raw id never leaves disk.</td></tr>
+    <tr><td><code>runOrdinalBucket</code></td><td>enum</td><td><code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code> | <code>unavailable</code></td><td>Lifetime run ordinal bucket; never the raw count.</td></tr>
+    <tr><td><code>handoffFormat</code></td><td>enum (optional)</td><td><code>text</code> | <code>json</code></td><td>SPEC-0042: emission mode, present only on handoff-command runs — never content.</td></tr>
   </tbody>
 </table></div>
 
-<h3 id="clierror-one-per-uncaught-error-at-the-clis-top-level"><code>cli_error</code> — one per uncaught error at the CLI's top level</h3>
+<h3 id="clierror-one-per-uncaught-top-level-cli-error"><code>cli_error</code> — one per uncaught top-level CLI error</h3>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>errorClass</code></td><td>enum</td><td><code>parse_error</code> | <code>io_error</code> | <code>network_error</code> | <code>validation_error</code> | <code>unknown_error</code></td><td>A small fixed taxonomy derived from the error's constructor name or a well-known Node error code — <strong>never <code>error.message</code></strong>, which can contain a file path or other identifying text.</td></tr>
-    <tr><td><code>command</code></td><td>enum</td><td><code>receipt</code> | <code>compare</code> | <code>other</code></td><td>Same closed taxonomy as <code>cli_run.commandClass</code>.</td></tr>
-    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>opencode</code> | <code>unknown</code></td><td></td></tr>
-    <tr><td><code>inPackage</code></td><td>boolean</td><td></td><td>Whether the error's top stack frame originated inside <code>aireceipts</code>'s own installed code (helps us tell &quot;our bug&quot; from &quot;your environment&quot;) — the stack trace text itself is inspected internally and never leaves the process.</td></tr>
+    <tr><td><code>errorClass</code></td><td>enum</td><td><code>parse_error</code> | <code>io_error</code> | <code>network_error</code> | <code>validation_error</code> | <code>unknown_error</code></td><td>Derived from bounded error metadata; never <code>error.message</code>.</td></tr>
+    <tr><td><code>command</code></td><td>enum</td><td>same 18-command enum as <code>cli_run.commandClass</code></td><td>Never raw argv.</td></tr>
+    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td></td></tr>
+    <tr><td><code>inPackage</code></td><td>boolean</td><td></td><td>Whether the top stack frame is inside aireceipts; the stack text never leaves the process.</td></tr>
   </tbody>
 </table></div>
 
-<h3 id="parsefailure-one-per-transcript-parsing-failure"><code>parse_failure</code> — one per transcript-parsing failure</h3>
+<h3 id="parsefailure-one-per-transcript-parsing-failure"><code>parse_failure</code> — one per transcript parsing failure</h3>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>opencode</code></td><td></td></tr>
-    <tr><td><code>adapterVersion</code></td><td>string</td><td>short opaque token, e.g. <code>&quot;1&quot;</code></td><td>An internal per-adapter constant, not anything read from a transcript.</td></tr>
-    <tr><td><code>signatureHash</code></td><td>string</td><td>64-character sha256 hex digest</td><td>A hash of a content-free description of <em>where</em> parsing broke (e.g. <code>&quot;claude-code:turn.usage.missing&quot;</code>). The raw description is hashed before it ever reaches a payload — you cannot recover it from the hash, and it never contains transcript content.</td></tr>
+    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td></td></tr>
+    <tr><td><code>adapterVersion</code></td><td>string</td><td>short opaque token</td><td>Internal adapter version, not read from a transcript.</td></tr>
+    <tr><td><code>signatureHash</code></td><td>string</td><td>64-hex sha256</td><td>Hash of a content-free structural failure descriptor.</td></tr>
   </tbody>
 </table></div>
 
-<p>Every field above is validated against a <code>zod</code> schema in <code>.strict()</code> mode before it's ever queued (<code>src/telemetry/schemas.ts</code>). <code>.strict()</code> rejects any payload carrying an extra, unlisted key, so a bug elsewhere in the codebase cannot silently smuggle a new field (a path, a prompt, a dollar amount) into a payload — it would have to be added here, deliberately, and reviewed.</p>
+<h3 id="receiptgenerated-one-per-rendered-cost-receipt"><code>receipt_generated</code> — one per rendered cost receipt</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>surface</code></td><td>enum</td><td><code>receipt</code> | <code>compare</code> | <code>mini</code> | <code>pr</code></td><td>Statusline/quota/template previews are not receipts.</td></tr>
+    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td><code>unknown</code> for mixed-agent/multi-session surfaces.</td></tr>
+    <tr><td><code>multiAgent</code></td><td>boolean</td><td></td><td>True when the rendered surface combines more than one session/model.</td></tr>
+    <tr><td><code>outputMode</code></td><td>enum</td><td><code>text</code> | <code>json</code> | <code>csv</code> | <code>svg</code> | <code>png</code> | <code>markdown</code></td><td></td></tr>
+    <tr><td><code>template</code></td><td>enum</td><td><code>classic</code> | <code>grocery</code> | <code>datavis</code> | <code>none</code></td><td><code>none</code> when no template flag drove the render.</td></tr>
+    <tr><td><code>pricedRowCoverage</code></td><td>enum</td><td><code>none</code> | <code>some</code> | <code>all</code></td><td>Share of rendered tool rows with resolved prices; no dollars are sent.</td></tr>
+    <tr><td><code>hasStuckLoopWaste</code></td><td>boolean</td><td></td><td></td></tr>
+    <tr><td><code>hasTrivialSpansWaste</code></td><td>boolean</td><td></td><td></td></tr>
+    <tr><td><code>hasContextThrashWaste</code></td><td>boolean</td><td></td><td></td></tr>
+    <tr><td><code>hasPriceDelta</code></td><td>boolean</td><td></td><td>Whether the receipt had an arithmetic cheaper-model delta line.</td></tr>
+    <tr><td><code>turnCountBucket</code></td><td>enum</td><td><code>0</code> | <code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code></td><td>Never raw turn count.</td></tr>
+    <tr><td><code>toolCallCountBucket</code></td><td>enum</td><td><code>0</code> | <code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code></td><td>Never raw tool-call count.</td></tr>
+    <tr><td><code>receiptOrdinalBucket</code></td><td>enum</td><td><code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code> | <code>unavailable</code></td><td>Lifetime local receipt ordinal bucket.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="exportgenerated-one-per-successful-export-path"><code>export_generated</code> — one per successful export path</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>surface</code></td><td>enum</td><td><code>receipt</code> | <code>compare</code> | <code>week</code> | <code>list</code> | <code>pr</code></td><td></td></tr>
+    <tr><td><code>format</code></td><td>enum</td><td><code>json</code> | <code>csv_session</code> | <code>csv_tool</code> | <code>svg</code> | <code>png</code> | <code>markdown</code> | <code>html</code></td><td></td></tr>
+    <tr><td><code>wroteFile</code></td><td>boolean</td><td></td><td>False for stdout exports.</td></tr>
+    <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="prflowcompleted-one-per-aireceipts-pr-flow"><code>pr_flow_completed</code> — one per <code>aireceipts pr</code> flow</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>mode</code></td><td>enum</td><td><code>dry_run</code> | <code>post</code></td><td></td></tr>
+    <tr><td><code>artifactRequested</code></td><td>boolean</td><td></td><td></td></tr>
+    <tr><td><code>shareRequested</code></td><td>boolean</td><td></td><td></td></tr>
+    <tr><td><code>contributorCountBucket</code></td><td>enum</td><td><code>0</code> | <code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code></td><td>Never raw contributor count.</td></tr>
+    <tr><td><code>commentResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
+    <tr><td><code>artifactResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
+    <tr><td><code>shareResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
+    <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="hookconfigured-one-per-hook-installuninstall-command"><code>hook_configured</code> — one per hook install/uninstall command</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>operation</code></td><td>enum</td><td><code>install</code> | <code>uninstall</code></td><td></td></tr>
+    <tr><td><code>promptOutcome</code></td><td>enum</td><td><code>accepted</code> | <code>declined</code> | <code>not_prompted</code></td><td></td></tr>
+    <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="integrationsurfacerendered-one-per-passive-integration-render"><code>integration_surface_rendered</code> — one per passive integration render</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>integration</code></td><td>enum</td><td><code>statusline</code> | <code>quota</code></td><td><code>mini</code> is a receipt, not an integration event.</td></tr>
+    <tr><td><code>inputMode</code></td><td>enum</td><td><code>stdin_payload</code> | <code>disk_fallback</code> | <code>none</code></td><td></td></tr>
+    <tr><td><code>payloadValid</code></td><td>boolean</td><td></td><td>Whether the stdin payload was usable for the integration.</td></tr>
+    <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="activationmilestone-once-per-milestone-per-local-state-file"><code>activation_milestone</code> — once per milestone per local state file</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>milestone</code></td><td>enum</td><td><code>first_run</code> | <code>first_receipt</code> | <code>third_receipt</code> | <code>tenth_receipt</code> | <code>first_export</code> | <code>first_compare</code> | <code>first_week</code> | <code>first_hook_install</code> | <code>first_pr</code> | <code>first_pr_post</code> | <code>first_artifact</code></td><td></td></tr>
+    <tr><td><code>command</code></td><td>enum</td><td>same 18-command enum as <code>cli_run.commandClass</code></td><td>Command that caused the milestone.</td></tr>
+    <tr><td><code>installAgeBucket</code></td><td>enum</td><td><code>first_day</code> | <code>2-7d</code> | <code>8-30d</code> | <code>31-90d</code> | <code>&gt;90d</code> | <code>unavailable</code></td><td>Derived locally from <code>firstRunAt</code>; raw date is not sent.</td></tr>
+  </tbody>
+</table></div>
+
+<h2 id="install-identifier">Install identifier</h2>
+
+<p>On the first telemetry-enabled run, aireceipts creates a random UUID in <code>~/.aireceipts/state.json</code>. It is never derived from hostname, username, MAC address, machine id, repo, path, or transcript data. The wire payload carries only:</p>
+
+<pre class="doc-code"><code class="language-text">sha256(&quot;aireceipts-install-v1:&quot; + installId)</code></pre>
+
+<p>That hash intentionally links events from the same install over time so adoption and retention can be counted. It does not identify a person, machine, or repo. To reset it, delete <code>~/.aireceipts/state.json</code>. If <code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code> is active on a fresh install, no install id is created.</p>
+
+<h2 id="local-counters">Local counters</h2>
+
+<p><code>~/.aireceipts/state.json</code> also stores local counters:</p>
+
+<ul>
+  <li><code>runCount</code></li>
+  <li><code>receiptCount</code></li>
+  <li><code>firstRunAt</code></li>
+  <li>once-only activation milestone booleans</li>
+</ul>
+
+<p>These exact counts stay on your machine. The <code>aireceipts stats</code> command prints the local receipt/run counters and labels them &quot;on this machine.&quot; Telemetry payloads use only buckets.</p>
 
 <h2 id="what-is-never-sent">What is never sent</h2>
 
-<p>Permanently, structurally banned — there is no field for any of these anywhere in the schema, and adding one would require an explicit, reviewed change to this document and to <code>src/telemetry/schemas.ts</code>:</p>
+<p>Permanently, structurally banned:</p>
 
 <ul>
   <li>Transcript content or any excerpt of it</li>
-  <li>Prompts or any user/assistant message text</li>
-  <li>File paths (yours or the CLI's own, beyond the fixed <code>inPackage</code> boolean)</li>
+  <li>Prompts or user/assistant message text</li>
+  <li>File paths</li>
   <li>Repo names or URLs</li>
   <li>Hostnames</li>
   <li>Usernames</li>
   <li>Session IDs</li>
-  <li>Dollar amounts or any cost/pricing data</li>
-  <li>Raw model strings (only the coarse <code>agentType</code> enum is sent)</li>
+  <li>Dollar amounts or cost/pricing data</li>
+  <li>Raw model strings</li>
+  <li>Raw counts</li>
+  <li>Raw timestamps</li>
 </ul>
 
 <h2 id="kill-switches">Kill switches</h2>
 
-<p>Either of the following disables telemetry completely. When disabled, <code>flushTelemetry()</code> returns immediately without making any network call — this is verified by tests that stub the network layer and assert it is never invoked.</p>
+<p>Either of the following disables telemetry completely. When disabled, <code>flushTelemetry()</code> returns immediately without making any network call, and fresh installs do not create an install id.</p>
 
-<pre class="doc-code"><code class="language-bash">AIRECEIPTS_TELEMETRY=off aireceipts receipt ...
+<pre class="doc-code"><code class="language-bash">AIRECEIPTS_TELEMETRY=off aireceipts ...
 # or: AIRECEIPTS_TELEMETRY=0 / AIRECEIPTS_TELEMETRY=false (case-insensitive)
 
-DO_NOT_TRACK=1 aireceipts receipt ...</code></pre>
-
-<p>To disable permanently, export one of these in your shell profile.</p>
+DO_NOT_TRACK=1 aireceipts ...</code></pre>
 
 <h2 id="inspecting-what-would-be-sent">Inspecting what would be sent</h2>
 
 <pre class="doc-code"><code class="language-bash">aireceipts --telemetry-show</code></pre>
 
-<p>This prints whether telemetry is currently enabled and the exact events queued for the current run — the same objects that would be sent — without sending anything.</p>
+<p>This prints whether telemetry is currently enabled and the exact events queued for the current run without sending anything. The command itself records nothing and skips the flush.</p>
 
 <h2 id="how-sending-works">How sending works</h2>
 
 <ul>
   <li>Events are queued in-process as they occur and sent as a single batched request at CLI shutdown.</li>
-  <li>The send is bounded to <strong>300ms</strong> via <code>Promise.race</code> against a timeout. If the network call is slow or hangs, it is abandoned in place; the CLI does not wait for it, and nothing is retried in the background.</li>
-  <li>Every failure mode — telemetry disabled, an invalid event, a network error, a timeout — is swallowed inside the telemetry module. Telemetry can never throw, never block the CLI, and never change its exit code.</li>
+  <li>The send is bounded to <strong>300ms</strong>. If the network call is slow or hangs, it is abandoned; the CLI does not wait for it, and nothing is retried in the background.</li>
+  <li>Every failure mode is swallowed inside the telemetry module. Telemetry can never throw, block the CLI, or change its exit code.</li>
   <li>The transport is Azure Application Insights, reached via a connection string (<code>InstrumentationKey=...;IngestionEndpoint=https://.../</code>) POSTed to <code>&lt;ingestionEndpoint&gt;/v2/track</code>.</li>
+  <li>Like any HTTPS/App Insights request, the transport stamps an arrival time for the batch. The &quot;no raw timestamps&quot; rule covers payload fields chosen by aireceipts, not transport metadata created by the service.</li>
 </ul>
 
 <h2 id="connection-string-honesty">Connection-string honesty</h2>
 
-<p>This section exists so the code and this document can never quietly disagree.</p>
-
 <ul>
-  <li>The ingestion key this package ships with is <strong>not a secret</strong> — Application Insights instrumentation keys are write-only and are commonly embedded in open-source clients. The shipped key, plainly: <code>InstrumentationKey=394da360-a50c-4700-bcf9-87b8d9d6e0ee</code> (ingestion endpoint <code>eastus-8.in.applicationinsights.azure.com</code>).</li>
-  <li><strong>Current status</strong>: a real Azure Application Insights resource is wired up as of 2026-07-02, so the diagnostics events documented above are sent by default (subject to the kill switches and the 300 ms bounded flush). Run <code>aireceipts --telemetry-show</code> to see exactly what a run would send before it sends anything.</li>
-  <li><code>AIRECEIPTS_TELEMETRY_CONNECTION</code> overrides the shipped default. Set it to point at your own Application Insights resource (e.g. for local development or a private fork), or set it to an empty string to force-disable telemetry independent of the kill switches.</li>
-  <li>A malformed connection string (missing either <code>InstrumentationKey</code> or <code>IngestionEndpoint</code>) also degrades to <code>enabled: false</code> rather than sending to an incomplete endpoint.</li>
+  <li>The ingestion key this package ships with is <strong>not a secret</strong>; Application Insights instrumentation keys are write-only and are commonly embedded in open-source clients. The shipped key: <code>InstrumentationKey=394da360-a50c-4700-bcf9-87b8d9d6e0ee</code> (ingestion endpoint <code>eastus-8.in.applicationinsights.azure.com</code>). &lt;!-- gitleaks:allow --&gt;</li>
+  <li><code>AIRECEIPTS_TELEMETRY_CONNECTION</code> overrides the shipped default. Set it to your own Application Insights resource or to an empty string to force-disable telemetry.</li>
+  <li>A malformed connection string also degrades to <code>enabled: false</code> rather than sending to an incomplete endpoint.</li>
 </ul>
 
 <h2 id="first-run-notice">First-run notice</h2>
 
-<p>The first time <code>aireceipts</code> runs for a given user, it prints a one-line disclosure (pointing here) before doing anything else, then persists that fact to <code>~/.aireceipts/telemetry.json</code> so it never prints again. If that file can't be read or written (no home directory, read-only filesystem), the notice is simply shown again on the next run rather than the CLI failing.</p>
+<p>The first time <code>aireceipts</code> runs for a given user, it prints a one-line disclosure pointing here, then persists <code>{ &quot;shown&quot;: true }</code> to <code>~/.aireceipts/telemetry.json</code> so it never prints again. If that file cannot be read or written, the notice is shown again on the next run rather than failing the CLI.</p>
 
 <h2 id="source-of-truth">Source of truth</h2>
 
-<p>The schemas in <code>src/telemetry/schemas.ts</code> are the actual source of truth; this document is kept in sync with them by hand and reviewed alongside any change to that file. If you find a discrepancy, please open an issue.</p>
+<p>The schemas in <code>src/telemetry/schemas.ts</code> are the actual source of truth. This document is kept in sync with them and reviewed alongside any schema change.</p>
     </article>
   </main>
   <footer>

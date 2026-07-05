@@ -313,17 +313,20 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -334,7 +337,7 @@ footer{
   <li>
     <a href="01-getting-started.html">Get started in 60 seconds</a>
     <span class="path">docs/guide/01-getting-started.md</span>
-    <p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost. No account, no API key, no upload.</p>
+    <p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost.</p>
   </li>
   <li>
     <a href="02-install.html">Install</a>
@@ -395,7 +398,12 @@ footer{
   <li>
     <a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a>
     <span class="path">docs/guide/12-troubleshooting.md</span>
-    <p>Symptom first. Find what you're seeing, then the fix.</p>
+    <p>Symptom first. Find what you're seeing, then the fix. For question-first answers — how this differs from usage dashboards, what the dollars mean, what leaves your machine — see…</p>
+  </li>
+  <li>
+    <a href="faq.html">FAQ</a>
+    <span class="path">docs/faq.md</span>
+    <p>Seeing an error or an odd receipt? That's troubleshooting — symptom-first. This page is question-first. (SPEC-0046.)</p>
   </li>
   <li>
     <a href="json-schema.html">Export schema (--json / --csv)</a>
@@ -418,9 +426,14 @@ footer{
     <p>For one repo, adoption is the 3-line caller — see pr-receipt-check-caller.yml and docs/pr-receipts.md.</p>
   </li>
   <li>
-    <a href="telemetry.html">Diagnostics telemetry</a>
+    <a href="telemetry.html">Diagnostics and adoption telemetry</a>
     <span class="path">docs/telemetry.md</span>
-    <p>aireceipts can send small, anonymous, content-free diagnostics events to help us find bugs and understand which agent formats and CLI paths are actually used in the wild.</p>
+    <p>aireceipts can send small, content-free telemetry events to help us find bugs and understand which CLI features are actually used.</p>
+  </li>
+  <li>
+    <a href="CHANGELOG.html">Changelog</a>
+    <span class="path">docs/CHANGELOG.md</span>
+    <p>All notable changes to aireceipts-cli. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
   </li>
 </ul>
 <h2>Why</h2>
@@ -439,6 +452,11 @@ footer{
     <a href="trust.html">What a receipt proves — and what it can't</a>
     <span class="path">docs/trust.md</span>
     <p>aireceipts is local-first: it reads agent transcripts off your disk and prints a receipt.</p>
+  </li>
+  <li>
+    <a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a>
+    <span class="path">docs/cost-model.md</span>
+    <p>This is the living account of how aireceipts turns a transcript into priced numbers, per scenario and per agent, and — the part that matters most — exactly when the receipt tells…</p>
   </li>
 </ul>
     </article>

@@ -313,17 +313,20 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -375,6 +378,20 @@ footer{
 </ol>
 
 <p>If you need a stronger guarantee than an author's disclosure — billing-grade attribution across a team — use your vendor's console. aireceipts will not pretend to be that, and a receipt that pretended would be worth less than one that tells you exactly what it knows.</p>
+
+<ol>
+  <li><strong>An anchor-pool session that only full-falls-back</strong> (SPEC-0044 A1). A session from another repo/worktree that touched this branch but resolves only to &quot;entire session&quot; (push-only or rebased anchor, no sliceable commit) is too uncertain to credit. <em>Direction:</em> under-credit. <em>Marker:</em> the total floors <code>≥</code> and a <strong>distinct</strong> note — &quot;N session(s) touched this branch but couldn't be attributed precisely&quot; — counts it, separate from the &quot;candidate session not attributed&quot; note. Previously such a session vanished with no trace: the silent mirror of #87's over-credit. Details: <a href="cost-model.html">cost-model.md</a>.</li>
+</ol>
+
+<ol>
+  <li><strong>Cursor Background Agents are not read</strong> (SPEC-0044 A2, known gap). The Cursor adapter reads inline Composer sessions but not Background Agent sessions (<code>agentKv:</code>/<code>glass.</code> keys). <em>Direction:</em> under-report a whole contributor. <em>Marker:</em> none yet — a documented blind spot pending its own spec (PR-scoping needs the background-agent schema). Details: <a href="cost-model.html">cost-model.md</a>.</li>
+</ol>
+
+<ol>
+  <li><strong>Cache-write cost is a lower bound when the vendor's price row cites no cache-write rate</strong> (SPEC-0044 A3, row-aware). An unsplit (or partially split) cache-write turn is priced under the assumed 5m-tier rate — and that's <em>exact</em>, not a caveat, whenever the price row cites <code>input_cache_write_5m</code> (every Anthropic model does, so Claude Code sessions never trip this, split or not). It's a genuine under-report only for vendors whose price row cites no cache-write rate at all (openai, google, deepseek today — every opencode session touching one of those models inherits the gap; opencode's own schema has no tier-split concept, but that alone isn't the trigger). <em>Direction:</em> under-report. <em>Marker:</em> the total floors <code>≥</code>, the single-session receipt carries a muted &quot;cache-write cost is a lower bound for this session&quot; caveat, and the PR body's confidence summary counts affected sessions. Fires only on the fallback's actual use against an uncited rate — a session priced entirely against vendors that cite the applicable tier rate, or with no cache-write at all, never trips it. Details: <a href="cost-model.html">cost-model.md</a>.</li>
+  <li><strong>A session we couldn't read</strong> (SPEC-0044 B4). A candidate in the branch window whose transcript failed to load, sitting outside the current worktree, used to vanish silently — &quot;couldn't read&quot; is not the same as &quot;read and found it isn't ours&quot;. It is now counted: the total floors <code>≥</code> and a note reads &quot;N session(s) touched this branch but couldn't be read&quot;. (A read-but-unproven session is still a correct silent skip; only a genuine read <em>failure</em> trips this.)</li>
+  <li><strong>A transcript with records skipped at parse time</strong> (SPEC-0044 B3). A malformed or crash-truncated record (a torn JSONL line, a corrupt DB row) is skipped while the rest of the session parses fine. When such a session is credited, its total is a lower bound: the receipt says &quot;N unreadable transcript record(s) skipped — total may be incomplete&quot; and the PR total floors <code>≥</code>. A clean transcript never trips it.</li>
+</ol>
     </article>
   </main>
   <footer>
