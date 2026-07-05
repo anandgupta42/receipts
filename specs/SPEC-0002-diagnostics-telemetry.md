@@ -88,7 +88,7 @@ event tied to an identity. No persistent install ID in v1 — events are unlinke
 - [ ] Connection-string honesty: the ingestion key ships embedded **openly** (stated in
       docs/telemetry.md — it is an ingest-only key); `AIRECEIPTS_TELEMETRY_CONNECTION`
       overrides it, and setting it empty disables. Docs and code must agree — a
-      docs-say-off/code-sends contradiction (the altimate-receipts footgun) fails review.
+      docs-say-off/code-sends contradiction (a predecessor project's footgun) fails review.
 
 ## Validation
 

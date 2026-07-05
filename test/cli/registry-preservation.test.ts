@@ -75,7 +75,7 @@ async function runMain(argv: string[], seedNotice = true): Promise<RunResult> {
 
 // R8 + Test matrix "R2 selectors": the full current selector → command table.
 // This is the committed command inventory snapshot; the set of distinct targets
-// is the 18 commands the registry must reproduce.
+// is the 19 commands the registry must reproduce.
 const SELECTION_TABLE: ReadonlyArray<readonly [string[], string]> = [
   [[], "receipt"],
   [["some-selector"], "receipt"],
@@ -85,6 +85,8 @@ const SELECTION_TABLE: ReadonlyArray<readonly [string[], string]> = [
   [["--handoff", "abc123"], "handoff"],
   [["--help"], "help"],
   [["-h"], "help"],
+  [["--version"], "version"],
+  [["-v"], "version"],
   [["--methodology"], "methodology"],
   [["--telemetry-show"], "telemetry-show"],
   [["--quota"], "quota"],
@@ -105,7 +107,7 @@ describe("SPEC-0018 R8 · command inventory snapshot (resolveCommand)", () => {
     expect(await resolveCommand(argv)).toBe(expected);
   });
 
-  it("covers exactly the 18 current commands", () => {
+  it("covers exactly the 19 current commands", () => {
     const distinct = new Set(SELECTION_TABLE.map(([, cmd]) => cmd));
     expect([...distinct].sort()).toEqual(
       [
@@ -126,6 +128,7 @@ describe("SPEC-0018 R8 · command inventory snapshot (resolveCommand)", () => {
         "telemetry-show",
         "templates",
         "uninstall-hook",
+        "version",
         "week",
       ].sort(),
     );
@@ -138,6 +141,14 @@ describe("SPEC-0018 R2 · selection precedence (byte-compatible with parseArgs)"
     expect(await resolveCommand(["--help", "--quota", "compare", "a", "b"])).toBe("help");
     expect(await resolveCommand(["--mini", "--help"])).toBe("help");
     expect(await resolveCommand(["week", "--help"])).toBe("help");
+  });
+
+  // --version sits just below --help, so --help still wins when both are passed,
+  // but --version beats every other command-selecting flag.
+  it("--help wins over --version; --version wins over --methodology and --quota", async () => {
+    expect(await resolveCommand(["--version", "--help"])).toBe("help");
+    expect(await resolveCommand(["--version", "--methodology"])).toBe("version");
+    expect(await resolveCommand(["--version", "--quota"])).toBe("version");
   });
 
   // hidden info commands (methodology, telemetry-show) beat budget/quota/subcommands.
@@ -259,6 +270,13 @@ describe("SPEC-0018 R8 · dispatch behavior (byte-exact, no scan)", () => {
     expect(code).toBe(0);
     expect(err).toBe("");
     expect(out.length).toBeGreaterThan(0);
+  });
+
+  it("--version → prints the package.json version + newline, exit 0", async () => {
+    const { code, out, err } = await runMain(["--version"]);
+    expect(code).toBe(0);
+    expect(err).toBe("");
+    expect(out).toMatch(/^\d+\.\d+\.\d+.*\n$/);
   });
 
   it("templates → live previews of every template, exit 0", async () => {

@@ -12,7 +12,8 @@
     "dist",
     "data/prices",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20"
