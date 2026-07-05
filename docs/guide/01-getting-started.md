@@ -56,6 +56,16 @@ it's arithmetic, not a claim that Haiku would have finished the job.
 If instead you see `no agent session data detected`, your agent's logs are
 somewhere aireceipts doesn't look yet — jump to [Troubleshooting](12-troubleshooting.md).
 
+No sessions of your own yet? See one now:
+
+```sh
+npx aireceipts-cli --demo
+```
+
+It renders a bundled example session through the same pipeline your real
+sessions use — a genuine receipt, not a mockup — so you can see the output
+before your first run.
+
 ## 2. Add up the week
 
 One session is a number. The trailing week is a habit:
