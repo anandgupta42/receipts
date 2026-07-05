@@ -24,6 +24,7 @@ export const ROOT_ALLOWLIST = Object.freeze([
   ".gitleaksignore",
   ".gitignore",
   "AGENTS.md",
+  "CHANGELOG.md",
   "CONTRIBUTING.md",
   "LICENSE",
   "NOTICE",

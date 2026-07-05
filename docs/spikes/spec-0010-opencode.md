@@ -18,10 +18,10 @@ structure without calling a vendor API?
   - DB files present: `opencode-local.db`, `opencode-upstream-merge-v1.17.9.db`.
   - Both expose the current SQLite tables (`session`, `message`, `part`, plus
     supporting project/account tables), but both had zero visible sessions.
-- Populated local opencode-format evidence:
-  - `/Users/anandgupta/.local/share/altimate-code/opencode-local.db`
+- Populated local opencode-format evidence (from an opencode fork's data dir):
+  - `~/.local/share/<opencode-fork>/opencode-local.db`
     contained 1,887 sessions, 18,396 messages, and 70,749 parts.
-  - `/Users/anandgupta/.local/share/altimate-code/opencode-upstream-merge-v1.17.9.db`
+  - `~/.local/share/<opencode-fork>/opencode-upstream-merge-v1.17.9.db`
     contained 165 sessions, 767 messages, and 2,394 parts.
   - `session.version` rows in the second DB were versioned as
     `0.0.0-upstream/merge-v1.17.9-<timestamp>`.

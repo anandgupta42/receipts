@@ -18,7 +18,7 @@ Maintainer direction (2026-07-03): before the public flip — (1) the repo
 becomes `anandgupta42/receipts` (the binary and npm package stay
 `aireceipts`); (2) the README must say what pain this addresses the moment
 someone lands, briefly; (3) installation must be dead simple, documented,
-and then dogfooded across the active repos of the altimateai org.
+and then dogfooded across the active repos of the maintainer's GitHub org.
 Renaming pre-launch avoids permanent redirect debt: GitHub redirects
 git/web URLs after a rename (raw resolves in practice; verify live), but
 **Pages does not** — `anandgupta42.github.io/aireceipts/*`
@@ -82,7 +82,7 @@ rollout script hard-fails if `npm view aireceipts version` fails.
   maintainer section shrinks to: paste the caller, add the CONTRIBUTING
   line. The existing same-repo trigger keeps working unchanged.
 - **R4 — The org dogfood rollout report (report-only, by design).**
-  `scripts/rollout-dogfood.mjs` enumerates `altimateai` org repos active in
+  `scripts/rollout-dogfood.mjs` enumerates a private dogfood org's repos active in
   the last 90 days (pushed_at, non-archived, non-fork), notes which already
   carry the caller, and emits a per-repo adoption packet: the exact caller
   file content, the CONTRIBUTING line, and the copy-pasteable `gh` commands
@@ -98,7 +98,7 @@ rollout script hard-fails if `npm view aireceipts version` fails.
   publish, then the caveat is deleted by the release flow); `docs/
   pr-receipts.md` maintainer section becomes the 3-line caller; a new short
   `docs/adopt/org-rollout.md` documents the R4 script for anyone running a
-  fleet (public doc, altimateai is just the first user).
+  fleet (public doc, a private dogfood org is just the first user).
 
 ## Design (lead-authored)
 
@@ -147,7 +147,7 @@ continuous window):
 
 ## Non-goals
 
-- **Transferring the repo to the altimateai org** (maintainer decision:
+- **Transferring the repo to the maintainer's private org** (maintainer decision:
   stays under `anandgupta42`).
 - **Renaming the npm package or binary** — `aireceipts` everywhere in the
   product; only the repo name changes.

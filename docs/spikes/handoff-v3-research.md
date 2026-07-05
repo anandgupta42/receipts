@@ -2,7 +2,7 @@
 
 Research spike for evolving `--handoff` beyond SPEC-0001 R6 (paste-back block) and
 SPEC-0013 (standing-rule suggestions). Sources: full repo inventory, analysis of the
-maintainer's real local traces (Claude Code, Codex, altimate-code), and four
+maintainer's real local traces (Claude Code, Codex, an opencode fork), and four
 independent research sweeps (web ecosystem, academic literature, community
 pain-points, Parallel deep-research). All ideas below respect I1–I6: deterministic,
 zero model calls, extraction not summarization, no autonomous writes, no model
@@ -62,9 +62,9 @@ transcripts (2026-07-04):
    retained transcript. A handoff can quote what survived/dropped with zero inference.
 4. **Free deterministic state anchors we ignore today:** `last-prompt` records
    (Claude Code — note `ai-title` is already parsed into `SessionSummary.title`);
-   Task-tool TODO state (Claude Code) and a relational `todo` table (altimate-code);
+   Task-tool TODO state (Claude Code) and a relational `todo` table (an opencode fork);
    Codex `turn_aborted{reason:"interrupted"}` ("user bailed mid-turn");
-   altimate-code `session.parent_id` (explicit fork/subagent lineage) and
+   the opencode fork's `session.parent_id` (explicit fork/subagent lineage) and
    per-session diffstat columns (`summary_files` etc.).
 5. **Session-chain candidates are decodable from paths**: worktree suffix naming
    (`get_ready_for_oss` → `get_ready_for_oss_2`) and same-cwd/branch proximity —
@@ -202,7 +202,7 @@ SPEC-0006 R1's confirm pattern, before any of it is built.)*
 ### Tier D — Chain and fleet awareness
 
 - **D1. Deterministic session chains.** Stitch worktree-suffix naming,
-  altimate-code `parent_id`, and same-cwd/branch adjacency into an explicit chain;
+  the opencode fork's `parent_id`, and same-cwd/branch adjacency into an explicit chain;
   `--handoff --chain` aggregates waste across the whole task, not one session.
   *(Codex review: `fork-context-ref` is NOT a lineage signal — SPEC-0038 R4 uses it
   to cut inherited history, not preserve chains. The path/adjacency heuristics are
@@ -305,4 +305,4 @@ spec-input requirements — pin dated citations before quoting externally.
 - Anthropic "not planned" issues: anthropics/claude-code #44200, #18550; resume-summary ask #46831; handoff verbs #11455; native /handover #54254
 - Competitors/prior art: analyzer.spec-kitty.ai · github.com/chrishutchinson/claude-receipts · github.com/willseltzer/claude-handoff · github.com/guvencem/handoff-md · github.com/thedotmack/claude-mem · ccusage.com · github.com/getagentseal/codeburn · github.com/jazzyalex/agent-sessions · github.com/riponcm/projectmem
 - Research: "Handoff Debt" (arXiv 2026) · CWL "Beyond Compaction" (arXiv:2606.11213) · AgentDiet · AWM (arXiv:2409.07429) · ExpeL (AAAI 2024) · Reflexion (NeurIPS 2023) · MAST (arXiv:2503.13657) · Context Rot (Chroma, 2025) · "How Coding Agents Fail Their Users" (arXiv:2605.29442) · PROJECTMEM (arXiv:2606.12329) · Gloaguen et al. via iwoszapar.com/p/context-engineering-research-2026
-- Codex compaction gap + trace facts: local trace analysis 2026-07-04 (~/.claude/projects, ~/.codex/sessions, ~/.local/share/altimate-code)
+- Codex compaction gap + trace facts: local trace analysis 2026-07-04 (~/.claude/projects, ~/.codex/sessions, ~/.local/share/<opencode-fork>)
