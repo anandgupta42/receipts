@@ -49,7 +49,7 @@ describe("SPEC-0042 R1 — state header", () => {
       "compactions: 2",
       "- Bash loop ×5: $0.08, 3m 45s wall-clock",
       "",
-      "covers: 6 turns · 5 tool calls · 2 compactions · 1 waste lines",
+      "covers: 6 turns · 5 tool calls · 2 compactions · 1 waste line",
     ]);
   });
 
@@ -57,7 +57,7 @@ describe("SPEC-0042 R1 — state header", () => {
     const out = renderHandoff(model({ modelMix: [] }), [], { ...counts, compactions: 0 });
     expect(out).not.toContain("%");
     expect(out).not.toContain("compactions:");
-    expect(out).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste lines");
+    expect(out).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
   });
 
   it("shows tokens, never `$`, when the session is unpriced (I2)", () => {
