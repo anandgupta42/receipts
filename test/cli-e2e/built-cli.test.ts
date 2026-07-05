@@ -353,7 +353,8 @@ describe("built CLI e2e", () => {
   // run I/O-throttled ~20x on loaded dev Macs (measured: an identical spawn is
   // 3.4s outside vitest, ~70s inside). CI (Linux) is unaffected. Ceiling sized
   // for the throttled worst case; the test asserts correctness, not speed.
-  it("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
+  // AIRECEIPTS_SKIP_STRESS=1 skips on a loaded dev machine; CI never sets it.
+  it.skipIf(process.env.AIRECEIPTS_SKIP_STRESS === "1")("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "simulated-100.db");
 

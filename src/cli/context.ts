@@ -7,7 +7,15 @@ import { createInterface } from "node:readline";
 import type { CommandContext, CommandDef } from "./types.js";
 import type { CliOptions } from "./options.js";
 import { assembleHelp } from "./help.js";
-import { showTelemetryPayload } from "../telemetry/index.js";
+import {
+  noteMilestone,
+  noteReceiptGenerated,
+  recordExportGenerated,
+  recordHookConfigured,
+  recordIntegrationSurfaceRendered,
+  recordPrFlowCompleted,
+  showTelemetryPayload,
+} from "../telemetry/index.js";
 
 /**
  * Read a single `[y/N]` answer; true only on an explicit yes. On EOF / no TTY the
@@ -44,7 +52,15 @@ export function createContext(options: CliOptions, commands: readonly CommandDef
     now: () => Date.now(),
     fs: { writeFile: (path, data) => writeFile(path, data) },
     prompt: (question) => stdinConfirm(question, stdin, stdout),
-    telemetry: { showPayload: (env) => showTelemetryPayload(env) },
+    telemetry: {
+      showPayload: (env) => showTelemetryPayload(env),
+      noteReceiptGenerated,
+      recordExportGenerated,
+      recordPrFlowCompleted,
+      recordHookConfigured,
+      recordIntegrationSurfaceRendered,
+      noteMilestone,
+    },
     renderHelp: () => assembleHelp(commands),
   };
 }

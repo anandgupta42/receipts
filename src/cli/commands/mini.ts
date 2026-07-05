@@ -7,6 +7,7 @@ import { buildReceiptModel } from "../../receipt/model.js";
 import { renderMiniReceipt } from "../../receipt/mini.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { resolveSelector } from "../common/session.js";
+import { receiptTelemetryFromModels } from "../common/telemetry.js";
 
 async function run(ctx: CommandContext): Promise<number> {
   try {
@@ -19,7 +20,19 @@ async function run(ctx: CommandContext): Promise<number> {
     if (!session) {
       return 0;
     }
-    ctx.stdout.write(`${renderMiniReceipt(await buildReceiptModel(session))}\n`);
+    const model = await buildReceiptModel(session);
+    ctx.stdout.write(`${renderMiniReceipt(model)}\n`);
+    await ctx.telemetry.noteReceiptGenerated(
+      receiptTelemetryFromModels({
+        surface: "mini",
+        models: [model],
+        outputMode: "text",
+        template: "none",
+        turnCount: session.totals.turnCount,
+        toolCallCount: session.totals.toolCallCount,
+      }),
+      "mini",
+    );
   } catch {
     // Fire-and-forget: a mini-receipt failure must never surface as a hook error.
   }

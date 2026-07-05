@@ -13,6 +13,9 @@ const SAMPLE_EVENT = {
     agentType: "claude-code" as const,
     durationBucket: "100-500ms" as const,
     ok: true,
+    isCI: false,
+    installHash: "a".repeat(64),
+    runOrdinalBucket: "1" as const,
   },
 };
 
