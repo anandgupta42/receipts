@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker-js/master/packages/api/schema/stryker-schema.json",
   "packageManager": "npm",
   "testRunner": "vitest",
-  "mutate": ["src/pricing/**/*.ts"],
+  "mutate": ["src/pricing/**/*.ts", "src/pr/**/*.ts"],
   "vitest": { "configFile": "vitest.config.ts" },
   "reporters": ["progress", "clear-text", "html"],
   "thresholds": { "high": 80, "low": 60, "break": 60 },

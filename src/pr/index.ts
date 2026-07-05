@@ -213,19 +213,28 @@ async function resolveContributors(
  * SPEC-0027's artifact page renders it in full instead of discarding it.
  */
 /**
- * SPEC-0044 B3 — a credited session (or one of its rolled-up subagents) whose
- * transcript had records skipped at parse time under-reports its cost; emit a
- * dropped-transcript-records event so the total floors `≥` and the receipt says
- * so. Runs in the cost loop (like A3's emitter), so the explicit `pr --session`
- * path — which flows through the SAME loop — is covered without a separate site.
+ * SPEC-0044 B3 + M2 — per-session/subagent ConfidenceEvents raised in the cost
+ * loop (like A3's emitter), so the explicit `pr --session` path — which flows
+ * through the SAME loop — is covered without a separate site:
+ *  - `dropped-transcript-records` (B3): a credited session or rolled-up subagent
+ *    whose transcript had records skipped at parse time under-reports its cost.
+ *  - `unreadable-subagent` (M2): a rolled-up subagent transcript that couldn't be
+ *    read. This routes the long-standing legacy `SubagentRow.unreadable` floor
+ *    (body.ts `totals.unreadableCount`) through the typed contract too, so the
+ *    "single typed enumeration" claim holds. Both agree by construction (same
+ *    `row.unreadable`); the legacy count still renders the note, the event floors
+ *    — no double note, so output is byte-identical.
  */
-function pushDroppedRecordEvents(events: ConfidenceEvent[], raw: RawContributor, subagents: SubagentRow[]): void {
+export function pushSessionSubagentEvents(events: ConfidenceEvent[], raw: RawContributor, subagents: SubagentRow[]): void {
   if ((raw.session.droppedRecords ?? 0) > 0) {
     events.push({ kind: "dropped-transcript-records", sessionId: raw.summary.filePath });
   }
   for (const row of subagents) {
     if ((row.droppedRecords ?? 0) > 0) {
       events.push({ kind: "dropped-transcript-records", sessionId: row.filePath });
+    }
+    if (row.unreadable) {
+      events.push({ kind: "unreadable-subagent", sessionId: row.filePath });
     }
   }
 }
@@ -442,7 +451,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     if (model.costLowerBoundCacheTier) {
       costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
     }
-    pushDroppedRecordEvents(costEvents, raw, view.subagents);
+    pushSessionSubagentEvents(costEvents, raw, view.subagents);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const { promoted, events: promoteEvents } = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
@@ -451,7 +460,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     if (model.costLowerBoundCacheTier) {
       costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
     }
-    pushDroppedRecordEvents(costEvents, raw, view.subagents);
+    pushSessionSubagentEvents(costEvents, raw, view.subagents);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const allEvents = [...resolved.events, ...promoteEvents, ...costEvents];
