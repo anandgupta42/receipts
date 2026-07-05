@@ -5,6 +5,14 @@
 // command (R7 — shared helpers under common ownership); the context is only the
 // side-effecting seams.
 import type { CliOptions } from "./options.js";
+import type {
+  RecordExportGeneratedInput,
+  RecordHookConfiguredInput,
+  RecordIntegrationSurfaceRenderedInput,
+  RecordPrFlowCompletedInput,
+  RecordReceiptGeneratedInput,
+} from "../telemetry/index.js";
+import type { MilestoneValue } from "../telemetry/schemas.js";
 
 /** A one-invocation stdin/stdout/stderr trio; process streams in production, fakes in tests. */
 export interface CommandContext {
@@ -27,6 +35,12 @@ export interface CommandContext {
   /** Telemetry surface a command may read (recording/flush stays in `main()` — R6). */
   readonly telemetry: {
     showPayload(env: NodeJS.ProcessEnv): { enabled: boolean; events: readonly unknown[] };
+    noteReceiptGenerated(input: Omit<RecordReceiptGeneratedInput, "receiptOrdinal">, command?: string): Promise<void>;
+    recordExportGenerated(input: RecordExportGeneratedInput): void;
+    recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void;
+    recordHookConfigured(input: RecordHookConfiguredInput): void;
+    recordIntegrationSurfaceRendered(input: RecordIntegrationSurfaceRenderedInput): void;
+    noteMilestone(milestone: MilestoneValue, command: string): Promise<void>;
   };
   /** The assembled `--help` text (registry-driven), for the help command. */
   renderHelp(): string;

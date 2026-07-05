@@ -5,7 +5,7 @@
 // exactly the telemetry lifecycle (R6): parse → select → first-run notice → run →
 // record → bounded flush. The re-exports keep the statusline and handoff test
 // entry points importable from `src/cli/index.js` across the refactor.
-import { ensureFirstRunNotice, flushTelemetry, recordCliError, recordCliRun } from "../telemetry/index.js";
+import { ensureFirstRunNotice, flushTelemetry, noteRunStart, recordCliError, recordCliRun } from "../telemetry/index.js";
 import { parseOptions } from "./options.js";
 import { loadCommands, selectCommand } from "./registry.js";
 import { createContext } from "./context.js";
@@ -21,16 +21,17 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // `telemetry-show` is the inspect-what-would-be-sent command: it must itself
   // send nothing and record nothing, or the privacy-preview surface becomes a
   // privacy leak (v0.1.0 docs-board BLOCKER). It's exempt from the first-run
-  // notice, the `cli_run` record, AND the flush below.
+  // notice, the run-counter start, the `cli_run` record, AND the flush below.
   const isTelemetryShow = command.name === "telemetry-show";
   if (!isTelemetryShow) {
     await ensureFirstRunNotice((text) => process.stderr.write(text + "\n"), undefined);
   }
   const ctx = createContext(options, commands);
+  const runTelemetry = isTelemetryShow ? undefined : await noteRunStart(command.name, process.env);
   const started = Date.now();
   try {
     const code = await command.run(ctx);
-    if (!isTelemetryShow) {
+    if (runTelemetry) {
       recordCliRun({
         command: command.name,
         agentType: undefined,
@@ -38,6 +39,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         ok: code === 0,
         // SPEC-0042 R5 — emission mode for the handoff command only (enum, never content).
         ...(command.name === "handoff" ? { handoffFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
+        ...runTelemetry,
       });
     }
     return code;

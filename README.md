@@ -120,7 +120,7 @@ Full methodology: `aireceipts --methodology`.
 
 ## Telemetry, disclosed
 
-Anonymous diagnostics only — error classes, duration buckets, parse-failure signatures.
+Anonymous diagnostics and usage signals — error classes, duration buckets, parse-failure signatures, feature enums, and coarse buckets.
 Never code, prompts, paths, titles, or dollar amounts. See exactly what a run would
 send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 `DO_NOT_TRACK=1`. Schema and rationale: [docs/telemetry.md](docs/telemetry.md).

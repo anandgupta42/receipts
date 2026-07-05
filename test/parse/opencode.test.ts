@@ -557,7 +557,8 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
   // (background QoS inheritance; also slow when the adapter takes the sqlite3
   // CLI path and shells out per query). Ceiling sized for the throttled worst
   // case — release preflight runs this locally, not just on CI's fast path.
-  it("validates 100 generated opencode schema/model/tool combinations", async () => {
+  // AIRECEIPTS_SKIP_STRESS=1 skips on a loaded dev machine; CI never sets it.
+  it.skipIf(process.env.AIRECEIPTS_SKIP_STRESS === "1")("validates 100 generated opencode schema/model/tool combinations", async () => {
     const dir = tempDir();
     dirs.push(dir);
     const dbPath = path.join(dir, "opencode-100-simulations.db");

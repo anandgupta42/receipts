@@ -32,8 +32,8 @@ lives in an exit code doesn't.
 **The constitution — `AGENTS.md`.** One file, ≤150 lines (CI-enforced), holding the
 mission, the verification commands (identical to CI, so "passed locally" means "passes
 CI"), the file-ownership map, and invariants **I1–I6** (deterministic & offline-complete;
-never fabricate a dollar; every number traceable; diagnostics-only telemetry, disclosed
-and escapable; byte-stable output; facts, never rankings). The invariants are restated in
+never fabricate a dollar; every number traceable; diagnostics + adoption telemetry,
+disclosed and escapable; byte-stable output; facts, never rankings). The invariants are restated in
 every spec and skill — repetition is the point; it is what keeps dozens of independent
 agent sessions from drifting.
 

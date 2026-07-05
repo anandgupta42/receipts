@@ -55,12 +55,14 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 - **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
   its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
   and no line ever claims another model would have completed the task.
-- **I4 — Local-first; diagnostics-only telemetry, disclosed and escapable.** The product
-  works fully offline. The only network call is anonymous diagnostics/performance
-  telemetry (Azure App Insights): command, duration bucket, versions, agent type, error
-  class, adapter parse-failure signature — NEVER transcript content, prompts, file
-  paths, repo names, or dollar amounts. First-run notice; `--telemetry-show` prints the
-  exact payload; `AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1` kills it. (SPEC-0002.)
+- **I4 — Local-first; diagnostics + adoption telemetry, disclosed and escapable.** The
+  product works fully offline. The only network call is content-free telemetry (Azure
+  App Insights): command, coarse buckets, versions, agent type, error class, parse-failure
+  signature, feature-usage enums, and a random (never machine-derived) install identifier
+  sent only as a salted hash — NEVER transcript content, prompts, file paths, repo names,
+  or dollar amounts; raw counts/timestamps never ship as payload fields. First-run notice;
+  `--telemetry-show` prints the exact payload; `AIRECEIPTS_TELEMETRY=off` or
+  `DO_NOT_TRACK=1` kills it. (SPEC-0002, SPEC-0043.)
 
 - **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.
 - **I6 — Facts, not rankings.** Report what a session cost; never rank models or agents

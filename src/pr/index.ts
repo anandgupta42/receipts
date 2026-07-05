@@ -31,6 +31,7 @@ import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./
 import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
 import { buildShareLines } from "./share.js";
 import type { ReceiptModel } from "../receipt/model.js";
+import type { ResultValue, StepResultValue } from "../telemetry/schemas.js";
 
 export interface PrOptions {
   post: boolean;
@@ -54,6 +55,23 @@ export interface PrDeps {
   err: (s: string) => void;
 }
 
+export interface PrReceiptTelemetry {
+  models: ReceiptModel[];
+  turnCount: number;
+  toolCallCount: number;
+}
+
+export interface PrRunResult {
+  code: number;
+  bodyRendered: boolean;
+  contributorCount: number;
+  receipt?: PrReceiptTelemetry;
+  commentResult: StepResultValue;
+  artifactResult: StepResultValue;
+  shareResult: StepResultValue;
+  result: ResultValue;
+}
+
 export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
   return {
     listSessions: async () => (await import("../parse/load.js")).listFullSessions(),
@@ -69,6 +87,17 @@ export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
 }
 
 const NO_MATCH = "no session matches this repo + branch; re-run with --session <id> to pick one explicitly";
+
+function prResult(input: Partial<PrRunResult> & { code: number; result: ResultValue }): PrRunResult {
+  return {
+    bodyRendered: false,
+    contributorCount: 0,
+    commentResult: "skipped",
+    artifactResult: "skipped",
+    shareResult: "skipped",
+    ...input,
+  };
+}
 
 function stemOf(filePath: string): string {
   return path.basename(filePath).replace(/\.jsonl$/, "");
@@ -285,17 +314,30 @@ function detailHeading(view: ContributorView): string {
   return `#### ${view.role} · \`${shortSessionId(view.sessionId)}\``;
 }
 
-/** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns the process exit code. */
-export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<number> {
+function countedTurns(raw: RawContributor): number {
+  return raw.slice.kind === "slice" ? raw.slice.endTurn - raw.slice.startTurn + 1 : raw.session.totals.turnCount;
+}
+
+function countedToolCalls(raw: RawContributor): number {
+  if (raw.slice.kind !== "slice") {
+    return raw.session.totals.toolCallCount;
+  }
+  return raw.session.turns
+    .slice(raw.slice.startTurn, raw.slice.endTurn + 1)
+    .reduce((sum, turn) => sum + turn.toolCalls.length, 0);
+}
+
+/** `aireceipts pr [--post] [--session <id>] [--artifact]`. Returns structured telemetry-safe outcome facts. */
+export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<PrRunResult> {
   // R4 (SPEC-0027): the artifact exists to be linked — reject before rendering.
   if (opts.artifact && !opts.post) {
     deps.err("--artifact requires --post");
-    return 1;
+    return prResult({ code: 1, result: "invalid_args" });
   }
   // SPEC-0035 R5: the share hint targets the artifact link — same shape as the guard above.
   if (opts.share && !opts.artifact) {
     deps.err("--share requires --artifact");
-    return 1;
+    return prResult({ code: 1, result: "invalid_args" });
   }
 
   // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
@@ -305,7 +347,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   const resolved = await resolveContributors(opts, deps, shas, commitMs, branchInfo.subjects);
   if ("error" in resolved) {
     deps.err(resolved.error);
-    return 1;
+    return prResult({ code: 1, result: "no_data" });
   }
 
   // SPEC-0024 R3 ordering: base views first (their rollups define what is
@@ -333,7 +375,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   }
   if (entries.length === 0) {
     deps.err(NO_MATCH);
-    return 1;
+    return prResult({ code: 1, result: "no_data" });
   }
   entries.sort((a, b) => a.startedAt - b.startedAt || a.id.localeCompare(b.id));
   // Round 2: the fence renders authors first, helpers grouped after — the
@@ -342,12 +384,18 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   const fenceOrdered = [...entries.filter((e) => e.view.basis !== "helper"), ...entries.filter((e) => e.view.basis === "helper")];
   const views = entries.map((e) => e.view);
   const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount };
+  const receipt: PrReceiptTelemetry = {
+    models: entries.map((e) => e.model),
+    turnCount: entries.reduce((sum, e) => sum + countedTurns(e.raw), 0),
+    toolCallCount: entries.reduce((sum, e) => sum + countedToolCalls(e.raw), 0),
+  };
 
   // SPEC-0027 R3: push the artifact BEFORE rendering the one final body, so
   // the printed and posted bodies are identical and the link only renders
   // after a confirmed push. A failed publish still posts (additive-only).
   let artifactFailed = false;
   let link: { fileName: string; url: string; ownerRepo: string } | null = null;
+  let artifactResult: StepResultValue = "skipped";
   if (opts.artifact) {
     // SPEC-0031 R3a — per-commit tables for sliced sessions; everything else
     // (helpers, full fallbacks) lands in the labeled bucket. The slicer's own
@@ -372,6 +420,7 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
       perCommitJson: islandData.length > 0 ? JSON.stringify(islandData) : undefined,
     });
     artifactFailed = link === null;
+    artifactResult = link === null ? "failed" : "success";
   }
   // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
   // --no-details. The label is the stat line: everything the fence dropped
@@ -383,15 +432,30 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   deps.out(body);
 
   if (!opts.post) {
-    return 0;
+    return prResult({
+      code: 0,
+      bodyRendered: true,
+      contributorCount: entries.length,
+      receipt,
+      artifactResult,
+      result: "success",
+    });
   }
 
-  const result = upsertPrComment(body, deps.runGh);
-  if (!result.ok) {
-    deps.err(result.error);
-    return 1;
+  const comment = upsertPrComment(body, deps.runGh);
+  if (!comment.ok) {
+    deps.err(comment.error);
+    return prResult({
+      code: 1,
+      bodyRendered: true,
+      contributorCount: entries.length,
+      receipt,
+      commentResult: "failed",
+      artifactResult,
+      result: comment.missing ? "external_missing" : "external_failed",
+    });
   }
-  deps.err(`posted receipt (${result.action}) to PR #${result.prNumber}`);
+  deps.err(`posted receipt (${comment.action}) to PR #${comment.prNumber}`);
   // SPEC-0035 R5: only after BOTH the push (link !== null) AND the upsert
   // (result.ok, just confirmed above) succeed — never advertise a receipt
   // whose comment failed to post. Text only; no network from this branch.
@@ -404,15 +468,17 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
   // Tightened per that review's Codex round: intent URLs print only on a
   // POSITIVE public answer (one gh call, --share path only); an errored
   // check skips neutrally, and the match guard covers owner/repo too.
+  let shareResult: StepResultValue = "skipped";
   if (opts.share && link !== null) {
-    if (link.fileName !== artifactFileName(result.prNumber) || link.ownerRepo !== result.ownerRepo) {
-      deps.err(`share hint skipped: artifact ${link.ownerRepo}/${link.fileName} does not match comment PR ${result.ownerRepo}#${result.prNumber}`);
+    if (link.fileName !== artifactFileName(comment.prNumber) || link.ownerRepo !== comment.ownerRepo) {
+      deps.err(`share hint skipped: artifact ${link.ownerRepo}/${link.fileName} does not match comment PR ${comment.ownerRepo}#${comment.prNumber}`);
     } else {
       const visibility = repoVisibility(link.ownerRepo, deps.runGh);
       if (visibility === "public") {
         for (const line of buildShareLines(link.url)) {
           deps.err(line);
         }
+        shareResult = "success";
       } else if (visibility === "private") {
         deps.err("share: skipped — repo is private; the viewer cannot render this for readers (works automatically once the repo is public)");
       } else {
@@ -420,5 +486,19 @@ export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Pr
       }
     }
   }
-  return artifactFailed ? 1 : 0;
+  return prResult({
+    code: artifactFailed ? 1 : 0,
+    bodyRendered: true,
+    contributorCount: entries.length,
+    receipt,
+    commentResult: "success",
+    artifactResult,
+    shareResult,
+    result: artifactFailed ? "external_failed" : "success",
+  });
+}
+
+/** `aireceipts pr [--post] [--session <id>]`. Returns the process exit code. */
+export async function runPr(opts: PrOptions, deps: PrDeps = defaultPrDeps()): Promise<number> {
+  return (await runPrDetailed(opts, deps)).code;
 }

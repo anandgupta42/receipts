@@ -11,6 +11,12 @@ const WINDOW_LABELS: Record<string, string> = {
   seven_day: "7d",
 };
 
+export interface QuotaTelemetryInfo {
+  inputMode: "stdin_payload" | "none";
+  payloadValid: boolean;
+  result: "success" | "no_data";
+}
+
 function isUsablePercentage(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
 }
@@ -53,6 +59,21 @@ async function readAll(stream: NodeJS.ReadStream): Promise<string> {
   return Buffer.concat(chunks).toString("utf8");
 }
 
+async function readStdinPayloadInfo(stdin: NodeJS.ReadStream): Promise<{ payload: unknown; inputMode: "stdin_payload" | "none"; payloadValid: boolean }> {
+  if (stdin.isTTY) {
+    return { payload: undefined, inputMode: "none", payloadValid: false };
+  }
+  const raw = await readAll(stdin);
+  if (raw.trim() === "") {
+    return { payload: undefined, inputMode: "none", payloadValid: false };
+  }
+  try {
+    return { payload: JSON.parse(raw), inputMode: "stdin_payload", payloadValid: true };
+  } catch {
+    return { payload: undefined, inputMode: "stdin_payload", payloadValid: false };
+  }
+}
+
 /**
  * I/O wrapper: a single point-in-time read of one JSON payload from stdin
  * (R2 — no polling). Never reads when stdin is a TTY (interactive, no piped
@@ -61,18 +82,7 @@ async function readAll(stream: NodeJS.ReadStream): Promise<string> {
  * rather than throwing.
  */
 export async function readStdinPayload(stdin: NodeJS.ReadStream = process.stdin): Promise<unknown> {
-  if (stdin.isTTY) {
-    return undefined;
-  }
-  const raw = await readAll(stdin);
-  if (raw.trim() === "") {
-    return undefined;
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
+  return (await readStdinPayloadInfo(stdin)).payload;
 }
 
 /**
@@ -85,11 +95,14 @@ export async function runQuota(
   write: (s: string) => void = (s) => {
     process.stdout.write(s);
   },
+  record?: (info: QuotaTelemetryInfo) => void | Promise<void>,
 ): Promise<number> {
-  const payload = await readStdinPayload(stdin);
+  const info = await readStdinPayloadInfo(stdin);
+  const payload = info.payload;
   const lines = renderQuotaLines(payload);
   if (lines.length > 0) {
     write(`${lines.join("\n")}\n`);
   }
+  await record?.({ inputMode: info.inputMode, payloadValid: info.payloadValid && lines.length > 0, result: lines.length > 0 ? "success" : "no_data" });
   return 0;
 }
