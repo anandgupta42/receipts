@@ -1,7 +1,7 @@
 ---
 id: SPEC-0043
 title: "Adoption telemetry v2 — feature events, activation milestones, install identity, receipts counter"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0002, SPEC-0018]
 ---
@@ -221,11 +221,11 @@ disagree — the amendment must land there, not only here).
 - [x] `aireceipts stats` ships and prints the local receipts counter, labeled
       "on this machine" (live-walked 2026-07-04: fresh home → 1 receipt → `stats`
       prints 1; `DO_NOT_TRACK=1` → no installId, counter still works).
-- [ ] Delivered `receipt_generated` events from telemetry-enabled installs are summable
+- [ ] (post-ship, observational) Delivered `receipt_generated` events from telemetry-enabled installs are summable
       in the App Insights workspace (maintainer live-check, not CI; the sum is an
       **undercount** of true fleet volume — opt-outs and dropped batches don't appear —
       and must be labeled as such wherever it is published).
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, and `node scripts/hygiene.mjs` all pass unmasked

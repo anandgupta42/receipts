@@ -1,7 +1,7 @@
 ---
 id: SPEC-0040
 title: Parse Codex compaction records
-status: approved
+status: shipped
 milestone: M5
 depends: [SPEC-0010, SPEC-0017]
 ---
@@ -113,9 +113,9 @@ best-guess mapping (I2-adjacent: no fabricated positions).
 
 ## Success criteria
 
-- [ ] A real local Codex session (the 96-compaction one or similar) loads with a
+- [x] A real local Codex session (the 96-compaction one or similar) loads with a
       non-empty `compactions` array; count reported in the PR description.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
 
 ## Validation
