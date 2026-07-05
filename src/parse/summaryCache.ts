@@ -192,7 +192,13 @@ export async function completeSummariesWithCache(
       }
       const full = await opts.load(summary);
       if (!full) {
-        return null;
+        // SPEC-0045 R1 — the lazy summary built but the full transcript can't be
+        // read (loadSession returned null — a corrupt transcript, or a file that
+        // vanished/errored after stat; all honestly "unreadable"). Retain it marked
+        // degraded so the PR layer can flag a repo-scoped unreadable session
+        // (R2) instead of it vanishing at discovery. NOT cached — a fixed file
+        // should re-parse cleanly next run.
+        return { ...summary, degraded: "unreadable" as const };
       }
       const fullSummary = stripTurns(full);
       cache.set(summary.filePath, stat, fullSummary);

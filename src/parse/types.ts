@@ -114,6 +114,15 @@ export interface SessionSummary {
    * the receipt renders a tokens-only note instead (I2). */
   unpriceable?: boolean;
   /**
+   * SPEC-0045 R1 — the lazy summary built (this carries `filePath`/timestamps/
+   * `cwd`) but the FULL transcript failed to parse (`loadSession` returns null).
+   * Retained through discovery rather than silently dropped so the PR layer can
+   * flag a repo-scoped unreadable session (R2). Only a *deterministic* parse
+   * failure sets this — never a transient stat/cache miss. A degraded summary
+   * has no reliable totals; every non-PR surface excludes it (R3).
+   */
+  degraded?: "unreadable";
+  /**
    * SPEC-0019 R1a — attribution-only. The raw session's working directory and
    * git branch (first seen in the transcript). Used solely to match a session
    * to the current repo/worktree for `aireceipts pr`. Absent in the raw

@@ -75,7 +75,10 @@ export interface PrRunResult {
 
 export function defaultPrDeps(overrides: Partial<PrDeps> = {}): PrDeps {
   return {
-    listSessions: async () => (await import("../parse/load.js")).listFullSessions(),
+    // SPEC-0045 R3 — only the PR flow opts into degraded summaries (so it can
+    // flag a repo-scoped unreadable session, R2); every other surface excludes
+    // them by default.
+    listSessions: async () => (await import("../parse/load.js")).listFullSessions(undefined, { includeDegraded: true }),
     loadSession: async (summary) => (await import("../parse/load.js")).loadSession(summary),
     runGit: defaultRunner,
     runGh: defaultRunner,
@@ -179,6 +182,14 @@ async function resolveContributors(
     if (isBranchCandidate(s, roots, commitMs)) {
       candidates.push({ summary: s, pool: "repo" });
     } else if (overlapsBranchWindow(s, commitMs)) {
+      // SPEC-0045 R2 anti-wallpaper — a degraded (unparseable) file that only
+      // overlaps the branch window, with no repo cwd match, is NOT proven ours;
+      // admitting it to the anchor pool would fire `unreadable-session` on time
+      // overlap alone (wallpaper). Unscopeable → excluded, documented (R4). A
+      // degraded file WITH a repo cwd took the isBranchCandidate branch above.
+      if (s.degraded) {
+        continue;
+      }
       // SPEC-0024 R1/R2 — time-overlapping but outside the repo pool: flagged
       // sidechains queue for promotion; everything else (cross-repo leads,
       // no-cwd sessions) joins the anchor pool, credited on SHA proof only.
@@ -192,7 +203,9 @@ async function resolveContributors(
   for (const n of nested) {
     if (isBranchCandidate(n.summary, roots, commitMs)) {
       candidates.push({ summary: n.summary, pool: "repo" });
-    } else if (overlapsBranchWindow(n.summary, commitMs)) {
+    } else if (overlapsBranchWindow(n.summary, commitMs) && !n.summary.degraded) {
+      // SPEC-0045 R2 anti-wallpaper — same rule as the top-level pool: a degraded
+      // nested candidate only joins the pools when repo-scoped (branch above).
       candidates.push({ summary: n.summary, pool: "anchor" });
     }
   }

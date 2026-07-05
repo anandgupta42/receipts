@@ -1,7 +1,7 @@
 ---
 id: SPEC-0045
 title: "Discovery-layer load failures — the session that never became a candidate"
-status: draft
+status: building
 milestone: M4
 depends: [SPEC-0044]
 ---
@@ -57,12 +57,12 @@ event.
 - **R1 — Retain degraded summaries with a typed reason.** When
   `completeSummariesWithCache` fails to complete a lazy summary *because the
   transcript's own parse failed* (not a transient stat/size/cache miss — those
-  are retried, never marked degraded), mark it `degraded: "parse"` (a field on
+  are retried, never marked degraded), mark it `degraded: "unreadable"` (a field on
   `SessionSummary`, cited in `parse/types.ts`, not inlined) and RETAIN it. The
   distinction matters: only a deterministic parse failure guarantees the PR-side
   `loadSession` will also return null (S2 finding 4).
 - **R2 — PR-layer routing: degraded + repo-scoped → `unreadable-session`.** In
-  `selectContributors`, a candidate whose summary is `degraded: "parse"` AND
+  `selectContributors`, a candidate whose summary is `degraded: "unreadable"` AND
   whose `cwd` resolves into the current repo/worktree emits `unreadable-session`
   (SPEC-0044 B4's variant) and floors `≥` — routed explicitly, NOT into the
   `here`→`silenced-git-write` path (S2 finding 1). A degraded candidate with NO
@@ -74,7 +74,7 @@ event.
   summaries: `week` (`aggregate/week.ts`), `compare`, token budget
   (`budget/compute.ts`), `--list` + its `--json` (`cli/commands/list.ts`,
   `receipt/json.ts`). The default receipt uses `newestSession()` (lazy, a
-  different path — S2 finding 5): if the newest is `degraded: "parse"`, skip to
+  different path — S2 finding 5): if the newest is `degraded: "unreadable"`, skip to
   the next readable session rather than render a zero receipt. A test pins each
   surface (S2 finding 6).
 - **R4 — Sub-case 2 + unscopeable sub-case-1 are documented, not surfaced.** A
@@ -117,7 +117,7 @@ event.
 
 | Case | Input | Expected |
 |---|---|---|
-| R1 degraded flag | lazy-ok + parse-fails file | summary retained, `degraded: "parse"`; a transient stat/cache miss is NOT marked degraded |
+| R1 degraded flag | lazy-ok + parse-fails file | summary retained, `degraded: "unreadable"`; a transient stat/cache miss is NOT marked degraded |
 | R2 scoped emit (here) | degraded file, `cwd` in current worktree | `unreadable-session` fires (NOT `silenced-git-write`), total floors `≥` |
 | R2 scoped emit (anchor-pool) | degraded file, `cwd` in repo, cross-worktree | `unreadable-session` fires |
 | R2 anti-wallpaper | degraded file, no `cwd`, in branch window | NO event, NO floor |
@@ -156,7 +156,7 @@ accepted:
    anti-wallpaper guard: fire only when `cwd` is repo-scoped; else → R4.
 3. HIGH — R3 non-PR caller list incomplete → added budget, `--list`/`--json`.
 4. MEDIUM — `loadSession`-null not guaranteed → R1 marks degraded ONLY on a
-   deterministic parse failure (`degraded: "parse"`), not transient stat/cache.
+   deterministic parse failure (`degraded: "unreadable"`), not transient stat/cache.
 5. MEDIUM — default receipt uses `newestSession` (lazy) → R3 handles that path
    explicitly (fall through to next readable).
 6. Missing test rows → added (here/anchor-pool/no-cwd/outside-repo/budget/list/
@@ -171,3 +171,25 @@ day R1/R2 land.
 **2026-07-05 · S4 (lint):** `node scripts/spec-lint.mjs` → OK.
 
 Status remains draft pending maintainer approval (button 1).
+
+**2026-07-05 · approved (button 1):** maintainer, in-session ("lets do" + Option
+A repo-cwd-scoped). Status → building.
+
+**2026-07-05 · implementation review (Codex): REWORK → all addressed.**
+1. HIGH — `load()→null` also covers missing/raced/IO files, so `degraded:"parse"`
+   mislabels → renamed the reason to cause-agnostic `degraded:"unreadable"` (the
+   user-facing signal — "couldn't read a session" — is honest for all of them);
+   only a load-null after a *successful* stat sets it (a transient stat throw
+   stays a dropped null, never degraded).
+2. HIGH — the no-selector default receipt used lazy `newestSession` and errored
+   on a corrupt newest → `resolveSelector` now iterates lazy summaries and
+   returns the newest that LOADS (carrying the pre-loaded session so `receipt.ts`
+   doesn't re-parse — same load count in the common case), skipping an
+   unreadable newest.
+3. MEDIUM — anti-wallpaper admission was under-tested → added a runPr test: a
+   degraded no-cwd session that only overlaps the window does NOT fire
+   `unreadable-session` (kills the `if (s.degraded) continue` mutant).
+4. LOW — confirmed the R2 contributor test kills the routing mutant (degraded →
+   `unreadable-session` vs → `excludeHere`).
+5. LOW — no golden risk (additive field; default `listFullSessions` filters
+   degraded).
