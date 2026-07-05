@@ -37,6 +37,31 @@ introduced.
 | opencode | per-message (multi-provider) | input/output(+reasoning)/cacheRead/cacheCreation | flat (no split) | vendor resolves per turn from the model id; unknown models stay tokens-only |
 | Cursor | none | session totals only | none | `unpriceable` — receipt states "totals only", never a guessed `$` |
 
+## Nested subagent rollups — dedup by subtree, not by file
+
+A PR contributor's rollup walks its own `subagents/` directory recursively
+(`discoverChildFiles`), so a subagent's subagent (a grandchild) is found and
+priced two hops down from the top-level session, same as a direct child.
+Separately, SPEC-0038 lets a subagent that makes its **own** branch-SHA commit
+be *promoted* to an independent top-level contributor (it did real, provably
+attributable work on the branch — crediting it only as a buried sub-row would
+undercount its role). Combining these two mechanisms without care creates a
+double-count: the promoted middle agent's entire subtree is still reachable
+from **both** its own rollup and its former parent's rollup.
+
+| Shape | Middle agent commits? | Grandchild counted | Notes |
+|---|---|---|---|
+| P → A (2-level) | A promoted | once, under A | the original SPEC-0038 case; no grandchild exists |
+| P → A → B, A never commits | — | once, under P | B is a normal grandchild in P's own subtree; A is not promoted, so P's single rollup finds it once |
+| P → A → B, A commits (**B5**) | A promoted | once, under A | fixed: A's entire subtree (A + B) is excluded from P's rollup once A is promoted, so B is priced only where it's structurally rooted — under A |
+
+The fix (`src/pr/index.ts`) computes a **per-contributor** exclusion set:
+when contributor A is promoted, every OTHER contributor's rollup excludes A's
+whole subtree (not just A's own file), while A's own rollup is untouched and
+still finds B normally. The dedup stays centralized in one place
+(`exclusionsFor` in `index.ts`) — `rollupChildren` (`src/pr/rollup.ts`) still
+only does exact-file exclusion; it has no subtree awareness of its own.
+
 ## Known gaps (recorded, not hidden)
 
 - **A2 — Cursor Background Agents** (`agentKv:`/`glass.` keys) are **not read**
