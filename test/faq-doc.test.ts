@@ -19,6 +19,18 @@ const QUESTIONS = [
   "Who builds this — is it really AI agents?",
 ];
 
+// SPEC-0046 Design — the canonical link each answer must carry, by question index.
+const CANONICAL_LINKS = [
+  "trust.md",
+  "guide/13-pricing.md",
+  "telemetry.md",
+  "trust.md",
+  "guide/13-pricing.md",
+  "guide/13-pricing.md",
+  "guide/14-session-attribution.md",
+  "docs/internal/harness.md",
+];
+
 // Case-insensitive strings that mark internal strategy material. User-facing
 // docs never carry these; CI fails if one is ever pasted in.
 const TRIPWIRE = ["show hn", "hacker news", "launch window", "gtm", "funnel", "objection", "competitor"];
@@ -38,7 +50,9 @@ function relativeLinks(text: string): string[] {
 
 describe("docs/faq.md (SPEC-0046)", () => {
   it("R5: is linked from the README docs section, getting-started, and troubleshooting", () => {
-    expect(readFileSync("README.md", "utf8")).toContain("docs/faq.md");
+    const readme = readFileSync("README.md", "utf8");
+    const docsSection = readme.split(/^## Docs$/m)[1]?.split(/^## /m)[0] ?? "";
+    expect(docsSection, "FAQ link must live in the Docs section").toContain("docs/faq.md");
     expect(readFileSync("docs/guide/01-getting-started.md", "utf8")).toContain("../faq.md");
     expect(readFileSync("docs/guide/12-troubleshooting.md", "utf8")).toContain("../faq.md");
   });
@@ -49,8 +63,10 @@ describe("docs/faq.md (SPEC-0046)", () => {
     expect(doc).toContain("symptom-first");
   });
 
-  it("R5: is registered in the docs-site nav manifest", () => {
-    expect(readFileSync("scripts/build-docs-site.mjs", "utf8")).toContain('"faq.md"');
+  it("R5: is registered in the docs-site nav manifest (inside NAV_SECTIONS, not a comment)", () => {
+    const script = readFileSync("scripts/build-docs-site.mjs", "utf8");
+    const manifest = script.split("NAV_SECTIONS")[1]?.split("]);")[0] ?? "";
+    expect(manifest).toContain('"faq.md"');
   });
 
   it("R4: carries all eight Design questions, verbatim, as headings", () => {
@@ -67,6 +83,13 @@ describe("docs/faq.md (SPEC-0046)", () => {
     for (const section of sections) {
       const lines = section.split("\n").filter((l) => l.trim() !== "");
       expect(lines.length, `answer runs long:\n${section.trim().slice(0, 120)}`).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it("R4: each answer links its Design-named canonical doc", () => {
+    const sections = doc.split(/^## .*$/m).slice(1);
+    for (const [i, link] of CANONICAL_LINKS.entries()) {
+      expect(sections[i], `answer ${i + 1} dropped its canonical link ${link}`).toContain(link);
     }
   });
 

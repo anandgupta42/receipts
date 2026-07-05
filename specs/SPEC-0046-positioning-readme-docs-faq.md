@@ -85,8 +85,9 @@ R4 — the eight questions, verbatim headings, with what each answer must contai
 1. **"How is this different from ccusage or my agent's built-in `/usage`?"** — both are
    usage dashboards over time; aireceipts is a receipt for a unit of work (a session, a
    PR) with per-tool attribution, cited prices, and byte-deterministic output. Links
-   Related work + `docs/trust.md`. States facts about what each reads/prints; no
-   ranking (I6).
+   the ccusage repo directly (README section links don't survive the site's flat
+   basename rewrite) + `docs/trust.md`. States facts about what each reads/prints; no
+   ranking or quality adjectives (I6).
 2. **"I'm on a flat-rate subscription — what do the dollar figures mean for me?"** —
    dollars are API-equivalent arithmetic from your real token counts (labeled, never a
    bill); `--quota` shows the window that actually constrains a subscriber; waste lines

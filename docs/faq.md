@@ -6,8 +6,9 @@ question-first. (SPEC-0046.)
 
 ## How is this different from ccusage or my agent's built-in `/usage`?
 
-Those are usage dashboards: they aggregate what you spent over time (today, this
-week, this billing window), and they do that job well. aireceipts prints a receipt
+Those are usage dashboards: [ccusage](https://github.com/ryoppippi/ccusage) and
+your agent's built-ins aggregate what you spent over time — today, this week,
+this billing window. aireceipts prints a receipt
 for a **unit of work** — one session or one pull request — with cost attributed per
 tool call, prices taken from cited and dated tables, and byte-deterministic output.
 Use a dashboard to watch a trend; use a receipt to answer "what did *this* cost,
