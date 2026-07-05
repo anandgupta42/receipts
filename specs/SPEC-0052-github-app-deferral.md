@@ -31,10 +31,12 @@ marked comment.
 **Optional spec-free hygiene** (S2's "smaller fix" — maintainer's call, no spec
 needed): two regression tests pinning author-agnostic comment selection
 (`user.login` noise through `upsertPrComment` and `check-pr-receipt.mjs`), and one
-FAQ sentence in `docs/pr-receipts.md` ("no bot; local by design"). **Maintainer TODO**
-(external, untestable, deliberately not a requirement): register a placeholder
-`aireceipts` GitHub App (webhook inactive, zero permissions, zero installs) to
-reserve the global App name and the `aireceipts[bot]` login.
+FAQ sentence in `docs/pr-receipts.md` ("no bot; local by design"). *Done 2026-07-05*
+(`test/pr/comment.test.ts`, `test/pr/check-pr-receipt.test.ts`,
+`docs/pr-receipts.md`). **Maintainer TODO — done 2026-07-05**: the placeholder
+`aireceipts` GitHub App is registered (App ID 4224201, github.com/apps/aireceipts;
+webhook inactive, zero permissions, zero installs), reserving the global App name
+and the `aireceipts[bot]` login.
 
 **Do NOT build** (`status: rejected` — `build-spec` gates on `approved`). The
 requirements below are preserved as the record of exactly what was considered.
