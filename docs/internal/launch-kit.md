@@ -32,15 +32,26 @@ Recommendation: **1**. The repo is the demo; the title should point at it.
 > the attribution engine caught itself crediting a $965 session to the
 > wrong PR, and the spec + fix that followed.
 >
-> `npx aireceipts` — no accounts, no servers, nothing leaves your machine.
+> `npx aireceipts-cli` — no accounts, no servers; your transcripts and code
+> never leave your machine (only anonymous, content-free diagnostics, off with
+> one env var — see the first comment).
 
 ## Prepared first comment (post immediately under your submission)
 
-> Maintainer here. Two honest disclosures up front: (1) built largely by AI
+> Maintainer here. Three honest disclosures up front: (1) built largely by AI
 > agents under an adversarial spec pipeline — every PR carries its receipt,
 > so you can audit exactly what that cost; (2) the numbers have known
 > failure modes, all documented in docs/trust.md ("where the numbers can go
-> wrong") — if you find one we missed, that file takes PRs.
+> wrong") — if you find one we missed, that file takes PRs; (3) it sends
+> anonymous, content-free diagnostics on by default — never transcript
+> content, prompts, paths, or dollar amounts; `--telemetry-show` prints the
+> exact payload and sends nothing, and `AIRECEIPTS_TELEMETRY=off` (or
+> `DO_NOT_TRACK=1`) makes it zero network calls. Schema: docs/telemetry.md.
+
+The telemetry disclosure is deliberate and goes first, not buried: a
+"nothing leaves your machine" tool that phones home at all will be asked
+about it on HN, and volunteering it reads as honesty while being asked
+reads as a dodge.
 
 ## The claude-receipts reply
 
@@ -48,7 +59,13 @@ Committed verbatim in `docs/internal/readme-evidence.md` — paste, don't improv
 
 ## Sequencing (from the session runbook, 2026-07-04)
 
-#46 labeling → flip public → verification hour (viewer, share loop, hero)
-→ `gh repo edit` description/topics → settings toggles (#81) → `/release`
-→ npm publish v0.1.0 → THEN post. The submission must never precede the
-working `npx aireceipts`.
+Status (2026-07-05): the repo is public and **v0.2.0 is live on npm** — the
+publish and repo-flip steps below are done. The one remaining precondition is
+a clean-machine smoke test: `npx aireceipts-cli` (and `setup`) on a box that
+has never seen this repo, ideally one with real agent sessions and one with
+none. The submission must never precede a working `npx aireceipts-cli`.
+
+Historical runbook order (kept for the record): #46 labeling → flip public →
+verification hour (viewer, share loop, hero) → `gh repo edit`
+description/topics → settings toggles (#81) → `/release` → npm publish →
+THEN post.
