@@ -265,6 +265,16 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain(path.join(home, ".codex", "sessions"));
   });
 
+  it("SPEC v0.1.1: `--list --json` on zero sessions emits valid JSON `[]` on stdout, message on stderr", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["--list", "--json"], home);
+
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual([]);
+    expect(result.stderr).toContain("no agent session data detected");
+  });
+
   it("discovers and prices opencode multi-provider sessions through built CLI", async () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "clean-multi-vendor.db");

@@ -12,7 +12,7 @@ import type {
   ToolCall,
   Turn,
 } from "./types.js";
-import { addUsage, emptyUsage, parseTimestamp, pathExists, truncate, withTotal } from "./util.js";
+import { addUsage, emptyUsage, parseTimestamp, pathExists, truncate, withTotal, sanitizeText } from "./util.js";
 
 /**
  * opencode stores sessions in SQLite DBs under `~/.local/share/opencode`.
@@ -244,7 +244,8 @@ function summaryFromRow(dbPath: string, row: SessionRow): SessionSummary {
 }
 
 function toToolCall(part: RawPartData): ToolCall | null {
-  const name = typeof part.tool === "string" && part.tool ? part.tool : part.name;
+  const rawName = typeof part.tool === "string" && part.tool ? part.tool : part.name;
+  const name = typeof rawName === "string" ? sanitizeText(rawName) : rawName;
   if (part.type !== "tool" || typeof name !== "string" || !name) {
     return null;
   }

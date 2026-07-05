@@ -5,7 +5,7 @@ import { AGENT_SOURCES, type AgentSource, type Session, type SessionSummary, typ
 import type { DiscoveryStat } from "./discovery.js";
 import { mapWithConcurrency } from "./util.js";
 
-const CACHE_VERSION = 1;
+const CACHE_VERSION = 2; // v0.1.1: titles are now escape-sanitized; invalidate pre-sanitizer entries
 const SOURCES = new Set<AgentSource>(AGENT_SOURCES);
 
 interface CacheEntry {

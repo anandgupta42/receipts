@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { openReadOnly } from "./sqlite.js";
 import type { AgentSource, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
-import { emptyUsage, pathExists, truncate } from "./util.js";
+import { emptyUsage, pathExists, truncate, sanitizeText } from "./util.js";
 
 /**
  * Cursor stores chat history in SQLite (`globalStorage/state.vscdb`, table
@@ -111,7 +111,7 @@ function parseArgs(raw: unknown): unknown {
 const CURSOR_SHELL_TOOLS = new Set(["run_terminal_cmd", "terminal", "shell", "bash"]);
 
 function toToolCall(t: ToolFormerData): ToolCall {
-  const name = toolName(t);
+  const name = sanitizeText(toolName(t));
   return {
     name,
     input: parseArgs(t.rawArgs),
