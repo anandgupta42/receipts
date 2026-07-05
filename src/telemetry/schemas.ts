@@ -20,6 +20,7 @@ export const COMMAND_VALUES = [
   "benchmark",
   "check-budget",
   "compare",
+  "demo",
   "handoff",
   "help",
   "install-hook",
