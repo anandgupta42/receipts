@@ -48,3 +48,21 @@ introduced.
 - **Reasoning-token rate** — Codex/opencode/Gemini fold reasoning tokens into
   `output`; no vendor in `data/prices/` prices reasoning distinctly today, so
   this is a documented assumption to revisit if a price row ever needs it.
+
+## The validation matrix (SPEC-0044 R3–R5)
+
+`test/matrix/cost-matrix.ts` is the scenario × agent matrix: rows are the
+taxonomy scenarios, columns the four agents. Every populated cell runs a real
+fixture through the real parse→price pipeline and asserts the receipt against a
+**hand-authored oracle manifest** — token totals summed independently from the
+fixture's raw bytes, plus structural invariants (reconciliation, priced/
+unpriceable, the waste kinds a scenario must surface). Manifests are never read
+back from the code under test.
+
+`test/matrix/cost-matrix.test.ts` enforces three things: each cell reconciles
+and matches its oracle; **completeness** — every (scenario, agent) pair is
+either populated or `n/a` with a non-empty reason, so adding a scenario or an
+agent without covering the new cells fails CI; and a **red path** — dropping a
+turn from a fixture must break its stale oracle, proving the oracle is
+independent of the code. Cells marked `n/a` record *why* an agent can't produce
+that scenario (e.g. Cursor has no per-turn model; Codex has no cache-write).
