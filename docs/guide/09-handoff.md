@@ -14,7 +14,7 @@ claude-opus-4-8 100%
 total $0.09 · 6 turns · 5 tool calls
 - Bash loop ×5: $0.08, 3m 45s wall-clock
 
-covers: 6 turns · 5 tool calls · 0 compactions · 1 waste lines
+covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line
 ```
 
 The block opens with the session's state — agent, when, how long, which models,
