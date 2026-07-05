@@ -2,7 +2,7 @@
 
 Honest and short, on purpose: order and reasons, never dates. For what's
 actually shipped in the current release, see the current-state inventory in
-[AGENTS.md](../AGENTS.md).
+[AGENTS.md](https://github.com/anandgupta42/receipts/blob/main/AGENTS.md).
 
 ## Now
 

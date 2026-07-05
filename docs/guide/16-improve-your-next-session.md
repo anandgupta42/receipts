@@ -6,9 +6,9 @@ in order, using commands you already have.
 ## 1. Read the waste lines
 
 Every receipt lists what it caught, each priced on its own line. A `$0.08`
-stuck loop and a `$12` one deserve different amounts of attention — read the
-receipt (see [Read a receipt](04-read-a-receipt.md)) before you do anything
-else.
+stuck loop and one costing ten times more deserve different amounts of
+attention — read the receipt (see [Read a receipt](04-read-a-receipt.md))
+before you do anything else.
 
 ## 2. Hand it off
 
