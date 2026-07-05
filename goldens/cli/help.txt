@@ -3,6 +3,7 @@ aireceipts — local, deterministic cost receipts for AI coding-agent sessions
 Usage:
   aireceipts [selector] [--json|--csv]  print a receipt (default: newest session)
   aireceipts --list [--json]            list sessions, newest first
+  aireceipts stats                      local usage counters (receipts generated on this machine)
   aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
   aireceipts --handoff [selector] [--handoff-threshold N] [--json]
                                         paste-ready block of fired waste lines;

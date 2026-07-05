@@ -29,6 +29,7 @@ async function run(ctx: CommandContext): Promise<number> {
   }
   if (ctx.options.json) {
     ctx.stdout.write(`${JSON.stringify(sessions.map(summaryToJson), null, 2)}\n`);
+    ctx.telemetry.recordExportGenerated({ surface: "list", format: "json", wroteFile: false, result: "success" });
   } else {
     ctx.stdout.write(`${sessions.map((s, i) => listLine(i, s)).join("\n")}\n`);
   }

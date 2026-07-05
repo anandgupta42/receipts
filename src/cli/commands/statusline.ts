@@ -8,6 +8,13 @@ import type { Session, SessionSummary } from "../../parse/types.js";
 import { buildReceiptModel } from "../../receipt/model.js";
 import { renderStatusline } from "../../receipt/mini.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import type { InputModeValue, ResultValue } from "../../telemetry/schemas.js";
+
+export interface StatuslineTelemetryInfo {
+  inputMode: InputModeValue;
+  payloadValid: boolean;
+  result: ResultValue;
+}
 
 /**
  * R3a: read the whole of `stream`. TTY streams (interactive terminal, no pipe)
@@ -76,20 +83,36 @@ export async function runStatusline(
   write: (s: string) => void = (s) => {
     process.stdout.write(s);
   },
+  record?: (info: StatuslineTelemetryInfo) => void | Promise<void>,
 ): Promise<number> {
   const raw = await readStdin(stdin);
-  const session = (await loadFromStdinPayload(raw)) ?? (await loadFromDiskFn());
+  let inputMode: InputModeValue = raw.trim() ? "stdin_payload" : "none";
+  let payloadValid = false;
+  let session = await loadFromStdinPayload(raw);
+  if (session) {
+    payloadValid = true;
+  } else {
+    const diskSession = await loadFromDiskFn();
+    if (diskSession) {
+      inputMode = "disk_fallback";
+      session = diskSession;
+    }
+  }
   if (!session) {
     write("aireceipts: no sessions detected\n");
+    await record?.({ inputMode, payloadValid, result: "no_data" });
     return 0;
   }
   const model = await buildReceiptModel(session);
   write(`${renderStatusline(model)}\n`);
+  await record?.({ inputMode, payloadValid, result: "success" });
   return 0;
 }
 
 function run(ctx: CommandContext): Promise<number> {
-  return runStatusline(ctx.stdin, loadFromDisk, (s) => ctx.stdout.write(s));
+  return runStatusline(ctx.stdin, loadFromDisk, (s) => ctx.stdout.write(s), (info) =>
+    ctx.telemetry.recordIntegrationSurfaceRendered({ integration: "statusline", ...info }),
+  );
 }
 
 export const command: CommandDef = {
