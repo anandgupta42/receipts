@@ -34,7 +34,16 @@ export type ConfidenceEvent =
   // price row cites no cache-write rate — the receipt's cost is a floor. (Not
   // triggered by an absent 5m/1h split alone: a cited 5m rate prices an unsplit
   // write exactly, so Anthropic/Claude Code never floors here.)
-  | { kind: "cost-lower-bound-cache-tier"; sessionId: string };
+  | { kind: "cost-lower-bound-cache-tier"; sessionId: string }
+  // B4: an in-window candidate we couldn't READ (load/parse failed), outside
+  // the current worktree so the classic excluded count never saw it. "Couldn't
+  // read" ≠ "read and found no anchor" — its absence is counted, never silent
+  // (honesty red-team B4).
+  | { kind: "unreadable-session"; sessionId: string }
+  // B3: a CREDITED session whose transcript had malformed/truncated records
+  // silently skipped at parse time — its cost is a lower bound (the dropped
+  // records carried real, now-missing token usage) (honesty red-team B3).
+  | { kind: "dropped-transcript-records"; sessionId: string };
 
 export interface ConfidenceSummary {
   /** A1 — anchor-pool sessions dropped as unattributable (distinct sessions). */
@@ -45,6 +54,10 @@ export interface ConfidenceSummary {
   unreadableSubagent: number;
   /** sessions whose cache-write cost is a lower bound (no published cache-write rate). */
   costLowerBoundCacheTier: number;
+  /** B4 — in-window candidates that couldn't be read (load/parse failed). */
+  unreadableSession: number;
+  /** B3 — credited sessions whose transcript had records skipped at parse time. */
+  droppedTranscriptRecords: number;
 }
 
 const distinctSessions = (events: readonly ConfidenceEvent[], kind: ConfidenceEvent["kind"]): number =>
@@ -63,6 +76,8 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
       case "silenced-git-write":
       case "unreadable-subagent":
       case "cost-lower-bound-cache-tier":
+      case "unreadable-session":
+      case "dropped-transcript-records":
         break;
       default: {
         const never: never = e;
@@ -75,6 +90,8 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
     silencedGitWrite: distinctSessions(events, "silenced-git-write"),
     unreadableSubagent: distinctSessions(events, "unreadable-subagent"),
     costLowerBoundCacheTier: distinctSessions(events, "cost-lower-bound-cache-tier"),
+    unreadableSession: distinctSessions(events, "unreadable-session"),
+    droppedTranscriptRecords: distinctSessions(events, "dropped-transcript-records"),
   };
 }
 
@@ -84,6 +101,8 @@ export function isFloored(summary: ConfidenceSummary): boolean {
     summary.unattributableAnchorPool > 0 ||
     summary.silencedGitWrite > 0 ||
     summary.unreadableSubagent > 0 ||
-    summary.costLowerBoundCacheTier > 0
+    summary.costLowerBoundCacheTier > 0 ||
+    summary.unreadableSession > 0 ||
+    summary.droppedTranscriptRecords > 0
   );
 }

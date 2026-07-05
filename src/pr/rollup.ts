@@ -19,6 +19,8 @@ export interface SubagentRow {
   tokens: TokenUsage;
   /** The child transcript could not be parsed — usd/tokens are unknown. */
   unreadable: boolean;
+  /** SPEC-0044 B3 — malformed records skipped in this child's transcript; `> 0` → its cost is a lower bound. */
+  droppedRecords?: number;
   filePath: string;
 }
 
@@ -88,6 +90,7 @@ export async function rollupChildren(
       usd: model.totalUsd,
       tokens: model.totalTokens,
       unreadable: false,
+      ...(((session.droppedRecords ?? 0) > 0) ? { droppedRecords: session.droppedRecords } : {}),
       filePath: childFile,
     });
   }
