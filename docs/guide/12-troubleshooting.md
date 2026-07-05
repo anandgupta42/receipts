@@ -1,6 +1,8 @@
 # Troubleshooting & FAQ
 
-Symptom first. Find what you're seeing, then the fix.
+Symptom first. Find what you're seeing, then the fix. For question-first answers —
+how this differs from usage dashboards, what the dollars mean, what leaves your
+machine — see the [FAQ](../faq.md).
 
 ## "no agent session data detected"
 

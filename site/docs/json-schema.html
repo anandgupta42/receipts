@@ -313,17 +313,20 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -354,8 +357,7 @@ footer{
   <tbody>
     <tr><td><code>schemaVersion</code></td><td>number (literal <code>1</code>)</td><td>This schema's major version. Bumped only on a breaking change.</td></tr>
     <tr><td><code>agentLabel</code></td><td>string</td><td>Human label for the agent, e.g. &quot;Claude Code&quot;.</td></tr>
-    <tr><td><code>source</code></td><td>enum</td><td>One of <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>gemini</code>.</td></tr>
-    <tr><td><code>source</code></td><td>enum</td><td>One of <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>opencode</code>.</td></tr>
+    <tr><td><code>source</code></td><td>enum</td><td>One of <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>gemini</code>, <code>opencode</code>.</td></tr>
     <tr><td><code>sessionId</code></td><td>string</td><td>Adapter-local id (an absolute file path for file-based adapters).</td></tr>
     <tr><td><code>title</code></td><td>string | null</td><td>Session title, or null when the adapter reports none.</td></tr>
     <tr><td><code>startedAtMs</code></td><td>number | null</td><td>Session start, epoch milliseconds, or null.</td></tr>
@@ -367,7 +369,7 @@ footer{
     <tr><td><code>totalTokens</code></td><td>TokenUsage</td><td>Attributed token totals.</td></tr>
     <tr><td><code>sessionTotalTokens</code></td><td>TokenUsage</td><td>Adapter-reported session totals (the only real number for Cursor).</td></tr>
     <tr><td><code>wasteLines</code></td><td>array</td><td>Fired waste findings; see WasteLine.</td></tr>
-    <tr><td><code>caveats</code></td><td>array</td><td>Time-integrity caveats (SPEC-0028): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code>) + <code>text</code>. Facts only — never affect <code>$</code>. Empty for consistent sessions.</td></tr>
+    <tr><td><code>caveats</code></td><td>array</td><td>Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code> | <code>cost-lower-bound-cache-tier</code>) + <code>text</code>. Never affects <code>$</code> itself. Empty when nothing to flag.</td></tr>
     <tr><td><code>budget</code></td><td>array (optional)</td><td>Advisory budget lines (SPEC-0009); present only when <code>~/.aireceipts/budget.json</code> is configured.</td></tr>
     <tr><td><code>priceDelta</code></td><td>PriceDelta | null</td><td>Cheapest-current-model arithmetic, or null in tokens-only mode.</td></tr>
     <tr><td><code>methodology</code></td><td>string</td><td>The attribution methodology string (I3).</td></tr>
@@ -412,12 +414,12 @@ footer{
   </tbody>
 </table></div>
 
-<h3 id="caveat-spec-0028-time-integrity">Caveat (SPEC-0028 time-integrity)</h3>
+<h3 id="caveat-spec-0028-time-integrity-spec-0044-a3-cost-lower-bound">Caveat (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound)</h3>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
   <tbody>
-    <tr><td><code>kind</code></td><td>enum</td><td><code>time-mtime</code> (a turn timestamp postdates the transcript file) or <code>time-span</code> (non-positive span carrying usage).</td></tr>
+    <tr><td><code>kind</code></td><td>enum</td><td><code>time-mtime</code> (a turn timestamp postdates the transcript file), <code>time-span</code> (non-positive span carrying usage), or <code>cost-lower-bound-cache-tier</code> (a priced turn's cache-write fell back to the base <code>input</code> rate because the vendor's price row cites no cache-write rate — row-aware, not just &quot;unsplit&quot;: an unsplit write against a row that cites the 5m rate, e.g. Anthropic, is priced exactly and never sets this).</td></tr>
     <tr><td><code>text</code></td><td>string</td><td>The rendered caveat line, verbatim.</td></tr>
   </tbody>
 </table></div>
@@ -492,6 +494,35 @@ footer{
 
 <p><code>compare</code> also carries <code>schemaVersion</code> on its root.</p>
 
+<h3 id="handoff-envelope-handoffjsonschema-spec-0042">Handoff envelope (<code>handoffJsonSchema</code>) — SPEC-0042</h3>
+
+<p><code>aireceipts --handoff &lt;selector&gt; --json</code>: the machine-readable resume packet. Always emits the full structure (empty arrays included). The attribution-only privacy fields (<code>cwd</code>, <code>gitBranch</code>, sidechain linkage) are structurally absent, same as every export.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>schemaVersion</code></td><td>number</td><td>Same envelope as receipt/compare.</td></tr>
+    <tr><td><code>source</code></td><td>string</td><td>Agent source enum.</td></tr>
+    <tr><td><code>sessionId</code></td><td>string</td><td>Adapter-local session id.</td></tr>
+    <tr><td><code>title</code></td><td>string | null</td><td>Session title when known.</td></tr>
+    <tr><td><code>startedAtMs</code></td><td>number | null</td><td>Session start, epoch ms.</td></tr>
+    <tr><td><code>durationMs</code></td><td>number | null</td><td>Wall-clock span.</td></tr>
+    <tr><td><code>totals</code></td><td>object</td><td><code>tokens</code> (TokenUsage object) + <code>turnCount</code> + <code>toolCallCount</code>.</td></tr>
+    <tr><td><code>turnCount</code></td><td>number</td><td>(totals) Assistant turns in the session.</td></tr>
+    <tr><td><code>toolCallCount</code></td><td>number</td><td>(totals) Tool calls in the session.</td></tr>
+    <tr><td><code>wasteLines</code></td><td>array</td><td>Same WasteLine union as the receipt.</td></tr>
+    <tr><td><code>suggestions</code></td><td>array</td><td>Standing-rule suggestion strings (SPEC-0013), possibly empty.</td></tr>
+    <tr><td><code>threshold</code></td><td>number</td><td>The distinct-session recurrence threshold in effect.</td></tr>
+    <tr><td><code>coverage</code></td><td>object</td><td>What the packet covers, checkably: <code>turns</code>, <code>toolCalls</code>, <code>compactions</code>, <code>wasteLines</code> (all numbers).</td></tr>
+    <tr><td><code>turns</code></td><td>number</td><td>(coverage) Turn count the packet covers.</td></tr>
+    <tr><td><code>toolCalls</code></td><td>number</td><td>(coverage) Tool-call count the packet covers.</td></tr>
+    <tr><td><code>compactions</code></td><td>number</td><td>(coverage) Compaction events in the session.</td></tr>
+    <tr><td><code>aggregates</code></td><td>array</td><td><code>{class, distinctSessionCount}</code> — exactly the waste classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent).</td></tr>
+    <tr><td><code>class</code></td><td>string</td><td>(aggregates) Waste class name.</td></tr>
+    <tr><td><code>distinctSessionCount</code></td><td>number</td><td>(aggregates) Distinct recent sessions the class fired in.</td></tr>
+  </tbody>
+</table></div>
+
 <h2 id="csv">CSV</h2>
 
 <p>CSV is a flat projection of the same model for spreadsheets. <code>$</code> cells are an empty string when unpriced (never <code>0</code>); token cells are always populated. RFC 4180 quoting is applied (a cell containing <code>&quot;</code>, <code>,</code>, CR, or LF is quoted, embedded quotes doubled). Records are LF-terminated. Columns are <strong>additive-only</strong> within a schema major version — never reordered or removed. Every row's first column is <code>schemaVersion</code>.</p>
@@ -520,7 +551,7 @@ footer{
 
 <h2 id="weekly-digest-spec-0008-integration-point">Weekly digest (SPEC-0008 integration point)</h2>
 
-<p><code>week --json</code> (SPEC-0008's weekly digest) is not yet implemented on this branch. When it lands, it MUST wrap its payload with the same <code>schemaVersion</code> constant (<code>SCHEMA_VERSION</code> from <code>src/receipt/exportSchema.ts</code>) rather than inventing a second, undocumented shape (R5, single-source-of-truth). Add a <code>weekJsonSchema</code> alongside the existing schemas, document its fields inside the <code>json-fields</code> markers above, and the parity test will hold it to the same contract automatically.</p>
+<p><code>week --json</code> (SPEC-0008's weekly digest) <strong>is</strong> implemented (<code>weekToJson</code> in <code>src/receipt/week.ts</code>) and emits a <code>{window, priorWindow, sinceOverride, byProject, current, prior, delta, topWaste}</code> digest (waste lines are under <code>topWaste</code>). It does <strong>not</strong> yet carry a <code>schemaVersion</code> wrapper or a <code>weekJsonSchema</code> in <code>exportSchema.ts</code>, so it is not covered by the field-parity test — a known gap tracked for a follow-up: it MUST gain the same <code>schemaVersion</code> constant (from <code>src/receipt/exportSchema.ts</code>) and a <code>weekJsonSchema</code> documented inside the <code>json-fields</code> markers above, rather than a second undocumented shape (R5, single-source-of-truth). Until then, treat <code>week --json</code> as an unversioned convenience surface, not part of the versioned contract.</p>
     </article>
   </main>
   <footer>

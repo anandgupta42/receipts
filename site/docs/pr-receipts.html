@@ -313,17 +313,20 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -336,8 +339,6 @@ footer{
 <p>From your checkout (or worktree) with the PR branch checked out:</p>
 
 <pre class="doc-code"><code class="language-sh">npx aireceipts-cli pr --post</code></pre>
-
-<blockquote><strong>Pre-release note:</strong> until the npm package is published, run the same command from a source checkout: <code>node dist/cli.js pr --post</code> (see the README's install status). The one-command story becomes literal at v0.1.0.</blockquote>
 
 <p>That is the finalizer for humans, Codex, Claude Code, OpenCode, Cursor, and any other coding assistant. It discovers supported local agent sessions, matches them to the current repo/worktree and PR branch, renders the exact comment body, then upserts one marked PR comment through <code>gh</code>.</p>
 
@@ -370,7 +371,7 @@ git receipt                  # after pushing your branch</code></pre>
 
 <p><code>--artifact</code> (requires <code>--post</code>) additionally writes a self-contained <code>pr-&lt;n&gt;.html</code> — the concise rollup plus every session's full per-tool receipt — to a dedicated <code>aireceipts/artifacts</code> branch of the PR's base repo, and appends one <code>full receipt:</code> link to the comment. The link only appears after the push is confirmed; if you lack push rights the comment still posts, just without the link.</p>
 
-<p>The comment link opens the artifact through the <strong>aireceipts viewer</strong> (<code>view.html</code> on the project site): a static page that fetches the raw file from GitHub in the reader's browser and renders it in a fully sandboxed frame — no server, no third party, works for any repo's artifacts with zero setup. Two honest limits: the viewer refuses everything except aireceipts artifact paths on GitHub raw/blob URLs (<code>…/aireceipts/artifacts/pr-&lt;n&gt;.html</code> — it must never become a generic HTML renderer), and <strong>private repos can't render</strong>: anonymous raw fetches 404 there, so the viewer shows its error with a direct GitHub link (readable as source by anyone with access) until the repo is public. Publishing writes nothing to your working tree, index, or current branch, and each PR's file is overwritten in place — other PRs' artifacts are never touched. The viewer page itself carries no analytics or beacons and never will (I4's spirit): nobody, including the aireceipts project, learns who viewed which receipt.</p>
+<p>The comment link opens the artifact through the <strong>aireceipts viewer</strong> (<code>view.html</code> on the project site): a static page that fetches the raw file from GitHub in the reader's browser and renders it in a fully sandboxed frame — no server, no third party, works for any repo's artifacts with zero setup. Two honest limits: the viewer refuses everything except aireceipts artifact paths on GitHub raw/blob URLs (<code>…/aireceipts/artifacts/pr-&lt;n&gt;.html</code> — it must never become a generic HTML renderer), and <strong>private repos can't render</strong>: anonymous raw fetches 404 there, so the viewer shows its error with a direct GitHub link (readable as source by anyone with access) until the repo is public. Publishing writes nothing to your working tree, index, or current branch, and each PR's file is overwritten in place — other PRs' artifacts are never touched. The viewer page itself carries no analytics or beacons (I4's spirit): nobody, including the aireceipts project, learns who viewed which receipt.</p>
 
 <h2 id="for-maintainers-repo-integration-2-minutes">For maintainers (repo integration, 2 minutes)</h2>
 

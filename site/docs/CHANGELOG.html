@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Show a statusline in your shell — aireceipts docs</title>
+<title>Changelog — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,8 +286,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Show a statusline in your shell</h1>
-      <p class="sub">Rendered from <code>docs/guide/07-statusline.md</code>.</p>
+      <h1>Changelog</h1>
+      <p class="sub">Rendered from <code>docs/CHANGELOG.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -330,51 +330,72 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="show-a-statusline-in-your-shell">Show a statusline in your shell</h1>
+<h1 id="changelog">Changelog</h1>
 
-<p>Goal: see the current session's cost on <em>every</em> Claude Code prompt, without running a command yourself.</p>
+<p>All notable changes to <code>aireceipts-cli</code>. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
 
-<p><code>aireceipts statusline</code> prints exactly one line, meant to be wired into Claude Code's <code>statusLine</code> config:</p>
+<h2 id="v020-2026-07-05">v0.2.0 — 2026-07-05</h2>
 
-<pre class="doc-code"><code>[Claude Code] $0.18 · 147k tok</code></pre>
+<p>Minor: adds adoption telemetry + a local <code>stats</code> command (SPEC-0043), and lands the security/privacy hardening from the v0.1.0 release-board findings (which were live in v0.1.1).</p>
 
-<h2 id="set-it-up">Set it up</h2>
-
-<p>Add a <code>statusLine</code> block to your Claude Code <code>settings.json</code> — global (<code>~/.claude/settings.json</code>) or project-local (<code>.claude/settings.json</code>):</p>
-
-<pre class="doc-code"><code class="language-json">{
-  &quot;statusLine&quot;: {
-    &quot;type&quot;: &quot;command&quot;,
-    &quot;command&quot;: &quot;aireceipts statusline&quot;
-  }
-}</code></pre>
-
-<p>Claude Code runs that command on its own schedule and pipes a small JSON payload on stdin — including the <code>transcript_path</code> of the active session. aireceipts reads that payload, prices the referenced transcript, and prints the line. No polling, no daemon, one disk read per invocation.</p>
-
-<p>If <code>aireceipts</code> isn't on your <code>PATH</code>, put the absolute path (the output of <code>which aireceipts</code>) in the <code>command</code> field.</p>
-
-<h2 id="what-the-line-shows">What the line shows</h2>
+<h3 id="added">Added</h3>
 
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session is priced; <code>Nk tok</code> alone when it isn't — never a fabricated dollar amount.</li>
-  <li>A waste flag (<code>⚠ Bash loop ×5</code>) appears only when a detector actually fired.</li>
-  <li>Outside a piped call, or when the payload carries no session, it falls back to the newest session on disk, and prints a neutral placeholder rather than an error if there are none — so your statusline layout never breaks.</li>
+  <li>Adoption telemetry v2 (SPEC-0043): a nine-event catalog (feature-usage events, activation milestones), a pseudonymous random-UUID install identity sent only as a salted hash, and a local receipts counter — all content-free, opt-out, and disclosed in the updated first-run notice. (#110)</li>
+  <li><code>aireceipts stats</code> — a new command that prints your local receipts-generated / total-runs / first-run counts from <code>~/.aireceipts/state.json</code>; works fully offline and even with telemetry disabled, and never leaves your machine. (#110)</li>
 </ul>
 
-<h2 id="rate-limit-window-quota">Rate-limit window (<code>--quota</code>)</h2>
-
-<p>If you're on a Claude Code subscription, <code>aireceipts --quota</code> reports your current rate-limit window when Claude Code provides it on stdin. It runs in statusline stdin mode only and stays silent when that data isn't available, so it's safe to include in a statusline command that also prints cost.</p>
-
-<h2 id="full-reference">Full reference</h2>
-
-<p>The authoritative statusline reference — every output shape and fallback — is <a href="statusline.html">docs/statusline.md</a>.</p>
-
-<h2 id="next">Next</h2>
+<h3 id="fixed">Fixed</h3>
 
 <ul>
-  <li><strong><a href="03-install-hook.html">Install the agent hook</a></strong> — a full receipt at session end.</li>
-  <li><strong><a href="08-budget.html">Set a budget</a></strong> — a threshold, not just a number.</li>
+  <li>PR-receipt cost confidence — the implemented slices of SPEC-0044 (the spec stays <code>building</code>: its <code>--self-check</code> kill-criterion and cost-model docs are still pending, so it is not flipped to <code>shipped</code>):</li>
+  <li>Every contributor drop/degrade/lower-bound now routes through a typed <code>ConfidenceEvent</code> and surfaces in the PR receipt — no more silent drops (the mirror of the #87 over-credit bug); a compile-time exhaustive switch + a hygiene guard make &quot;no silent wrongness&quot; a property. (#117)</li>
+  <li>Oracle-independent cost matrix (scenario × agent). (#120)</li>
+  <li>Receipt rows now sum to the displayed total. (#121)</li>
+  <li>Cache-write lower-bound caveat, only when actually under-priced. (#122)</li>
+  <li>Silent parse-skip and load-failure drops surfaced. (#123)</li>
+  <li>Grandchild subagent counted once, not twice. (#124)</li>
+  <li><code>src/pr/**</code> mutation-gated + the silent-drop guard broadened. (#126)</li>
+  <li>Strip terminal escape sequences (ANSI/CSI/OSC/nF) and C0/C1 control characters from all transcript-derived display text — session titles, tool names, and model-mix labels — across every adapter. A crafted transcript could previously emit raw escapes to the operator's terminal (e.g. recolor output or retitle the window via OSC-0). (#112)</li>
+  <li><code>aireceipts --list --json</code> on zero sessions now emits valid JSON <code>[]</code> on stdout with the message on stderr, instead of plain text that broke <code>| jq</code>. (#112)</li>
+  <li><code>aireceipts --telemetry-show</code> — the command that previews what telemetry would be sent — no longer records or flushes a <code>cli_run</code> event itself; previewing telemetry sent telemetry. (#115)</li>
+  <li>Bump the summary-cache version so titles cached by the pre-sanitizer parser are re-parsed rather than served raw. (#112)</li>
 </ul>
+
+<h3 id="docs">Docs</h3>
+
+<ul>
+  <li>Correct README/getting-started privacy and coverage claims (transcripts/code never uploaded; diagnostics are opt-out; supported-agent list is finite); sync <code>docs/telemetry.md</code> agent-type enums and kill-switch examples; correct the <code>week --json</code> and <code>source</code> entries in <code>docs/json-schema.md</code>; drop a stale pre-release note. (#115)</li>
+</ul>
+
+<h3 id="chore">Chore</h3>
+
+<ul>
+  <li>Restructure the opencode combinatorial unit test: validate all summaries from one <code>listSessions()</code> and deep round-trip only a structural-coverage sample, instead of reopening the SQLite DB per session (6m40s → ~20s, coverage retained). Local <code>preflight-release.mjs</code> sets <code>AIRECEIPTS_SKIP_STRESS=1</code> so the spawn-heavy 100-session e2e stress case doesn't wedge on throttled dev macOS; CI runs the full suite (env unset), so coverage is unchanged.</li>
+  <li>Ledger: SPEC-0040/0041/0042 flipped to <code>shipped</code> (they shipped in v0.1.1); <code>AGENTS.md</code> current-state inventory brought up to date; <code>CHANGELOG.md</code> added.</li>
+</ul>
+
+<h2 id="v011-2026-07-04">v0.1.1 — 2026-07-04</h2>
+
+<p>First release through the OIDC trusted-publishing workflow (v0.1.0 was the manual bootstrap).</p>
+
+<h3 id="added-2">Added</h3>
+
+<ul>
+  <li>Parse Codex compaction records (<code>compacted</code> + <code>context_compacted</code>) into the normalized model, so <code>context-thrash</code> can fire on Codex sessions. (SPEC-0040)</li>
+  <li>Real-session discovery filter: exclude workflow-journal artifacts under <code>subagents/</code> from listings; floor all-zero artifacts out of aggregate windows. (SPEC-0041)</li>
+  <li><code>--handoff</code> resume packet: a deterministic state header, a <code>covers:</code> line, and a versioned <code>--handoff --json</code> surface. (SPEC-0042)</li>
+</ul>
+
+<h3 id="chore-2">Chore</h3>
+
+<ul>
+  <li>Size two long-running SQLite test timeouts for macOS background-QoS throttling of vitest-spawned children; CI unaffected. (#111)</li>
+</ul>
+
+<h2 id="v010-2026-07-04">v0.1.0 — 2026-07-04</h2>
+
+<p>Initial public release: the receipt engine and its full surface (parse adapters, cited price tables, per-tool attribution, waste lines, compare, week, budget, handoff, PR receipts, SVG/PNG export, templates, disclosed opt-out telemetry).</p>
     </article>
   </main>
   <footer>

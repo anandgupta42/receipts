@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Show a statusline in your shell — aireceipts docs</title>
+<title>The cost model — how a receipt's numbers are computed, and when it flags — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,8 +286,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Show a statusline in your shell</h1>
-      <p class="sub">Rendered from <code>docs/guide/07-statusline.md</code>.</p>
+      <h1>The cost model — how a receipt's numbers are computed, and when it flags</h1>
+      <p class="sub">Rendered from <code>docs/cost-model.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -330,51 +330,67 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="show-a-statusline-in-your-shell">Show a statusline in your shell</h1>
+<h1 id="the-cost-model-how-a-receipts-numbers-are-computed-and-when-it-flags">The cost model — how a receipt's numbers are computed, and when it flags</h1>
 
-<p>Goal: see the current session's cost on <em>every</em> Claude Code prompt, without running a command yourself.</p>
+<p>This is the living account of how aireceipts turns a transcript into priced numbers, per scenario and per agent, and — the part that matters most — exactly when the receipt tells you a number may be incomplete rather than showing it as if it were exact. It pairs with <a href="trust.html">trust.md</a> (&quot;Where the numbers can go wrong&quot;) and is grounded in the audits in <a href="cost-attribution-evidence.html">internal/cost-attribution-evidence.md</a>.</p>
 
-<p><code>aireceipts statusline</code> prints exactly one line, meant to be wired into Claude Code's <code>statusLine</code> config:</p>
+<h2 id="the-one-rule">The one rule</h2>
 
-<pre class="doc-code"><code>[Claude Code] $0.18 · 147k tok</code></pre>
+<p>For every <code>$</code>/token total the receipt shows, exactly one is true: it reconciles to the underlying tokens × cited prices, <strong>or</strong> the receipt carries a visible signal that it may be incomplete. Silent wrongness is the forbidden state. SPEC-0044 makes that a mechanical property: every drop/degrade/lower-bound decision routes through a typed <code>ConfidenceEvent</code> (<code>src/pr/confidence.ts</code>), and a hygiene check + an exhaustive-switch test prevent a new silent drop from being introduced.</p>
 
-<h2 id="set-it-up">Set it up</h2>
+<h2 id="the-confidenceevent-contract-every-reason-a-number-may-be-incomplete">The ConfidenceEvent contract — every reason a number may be incomplete</h2>
 
-<p>Add a <code>statusLine</code> block to your Claude Code <code>settings.json</code> — global (<code>~/.claude/settings.json</code>) or project-local (<code>.claude/settings.json</code>):</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Event</th><th>Meaning</th><th>Visible signal on the receipt</th></tr></thead>
+  <tbody>
+    <tr><td><code>unattributable-anchor-pool</code></td><td>A cross-repo/worktree session touched this branch but can only fall back to &quot;entire session&quot; — too uncertain to credit precisely.</td><td>Total floors <code>≥</code>; a distinct note: &quot;N session(s) touched this branch but couldn't be attributed precisely&quot;. Counted, <strong>never silent</strong> (this closed the coverage-map C.2 hole — the mirror of the #87 over-credit bug).</td></tr>
+    <tr><td><code>silenced-git-write</code></td><td>A repo+window candidate not proven ours (no branch SHA — quiet commit, cherry-pick, foreign work).</td><td>Total floors <code>≥</code>; &quot;N candidate session(s) not attributed (in repo + branch window, no branch commit)&quot;.</td></tr>
+    <tr><td><code>unreadable-subagent</code></td><td>A subagent transcript that couldn't be parsed.</td><td>Total floors <code>≥</code>; &quot;N unreadable subagent(s) not priced&quot;. Always listed, never dropped.</td></tr>
+    <tr><td><code>cost-lower-bound-cache-tier</code></td><td>Cache-write tokens priced at a lower-bound rate because the <em>vendor's price row doesn't cite</em> the applicable cache-write rate, so the fallback to the base <code>input</code> rate actually understates cost. <strong>Row-aware, not usage-only:</strong> an unsplit (or partially split) cache-write is priced under the documented 5m-tier assumption — that's exact, not a caveat, whenever the row cites <code>input_cache_write_5m</code> (every Anthropic model does, so Claude Code sessions never trigger this, split or not). It fires for vendors whose price table cites no cache-write rate at all (openai, google, deepseek today) — a session on one of those models with any cache-write tokens genuinely under-reports.</td><td>Total floors <code>≥</code>; the single-session receipt carries a muted &quot;cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)&quot; caveat, and the PR body's confidence summary counts affected sessions (&quot;N session(s) had a cache-write cost that is a lower bound&quot;). Fires only for a <em>priced</em> turn whose cache-write actually took the uncited-rate fallback — a session with no cache-write at all, an unpriceable session, or a priced turn on a vendor that cites the applicable tier rate, never triggers it.</td></tr>
+    <tr><td><code>unreadable-session</code> (B4)</td><td>An in-window candidate we couldn't <strong>read</strong> (its transcript failed to load/parse) and which is outside the current worktree, so the classic &quot;excluded&quot; count never saw it. &quot;Couldn't read&quot; ≠ &quot;read and found no anchor&quot; — the two are epistemically different, and the load-failure used to vanish silently.</td><td>Total floors <code>≥</code>; a distinct note &quot;N session(s) touched this branch but couldn't be read&quot;. Counted, never silent. A load failure <em>inside</em> the current worktree stays in the classic excluded count; a read-but-no-own-SHA session stays a correct silent skip (genuinely not ours).</td></tr>
+    <tr><td><code>dropped-transcript-records</code> (B3)</td><td>A <strong>credited</strong> session whose transcript had one or more malformed/truncated records skipped at parse time (a crash-torn JSONL line, a corrupt opencode DB row). The dropped records carried real token usage, so the session's total is a lower bound.</td><td>The single-session receipt carries a muted &quot;N unreadable transcript record(s) skipped — total may be incomplete&quot; caveat; the PR body counts affected credited sessions and floors the total <code>≥</code>. A clean transcript (zero skips) never trips it; a session that fails to load <em>entirely</em> is <code>unreadable-session</code>, not this.</td></tr>
+  </tbody>
+</table></div>
 
-<pre class="doc-code"><code class="language-json">{
-  &quot;statusLine&quot;: {
-    &quot;type&quot;: &quot;command&quot;,
-    &quot;command&quot;: &quot;aireceipts statusline&quot;
-  }
-}</code></pre>
+<h2 id="per-agent-extraction-depth-what-can-be-priced">Per-agent extraction depth (what can be priced)</h2>
 
-<p>Claude Code runs that command on its own schedule and pipes a small JSON payload on stdin — including the <code>transcript_path</code> of the active session. aireceipts reads that payload, prices the referenced transcript, and prints the line. No polling, no daemon, one disk read per invocation.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Agent</th><th>Per-turn model</th><th>Per-turn usage</th><th>Cache tiers</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Claude Code</td><td>yes</td><td>input/output/cacheRead/cacheCreation (5m/1h split when present)</td><td>yes</td><td>shape-validated; no vendor cumulative total to reconcile against</td></tr>
+    <tr><td>Codex CLI</td><td>yes (<code>turn_context</code>)</td><td>input/output/cacheRead; <code>reasoning_output_tokens</code> folded into output; no cache-write</td><td>read-only</td><td>zero-tolerance reconciliation vs the rollout's own cumulative envelope</td></tr>
+    <tr><td>opencode</td><td>per-message (multi-provider)</td><td>input/output(+reasoning)/cacheRead/cacheCreation</td><td>flat (no split)</td><td>vendor resolves per turn from the model id; unknown models stay tokens-only</td></tr>
+    <tr><td>Cursor</td><td>none</td><td>session totals only</td><td>none</td><td><code>unpriceable</code> — receipt states &quot;totals only&quot;, never a guessed <code>$</code></td></tr>
+  </tbody>
+</table></div>
 
-<p>If <code>aireceipts</code> isn't on your <code>PATH</code>, put the absolute path (the output of <code>which aireceipts</code>) in the <code>command</code> field.</p>
+<h2 id="nested-subagent-rollups-dedup-by-subtree-not-by-file">Nested subagent rollups — dedup by subtree, not by file</h2>
 
-<h2 id="what-the-line-shows">What the line shows</h2>
+<p>A PR contributor's rollup walks its own <code>subagents/</code> directory recursively (<code>discoverChildFiles</code>), so a subagent's subagent (a grandchild) is found and priced two hops down from the top-level session, same as a direct child. Separately, SPEC-0038 lets a subagent that makes its <strong>own</strong> branch-SHA commit be <em>promoted</em> to an independent top-level contributor (it did real, provably attributable work on the branch — crediting it only as a buried sub-row would undercount its role). Combining these two mechanisms without care creates a double-count: the promoted middle agent's entire subtree is still reachable from <strong>both</strong> its own rollup and its former parent's rollup.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Shape</th><th>Middle agent commits?</th><th>Grandchild counted</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>P → A (2-level)</td><td>A promoted</td><td>once, under A</td><td>the original SPEC-0038 case; no grandchild exists</td></tr>
+    <tr><td>P → A → B, A never commits</td><td>—</td><td>once, under P</td><td>B is a normal grandchild in P's own subtree; A is not promoted, so P's single rollup finds it once</td></tr>
+    <tr><td>P → A → B, A commits (<strong>B5</strong>)</td><td>A promoted</td><td>once, under A</td><td>fixed: A's entire subtree (A + B) is excluded from P's rollup once A is promoted, so B is priced only where it's structurally rooted — under A</td></tr>
+  </tbody>
+</table></div>
+
+<p>The fix (<code>src/pr/index.ts</code>) computes a <strong>per-contributor</strong> exclusion set: when contributor A is promoted, every OTHER contributor's rollup excludes A's whole subtree (not just A's own file), while A's own rollup is untouched and still finds B normally. The dedup stays centralized in one place (<code>exclusionsFor</code> in <code>index.ts</code>) — <code>rollupChildren</code> (<code>src/pr/rollup.ts</code>) still only does exact-file exclusion; it has no subtree awareness of its own.</p>
+
+<h2 id="known-gaps-recorded-not-hidden">Known gaps (recorded, not hidden)</h2>
 
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session is priced; <code>Nk tok</code> alone when it isn't — never a fabricated dollar amount.</li>
-  <li>A waste flag (<code>⚠ Bash loop ×5</code>) appears only when a detector actually fired.</li>
-  <li>Outside a piped call, or when the payload carries no session, it falls back to the newest session on disk, and prints a neutral placeholder rather than an error if there are none — so your statusline layout never breaks.</li>
+  <li><strong>A2 — Cursor Background Agents</strong> (<code>agentKv:</code>/<code>glass.</code> keys) are <strong>not read</strong> by the adapter, so a session created by Cursor's Background Agents feature is currently invisible (not degraded — absent). Honest PR-scoping needs their timestamps + cwd; that is its <strong>own spec</strong>. Until then this is a documented blind spot: a PR built with a Cursor Background Agent can under-report a whole contributor. (See trust.md.)</li>
+  <li><strong>Reasoning-token rate</strong> — Codex/opencode/Gemini fold reasoning tokens into <code>output</code>; no vendor in <code>data/prices/</code> prices reasoning distinctly today, so this is a documented assumption to revisit if a price row ever needs it.</li>
 </ul>
 
-<h2 id="rate-limit-window-quota">Rate-limit window (<code>--quota</code>)</h2>
+<h2 id="the-validation-matrix-spec-0044-r3r5">The validation matrix (SPEC-0044 R3–R5)</h2>
 
-<p>If you're on a Claude Code subscription, <code>aireceipts --quota</code> reports your current rate-limit window when Claude Code provides it on stdin. It runs in statusline stdin mode only and stays silent when that data isn't available, so it's safe to include in a statusline command that also prints cost.</p>
+<p><code>test/matrix/cost-matrix.ts</code> is the scenario × agent matrix: rows are the taxonomy scenarios, columns the four agents. Every populated cell runs a real fixture through the real parse→price pipeline and asserts the receipt against a <strong>hand-authored oracle manifest</strong> — token totals summed independently from the fixture's raw bytes, plus structural invariants (reconciliation, priced/ unpriceable, the waste kinds a scenario must surface). Manifests are never read back from the code under test.</p>
 
-<h2 id="full-reference">Full reference</h2>
-
-<p>The authoritative statusline reference — every output shape and fallback — is <a href="statusline.html">docs/statusline.md</a>.</p>
-
-<h2 id="next">Next</h2>
-
-<ul>
-  <li><strong><a href="03-install-hook.html">Install the agent hook</a></strong> — a full receipt at session end.</li>
-  <li><strong><a href="08-budget.html">Set a budget</a></strong> — a threshold, not just a number.</li>
-</ul>
+<p><code>test/matrix/cost-matrix.test.ts</code> enforces three things: each cell reconciles and matches its oracle; <strong>completeness</strong> — every (scenario, agent) pair is either populated or <code>n/a</code> with a non-empty reason, so adding a scenario or an agent without covering the new cells fails CI; and a <strong>red path</strong> — dropping a turn from a fixture must break its stale oracle, proving the oracle is independent of the code. Cells marked <code>n/a</code> record <em>why</em> an agent can't produce that scenario (e.g. Cursor has no per-turn model; Codex has no cache-write).</p>
     </article>
   </main>
   <footer>
