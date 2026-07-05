@@ -15,6 +15,7 @@ import { buildReceiptModel } from "../../src/receipt/model.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/opencode");
+const SIMULATION_COUNT = process.env.AIRECEIPTS_SLOW_OPENCODE === "1" ? 100 : 24;
 
 interface SimulatedOpenCodeSession {
   sessionId: string;
@@ -554,27 +555,28 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
   });
 
   // 24 sessions cover the full structural combination cycle (LCM of the
-  // priced/schema/model/tool mods is 20). Every summary is validated from a
-  // SINGLE `listSessions()` (one DB open); the deeper `loadSession` +
+  // priced/schema/model/tool mods is 20). Set AIRECEIPTS_SLOW_OPENCODE=1 for a
+  // 100-session local stress run. Every summary is validated from a SINGLE
+  // `listSessions()` (one DB open); the deeper `loadSession` +
   // `buildReceiptModel` round-trip — each of which reopens the SQLite DB — runs
   // only on a representative SAMPLE spanning priced/unpriced × every tool set ×
   // both schema flags. This keeps combinatorial coverage while bounding DB
   // reopens (list-all, sample-deep, the same shape as the e2e test), so it no
   // longer times out under the full suite's concurrent load on dev machines.
-  it("validates 24 generated opencode schema/model/tool combinations (full structural cycle)", async () => {
+  it(`validates ${SIMULATION_COUNT} generated opencode schema/model/tool combinations`, async () => {
     const dir = tempDir();
     dirs.push(dir);
-    const dbPath = path.join(dir, "opencode-24-simulations.db");
-    const simulations = Array.from({ length: 24 }, (_, index) => createSimulation(index));
+    const dbPath = path.join(dir, `opencode-${SIMULATION_COUNT}-simulations.db`);
+    const simulations = Array.from({ length: SIMULATION_COUNT }, (_, index) => createSimulation(index));
     makeSimulatedDb(dbPath, simulations);
     const adapter = new OpenCodeAdapter({ dbPath });
 
     const summaries = await adapter.listSessions();
-    expect(summaries).toHaveLength(24);
+    expect(summaries).toHaveLength(SIMULATION_COUNT);
     expect(summaries[0].title).toBe(simulations.at(-1)!.title);
 
-    // Summary-level validation for ALL 24 — the single listSessions() above
-    // already parsed every session's model, token totals, and tool count.
+    // Summary-level validation for ALL simulations — the single listSessions()
+    // above already parsed every session's model, token totals, and tool count.
     const summariesByTitle = new Map(summaries.map((summary) => [summary.title, summary]));
     for (const sim of simulations) {
       const expected = expectedUsage(sim);
@@ -609,7 +611,7 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       }
       expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
     }
-  }, 60_000);
+  }, process.env.AIRECEIPTS_SLOW_OPENCODE === "1" ? 300_000 : 90_000);
 
   it("degrades invalid SQLite files to no sessions and null loads", async () => {
     const dir = tempDir();
