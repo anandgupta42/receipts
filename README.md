@@ -7,7 +7,7 @@
 
 **Your AI coding agent just billed you. Here's the receipt.**
 
-[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/aireceipts-cli.svg)](https://www.npmjs.com/package/aireceipts-cli) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/anandgupta42/receipts/badge)](https://scorecard.dev/viewer/?uri=github.com/anandgupta42/receipts) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
@@ -36,6 +36,11 @@ npx aireceipts-cli setup    # first-run report + integration next steps
 ```
 
 Or install it: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
+
+<img alt="aireceipts --demo rendering a sample receipt in a terminal" src="site/assets/demo.gif" width="620">
+
+<sub>`aireceipts --demo` — the bundled sample session; recorded by
+[`site/assets/demo.tape`](site/assets/demo.tape)</sub>
 
 What you get back — the hero image above, as the bytes your terminal prints:
 

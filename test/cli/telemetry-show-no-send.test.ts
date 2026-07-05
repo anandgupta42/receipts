@@ -30,8 +30,12 @@ describe("SPEC-0002 R5 · --telemetry-show sends nothing even with telemetry ena
     }
     process.env.HOME = home;
     process.env.USERPROFILE = home;
-    // Telemetry ON: kill switches cleared, a valid (but unreachable) endpoint set.
-    delete process.env.AIRECEIPTS_TELEMETRY;
+    // Telemetry ON: kill switches cleared, a valid (but unreachable) endpoint
+    // set. Explicit `on` (not just unset) because these tests also run on CI,
+    // where the 2026-07-05 amendment defaults telemetry off — the explicit
+    // override is the supported way to enable it there, and the guard under
+    // test must hold even against the strongest enabled state.
+    process.env.AIRECEIPTS_TELEMETRY = "on";
     delete process.env.DO_NOT_TRACK;
     process.env.AIRECEIPTS_TELEMETRY_CONNECTION = VALID_CONNECTION;
     origOut = process.stdout.write.bind(process.stdout);
