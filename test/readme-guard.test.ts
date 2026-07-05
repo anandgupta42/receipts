@@ -102,6 +102,31 @@ describe("SPEC-0029 · README guard", () => {
     expect(readme).toContain("docs/telemetry.md");
   });
 
+  it("SPEC-0053 R1: the PR-receipt proof image is committed and linked to a live comment on this repo", () => {
+    const wrapped =
+      /<a href="https:\/\/github\.com\/anandgupta42\/receipts\/pull\/\d+#issuecomment-\d+">\s*<img [^>]*src="(docs\/assets\/pr-receipt-comment\.png)"/.exec(readme);
+    expect(wrapped, "README must show the proof image wrapped in a PR-comment permalink").not.toBeNull();
+    expect(existsSync(wrapped![1]), `proof image missing on disk: ${wrapped![1]}`).toBe(true);
+    const tagIdx = lines.findIndex((l) => /^\*\*.+\*\*$/.test(l.trim()));
+    const imgLine = lines.findIndex((l) => l.includes("pr-receipt-comment.png"));
+    const installAt = lines.findIndex((l) => l.trim().toLowerCase().startsWith("## install"));
+    expect(imgLine, "proof image must sit between the tagline and Install").toBeGreaterThan(tagIdx);
+    expect(imgLine).toBeLessThan(installAt);
+  });
+
+  it("SPEC-0053 R3: the install section is exactly four numbered steps and step 1 names --demo", () => {
+    const installAt = lines.findIndex((l) => l.trim().toLowerCase().startsWith("## install"));
+    const nextH2 = lines.findIndex((l, i) => i > installAt && l.startsWith("## "));
+    const section = lines.slice(installAt, nextH2);
+    const stepIdx = section.reduce<number[]>((acc, l, i) => (/^\d+\. /.test(l.trim()) ? [...acc, i] : acc), []);
+    expect(stepIdx.map((i) => section[i].trim().slice(0, 2))).toEqual(["1.", "2.", "3.", "4."]);
+    const stepOne = section.slice(stepIdx[0], stepIdx[1]).join(" ");
+    expect(stepOne).toContain("--demo");
+    const stepFour = section.slice(stepIdx[3]).join(" ");
+    expect(stepFour).toContain("pr --post");
+    expect(stepFour, "the CI workflow verifies receipts; posting is local").toContain("local");
+  });
+
   it("R3: install appears within the first 60 lines; CLI table names every command with doc links", () => {
     const installAt = lines.findIndex((l) => l.trim().toLowerCase().startsWith("## install"));
     expect(installAt).toBeGreaterThan(-1);
