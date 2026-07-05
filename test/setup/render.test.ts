@@ -48,7 +48,7 @@ function report(overrides: Partial<SetupReport> = {}): SetupReport {
   };
 }
 
-describe("SPEC-0043 setup render", () => {
+describe("SPEC-0050 setup render", () => {
   it("shows value before next-step automation", () => {
     const out = renderSetupReport(report());
     expect(out.indexOf("Latest session")).toBeLessThan(out.indexOf("Next"));

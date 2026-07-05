@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { INTEGRATION_RECIPES, INTEGRATION_TARGETS, integrationRecipe } from "../../src/setup/integrations.js";
 import { integrationsToJson, renderIntegrationMatrix, renderIntegrationRecipe } from "../../src/setup/render.js";
 
-describe("SPEC-0043 integration recipes", () => {
+describe("SPEC-0050 integration recipes", () => {
   it("covers the day-1 targets with exact recipes", () => {
     expect(INTEGRATION_RECIPES.map((recipe) => recipe.target)).toEqual([...INTEGRATION_TARGETS]);
     for (const recipe of INTEGRATION_RECIPES) {

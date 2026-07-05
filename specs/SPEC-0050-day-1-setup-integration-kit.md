@@ -1,12 +1,12 @@
 ---
-id: SPEC-0043
+id: SPEC-0050
 title: "Day-1 setup and integration kit"
-status: shipped
+status: building
 milestone: M5
 depends: [SPEC-0036, SPEC-0037]
 ---
 
-# SPEC-0043 · day-1 setup and integration kit
+# SPEC-0050 · day-1 setup and integration kit
 
 Source research: `docs/internal/research/2026-07-04-day-1-integration-strategy.md`.
 
