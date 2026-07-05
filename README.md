@@ -7,7 +7,7 @@
 
 **Your AI coding agent just billed you. Here's the receipt.**
 
-[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/aireceipts-cli.svg)](https://www.npmjs.com/package/aireceipts-cli) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/anandgupta42/receipts/badge)](https://scorecard.dev/viewer/?uri=github.com/anandgupta42/receipts) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 <a href="https://github.com/anandgupta42/receipts/pull/131#issuecomment-4886722030">
   <img alt="a real aireceipts receipt comment on a merged pull request of this repo: 6 sessions, two Claude models and five Codex helpers, $172.76 total" src="docs/assets/pr-receipt-comment.png" width="560">
@@ -49,6 +49,11 @@ built it — the comment above is one ([how](docs/pr-receipts.md)).
    carries one ([guide](docs/pr-receipts.md)).
 
 Prefer a global install: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
+
+<img alt="aireceipts --demo rendering a sample receipt in a terminal" src="site/assets/demo.gif" width="620">
+
+<sub>`aireceipts --demo` — the bundled sample session; recorded by
+[`site/assets/demo.tape`](site/assets/demo.tape)</sub>
 
 What you get back, as the bytes your terminal prints:
 

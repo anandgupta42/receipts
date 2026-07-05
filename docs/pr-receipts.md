@@ -109,6 +109,10 @@ transcripts remain on the contributor's machine. CI still never generates a rece
 itself: the source transcripts stay local. Rolling out across a whole org:
 [docs/adopt/org-rollout.md](adopt/org-rollout.md).
 
+There is no aireceipts GitHub App or bot: receipts are generated and posted locally by
+design, and a hosted App could never see the transcripts they're built from — the
+decision record is [SPEC-0052](../specs/SPEC-0052-github-app-deferral.md).
+
 ## What the comment contains
 
 - A marker line (`<!-- aireceipts-dogfood -->`) so the upsert and the CI check can find

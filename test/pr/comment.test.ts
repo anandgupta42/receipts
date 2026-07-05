@@ -71,6 +71,23 @@ describe("upsertPrComment", () => {
     expect(calls.filter((c) => c.args.includes("-X"))).toHaveLength(1);
   });
 
+  it("selects the marked comment by body prefix only — never by author (SPEC-0052 R3)", () => {
+    // The GitHub JSON carries a `user` object; selection must ignore it, so a
+    // future bot identity can take over the comment a human's `gh` created
+    // (and a human can update a bot-created one).
+    const existing = JSON.stringify([
+      { id: 111, body: "unrelated", user: { login: "aireceipts[bot]" } },
+      { id: 999, body: `${DOGFOOD_MARKER}\nold receipt`, user: { login: "alice" } },
+    ]);
+    const { run, calls } = mockGh(existing);
+    const result = upsertPrComment(body, run);
+
+    expect(result).toMatchObject({ action: "updated", commentId: 999 });
+    const write = calls.find((c) => c.args.includes("-X"))!;
+    expect(write.args).toContain("PATCH");
+    expect(write.args.join(" ")).toContain("repos/o/r/issues/comments/999");
+  });
+
   it("reports gh missing distinctly", () => {
     const run: CommandRunner = () => ({ stdout: "", stderr: "", code: null, missing: true });
     const result = upsertPrComment(body, run);

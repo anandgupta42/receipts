@@ -19,6 +19,18 @@ describe("hasReceiptComment", () => {
     expect(hasReceiptComment("[]")).toBe(false);
     expect(hasReceiptComment("not json")).toBe(false);
   });
+
+  it("keys on the marker only — never on comment author (SPEC-0052 R3)", () => {
+    // A marked comment counts regardless of who authored it, and an unmarked
+    // bot comment never counts — the marker is the whole contract.
+    const markedByHuman = JSON.stringify([
+      { body: "chatter", user: { login: "aireceipts[bot]" } },
+      { body: `${SCRIPT_MARKER}\nreceipt`, user: { login: "alice" } },
+    ]);
+    expect(hasReceiptComment(markedByHuman)).toBe(true);
+    const onlyUnmarkedBot = JSON.stringify([{ body: "not a receipt", user: { login: "aireceipts[bot]" } }]);
+    expect(hasReceiptComment(onlyUnmarkedBot)).toBe(false);
+  });
 });
 
 describe("receiptCheckVerdict", () => {
