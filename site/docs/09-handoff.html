@@ -322,12 +322,26 @@ footer{
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
+      <p class="toc-section">Agents</p>
+      <ul>
+        <li><a href="README.html">Supported agents</a></li>
+        <li><a href="claude-code.html">Receipts for Claude Code</a></li>
+        <li><a href="codex.html">Receipts for Codex CLI</a></li>
+        <li><a href="cursor.html">Receipts for Cursor</a></li>
+        <li><a href="gemini.html">Receipts for Gemini CLI</a></li>
+        <li><a href="opencode.html">Receipts for opencode</a></li>
+      </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
+        <li><a href="ROADMAP.html">Roadmap</a></li>
+      </ul>
+      <p class="toc-section">Advanced</p>
+      <ul>
+        <li><a href="16-improve-your-next-session.html">Improve your next session</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -341,11 +355,18 @@ footer{
 Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s
 claude-opus-4-8 100%
 total $0.09 · 6 turns · 5 tool calls
-- Bash loop ×5: $0.08, 3m 45s wall-clock
+--------------------------------------------------
+COULD HAVE SAVED...........................≤ $0.08
+  81% of $0.09 · arithmetic, not a prediction
+
+⚠ Bash loop ×5......................$0.08 (3m 45s)
+  → change or stop after two identical failures
 
 covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line</code></pre>
 
-<p>The block opens with the session's state — agent, when, how long, which models, what it cost, how many turns and tool calls (plus a compaction count when any fired) — then lists the waste lines with what each one cost, and closes with a <code>covers:</code> line stating exactly what the packet accounts for. Everything is extracted from the transcript, never summarized, so nothing can be paraphrased away. Paste it into your next prompt (or your <code>CLAUDE.md</code>) so the agent knows what to avoid — here, a Bash command it re-ran five times over nearly four minutes.</p>
+<p>The block opens with the session's state — agent, when, how long, which models, what it cost, how many turns and tool calls (plus a compaction count when any fired). Then comes the savings slip: a <code>COULD HAVE SAVED</code> ceiling summing the fired waste lines (the <code>≤</code> and the hedge line are the honesty contract — this is arithmetic over what the detectors found, never a prediction that a different run would have gone better), each waste line as evidence with the same <code>⚠</code>/<code>≈</code> glyphs the receipt prints, and under each class a one-line <code>→</code> rule your agent can follow next time. The rules are fixed strings keyed to the waste class — extracted evidence plus a static instruction, never generated prose. It closes with a <code>covers:</code> line stating exactly what the packet accounts for. Paste the whole block into your next prompt so the agent knows what to avoid — here, a Bash command it re-ran five times over nearly four minutes.</p>
+
+<p>The same slip rides the PR comment: <code>aireceipts pr</code> adds a collapsed <code>handoff — could have saved ≤ $X</code> section after the full receipts whenever a counted session fired a waste line (and adds nothing at all on a clean PR).</p>
 
 <h2 id="machine-readable-form">Machine-readable form</h2>
 
@@ -368,6 +389,8 @@ covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line</code></pre>
 <p>Some waste shows up run after run. Pass <code>--handoff-threshold N</code> and, for any waste class that recurs across <code>N</code> or more of your recent sessions, the handoff also suggests a <code>CLAUDE.md</code> rule to prevent it — a durable fix instead of a one-off note. The default threshold is <code>3</code>:</p>
 
 <pre class="doc-code"><code class="language-sh">aireceipts --handoff --handoff-threshold 3</code></pre>
+
+<p>That recurrence count is the false-positive control: it requires the same waste class to repeat across <code>N</code> <em>distinct recent sessions</em>, not just several times inside one session, before it's ever suggested as a standing rule — a one-off fluke, however dramatic, never becomes a <code>CLAUDE.md</code> line. And when nothing recurs, the handoff stays silent about rules the same way it stays silent about waste: no waste fired means <code>nothing to hand off</code>, never invented advice.</p>
 
 <h2 id="next">Next</h2>
 

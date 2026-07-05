@@ -120,6 +120,12 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
   could run — each priced, each conservative (a false positive fails our CI).
 - **An honest cheaper-model line**: "same tokens on X" is arithmetic on your real token
   counts, never a claim that X would have done the job.
+- **Works on your existing sessions**: aireceipts reads the transcripts your agents
+  already wrote — install today, get receipts for last month, no new session needed.
+- **A handoff that graduates, carefully**: `--handoff` turns the waste a session
+  actually hit into a paste-ready instruction for the next run; a suggested standing
+  rule only fires once a waste class recurs across 3+ sessions, so a one-off fluke
+  never becomes a rule.
 - **Exports**: SVG/PNG images, JSON with a versioned schema, CSV.
 
 ## The honesty rules
@@ -170,7 +176,7 @@ pricing, troubleshooting ([hosted docs](https://anandgupta42.github.io/receipts/
 [FAQ](docs/faq.md) · [What a receipt proves](docs/trust.md) ·
 [PR receipts](docs/pr-receipts.md) · [Integrations](docs/guide/15-integrations.md) ·
 [JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
-[telemetry](docs/telemetry.md)
+[telemetry](docs/telemetry.md) · [Roadmap](docs/ROADMAP.md)
 
 **Related work.** [claude-receipts](https://github.com/chrishutchinson/claude-receipts)
 prints a beautiful thermal-receipt souvenir of a Claude Code session (numbers via

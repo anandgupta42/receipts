@@ -322,12 +322,26 @@ footer{
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
+      <p class="toc-section">Agents</p>
+      <ul>
+        <li><a href="README.html">Supported agents</a></li>
+        <li><a href="claude-code.html">Receipts for Claude Code</a></li>
+        <li><a href="codex.html">Receipts for Codex CLI</a></li>
+        <li><a href="cursor.html">Receipts for Cursor</a></li>
+        <li><a href="gemini.html">Receipts for Gemini CLI</a></li>
+        <li><a href="opencode.html">Receipts for opencode</a></li>
+      </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
+        <li><a href="ROADMAP.html">Roadmap</a></li>
+      </ul>
+      <p class="toc-section">Advanced</p>
+      <ul>
+        <li><a href="16-improve-your-next-session.html">Improve your next session</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -511,7 +525,10 @@ footer{
     <tr><td><code>totals</code></td><td>object</td><td><code>tokens</code> (TokenUsage object) + <code>turnCount</code> + <code>toolCallCount</code>.</td></tr>
     <tr><td><code>turnCount</code></td><td>number</td><td>(totals) Assistant turns in the session.</td></tr>
     <tr><td><code>toolCallCount</code></td><td>number</td><td>(totals) Tool calls in the session.</td></tr>
-    <tr><td><code>wasteLines</code></td><td>array</td><td>Same WasteLine union as the receipt.</td></tr>
+    <tr><td><code>wasteLines</code></td><td>array</td><td>Same WasteLine union as the receipt, plus a per-line <code>rule</code> (SPEC-0059).</td></tr>
+    <tr><td><code>rule</code></td><td>string | null</td><td>(wasteLines) The class's fixed one-line next-time rule; <code>null</code> for a class without one.</td></tr>
+    <tr><td><code>couldHaveSaved</code></td><td>object</td><td>SPEC-0059: the extracted savings ceiling — <code>usd</code> (sum of priced waste lines, <code>null</code> when none priced), <code>tokens</code> (sum over all fired lines), <code>pctOfTotal</code>. Arithmetic, never a prediction.</td></tr>
+    <tr><td><code>pctOfTotal</code></td><td>number | null</td><td>(couldHaveSaved) <code>round(100 · usd / totalUsd)</code>; <code>null</code> without both dollar sides.</td></tr>
     <tr><td><code>suggestions</code></td><td>array</td><td>Standing-rule suggestion strings (SPEC-0013), possibly empty.</td></tr>
     <tr><td><code>threshold</code></td><td>number</td><td>The distinct-session recurrence threshold in effect.</td></tr>
     <tr><td><code>coverage</code></td><td>object</td><td>What the packet covers, checkably: <code>turns</code>, <code>toolCalls</code>, <code>compactions</code>, <code>wasteLines</code> (all numbers).</td></tr>
@@ -521,6 +538,25 @@ footer{
     <tr><td><code>aggregates</code></td><td>array</td><td><code>{class, distinctSessionCount}</code> — exactly the waste classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent).</td></tr>
     <tr><td><code>class</code></td><td>string</td><td>(aggregates) Waste class name.</td></tr>
     <tr><td><code>distinctSessionCount</code></td><td>number</td><td>(aggregates) Distinct recent sessions the class fired in.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="backfill-envelope-backfilljsonschema-spec-0056">Backfill envelope (<code>backfillJsonSchema</code>) — SPEC-0056</h3>
+
+<p><code>aireceipts backfill --json</code>: the bulk-sweep summary. Counts are honest per SPEC-0045 — degraded/unloadable sessions are counted in <code>loadFailureCount</code>, never silently dropped. <code>sessions</code> is one row per matched session (after <code>--since</code>/<code>--limit</code>), newest-first; rows also carry <code>source</code>, <code>sessionId</code>, <code>title</code>, <code>startedAtMs</code> with the same meanings as the handoff envelope above.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>schemaVersion</code></td><td>number</td><td>Same envelope as receipt/compare/handoff.</td></tr>
+    <tr><td><code>discoveredCount</code></td><td>number</td><td>Every discovered session summary, degraded ones included.</td></tr>
+    <tr><td><code>matchedCount</code></td><td>number</td><td>After the <code>--since</code>/<code>--limit</code> filters.</td></tr>
+    <tr><td><code>loadFailureCount</code></td><td>number</td><td>Honest per SPEC-0045, mode-dependent: on an <code>--out</code> run (loads attempted), degraded summaries plus failed loads; on a dry run only known-unreadable summaries — a lower bound (labelled <code>Known unreadable</code> in the text summary).</td></tr>
+    <tr><td><code>writtenCount</code></td><td>number</td><td>Receipt files written this run; <code>0</code> without <code>--out</code>.</td></tr>
+    <tr><td><code>wroteFiles</code></td><td>boolean</td><td><code>true</code> only when <code>--out</code> wrote files.</td></tr>
+    <tr><td><code>sessions</code></td><td>array</td><td>One row per matched session, newest-first.</td></tr>
+    <tr><td><code>fileName</code></td><td>string | null</td><td>(sessions) File written under <code>--out</code>, or <code>null</code> (dry run / load failed).</td></tr>
+    <tr><td><code>loadFailed</code></td><td>boolean</td><td>(sessions) <code>true</code> when the session is known unreadable or (on an <code>--out</code> run) its load failed.</td></tr>
   </tbody>
 </table></div>
 

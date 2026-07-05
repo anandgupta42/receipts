@@ -322,12 +322,26 @@ footer{
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
+      <p class="toc-section">Agents</p>
+      <ul>
+        <li><a href="README.html">Supported agents</a></li>
+        <li><a href="claude-code.html">Receipts for Claude Code</a></li>
+        <li><a href="codex.html">Receipts for Codex CLI</a></li>
+        <li><a href="cursor.html">Receipts for Cursor</a></li>
+        <li><a href="gemini.html">Receipts for Gemini CLI</a></li>
+        <li><a href="opencode.html">Receipts for opencode</a></li>
+      </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
+        <li><a href="ROADMAP.html">Roadmap</a></li>
+      </ul>
+      <p class="toc-section">Advanced</p>
+      <ul>
+        <li><a href="16-improve-your-next-session.html">Improve your next session</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -396,9 +410,10 @@ git receipt                  # after pushing your branch</code></pre>
 
 <ul>
   <li>A marker line (<code>&lt;!-- aireceipts-dogfood --&gt;</code>) so the upsert and the CI check can find exactly one comment to keep current.</li>
-  <li>A fenced receipt headed <code>N sessions behind this PR</code>: one row per contributing session (<code>&lt;role&gt; · &lt;model mix&gt; · &lt;cost&gt;</code>), a muted provenance line under each (session id + <code>session slice: turns A–B of N</code>, or <code>entire session (slice unavailable)</code> when the work can't be cut cleanly — ambiguity is labeled, never presented as PR cost), and indented <code>SUBAGENTS</code> sub-rows for any subagent sessions a contributor launched.</li>
+  <li>A fenced receipt headed <code>N sessions behind this PR</code>: one row per contributing session (<code>&lt;role&gt; · &lt;model mix&gt; · &lt;cost&gt;</code>), a muted provenance line under each (session id + <code>session slice: turns A–B of N</code>, or <code>entire session (slice unavailable)</code> when the work can't be cut cleanly — ambiguity is labeled, never presented as PR cost), and one indented <code>SUBAGENTS (N)</code> aggregate row summing any subagent sessions a contributor launched (SPEC-0060).</li>
   <li>One combined total. Priced and unpriced sessions are never blended: dollars and tokens total separately.</li>
   <li>An honest note counting any plausible-but-unproven sessions that were <strong>not</strong> attributed.</li>
+  <li>A collapsed <code>full receipts</code> section: a per-session ledger table, each session's full receipt, and — for a session that launched subagents — a <code>subagents (N)</code> table under its receipt, sorted by cost and capped at 20 rows where the last row carries the remainder's sum (a capped list never silently drops value).</li>
 </ul>
 
 <h2 id="how-sessions-are-matched-to-a-pr">How sessions are matched to a PR</h2>

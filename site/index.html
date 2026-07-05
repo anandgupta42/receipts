@@ -133,7 +133,8 @@
     display:grid;grid-template-columns:minmax(0,1fr);
     gap:clamp(28px,3vw,36px);
   }
-  @media (min-width:820px){.scenarios{grid-template-columns:repeat(3,minmax(0,1fr))}}
+  @media (min-width:620px){.scenarios{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (min-width:1040px){.scenarios{grid-template-columns:repeat(4,minmax(0,1fr))}}
   .scn{min-width:0;border-top:2px solid var(--ink);padding-top:20px}
   .scn h3{
     font-family:var(--sans);font-weight:700;
@@ -366,6 +367,15 @@
 builder · opus ············ $43.80
 TOTAL ····················· <span class="grnl">$56.10</span></pre></div>
         </div>
+        <div class="scn">
+          <img class="scnimg" src="assets/scn-loop.png" alt="" width="76" height="76">
+          <h3>Waste becomes an instruction</h3>
+          <p>The handoff turns the waste a session actually hit into a paste-ready block for the next one — never a summary, always the transcript's own numbers.</p>
+          <pre class="art cardart">- Bash loop ×5: <span class="redl">$0.08</span>, 3m 45s wall-clock
+<span class="dim">covers: 6 turns · 5 tool calls · 1 waste line</span>
+<span class="dim">fires only after 3+ sessions repeat it —</span>
+<span class="dim">otherwise: "nothing to hand off"</span></pre>
+        </div>
       </div>
     </section>
   </div>
@@ -402,6 +412,7 @@ TOTAL ····················· <span class="grnl">$56.10</span
   <div class="wrap">
     <section aria-label="Three steps">
         <h2 class="lede">Sixty seconds to your first receipt.</h2>
+        <p class="proofcap">It reads the sessions you've already run — first receipt works on last month's history, no new session needed.</p>
       <div class="steps">
         <div class="step">
           <span class="k">01</span>

@@ -78,6 +78,14 @@ note. The default threshold is `3`:
 aireceipts --handoff --handoff-threshold 3
 ```
 
+That recurrence count is the false-positive control: it requires the same
+waste class to repeat across `N` *distinct recent sessions*, not just several
+times inside one session, before it's ever suggested as a standing rule — a
+one-off fluke, however dramatic, never becomes a `CLAUDE.md` line. And when
+nothing recurs, the handoff stays silent about rules the same way it stays
+silent about waste: no waste fired means `nothing to hand off`, never
+invented advice.
+
 ## Next
 
 - **[Compare two sessions](05-compare.md)** — confirm the fix actually cost less.
