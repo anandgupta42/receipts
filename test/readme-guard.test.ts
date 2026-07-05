@@ -112,7 +112,7 @@ describe("SPEC-0029 · README guard", () => {
     expect(permalinks.length).toBeGreaterThanOrEqual(2);
     expect(new Set(permalinks).size, "image wrapper and caption must link the same comment").toBe(1);
     // Placement: directly under the badges (inside the hero div), before the first prose paragraph.
-    const badgeIdx = lines.findIndex((l) => l.includes("shields.io") || l.includes("badge.svg"));
+    const badgeIdx = lines.findIndex((l) => l.trim().startsWith("[!["));
     const imgLine = lines.findIndex((l) => l.includes("pr-receipt-comment.png"));
     const proseIdx = lines.findIndex((l) => l.startsWith("**Why this exists.**"));
     expect(imgLine, "proof image must sit directly under the badges").toBeGreaterThan(badgeIdx);
