@@ -159,3 +159,15 @@ that tells you exactly what it knows.
     credited, its total is a lower bound: the receipt says "N unreadable
     transcript record(s) skipped — total may be incomplete" and the PR total
     floors `≥`. A clean transcript never trips it.
+17. **A session that failed to parse before it was even a candidate**
+    (SPEC-0045). B4 (#15) catches a candidate whose full transcript won't load;
+    this catches the same failure one layer earlier — at *discovery*, where a
+    file that can't be parsed would otherwise be dropped before the PR flow sees
+    it. If its lazy metadata places it in **this repo**, it is flagged exactly
+    like #15 (floors `≥`, counted as an unreadable session). **The honest
+    limit:** a transcript so corrupt that even its lazy metadata (the working
+    directory) is lost cannot be tied to any particular repo, so it is excluded
+    without a per-receipt note — flagging it would fire on any corrupt file
+    anywhere under your agent's data directory, PR-relevant or not. A degraded
+    file is likewise excluded from every non-PR view (`week`, `compare`,
+    `--list`, budget), which never render an incomplete total for it.

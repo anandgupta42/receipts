@@ -112,9 +112,14 @@ function stateHeaderLines(model: ReceiptModel, counts: HandoffCounts): string[] 
   return lines;
 }
 
+/** Pluralize a count with its noun (`1 waste line`, `2 waste lines`) — matches the receipt's row-label singular/plural discipline. */
+function countNoun(n: number, singular: string): string {
+  return `${formatInt(n)} ${singular}${n === 1 ? "" : "s"}`;
+}
+
 /** SPEC-0042 R2 — the packet states what it covers, checkably (fixed format, counts only). */
 function coverageLine(model: ReceiptModel, counts: HandoffCounts): string {
-  return `covers: ${formatInt(counts.turns)} turns · ${formatInt(counts.toolCalls)} tool calls · ${formatInt(counts.compactions)} compactions · ${formatInt(model.wasteLines.length)} waste lines`;
+  return `covers: ${countNoun(counts.turns, "turn")} · ${countNoun(counts.toolCalls, "tool call")} · ${countNoun(counts.compactions, "compaction")} · ${countNoun(model.wasteLines.length, "waste line")}`;
 }
 
 /**

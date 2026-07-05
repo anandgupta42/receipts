@@ -8,6 +8,7 @@ import { loadById } from "../../src/parse/load.js";
 import type { CommandResult, CommandRunner } from "../../src/pr/git.js";
 import { DOGFOOD_MARKER } from "../../src/pr/body.js";
 import { runPr, type PrDeps } from "../../src/pr/index.js";
+import type { SessionSummary } from "../../src/parse/types.js";
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
 const ANCHORS = path.join(FIX, "claude-anchors.jsonl");
@@ -80,6 +81,29 @@ describe("R3 render-first ordering", () => {
     expect(ghCalled).toBe(false);
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
     expect(out[0]).toContain("session slice: turns 2–4 of 6");
+  });
+
+  it("SPEC-0045 R2 anti-wallpaper — a degraded no-cwd session that only overlaps the window does NOT flag unreadable-session", async () => {
+    // A transcript that failed to parse (degraded) with NO cwd, whose timestamps
+    // merely overlap the branch window. Without repo-cwd proof it isn't ours, so
+    // index.ts keeps it OUT of the anchor pool (the `if (s.degraded) continue`
+    // guard) — it must NOT fire `unreadable-session`, or every corrupt file
+    // anywhere would floor unrelated PRs.
+    const real = (await loadById("claude-code", ANCHORS))!;
+    const degradedNoCwd: SessionSummary = {
+      id: "/elsewhere/ghost.jsonl",
+      source: "claude-code",
+      filePath: "/elsewhere/ghost.jsonl",
+      startedAt: Date.parse("2026-06-28T10:02:20.000Z"),
+      endedAt: Date.parse("2026-06-28T10:02:40.000Z"),
+      totals: { tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 }, turnCount: 0, toolCallCount: 0 },
+      degraded: "unreadable", // no cwd → not repo-scoped
+    };
+    const { deps, out } = await makeDeps({ listSessions: async () => [real, degradedNoCwd] });
+    const code = await runPr({ post: false }, deps);
+    expect(code).toBe(0);
+    // The real session still renders; the no-cwd degraded file is silent.
+    expect(out[0]).not.toContain("couldn't be read");
   });
 
   it("explicit --session can select a subagent by stem, render, and post", async () => {

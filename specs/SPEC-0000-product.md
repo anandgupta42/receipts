@@ -68,7 +68,7 @@ doubt, this file wins.
 
 ## OSS / indie / zero-telemetry stance
 
-aireceipts is built in the open by one person, as OSS, MIT-licensed. It is not a company
+aireceipts is built in the open by one person, as OSS, Apache-2.0-licensed. It is not a company
 product and is not gated behind a signup. Beyond the disclosed, one-switch-escapable I4
 telemetry contract (diagnostics plus pseudonymous feature-adoption events), it never
 phones home: no third-party analytics, no crash uploads, no update pings. If a future opt-in feature
