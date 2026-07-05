@@ -313,17 +313,20 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -331,7 +334,7 @@ footer{
 
 <p>Goal: total every session from the last seven days, across every agent, with an honest comparison to the week before.</p>
 
-<pre class="doc-code"><code class="language-sh">aireceipts week</code></pre>
+<pre class="doc-code"><code class="language-sh">aireceipts week --since 2026-06-18</code></pre>
 
 <pre class="doc-code"><code>                  WEEKLY DIGEST                   
     Jun 18 2026 → Jun 25 2026 · since override    
@@ -367,7 +370,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
 
 <pre class="doc-code"><code class="language-sh">aireceipts week --since 2026-06-18</code></pre>
 
-<p>That's the invocation behind the digest above — the <code>· since override</code> in the header marks it.</p>
+<p>That's the invocation shown at the top — the <code>· since override</code> in the header marks it. A bare <code>aireceipts week</code> (no <code>--since</code>) instead prints a trailing-7-days header ending at the current moment.</p>
 
 <h2 id="split-by-project">Split by project</h2>
 

@@ -313,23 +313,26 @@ footer{
       <p class="toc-section">Reference</p>
       <ul>
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
-        <li><a href="telemetry.html">Diagnostics telemetry</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
 <h1 id="troubleshooting-faq">Troubleshooting &amp; FAQ</h1>
 
-<p>Symptom first. Find what you're seeing, then the fix.</p>
+<p>Symptom first. Find what you're seeing, then the fix. For question-first answers — how this differs from usage dashboards, what the dollars mean, what leaves your machine — see the <a href="faq.html">FAQ</a>.</p>
 
 <h2 id="no-agent-session-data-detected">&quot;no agent session data detected&quot;</h2>
 
@@ -366,9 +369,9 @@ no price table matched</code></pre>
 
 <p>The very first time you run aireceipts, it prints this once:</p>
 
-<pre class="doc-code"><code>aireceipts sends anonymous, content-free diagnostics (performance, error, and parse-failure signals only — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md</code></pre>
+<pre class="doc-code"><code>aireceipts sends anonymous, content-free diagnostics and feature-usage events (command, coarse buckets, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md</code></pre>
 
-<p>It never prints again after that. To turn diagnostics off entirely (zero network calls — not &quot;less,&quot; zero), set either environment variable:</p>
+<p>It never prints again after that. To turn telemetry off entirely (zero network calls — not &quot;less,&quot; zero), set either environment variable:</p>
 
 <pre class="doc-code"><code class="language-sh">export AIRECEIPTS_TELEMETRY=off      # or DO_NOT_TRACK=1</code></pre>
 

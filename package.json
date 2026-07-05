@@ -11,8 +11,10 @@
   "files": [
     "dist",
     "data/prices",
+    "data/demo",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "engines": {
     "node": ">=20"

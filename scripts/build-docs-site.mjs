@@ -34,21 +34,24 @@ const NAV_SECTIONS = Object.freeze([
     section: "Reference",
     items: [
       "guide/12-troubleshooting.md",
+      "faq.md",
       "json-schema.md",
       "statusline.md",
       "pr-receipts.md",
       "adopt/org-rollout.md",
       "telemetry.md",
+      "CHANGELOG.md",
     ],
   },
   {
     section: "Why",
-    items: ["guide/13-pricing.md", "guide/14-session-attribution.md", "trust.md"],
+    items: ["guide/13-pricing.md", "guide/14-session-attribution.md", "trust.md", "cost-model.md"],
   },
 ]);
 
 // Directories under docs/ that are intentionally never published to the site.
-const EXCLUDED_DIRS = Object.freeze(["internal", "spikes"]);
+// releases/ holds release-board verdicts — repo bookkeeping, like internal/.
+const EXCLUDED_DIRS = Object.freeze(["internal", "spikes", "releases"]);
 
 const RESOURCE_LOAD_PATTERNS = [
   /<script\b[^>]*\bsrc=["']https?:/iu,

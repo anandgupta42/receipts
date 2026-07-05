@@ -24,7 +24,9 @@ turns them into receipts: what a session cost, tool by tool; what a PR cost, acr
 every supported agent session it can attribute; where tokens were wasted. Local and
 deterministic — no accounts, no servers; your transcripts and code never leave your
 machine (anonymous, content-free diagnostics are on by default and opt-out — see
-[docs/telemetry.md](docs/telemetry.md)).
+[docs/telemetry.md](docs/telemetry.md)). This repo runs on it: every pull request here
+carries the receipt of the agent sessions that built it — open any merged PR and read
+the bill ([how](docs/pr-receipts.md)).
 
 ## Install
 
@@ -69,6 +71,7 @@ guessed dollars. Full method: aireceipts
 | Command | What it does |
 |---|---|
 | `aireceipts` | Receipt for the newest session (`--list` to pick another) |
+| `aireceipts --demo` | See a sample receipt with no sessions of your own — a bundled example, rendered live |
 | `aireceipts setup` | First-run report: found sessions, latest cost, week total, integration options — [guide](docs/guide/01-getting-started.md) |
 | `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, opencode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
 | `aireceipts pr --post` | Attach the receipt of the sessions behind a PR as a comment — [guide](docs/pr-receipts.md) |
@@ -85,12 +88,12 @@ guessed dollars. Full method: aireceipts
 
 ## What you get
 
-- **A per-tool cost anatomy** of every session: models, cache tiers, tool-by-tool spend.
-- **Waste lines, precision-gated**: stuck tool loops and trivial spans a cheaper model
-  could run — each priced, each conservative (a false positive fails our CI).
 - **PR receipts**: every pull request can carry the receipt of the agent sessions that
   built it — totals across leads, builders, and helpers, floors when anything is
   unattributed.
+- **A per-tool cost anatomy** of every session: models, cache tiers, tool-by-tool spend.
+- **Waste lines, precision-gated**: stuck tool loops and trivial spans a cheaper model
+  could run — each priced, each conservative (a false positive fails our CI).
 - **An honest cheaper-model line**: "same tokens on X" is arithmetic on your real token
   counts, never a claim that X would have done the job.
 - **Exports**: SVG/PNG images, JSON with a versioned schema, CSV.
@@ -135,8 +138,9 @@ send: `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 pricing, troubleshooting ([hosted docs](https://anandgupta42.github.io/receipts/docs/) ·
 [site](https://anandgupta42.github.io/receipts/)).
 
-[What a receipt proves](docs/trust.md) · [PR receipts](docs/pr-receipts.md) ·
-[Integrations](docs/guide/15-integrations.md) · [JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
+[FAQ](docs/faq.md) · [What a receipt proves](docs/trust.md) ·
+[PR receipts](docs/pr-receipts.md) · [Integrations](docs/guide/15-integrations.md) ·
+[JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md) ·
 [telemetry](docs/telemetry.md)
 
 **Related work.** [claude-receipts](https://github.com/chrishutchinson/claude-receipts)
@@ -144,6 +148,19 @@ prints a beautiful thermal-receipt souvenir of a Claude Code session (numbers vi
 [ccusage](https://github.com/ryoppippi/ccusage)); [Infracost](https://github.com/infracost/infracost)
 does cost-as-a-PR-comment for Terraform. aireceipts is the bookkeeping sibling:
 multi-agent parsing, cited prices, and PR-level attribution with an honesty model.
+[ccusage](https://github.com/ryoppippi/ccusage) is the standard for daily and weekly
+usage dashboards across coding agents; aireceipts answers a different question — what
+a specific session or PR cost, with every number traceable.
+
+## Versioning & stability
+
+Pre-1.0 (`0.x`): **minor** versions may change behavior or output, **patch**
+versions are fixes only. The receipt's byte-stability contract (I5) is the
+compatibility surface — a change that breaks byte-stability for existing golden
+receipts is a **major** bump, and won't happen inside `0.x` minors without a
+changelog callout. Every release is tagged, with notes on the
+[Releases page](https://github.com/anandgupta42/receipts/releases) and in
+[the changelog](docs/CHANGELOG.md).
 
 ## Contributing
 

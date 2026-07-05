@@ -64,4 +64,5 @@ Skills themselves are maintainer-curated, not something agents add unprompted.
 
 ## Code of conduct
 
-Be direct, be kind, cite your sources.
+Be direct, be kind, cite your sources. Full text:
+[`.github/CODE_OF_CONDUCT.md`](.github/CODE_OF_CONDUCT.md).

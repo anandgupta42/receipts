@@ -20,6 +20,7 @@ export const COMMAND_VALUES = [
   "benchmark",
   "check-budget",
   "compare",
+  "demo",
   "handoff",
   "help",
   "install-hook",
@@ -34,6 +35,7 @@ export const COMMAND_VALUES = [
   "telemetry-show",
   "templates",
   "uninstall-hook",
+  "version",
   "week",
 ] as const;
 export type CommandValue = (typeof COMMAND_VALUES)[number];

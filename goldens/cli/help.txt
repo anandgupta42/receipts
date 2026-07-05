@@ -2,6 +2,7 @@ aireceipts — local, deterministic cost receipts for AI coding-agent sessions
 
 Usage:
   aireceipts [selector] [--json|--csv]  print a receipt (default: newest session)
+  aireceipts --demo                     render a bundled sample receipt (no sessions needed)
   aireceipts setup [--json]             first-run report and local integration next steps
   aireceipts integrations [target] [--json]  print setup recipes for assistants and CI
   aireceipts --list [--json]            list sessions, newest first
@@ -37,6 +38,7 @@ Usage:
   aireceipts uninstall-hook             remove that hook
   aireceipts statusline                 one-line summary for Claude Code's statusLine
   aireceipts --help                     show this help
+  aireceipts --version                  print the installed version
 
 flags: --svg renders an SVG file; --png rasterizes it (receipt only, not compare);
        --theme light|dark picks the palette (default light); -o/--output names the file.

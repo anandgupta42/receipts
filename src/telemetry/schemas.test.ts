@@ -88,12 +88,13 @@ describe("SPEC-0043 R9: docs parity", () => {
 });
 
 describe("SPEC-0043 R2: command enum", () => {
-  it("pins the 17 command files plus stats", () => {
+  it("pins the 19 command files plus stats", () => {
     expect([...COMMAND_VALUES].sort()).toEqual(
       [
         "benchmark",
         "check-budget",
         "compare",
+        "demo",
         "handoff",
         "help",
         "install-hook",
@@ -108,6 +109,7 @@ describe("SPEC-0043 R2: command enum", () => {
         "telemetry-show",
         "templates",
         "uninstall-hook",
+        "version",
         "week",
       ].sort(),
     );

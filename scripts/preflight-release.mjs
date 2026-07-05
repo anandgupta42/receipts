@@ -3,8 +3,8 @@
 // publish to npm." It runs the SAME gates CI runs (so a green preflight needs
 // no separate CI trust) PLUS what CI never gates on the release SHA: the
 // packaged, installed, running artifact and the publish-shape manifest.
-// release-publish.yml only `npm ci && npm run build && npm publish`, so without
-// this a red SHA could ship — wire this into the workflow before `npm publish`.
+// release-publish.yml runs this before `npm publish` (and CI runs `--quick`
+// on every PR), so a red SHA cannot ship through the workflow.
 //
 //   node scripts/preflight-release.mjs            # full gate (release-valid)
 //   node scripts/preflight-release.mjs --quick    # fast subset, NOT release-valid
@@ -26,13 +26,21 @@ const r = (p) => join(ROOT, p);
 // regression (sourcemaps back, a stray dir) trips it, not normal growth.
 export const MAX_TARBALL_FILES = 80;
 export const MAX_UNPACKED_KB = 500;
-export const FILES_ALLOWLIST = ["dist", "data/prices", "README.md", "LICENSE"];
+// NOTICE ships because Apache-2.0 §4(d) requires redistributions to include it.
+export const FILES_ALLOWLIST = ["dist", "data/prices", "data/demo", "README.md", "LICENSE", "NOTICE"];
 
 /** Committed price tables (the runtime needs every one) → their tarball paths. */
 function priceTablePaths() {
   return readdirSync(r("data/prices"))
     .filter((f) => f.endsWith(".json"))
     .map((f) => `data/prices/${f}`);
+}
+
+/** The bundled demo transcript (SPEC-0051 `--demo` reads it) → its tarball path(s). */
+function demoAssetPaths() {
+  return readdirSync(r("data/demo"))
+    .filter((f) => f.endsWith(".jsonl"))
+    .map((f) => `data/demo/${f}`);
 }
 
 /**
@@ -132,7 +140,7 @@ function main() {
   //    produces, enforced by the manifest prepublishOnly==build check)
   record("tarball: lean + complete", () => {
     const out = sh("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"]);
-    const viol = checkTarball(JSON.parse(out)[0], ["dist/cli.js", "README.md", "LICENSE", ...priceTablePaths()]);
+    const viol = checkTarball(JSON.parse(out)[0], ["dist/cli.js", "README.md", "LICENSE", "NOTICE", ...priceTablePaths(), ...demoAssetPaths()]);
     if (viol.length) throw new Error(viol.join("\n"));
   });
 

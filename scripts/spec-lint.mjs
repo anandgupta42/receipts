@@ -18,10 +18,15 @@ const files = (process.argv.slice(2).length
 ).filter((f) => !f.includes("SPEC-0000"));
 
 const errors = [];
+const idOwners = new Map(); // SPEC id -> [files declaring it]
 for (const file of files) {
   const s = readFileSync(file, "utf8");
   const fm = s.match(/^---\n([\s\S]*?)\n---/);
   if (!fm) { errors.push(`${file}: missing YAML frontmatter`); continue; }
+  // Normalize one layer of matched surrounding quotes so `id: SPEC-1` and
+  // `id: "SPEC-1"` are the same key, not two distinct ones.
+  const id = fm[1].match(/^id:\s*(\S+)/m)?.[1]?.replace(/^(['"])(.*)\1$/, "$2");
+  if (id) idOwners.set(id, [...(idOwners.get(id) ?? []), file]);
   const status = fm[1].match(/^status:\s*(\S+)/m)?.[1];
   if (!status || !STATUS.has(status)) errors.push(`${file}: status must be one of ${[...STATUS].join("|")} (got: ${status})`);
   for (const k of ["id:", "title:", "milestone:"]) {
@@ -41,6 +46,17 @@ for (const file of files) {
   // Inline type definitions belong in code (AGENTS.md anti-duplication rule).
   if (/^\s*(export\s+)?(interface|type)\s+\w+/m.test(s)) {
     errors.push(`${file}: inline TS type definition found — cite file:line or a zod schema instead`);
+  }
+}
+
+// One id, one file. Side-session drafts have repeatedly reused a live SPEC
+// number (0043, 0046) because the number was free when the branch forked but
+// taken by the time it merged; the collision merged silently because this lint
+// only checked structure. A rejected/tombstoned spec keeps its id, so a clash
+// with an active spec is a real violation the author must renumber.
+for (const [id, owners] of idOwners) {
+  if (owners.length > 1) {
+    errors.push(`duplicate spec id ${id} declared by: ${owners.join(", ")} — renumber all but one`);
   }
 }
 

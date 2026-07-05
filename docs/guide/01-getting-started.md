@@ -56,6 +56,16 @@ it's arithmetic, not a claim that Haiku would have finished the job.
 If instead you see `no agent session data detected`, your agent's logs are
 somewhere aireceipts doesn't look yet — jump to [Troubleshooting](12-troubleshooting.md).
 
+No sessions of your own yet? See one now:
+
+```sh
+npx aireceipts-cli --demo
+```
+
+It renders a bundled example session through the same pipeline your real
+sessions use — a genuine receipt, not a mockup — so you can see the output
+before your first run.
+
 ## 2. Run setup
 
 Ask aireceipts what it found and what to do next:
@@ -133,3 +143,6 @@ Full walkthrough: [Install the agent hook](03-install-hook.md).
 - **[Read a receipt](04-read-a-receipt.md)** — pick any session, not just the newest.
 - **[Choose an integration](15-integrations.md)** — local hooks, assistant snippets, and GitHub checks.
 - **[Set a budget](08-budget.md)** — get an exit code when the week crosses a cap.
+- **[FAQ](../faq.md)** — how this differs from usage dashboards, what the dollars
+  mean on a subscription, what leaves your machine (nothing but disclosed,
+  content-free telemetry), and more.
