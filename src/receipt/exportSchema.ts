@@ -120,7 +120,7 @@ const receiptBodyShape = {
   totalTokens: tokenUsageSchema,
   sessionTotalTokens: tokenUsageSchema,
   wasteLines: z.array(wasteLineSchema),
-  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span"]), text: z.string() }).strict()),
+  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span", "cost-lower-bound-cache-tier"]), text: z.string() }).strict()),
   priceDelta: priceDeltaSchema.nullable(),
   methodology: z.string(),
   priceRowsUsed: z.array(priceRowUsedSchema),

@@ -64,7 +64,17 @@ export const MATRIX: Record<string, Cell> = {
     // rawTokens: Σ per-turn input_tokens/output_tokens summed straight from the
     // fixture's raw JSONL (independent of the adapter) — the oracle for the
     // total-token arithmetic and the red path.
-    expected: { unpriceable: false, priced: true, rawTokens: { input: 19680, output: 897, cacheRead: 124200, cacheCreation: 2100 } },
+    // events: two priced turns (a-0004, a-0018, both claude-opus-4-8/
+    // claude-sonnet-5) carry a flat cache_creation_input_tokens with no nested
+    // 5m/1h split object — but the A3 trigger is row-aware, not usage-only:
+    // data/prices/anthropic.json cites input_cache_write_5m for both models, so
+    // the unsplit remainder still prices at that cited rate exactly. No
+    // fallback to base `input` occurs, so this hero session must NOT caveat.
+    expected: {
+      unpriceable: false,
+      priced: true,
+      rawTokens: { input: 19680, output: 897, cacheRead: 124200, cacheCreation: 2100 },
+    },
   },
   "clean-multi-tool::codex": {
     fixture: `${f}/codex/clean-session.jsonl`,
@@ -72,7 +82,13 @@ export const MATRIX: Record<string, Cell> = {
   },
   "clean-multi-tool::opencode": {
     fixture: `${f}/opencode/clean-multi-vendor.db`,
-    expected: { unpriceable: false, priced: true },
+    // events: two priced turns with cache-write — claude-haiku-4-5 (anthropic,
+    // cache.write: 40, cited 5m rate → prices exactly) and gpt-5.3-codex
+    // (openai, cache.write: 50, data/prices/openai.json cites NO
+    // input_cache_write_5m/1h → falls back to base input). The row-aware
+    // trigger fires because of the openai turn specifically, not because
+    // opencode lacks a split-tier concept in general.
+    expected: { unpriceable: false, priced: true, events: ["cost-lower-bound-cache-tier"] },
   },
   "clean-multi-tool::cursor": na("Cursor records session totals only — 'clean multi-tool' priced anatomy is unpriceable by construction; covered by the unpriceable cell."),
 
@@ -124,6 +140,10 @@ export const MATRIX: Record<string, Cell> = {
   "unpriced-model::opencode": {
     fixture: `${f}/opencode/mixed-known-unknown.db`,
     // A mixed session: known vendors price, unknown models stay tokens-only.
+    // The only priced turn (claude-haiku-4-5, cache.write: 40) prices against
+    // Anthropic's cited input_cache_write_5m rate exactly — no fallback, no
+    // caveat. (The other turn, local-big-pickle/local, is the unpriced one and
+    // never reaches cacheWriteIsLowerBound at all.)
     expected: { unpriceable: false, priced: true },
   },
   "unpriced-model::cursor": {
@@ -133,9 +153,41 @@ export const MATRIX: Record<string, Cell> = {
   },
 
   // ---- cache-tier-fallback (A3) ----
-  "cache-tier-fallback::claude-code": na("A3 emitter (cost-lower-bound-cache-tier) is declared in the ConfidenceEvent union but not yet wired through the Stryker-gated pricing path — deferred to its own build; cell reserved."),
+  "cache-tier-fallback::claude-code": {
+    fixture: `${f}/claude-code/cache-tier-fallback-unsplit.jsonl`,
+    // A single priced turn (a-2002, gpt-5.4-mini) carries a flat
+    // cache_creation_input_tokens: 2000 with NO nested 5m/1h split object.
+    // The trigger is row-aware: data/prices/openai.json cites NO
+    // input_cache_write_5m/1h for gpt-5.4-mini, so this unsplit remainder
+    // falls back to the base `input` rate — a genuine lower bound. The model
+    // is deliberately NOT Anthropic — an unsplit write against a row that DOES
+    // cite the 5m rate (e.g. claude-opus-4-8) prices exactly and must NOT
+    // caveat (see the "does NOT flag ... for an unsplit cache-write when the
+    // vendor cites the 5m rate" case in test/pricing/attribution.test.ts). A
+    // sibling fixture (cache-tier-fallback-split.jsonl, an Anthropic session
+    // with both tiers split and cited) is the negative control — see
+    // test/pricing/attribution.test.ts and the e2e cache-tier-caveat tests.
+    expected: {
+      unpriceable: false,
+      priced: true,
+      rawTokens: { input: 800, output: 180, cacheRead: 1800, cacheCreation: 2000 },
+      events: ["cost-lower-bound-cache-tier"],
+    },
+  },
   "cache-tier-fallback::codex": na("Codex has no cache-write pricing concept (cached_input is read-only) — the tier-fallback scenario cannot occur."),
-  "cache-tier-fallback::opencode": na("opencode reports a flat cache-write with no tier — the fallback applies but A3's emitter is deferred; cell reserved."),
+  "cache-tier-fallback::opencode": {
+    fixture: `${f}/opencode/clean-multi-vendor.db`,
+    // opencode's schema exposes only a flat tokens.cache.write with no tier
+    // concept at all (src/parse/opencode.ts never sets cacheCreation5m/1h), so
+    // every opencode cache-write turn takes the unsplit-remainder path — but
+    // whether that's a caveat still depends on the row: this fixture's
+    // gpt-5.3-codex turn (openai, cache.write: 50) has no cited
+    // input_cache_write_5m/1h and falls back to base input (the trigger); its
+    // claude-haiku-4-5 turn (cache.write: 40) prices exactly against
+    // Anthropic's cited 5m rate and would NOT caveat on its own. Reusing
+    // clean-multi-vendor.db rather than authoring a redundant new .db fixture.
+    expected: { unpriceable: false, priced: true, events: ["cost-lower-bound-cache-tier"] },
+  },
   "cache-tier-fallback::cursor": na("No cache stats at all; unpriceable."),
 
   // ---- reasoning-tokens (C1: codex fold had no test) ----
@@ -153,7 +205,11 @@ export const MATRIX: Record<string, Cell> = {
   "multi-vendor-session::codex": na("Codex is single-vendor (OpenAI)."),
   "multi-vendor-session::opencode": {
     fixture: `${f}/opencode/clean-multi-vendor.db`,
-    expected: { unpriceable: false, priced: true },
+    // events: same A3 ground truth as the cache-tier-fallback and
+    // clean-multi-tool cells that reuse this fixture — the gpt-5.3-codex turn's
+    // cache-write falls back to base input (openai cites no cache-write rate),
+    // a genuine lower bound; the claude-haiku-4-5 turn prices exactly.
+    expected: { unpriceable: false, priced: true, events: ["cost-lower-bound-cache-tier"] },
   },
   "multi-vendor-session::cursor": na("Cursor records no per-turn vendor; unpriceable."),
 };

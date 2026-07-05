@@ -297,6 +297,18 @@ function totalBlocks(input: PrBodyInput): Block[] {
     });
     blocks.push({ kind: "note", text: "(see docs/trust.md)", muted: true });
   }
+  // SPEC-0044 A3 — a session whose cache-write cost took the unsplit-tier
+  // fallback (assumed 5m rate): its `$` share is a lower bound, not exact.
+  const cacheTierLowerBound = input.confidence?.costLowerBoundCacheTier ?? 0;
+  if (cacheTierLowerBound > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(cacheTierLowerBound, "session")} had a cache-write cost that is a lower bound`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(see docs/cost-model.md)", muted: true });
+  }
   // SPEC-0026 R4 (round 2) — the route to the full per-tool story, always the
   // last note: point at the details section when one follows, else the command.
   blocks.push(

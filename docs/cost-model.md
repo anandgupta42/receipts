@@ -24,7 +24,7 @@ introduced.
 | `unattributable-anchor-pool` | A cross-repo/worktree session touched this branch but can only fall back to "entire session" — too uncertain to credit precisely. | Total floors `≥`; a distinct note: "N session(s) touched this branch but couldn't be attributed precisely". Counted, **never silent** (this closed the coverage-map C.2 hole — the mirror of the #87 over-credit bug). |
 | `silenced-git-write` | A repo+window candidate not proven ours (no branch SHA — quiet commit, cherry-pick, foreign work). | Total floors `≥`; "N candidate session(s) not attributed (in repo + branch window, no branch commit)". |
 | `unreadable-subagent` | A subagent transcript that couldn't be parsed. | Total floors `≥`; "N unreadable subagent(s) not priced". Always listed, never dropped. |
-| `cost-lower-bound-cache-tier` | Cache-write tokens priced at a lower-bound rate because the 5m/1h TTL split is absent (older Claude Code; all opencode). | *(emitter lands in the follow-up build — see Known gaps.)* When wired: a muted "cache-write cost is a lower bound for this session" caveat. |
+| `cost-lower-bound-cache-tier` | Cache-write tokens priced at a lower-bound rate because the *vendor's price row doesn't cite* the applicable cache-write rate, so the fallback to the base `input` rate actually understates cost. **Row-aware, not usage-only:** an unsplit (or partially split) cache-write is priced under the documented 5m-tier assumption — that's exact, not a caveat, whenever the row cites `input_cache_write_5m` (every Anthropic model does, so Claude Code sessions never trigger this, split or not). It fires for vendors whose price table cites no cache-write rate at all (openai, google, deepseek today) — a session on one of those models with any cache-write tokens genuinely under-reports. | Total floors `≥`; the single-session receipt carries a muted "cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)" caveat, and the PR body's confidence summary counts affected sessions ("N session(s) had a cache-write cost that is a lower bound"). Fires only for a *priced* turn whose cache-write actually took the uncited-rate fallback — a session with no cache-write at all, an unpriceable session, or a priced turn on a vendor that cites the applicable tier rate, never triggers it. |
 
 ## Per-agent extraction depth (what can be priced)
 
@@ -43,8 +43,6 @@ introduced.
   timestamps + cwd; that is its **own spec**. Until then this is a documented
   blind spot: a PR built with a Cursor Background Agent can under-report a whole
   contributor. (See trust.md.)
-- **A3 — cache-tier lower bound** is declared in the ConfidenceEvent union; its
-  emitter + caveat land in the SPEC-0044 follow-up build.
 - **Reasoning-token rate** — Codex/opencode/Gemini fold reasoning tokens into
   `output`; no vendor in `data/prices/` prices reasoning distinctly today, so
   this is a documented assumption to revisit if a price row ever needs it.

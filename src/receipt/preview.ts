@@ -39,5 +39,6 @@ export function previewModel(): ReceiptModel {
     methodology: "preview",
     priceRowsUsed: [],
     unpriceable: false,
+    costLowerBoundCacheTier: false,
   };
 }

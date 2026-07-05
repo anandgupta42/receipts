@@ -147,6 +147,80 @@ describe("attributeByTool", () => {
     expect(result.totalUsd).toBeCloseTo(2.0, 10);
   });
 
+  it("SPEC-0044 A3: flags costLowerBoundCacheTier when a priced turn's cache-write falls back to an uncited rate (openai: no input_cache_write_5m cited)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "gpt-5.4-mini",
+      usage: usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1000 }), // no cacheCreation5m/1h at all
+      toolCalls: [{ name: "read" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.costLowerBoundCacheTier).toBe(true);
+  });
+
+  it("SPEC-0044 A3: does NOT flag costLowerBoundCacheTier for an unsplit cache-write when the vendor cites the 5m rate (Anthropic priced exactly, even though the transcript never split it)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-opus-4-8",
+      usage: usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1000 }), // unsplit, but Anthropic's row cites input_cache_write_5m
+      toolCalls: [{ name: "read" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.costLowerBoundCacheTier).toBe(false);
+  });
+
+  it("SPEC-0044 A3: does NOT flag costLowerBoundCacheTier when the turn's cache-write tiers are fully split (Anthropic, both tiers cited)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-opus-4-8",
+      usage: {
+        ...usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1000 }),
+        cacheCreation5m: 600,
+        cacheCreation1h: 400,
+      },
+      toolCalls: [{ name: "read" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.costLowerBoundCacheTier).toBe(false);
+  });
+
+  it("SPEC-0044 A3: does NOT flag costLowerBoundCacheTier for an unsplit cache-write on an UNPRICED turn (kill-criterion: gated on turnUsd !== null)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-unknown-model-xyz",
+      usage: usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1000 }), // unsplit, but model has no price row
+      toolCalls: [{ name: "read" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalUsd).toBeNull();
+    expect(result.costLowerBoundCacheTier).toBe(false);
+  });
+
+  it("SPEC-0044 A3: stays false across an all-clean multi-turn session (no false positive on ordinary priced turns with no cache-write)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-opus-4-8",
+      usage: usage({ input: 1000, output: 500, cacheRead: 200, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.costLowerBoundCacheTier).toBe(false);
+  });
+
   it("exports METHODOLOGY verbatim and stamps it onto every result", async () => {
     expect(typeof METHODOLOGY).toBe("string");
     expect(METHODOLOGY).toContain("(thinking/reply)");

@@ -30,8 +30,10 @@ export type ConfidenceEvent =
   | { kind: "silenced-git-write"; sessionId: string }
   // A subagent transcript that couldn't be parsed — listed, never dropped.
   | { kind: "unreadable-subagent"; sessionId: string }
-  // A3: cache-write tokens priced at a lower-bound rate because the 5m/1h tier
-  // split is absent — the receipt's cost for that session is a floor.
+  // A3: cache-write tokens priced at the base input rate because the vendor's
+  // price row cites no cache-write rate — the receipt's cost is a floor. (Not
+  // triggered by an absent 5m/1h split alone: a cited 5m rate prices an unsplit
+  // write exactly, so Anthropic/Claude Code never floors here.)
   | { kind: "cost-lower-bound-cache-tier"; sessionId: string };
 
 export interface ConfidenceSummary {
@@ -41,7 +43,7 @@ export interface ConfidenceSummary {
   silencedGitWrite: number;
   /** subagents that couldn't be parsed. */
   unreadableSubagent: number;
-  /** sessions whose cache-write cost is a lower bound (tier unknown). */
+  /** sessions whose cache-write cost is a lower bound (no published cache-write rate). */
   costLowerBoundCacheTier: number;
 }
 

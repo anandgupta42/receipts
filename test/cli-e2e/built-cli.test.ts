@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { handoffJsonSchema } from "../../src/receipt/exportSchema.js";
+import { handoffJsonSchema, receiptJsonSchema } from "../../src/receipt/exportSchema.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
@@ -251,6 +251,41 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("Claude Code");
     expect(result.stdout).toContain("TOTAL");
     expect(result.stdout).toContain("Per-turn cost split");
+  });
+
+  // SPEC-0044 A3 (e2e through the real built CLI, not just runPr): the caveat
+  // is row-aware, not usage-only — it fires only when the vendor's price row
+  // doesn't cite a cache-write rate, so the fallback to base `input` actually
+  // understates cost. `cache-tier-fallback-unsplit.jsonl` uses an openai model
+  // (no `input_cache_write_5m`/`1h` cited in data/prices/openai.json), so its
+  // unsplit cache-write falls back to the base rate — genuine lower bound.
+  // `cache-tier-fallback-split.jsonl` uses an Anthropic model whose row cites
+  // both TTL tiers, so it prices exactly — no caveat — the negative control.
+  // (test/fixtures/claude-code/cache-tier-fallback-*.jsonl; through the actual
+  // dist/cli.js binary: parse → attributeByTool → buildReceiptModel → render.)
+  it("SPEC-0044 A3: an unsplit cache-write session on a vendor with no cited cache-write rate renders the lower-bound caveat on the text receipt and the schema-valid `--json` export", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "cache-tier-fallback-unsplit.jsonl");
+
+    const textResult = await runCli([], home);
+    expectSuccess(textResult);
+    expect(textResult.stdout).toContain("caveat: cache-write cost is a lower bound for this session");
+
+    const receipt = readJson<ReceiptJson & { caveats: Array<{ kind: string; text: string }> }>(await runCli(["--json"], home));
+    expect(receipt.caveats.some((c) => c.kind === "cost-lower-bound-cache-tier")).toBe(true);
+    expect(receiptJsonSchema.safeParse(receipt).success).toBe(true);
+  });
+
+  it("SPEC-0044 A3 negative control: an Anthropic session (cited 5m/1h rates) renders NO caveat even with cache-write tokens (no false positive)", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "cache-tier-fallback-split.jsonl");
+
+    const textResult = await runCli([], home);
+    expectSuccess(textResult);
+    expect(textResult.stdout).not.toContain("cache-write cost is a lower bound");
+
+    const receipt = readJson<ReceiptJson & { caveats: Array<{ kind: string; text: string }> }>(await runCli(["--json"], home));
+    expect(receipt.caveats.some((c) => c.kind === "cost-lower-bound-cache-tier")).toBe(false);
   });
 
   it("prints the no-session message with the searched sandbox roots and exit 0", async () => {

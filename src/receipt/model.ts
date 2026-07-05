@@ -84,6 +84,8 @@ export interface ReceiptModel {
   priceRowsUsed: PriceRowUsed[];
   /** Cursor's degraded mode (R1): no per-turn model/usage, session totals only. */
   unpriceable: boolean;
+  /** SPEC-0044 A3 — true when `totalUsd` includes a cache-write fallback price (unsplit TTL remainder), so the total is a lower bound. Mirrored into `caveats` as a rendered note; also folded into a `ConfidenceEvent` at the PR layer (src/pr/index.ts). */
+  costLowerBoundCacheTier: boolean;
 }
 
 /**
@@ -246,6 +248,19 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
 
   const priceRowsUsed = await collectPriceRowsUsed(session, dataDir);
   const caveats = detectTimeCaveats(session);
+  // SPEC-0044 A3 — `costLowerBoundCacheTier` is only ever set from a PRICED
+  // turn whose cache-write actually fell back to an uncited rate
+  // (attribution.ts guards on `priced !== null && priced.cacheWriteLowerBound`,
+  // row-aware via `cacheWriteIsLowerBound` — not fired for every unsplit
+  // write, only when the vendor's price row lacks the applicable cache-write
+  // rate), so `totalUsd` is guaranteed non-null here; the caveat is meaningful
+  // only once a `$` exists for it to bound.
+  if (attribution.costLowerBoundCacheTier) {
+    caveats.push({
+      kind: "cost-lower-bound-cache-tier",
+      text: "caveat: cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)",
+    });
+  }
 
   const durationMs =
     session.totals.durationMs ??
@@ -271,5 +286,6 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     methodology: attribution.methodology ?? METHODOLOGY,
     priceRowsUsed,
     unpriceable: session.unpriceable === true,
+    costLowerBoundCacheTier: attribution.costLowerBoundCacheTier,
   };
 }

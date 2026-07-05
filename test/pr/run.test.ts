@@ -594,3 +594,48 @@ describe("SPEC-0027 --artifact (e2e through runPr)", () => {
     });
   });
 });
+
+// SPEC-0044 A3 (e2e through runPr) — the real bug this closes: a session whose
+// cache-write cost took the unsplit-tier fallback rendered an exact-looking
+// dollar total with no signal it was a floor. These two fixtures are IDENTICAL
+// in shape/tokens (see test/fixtures/claude-code/cache-tier-fallback-*.jsonl) —
+// only whether the remainder is split into a nested cache_creation object
+// differs — so this is a true positive/negative pair through the FULL pipeline
+// (parse → attributeByTool → buildContributorView → the costEvents collection
+// in src/pr/index.ts → summarizeConfidence → renderPrReceiptText), not just the
+// unit-level summarizeConfidence/renderPrReceiptText tests in confidence.test.ts.
+describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e through runPr)", () => {
+  const CACHE_TIER_UNSPLIT = path.join(FIX, "..", "claude-code", "cache-tier-fallback-unsplit.jsonl");
+  const CACHE_TIER_SPLIT = path.join(FIX, "..", "claude-code", "cache-tier-fallback-split.jsonl");
+
+  it("RED-then-GREEN positive: an unsplit cache-write session floors the total and renders the caveat + docs pointer", async () => {
+    const session = (await loadById("claude-code", CACHE_TIER_UNSPLIT))!;
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [session],
+      loadSession: async (summary) => loadById(summary.source, summary.id),
+    });
+    const code = await runPr({ post: false, session: session.id }, deps);
+    expect(code).toBe(0);
+    expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
+    expect(out[0]).toContain("1 session had a cache-write cost that is a lower bound");
+    expect(out[0]).toContain("(see docs/cost-model.md)");
+    // The `≥` floor prefix (isFloored) fires for this event kind (A3's own
+    // "at least this much" meaning matches the existing floor semantics —
+    // see the floor-semantics decision recorded in the PR description).
+    expect(out[0]).toMatch(/TOTAL priced\.+≥/);
+  });
+
+  it("negative control: the SAME shape/tokens fully split into 5m/1h tiers renders NO caveat (no false positive)", async () => {
+    const session = (await loadById("claude-code", CACHE_TIER_SPLIT))!;
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [session],
+      loadSession: async (summary) => loadById(summary.source, summary.id),
+    });
+    const code = await runPr({ post: false, session: session.id }, deps);
+    expect(code).toBe(0);
+    expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
+    expect(out[0]).not.toContain("cache-write cost that is a lower bound");
+    expect(out[0]).not.toContain("cost-model.md");
+    expect(out[0]).not.toMatch(/TOTAL priced\.+≥/);
+  });
+});
