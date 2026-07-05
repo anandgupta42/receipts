@@ -2,8 +2,8 @@
 // benchmark commands, under common ownership. Moved verbatim from the pre-refactor
 // CLI dispatcher — selector logic still delegates to the parse layer's
 // `listFullSessions`/`selectSummary`/`newestSession`; nothing is reimplemented.
-import { anyDetected, listFullSessions, newestSession, rootsHint, selectSummary } from "../../index.js";
-import type { SessionSummary } from "../../parse/types.js";
+import { anyDetected, listFullSessions, listSessions, loadSession, rootsHint, selectSummary } from "../../index.js";
+import type { Session, SessionSummary } from "../../parse/types.js";
 import { TEMPLATE_NAMES, isTemplateName } from "../../receipt/blocks.js";
 import type { TemplateName } from "../../receipt/blocks.js";
 
@@ -16,13 +16,21 @@ export async function noSessionsMessage(): Promise<string> {
 
 export async function resolveSelector(
   selector: string | undefined,
-): Promise<{ summary: SessionSummary } | { error: string }> {
+): Promise<{ summary: SessionSummary; session?: Session } | { error: string }> {
   if (selector === undefined || selector.trim() === "") {
-    const summary = await newestSession();
-    if (!summary) {
-      return { error: await noSessionsMessage() };
+    // SPEC-0045 R3 — the default receipt shows the NEWEST readable session. A
+    // corrupt/unreadable newest is skipped (fall through to the next) rather
+    // than erroring; the session is loaded here and returned so the caller
+    // renders it without a second load (same load count as before in the common
+    // case, where the newest reads fine on the first try).
+    const lazy = await listSessions();
+    for (const summary of lazy) {
+      const session = await loadSession(summary);
+      if (session) {
+        return { summary, session };
+      }
     }
-    return { summary };
+    return { error: await noSessionsMessage() };
   }
   const sessions = await listFullSessions();
   if (sessions.length === 0) {

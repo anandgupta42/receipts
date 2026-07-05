@@ -36,7 +36,9 @@ async function run(ctx: CommandContext): Promise<number> {
     ctx.stderr.write(`${resolved.error}\n`);
     return 1;
   }
-  const session = await loadSession(resolved.summary);
+  // SPEC-0045 R3 — the no-selector default already loaded a readable session
+  // (skipping any unreadable newest); reuse it, no second parse.
+  const session = resolved.session ?? (await loadSession(resolved.summary));
   if (!session) {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
     return 1;
