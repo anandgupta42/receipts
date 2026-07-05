@@ -7,7 +7,7 @@ import { checkManifest, checkTarball, MAX_TARBALL_FILES } from "../scripts/prefl
 
 const realPkg = JSON.parse(readFileSync("package.json", "utf8"));
 const realLock = JSON.parse(readFileSync("package-lock.json", "utf8"));
-const REQ = ["dist/cli.js", "README.md", "LICENSE", "data/prices/anthropic.json"];
+const REQ = ["dist/cli.js", "README.md", "LICENSE", "NOTICE", "data/prices/anthropic.json"];
 
 describe("preflight · checkManifest", () => {
   it("passes on the real manifest + lockfile", () => {
@@ -59,7 +59,7 @@ describe("preflight · checkManifest", () => {
 
 describe("preflight · checkTarball", () => {
   const good = {
-    files: [{ path: "dist/cli.js" }, { path: "data/prices/anthropic.json" }, { path: "README.md" }, { path: "LICENSE" }],
+    files: [{ path: "dist/cli.js" }, { path: "data/prices/anthropic.json" }, { path: "README.md" }, { path: "LICENSE" }, { path: "NOTICE" }],
     unpackedSize: 294 * 1024,
   };
 

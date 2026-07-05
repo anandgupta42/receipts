@@ -22,7 +22,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `cliVersion` | string | semver | From this package's `package.json`. |
 | `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | Collapsed from `process.platform`. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
-| `commandClass` | enum | `benchmark` \| `check-budget` \| `compare` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `week` | Selected command name only; never raw argv or flag values. |
+| `commandClass` | enum | `benchmark` \| `check-budget` \| `compare` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket; never raw milliseconds. |
 | `ok` | boolean | | Whether the command returned exit code 0. |
@@ -36,7 +36,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | Field | Type | Values | Notes |
 |---|---|---|---|
 | `errorClass` | enum | `parse_error` \| `io_error` \| `network_error` \| `validation_error` \| `unknown_error` | Derived from bounded error metadata; never `error.message`. |
-| `command` | enum | same 18-command enum as `cli_run.commandClass` | Never raw argv. |
+| `command` | enum | same 19-command enum as `cli_run.commandClass` | Never raw argv. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | |
 | `inPackage` | boolean | | Whether the top stack frame is inside aireceipts; the stack text never leaves the process. |
 
@@ -110,7 +110,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | Field | Type | Values | Notes |
 |---|---|---|---|
 | `milestone` | enum | `first_run` \| `first_receipt` \| `third_receipt` \| `tenth_receipt` \| `first_export` \| `first_compare` \| `first_week` \| `first_hook_install` \| `first_pr` \| `first_pr_post` \| `first_artifact` | |
-| `command` | enum | same 18-command enum as `cli_run.commandClass` | Command that caused the milestone. |
+| `command` | enum | same 19-command enum as `cli_run.commandClass` | Command that caused the milestone. |
 | `installAgeBucket` | enum | `first_day` \| `2-7d` \| `8-30d` \| `31-90d` \| `>90d` \| `unavailable` | Derived locally from `firstRunAt`; raw date is not sent. |
 
 ## Install identifier

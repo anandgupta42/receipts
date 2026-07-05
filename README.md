@@ -142,6 +142,16 @@ prints a beautiful thermal-receipt souvenir of a Claude Code session (numbers vi
 does cost-as-a-PR-comment for Terraform. aireceipts is the bookkeeping sibling:
 multi-agent parsing, cited prices, and PR-level attribution with an honesty model.
 
+## Versioning & stability
+
+Pre-1.0 (`0.x`): **minor** versions may change behavior or output, **patch**
+versions are fixes only. The receipt's byte-stability contract (I5) is the
+compatibility surface — a change that breaks byte-stability for existing golden
+receipts is a **major** bump, and won't happen inside `0.x` minors without a
+changelog callout. Every release is tagged, with notes on the
+[Releases page](https://github.com/anandgupta42/receipts/releases) and in
+[the changelog](docs/CHANGELOG.md).
+
 ## Contributing
 
 aireceipts is designed and largely built by AI agents under a spec-driven harness —

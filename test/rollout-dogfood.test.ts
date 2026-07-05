@@ -2,7 +2,7 @@
 // idempotent, and provably write-free (every gh call it makes is a plain GET).
 import { describe, expect, it } from "vitest";
 import type { CommandResult } from "../src/pr/git.js";
-import { activeRepos, buildReport, CALLER_YAML } from "../scripts/rollout-dogfood.mts";
+import { activeRepos, buildReport, CALLER_YAML, parseOrgArg } from "../scripts/rollout-dogfood.mts";
 
 const NOW = Date.parse("2026-07-03T00:00:00Z");
 const day = 86_400_000;
@@ -35,7 +35,7 @@ function runner(opts: { published: boolean; repos: string[]; withCaller: string[
 describe("SPEC-0030 R4 rollout report", () => {
   it("refuses before npm publish (kill criterion b), exit 2", () => {
     const { run } = runner({ published: false, repos: [], withCaller: [] });
-    const r = buildReport(run, "altimateai", 90, NOW);
+    const r = buildReport(run, "example-org", 90, NOW);
     expect(r.code).toBe(2);
     expect(r.text).toContain("not on npm");
   });
@@ -52,16 +52,23 @@ describe("SPEC-0030 R4 rollout report", () => {
 
   it("skips repos already carrying the caller (idempotence) and packets the rest", () => {
     const { run } = runner({ published: true, repos: [repoLine("has-it", 3), repoLine("needs-it", 3)], withCaller: ["has-it"] });
-    const r = buildReport(run, "altimateai", 90, NOW);
+    const r = buildReport(run, "example-org", 90, NOW);
     expect(r.code).toBe(0);
     expect(r.text).toContain("has-it: already carries the caller — skipped");
-    expect(r.text).toContain("### altimateai/needs-it");
+    expect(r.text).toContain("### example-org/needs-it");
     expect(r.text).toContain(CALLER_YAML.trimEnd());
+  });
+
+  it("has no built-in org default: --org is required and errors with usage on missing/flag-shaped value", () => {
+    expect(parseOrgArg(["node", "rollout-dogfood.mjs", "--days", "90"])).toEqual({ error: expect.stringContaining("Usage:") });
+    expect(parseOrgArg(["node", "rollout-dogfood.mjs", "--org"])).toEqual({ error: expect.stringContaining("Usage:") });
+    expect(parseOrgArg(["node", "rollout-dogfood.mjs", "--org", "--days"])).toEqual({ error: expect.stringContaining("Usage:") });
+    expect(parseOrgArg(["node", "rollout-dogfood.mjs", "--org", "example-org"])).toEqual({ org: "example-org" });
   });
 
   it("performs no GitHub mutations: every gh call is a plain read (no -X/-f/-F flags)", () => {
     const { run, calls } = runner({ published: true, repos: [repoLine("r1", 1), repoLine("r2", 2)], withCaller: [] });
-    buildReport(run, "altimateai", 90, NOW);
+    buildReport(run, "example-org", 90, NOW);
     for (const c of calls.filter((c) => c[0] === "gh")) {
       expect(c.some((a) => a === "-X" || a === "--method" || a === "-f" || a === "-F"), `mutating flag in: ${c.join(" ")}`).toBe(false);
     }

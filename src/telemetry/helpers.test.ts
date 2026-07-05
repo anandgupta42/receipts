@@ -58,7 +58,7 @@ describe("bucketDuration: R2 coarse buckets, never the raw millisecond count", (
   });
 });
 
-describe("toCommandTelemetry: R2 closed 18-command taxonomy", () => {
+describe("toCommandTelemetry: R2 closed 19-command taxonomy", () => {
   it.each([
     ["receipt", "receipt"],
     ["RECEIPT", "receipt"],
@@ -66,6 +66,7 @@ describe("toCommandTelemetry: R2 closed 18-command taxonomy", () => {
     ["compare", "compare"],
     ["COMPARE", "compare"],
     ["stats", "stats"],
+    ["version", "version"],
   ] as const)("maps %j to %s", (command, expected) => {
     expect(toCommandTelemetry(command)).toBe(expected);
   });
