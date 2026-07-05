@@ -116,6 +116,52 @@ empty cell, never a fabricated fixture.
   maintainer explicitly wants real-world confidence across all four agents. It
   is a tool + a success-criterion (maintainer runs it and pastes the summary),
   explicitly not a mechanical product invariant (S2 finding 7).
+- **R8 — B1: displayed rows must sum to the displayed TOTAL (this PR).** A
+  fourth adversarial re-evaluation (`docs/internal/cost-attribution-review-findings.md`)
+  found a **visible** self-contradiction the earlier reviews missed: priced
+  rows are `formatUsd`'d independently while the TOTAL sums the RAW `usd` and
+  rounds separately — no shared rounding basis, so a receipt can show rows
+  that don't add up to its own total (e.g. 3 rows @ $0.004 → rows show
+  $0.00×3, Σ $0.00, but TOTAL $0.01). Fix: `reconcileCents`
+  (`src/receipt/format.ts`) — largest-remainder / Hamilton's method — keeps
+  TOTAL as today's correctly-rounded raw sum and apportions its cents across
+  rows (floor each row, hand leftover cents to the largest fractional
+  remainders) so displayed rows sum EXACTLY to the displayed total. Applies
+  wherever priced rows sit beside their total: single-session receipt tool
+  rows (`present.ts`) and PR-body contributor/subagent rows (`body.ts`).
+  Display-only — `--json` and all underlying `usd`/`totalUsd` values are
+  unchanged. Enforced by an invariant, not a snapshot: `test/pr/ledger.test.ts`
+  Tier 2 tightened from a tolerated per-row drift bound to exact equality
+  (Σ displayed row cents == displayed TOTAL cents), plus
+  `test/receipt/reconcile.test.ts` unit-testing `reconcileCents` (proof cases,
+  negatives, zero, single-row, empty, ties) and end-to-end across every
+  template.
+- **R9 — B3: per-record parse-skip must emit a `ConfidenceEvent` (pending).**
+  `readJsonl` (`util.ts`) silently `continue`s on a malformed line with no
+  event and no skip-count surfaced to callers; a crash-truncated line in a
+  *credited* session drops that turn's cost with nothing to show for it.
+  Deferred — not part of this PR.
+- **R10 — B4: whole-candidate load failure must emit a `ConfidenceEvent`
+  (pending).** `contributors.ts` drops an unloadable anchor-pool/sibling-repo
+  candidate with no event; `promote.ts` drops any unloadable sidechain
+  unconditionally. R1/A1 only covers *loaded-but-full-fallback*, not
+  *failed-to-load* — "couldn't read" is a distinct forbidden state from "no
+  anchor". Deferred — not part of this PR.
+- **R11 — B5: grandchild subagent double-count (pending).** If P→A→B and A
+  independently commits (becoming a top-level contributor excluded from P's
+  rollup), B is not itself a contributor so isn't excluded — P's recursive
+  child discovery finds B *and* A's own rollup finds B, counting B twice.
+  Needs subtree-aware rollup dedup. Deferred — not part of this PR.
+- **R12 — M1/M2: broaden the silent-drop hygiene check; resolve dead
+  `ConfidenceEvent` variants (pending).** The hygiene check
+  (`scripts/hygiene.mjs`) only regex-bans `excludedCount` mutation in three
+  files, not the real shapes a silent drop takes (bare `continue`,
+  `return []`, helper-file drops, pricing-path drops) — this is why B1–B4
+  slipped past the R1 contract's own enforcement claim. Separately,
+  `unreadable-subagent` and `cost-lower-bound-cache-tier` are declared
+  `ConfidenceEvent` variants that are never actually minted; either wire real
+  emitters or delete them and document the legacy path honestly. Deferred —
+  not part of this PR.
 
 ## Scenarios
 
@@ -132,6 +178,9 @@ empty cell, never a fabricated fixture.
   fails CI.
 - **Given** a new `ConfidenceEvent` variant with no rendered signal, **then** R1
   fails to compile / the hygiene check fails.
+- **Given** priced rows whose individually-rounded cents don't sum to the raw
+  total's own rounding, **then** the displayed rows are cent-reconciled so
+  their sum equals the displayed TOTAL exactly (R8/B1) — never merely close.
 
 ## Non-goals
 
@@ -164,6 +213,11 @@ empty cell, never a fabricated fixture.
 | R7 self-check | run on a fixture home | reconcile + events-fired summary; zero content leaked |
 | C1 codex reasoning fold | codex fixture w/ `reasoning_output_tokens` | lands in output total (regression guard) |
 | C3 grandchild subagent | 2-level-nested fixture | priced or counted-absent — never silently missing |
+| R8/B1 row reconciliation | 3 rows @ $0.004 (naive Σ $0.00 vs TOTAL $0.01); 2 rows @ $0.006 (naive Σ $0.02 vs TOTAL $0.01) | displayed rows sum exactly to displayed TOTAL, both templates and render paths (single-session + PR body) |
+| R9/B3 parse-skip *(deferred)* | a credited JSONL session with one malformed/truncated line | a ConfidenceEvent fires + the total floors `≥`; not a silent drop |
+| R10/B4 load-failure *(deferred)* | an anchor-pool / sibling-worktree / sidechain candidate that fails to load | a ConfidenceEvent fires; not silently skipped |
+| R11/B5 grandchild dedup *(deferred)* | P→A→B where A independently commits | B counted once (subtree-aware rollup dedup), not under both P and A |
+| R12/M1+M2 *(deferred)* | a bare contributor-drop `continue`; a never-emitted ConfidenceEvent variant | hygiene check fails on the drop; every declared variant is emitted or deleted |
 
 ## Success criteria
 
@@ -244,3 +298,58 @@ zod resolution; the compiler-exhaustiveness guarantee is unchanged.
 priority hole, in BOTH contributors.ts and promote.ts) + R6 docs. A3
 (cache-tier caveat — variant declared, emitter deferred), the matrix (R3-R5),
 and `--self-check` (R7) are the remaining build under this `building` spec.
+
+**2026-07-05 · four-review re-evaluation (Codex + money-math re-derivation +
+honesty forbidden-state red-team + test-quality/mutation audit):** with R1/A1
+merged, the team re-attacked the whole money path rather than assume it was
+now settled. The reviews found six further real bugs the earlier research,
+spec, and first build all missed
+(`docs/internal/cost-attribution-review-findings.md`), one of them — B1 —
+**visible with no failure required**: displayed per-row amounts don't sum to
+the displayed TOTAL, because rows and the total round independently with no
+shared basis. Ranked by the reviews as highest priority precisely because it's
+visible (a skeptic adds the column and it doesn't match), B1 is recorded here
+as **R8** and lands in this PR. B3/B4/B5/M1/M2 are recorded as **R9-R12**,
+deferred to their own builds per the fix program's ordering (B1 first).
+Verified-not-bugs from this pass: A1 cannot double-count across
+`contributors.ts`/`promote.ts` (sorted XOR at `index.ts:165`);
+`bodyInput.confidence` is always populated at the real CLI call site, so the
+"confidence omitted" path is type-only and unreachable; `summarizeConfidence`
+exhaustiveness forces a case but not necessarily a rendered signal (a
+follow-on note for R12, not a new bug).
+
+**2026-07-05 · R8/B1 implementation:** `reconcileCents`/`formatCentsAmount`
+added to `src/receipt/format.ts` (largest-remainder apportionment; TOTAL's own
+rounding is untouched, only row splits are computed); wired into
+`present.ts` (`reconciledRowText`, keyed by `ToolRow` object reference so
+`buildDatavis`'s filtered row subsets still align) and `body.ts`
+(`reconciledAtomText`, keyed by `ContributorView | SubagentRow` reference).
+`test/pr/ledger.test.ts`'s Tier 2 assertion tightened from a tolerated
+per-row drift bound to exact equality; `test/receipt/reconcile.test.ts` added
+covering `reconcileCents` directly (proof cases, negatives, zero, single-row,
+empty, all-tied remainders, a 300-run fast-check property) plus end-to-end
+render-path assertions for both proof cases across all three templates and
+both the single-session and PR-body paths. A genuine but separate
+completeness gap was found in the process and flagged out of scope: nothing
+in `src/pr/contributors.ts`/`body.ts` structurally guarantees a `helper`-basis
+contributor has empty `subagents` — `helperGroupBlocks` renders exactly one
+row per helper with no loop over `h.subagents`, while `collectAtoms`/
+`totalsFor` sum ALL contributors' subagents unconditionally into the priced
+total. If a helper ever has priced subagents, those dollars count toward
+TOTAL but are never rendered as any row — a visibility/completeness gap,
+different in kind from B1's rounding-drift bug.
+
+**2026-07-05 · R8/B1 takeover review (Codex, 3 rounds): REWORK×2 → PASS.** The
+lead finalized the build (the builder stalled pre-push) and ran the deferred
+Codex review, which turned the "future work" note above into a fix:
+1. HIGH — helper subagents counted in TOTAL but never drawn (the gap above) →
+   `helperGroupBlocks` now renders each helper's subagents as their own rows,
+   matching how `contributorBlocks` draws author subagents. Counted == drawn.
+2. HIGH — a first attempt *folded* helper subagents into one helper atom; the
+   ledger property test (helper-subagent generation un-masked) found the fold
+   hid a tokens-only helper's genuinely-unpriced tokens (`usd:null` helper +
+   priced child → the 1000 unpriced tokens vanished from `TOTAL unpriced`).
+   Rejected the fold; kept per-subagent accounting + rendering instead.
+3. LOW — stale test comment corrected. Goldens byte-identical (fixtures carry
+   no helper subagents). Final Codex verdict: PASS, no HIGH/MED. The invariant
+   now holds for BOTH the priced-`$` and unpriced-token subtotals.

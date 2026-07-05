@@ -19,7 +19,7 @@ import {
   sessionToken,
 } from "./blocks.js";
 import type { Block, ReceiptView, TemplateName } from "./blocks.js";
-import { formatAbsoluteUtc, formatDuration, formatInt, formatUsd } from "./format.js";
+import { formatAbsoluteUtc, formatCentsAmount, formatDuration, formatInt, formatUsd, reconcileCents } from "./format.js";
 import type { ReceiptModel, ToolRow, WasteLine } from "./model.js";
 import type { TokenUsage } from "../parse/types.js";
 
@@ -137,17 +137,26 @@ function countLabel(row: ToolRow): string {
   return `(${formatInt(row.callCount)} ${unit}${row.callCount === 1 ? "" : "s"})`;
 }
 
+/** B1 — every priced row's cent-reconciled display string, keyed by object reference (`buildDatavis` filters `toolRows` into subsets, so a position-based lookup would misalign). Same atom universe `model.totalUsd` itself sums, so rows always add up to TOTAL by construction. */
+function reconciledRowText(model: ReceiptModel): Map<ToolRow, string> {
+  const priced = model.toolRows.filter((r) => r.usd !== null);
+  const cents = reconcileCents(priced.map((r) => r.usd as number));
+  const map = new Map<ToolRow, string>();
+  priced.forEach((row, i) => map.set(row, formatCentsAmount(cents[i])));
+  return map;
+}
+
 /** The bare amount for one tool row: `$X.XX`, `N tok`, or `""` in Cursor's degraded (per-tool tokens always zero) mode. */
-function rowAmount(row: ToolRow, model: ReceiptModel): string {
+function rowAmount(row: ToolRow, model: ReceiptModel, reconciled: Map<ToolRow, string>): string {
   if (model.unpriceable) {
     return "";
   }
-  return row.usd !== null ? `$${formatUsd(row.usd)}` : `${formatInt(row.tokens.total)} tok`;
+  return row.usd !== null ? `$${reconciled.get(row) ?? formatUsd(row.usd)}` : `${formatInt(row.tokens.total)} tok`;
 }
 
 /** The classic `.`-leader value: amount + count (or count alone in Cursor mode). */
-function classicRowValue(row: ToolRow, model: ReceiptModel): string {
-  const amt = rowAmount(row, model);
+function classicRowValue(row: ToolRow, model: ReceiptModel, reconciled: Map<ToolRow, string>): string {
+  const amt = rowAmount(row, model, reconciled);
   return amt === "" ? countLabel(row) : `${amt}  ${countLabel(row)}`;
 }
 
@@ -247,12 +256,13 @@ function tailBlocks(model: ReceiptModel, footer: Block): Block[] {
 // --- classic (default; byte-identical to pre-SPEC-0020) ----------------------
 
 function buildClassic(model: ReceiptModel): Block[] {
+  const reconciled = reconciledRowText(model);
   const blocks: Block[] = [
     { kind: "masthead", text: WORDMARK },
     { kind: "meta", lines: metaLines(model) },
   ];
   model.toolRows.forEach((row, i) => {
-    blocks.push({ kind: "row", label: row.tool, value: classicRowValue(row, model), spaceBefore: i === 0 });
+    blocks.push({ kind: "row", label: row.tool, value: classicRowValue(row, model, reconciled), spaceBefore: i === 0 });
   });
   model.wasteLines.forEach((waste, i) => {
     const block = classicWasteBlock(waste);
@@ -265,6 +275,7 @@ function buildClassic(model: ReceiptModel): Block[] {
 // --- grocery (the shareable meme; Receiptify column mechanics) ---------------
 
 function buildGrocery(model: ReceiptModel): Block[] {
+  const reconciled = reconciledRowText(model);
   const dominantModel = model.modelMix[0]?.model ?? "unknown";
   const token = sessionToken(model.sessionId);
   const blocks: Block[] = [
@@ -274,7 +285,7 @@ function buildGrocery(model: ReceiptModel): Block[] {
     { kind: "columnHeader", item: "ITEM", qty: "QTY", amt: "AMT" },
   ];
   for (const row of model.toolRows) {
-    const amt = rowAmount(row, model);
+    const amt = rowAmount(row, model, reconciled);
     blocks.push({ kind: "row", label: row.tool, value: amt, columns: { qty: formatInt(row.callCount), amt } });
   }
   if (model.wasteLines.length > 0) {
@@ -307,14 +318,15 @@ function buildGrocery(model: ReceiptModel): Block[] {
 
 const DATAVIS_LEGEND = "[##########] = priciest line; others in proportion";
 
-function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number): Block {
-  const amt = rowAmount(row, model);
+function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number, reconciled: Map<ToolRow, string>): Block {
+  const amt = rowAmount(row, model, reconciled);
   const bar = normalizedBar(rowMetric(row, model), max);
   const value = amt === "" ? bar : `${amt} ${bar}`;
   return { kind: "row", label: row.tool, value };
 }
 
 function buildDatavis(model: ReceiptModel): Block[] {
+  const reconciled = reconciledRowText(model);
   const max = model.toolRows.reduce((m, row) => Math.max(m, rowMetric(row, model)), 0);
   const modelOutput = model.toolRows.filter((r) => r.tool === THINKING_REPLY);
   const toolCalls = model.toolRows.filter((r) => r.tool !== THINKING_REPLY);
@@ -327,13 +339,13 @@ function buildDatavis(model: ReceiptModel): Block[] {
   if (modelOutput.length > 0) {
     blocks.push({ kind: "note", text: "--- MODEL OUTPUT ---", spaceBefore: true });
     for (const row of modelOutput) {
-      blocks.push(datavisRowBlock(row, model, max));
+      blocks.push(datavisRowBlock(row, model, max, reconciled));
     }
   }
   if (toolCalls.length > 0) {
     blocks.push({ kind: "note", text: "--- TOOL CALLS ---", spaceBefore: true });
     for (const row of toolCalls) {
-      blocks.push(datavisRowBlock(row, model, max));
+      blocks.push(datavisRowBlock(row, model, max, reconciled));
     }
   }
   model.wasteLines.forEach((waste, i) => {
