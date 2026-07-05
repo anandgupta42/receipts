@@ -75,7 +75,7 @@ async function runMain(argv: string[], seedNotice = true): Promise<RunResult> {
 
 // R8 + Test matrix "R2 selectors": the full current selector → command table.
 // This is the committed command inventory snapshot; the set of distinct targets
-// is the 19 commands the registry must reproduce.
+// is the 20 commands the registry must reproduce.
 const SELECTION_TABLE: ReadonlyArray<readonly [string[], string]> = [
   [[], "receipt"],
   [["some-selector"], "receipt"],
@@ -87,6 +87,7 @@ const SELECTION_TABLE: ReadonlyArray<readonly [string[], string]> = [
   [["-h"], "help"],
   [["--version"], "version"],
   [["-v"], "version"],
+  [["--demo"], "demo"],
   [["--methodology"], "methodology"],
   [["--telemetry-show"], "telemetry-show"],
   [["--quota"], "quota"],
@@ -107,13 +108,14 @@ describe("SPEC-0018 R8 · command inventory snapshot (resolveCommand)", () => {
     expect(await resolveCommand(argv)).toBe(expected);
   });
 
-  it("covers exactly the 19 current commands", () => {
+  it("covers exactly the 20 current commands", () => {
     const distinct = new Set(SELECTION_TABLE.map(([, cmd]) => cmd));
     expect([...distinct].sort()).toEqual(
       [
         "benchmark",
         "check-budget",
         "compare",
+        "demo",
         "handoff",
         "help",
         "install-hook",
