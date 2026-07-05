@@ -1,15 +1,18 @@
 ---
-id: SPEC-0046
+id: SPEC-0048
 title: "Positioning pass — work-unit receipts lead the README, plus an end-user FAQ"
 status: building
 milestone: M5
 depends: [SPEC-0025, SPEC-0029]
 ---
 
-# SPEC-0046: Positioning pass — work-unit receipts lead the README, plus an end-user FAQ
+# SPEC-0048: Positioning pass — work-unit receipts lead the README, plus an end-user FAQ
 
-*Numbering note: SPEC-0045 is left unassigned — it is reserved for renumbering the
-colliding day-1-setup spec currently sitting on PR #119 as a second SPEC-0043.*
+*Numbering note: renumbered from 0046 to 0048 on 2026-07-05 — 0045 landed as
+`SPEC-0045-discovery-load-failure` (#128) and 0046 as the rejected
+`SPEC-0046-pr-backfill` (#133) while this branch was open. The side-session
+ID-collision pattern recurs because `spec-lint` checks structure only, not
+duplicate ids across filenames; a duplicate-id check is worth adding.*
 
 Invariants: **I5** (every receipt shown in README stays byte-pinned to a golden; the
 guard budgets in `test/readme-guard.test.ts` are caps this spec must fit inside),

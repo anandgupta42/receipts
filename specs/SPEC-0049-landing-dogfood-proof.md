@@ -1,16 +1,16 @@
 ---
-id: SPEC-0047
+id: SPEC-0049
 title: "Landing-page parity — the dogfood proof on the PR-receipt tile"
 status: building
 milestone: M5
-depends: [SPEC-0021, SPEC-0046]
+depends: [SPEC-0021, SPEC-0048]
 ---
 
-# SPEC-0047: Landing-page parity — the dogfood proof on the PR-receipt tile
+# SPEC-0049: Landing-page parity — the dogfood proof on the PR-receipt tile
 
 ## Purpose
 
-SPEC-0046 put the dogfood proof — *this repo runs on it; every PR carries the receipt
+SPEC-0048 put the dogfood proof — *this repo runs on it; every PR carries the receipt
 of the sessions that built it* — on the README's first screen, because it is the one
 claim no competitor can copy without copying the harness. The landing page
 (`site/index.html`, SPEC-0021) is the other first-contact surface and does not make
@@ -55,10 +55,10 @@ Exact paragraph, verbatim (link text and href verbatim):
 
 - **Reordering the hero to lead with PR receipts.** SPEC-0021's page IS a session
   receipt end to end; forcing PR-first would fight the design. The README reordered a
-  bullet list (SPEC-0046 R2); the landing page keeps its session-receipt narrative and
+  bullet list (SPEC-0048 R2); the landing page keeps its session-receipt narrative and
   gains the dogfood proof as the credibility line on the tile that already earns it.
 - **Crediting ccusage on the landing page.** The ccusage differentiation lives in the
-  README Related-work section and `docs/faq.md` (SPEC-0046 R3/R4) — where a
+  README Related-work section and `docs/faq.md` (SPEC-0048 R3/R4) — where a
   comparison-shopping reader actually lands. The landing page is a 30-second conversion
   surface (SPEC-0021 Purpose); competitor copy there dilutes it. Recorded as a
   deliberate decision, not an oversight.

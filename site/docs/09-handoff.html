@@ -342,7 +342,7 @@ claude-opus-4-8 100%
 total $0.09 · 6 turns · 5 tool calls
 - Bash loop ×5: $0.08, 3m 45s wall-clock
 
-covers: 6 turns · 5 tool calls · 0 compactions · 1 waste lines</code></pre>
+covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line</code></pre>
 
 <p>The block opens with the session's state — agent, when, how long, which models, what it cost, how many turns and tool calls (plus a compaction count when any fired) — then lists the waste lines with what each one cost, and closes with a <code>covers:</code> line stating exactly what the packet accounts for. Everything is extracted from the transcript, never summarized, so nothing can be paraphrased away. Paste it into your next prompt (or your <code>CLAUDE.md</code>) so the agent knows what to avoid — here, a Bash command it re-ran five times over nearly four minutes.</p>
 

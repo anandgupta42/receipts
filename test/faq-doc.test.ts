@@ -1,4 +1,4 @@
-// SPEC-0046 R6 — the FAQ exists, answers stay grounded and short, every
+// SPEC-0048 R6 — the FAQ exists, answers stay grounded and short, every
 // relative link resolves, and internal-strategy language can never drift in
 // (the tripwire is a guard against drift, not a claim of completeness).
 import { existsSync, readFileSync } from "node:fs";
@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 const doc = readFileSync("docs/faq.md", "utf8");
 
-// SPEC-0046 Design — the eight questions, verbatim.
+// SPEC-0048 Design — the eight questions, verbatim.
 const QUESTIONS = [
   "How is this different from ccusage or my agent's built-in `/usage`?",
   "I'm on a flat-rate subscription — what do the dollar figures mean for me?",
@@ -19,7 +19,7 @@ const QUESTIONS = [
   "Who builds this — is it really AI agents?",
 ];
 
-// SPEC-0046 Design — the canonical link each answer must carry, by question index.
+// SPEC-0048 Design — the canonical link each answer must carry, by question index.
 const CANONICAL_LINKS = [
   "trust.md",
   "guide/13-pricing.md",
@@ -48,7 +48,7 @@ function relativeLinks(text: string): string[] {
     .map((href) => href.split("#", 2)[0]);
 }
 
-describe("docs/faq.md (SPEC-0046)", () => {
+describe("docs/faq.md (SPEC-0048)", () => {
   it("R5: is linked from the README docs section, getting-started, and troubleshooting", () => {
     const readme = readFileSync("README.md", "utf8");
     const docsSection = readme.split(/^## Docs$/m)[1]?.split(/^## /m)[0] ?? "";

@@ -2,7 +2,7 @@
 
 Seeing an error or an odd receipt? That's
 [troubleshooting](guide/12-troubleshooting.md) — symptom-first. This page is
-question-first. (SPEC-0046.)
+question-first. (SPEC-0048.)
 
 ## How is this different from ccusage or my agent's built-in `/usage`?
 
