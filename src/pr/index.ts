@@ -24,7 +24,7 @@ import { deriveRole, selectContributors, type PoolCandidate, type RawContributor
 import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
 import { nestedCandidates } from "./nested.js";
-import { isChildPath } from "../parse/children.js";
+import { discoverChildFiles, isChildPath } from "../parse/children.js";
 import { renderPrBody, type ContributorView, type PrBodyInput } from "./body.js";
 import { summarizeConfidence, type ConfidenceEvent } from "./confidence.js";
 import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
@@ -102,6 +102,19 @@ function prResult(input: Partial<PrRunResult> & { code: number; result: ResultVa
 
 function stemOf(filePath: string): string {
   return path.basename(filePath).replace(/\.jsonl$/, "");
+}
+
+/**
+ * SPEC-0044 B5 — true if `candidate`'s file lives anywhere under
+ * `ancestorFilePath`'s own `subagents/` subtree (any depth). Used to scope a
+ * promoted contributor's territory to whichever OTHER contributor is its
+ * actual ancestor, so a deeper promoted grandchild's territory is carved out
+ * of its immediate promoted parent's exclusion set too (not just the
+ * top-level ancestor's) — see `exclusionsFor` below.
+ */
+function isDescendantOfContributor(candidate: string, ancestorFilePath: string): boolean {
+  const root = path.join(ancestorFilePath.replace(/\.jsonl$/, ""), "subagents") + path.sep;
+  return candidate.startsWith(root);
 }
 
 interface Resolved {
@@ -379,15 +392,49 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   const covered = new Set<string>();
   // SPEC-0038 R3 dedup — nested sessions credited as contributors must not
   // ALSO appear inside their parent's SUBAGENTS rollup (filePath key).
-  const nestedContributorPaths = new Set(
-    resolved.contributors.filter((r) => isChildPath(r.summary.filePath)).map((r) => r.summary.filePath),
-  );
+  //
+  // SPEC-0044 B5 — that alone only covers ONE level: a promoted contributor
+  // (say A, a subagent of P that made its own branch commit) owns its ENTIRE
+  // subtree, not just its own row. `discoverChildFiles` walks recursively, so
+  // P's rollup call flattens A's descendants (e.g. grandchild B) in too —
+  // B then prices once under P's rollup AND once under A's own rollup.
+  // Fixed by computing, per contributor being rolled up, an exclusion set
+  // that also carves out any OTHER promoted contributor's subtree when that
+  // promoted contributor is nested underneath the one currently rolling up
+  // (this generalizes: if a further-promoted grandchild ever existed, its
+  // territory would be carved out of its promoted parent too, not just the
+  // top ancestor — though `nestedCandidates` currently only promotes direct
+  // children of top-level sessions, so chains deeper than P→A→B don't arise
+  // in practice; the subtree logic is correct regardless). The promoted
+  // contributor itself still rolls up its own direct subtree normally:
+  // `exclusionsFor(X)` never subtracts X's own descendants.
+  // Kept as the ONE dedup site; `rollupChildren`'s exact-file exclusion check
+  // is unchanged — callers just hand it a subtree-aware set now.
+  const promotedChildPaths = resolved.contributors
+    .filter((r) => isChildPath(r.summary.filePath))
+    .map((r) => r.summary.filePath);
+  const promotedDescendants = new Map<string, string[]>();
+  for (const promotedPath of promotedChildPaths) {
+    promotedDescendants.set(promotedPath, await discoverChildFiles(promotedPath));
+  }
+  function exclusionsFor(contributorFilePath: string): ReadonlySet<string> {
+    const excluded = new Set<string>(promotedChildPaths);
+    for (const promotedPath of promotedChildPaths) {
+      if (promotedPath === contributorFilePath || !isDescendantOfContributor(promotedPath, contributorFilePath)) {
+        continue;
+      }
+      for (const descendant of promotedDescendants.get(promotedPath) ?? []) {
+        excluded.add(descendant);
+      }
+    }
+    return excluded;
+  }
   // SPEC-0044 A3 — collected across BOTH contributor loops below (main +
   // promoted sidechains) and folded into `allEvents` before any
   // `summarizeConfidence` call sees it.
   const costEvents: ConfidenceEvent[] = [];
   for (const raw of resolved.contributors) {
-    const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
+    const { view, model } = await buildContributorView(raw, deps, exclusionsFor(raw.summary.filePath));
     covered.add(raw.summary.filePath);
     for (const row of view.subagents) {
       covered.add(row.filePath);
@@ -400,7 +447,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   }
   const { promoted, events: promoteEvents } = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
   for (const raw of promoted) {
-    const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
+    const { view, model } = await buildContributorView(raw, deps, exclusionsFor(raw.summary.filePath));
     if (model.costLowerBoundCacheTier) {
       costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
     }

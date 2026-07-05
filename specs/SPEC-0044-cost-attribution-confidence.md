@@ -387,3 +387,12 @@ clean transcript) trips nothing.
    dropped from the record. Final Codex verdict after fixes: the three in-scope
    findings resolved; 506 pr/receipt/parse/matrix tests green, hygiene + spec-
    lint OK, goldens byte-identical (caveats fire only on drop/load-failure).
+
+**2026-07-05 · R11/B5 (grandchild double-count):** `index.ts` now computes a
+per-contributor subtree-aware exclusion set (`isDescendantOfContributor` +
+`exclusionsFor`) so a promoted middle contributor A owns its whole subtree —
+grandchild B is rolled up once under A, not also under P. Kept as the single
+dedup site; `rollupChildren`'s exact-file check unchanged. Codex: PASS (1 LOW —
+a comment overclaimed the recursion depth vs what `nestedCandidates` admits;
+softened). Goldens byte-identical (no existing fixture has the P→A→B-with-
+middle-commit shape). Red-then-green via `test/pr/grandchild-dedup.test.ts`.
