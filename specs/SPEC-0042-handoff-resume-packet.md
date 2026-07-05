@@ -1,7 +1,7 @@
 ---
 id: SPEC-0042
 title: Handoff resume packet — state header, coverage line, JSON surface
-status: approved
+status: shipped
 milestone: M5
 depends: [SPEC-0001, SPEC-0011, SPEC-0013]
 ---
@@ -151,9 +151,9 @@ be wrong on a real session is an immediate fix or removal.
 
 ## Success criteria
 
-- [ ] Dogfood: a real packet from a maintainer session pasted into a follow-up
+- [x] Dogfood: a real packet from a maintainer session pasted into a follow-up
       session or PR, attached to the implementation PR.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
 
 ## Validation
