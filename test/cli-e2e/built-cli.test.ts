@@ -339,6 +339,10 @@ describe("built CLI e2e", () => {
     expect(textResult.stdout).not.toContain("$");
   });
 
+  // Children spawned from vitest fork workers inherit macOS background QoS and
+  // run I/O-throttled ~20x on loaded dev Macs (measured: an identical spawn is
+  // 3.4s outside vitest, ~70s inside). CI (Linux) is unaffected. Ceiling sized
+  // for the throttled worst case; the test asserts correctness, not speed.
   it("loads 100 simulated opencode sessions through built CLI and samples receipt selectors", async () => {
     const home = await makeHome();
     await stageOpenCodeDb(home, "simulated-100.db");
@@ -388,7 +392,7 @@ describe("built CLI e2e", () => {
       expect(Object.keys(tools).sort()).toEqual(toolNames.sort());
       expect(receipt.toolRows.reduce((sum, row) => sum + row.callCount, 0)).toBe(Math.max(1, sim.tools.length));
     }
-  }, 45_000);
+  }, 600_000);
 
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
     const home = await makeHome();
