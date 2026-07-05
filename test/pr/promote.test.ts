@@ -80,10 +80,13 @@ describe("SPEC-0024 R2 orphan sidechain promotion", () => {
     expect(promoted).toHaveLength(0);
   });
 
-  it("silently skips an unloadable sidechain", async () => {
+  it("counts an unloadable sidechain as unreadable, never silent (B4)", async () => {
     const ghost = anchored("ghost");
-    const { promoted } = await promoteOrphanSidechains([ghost], [BRANCH_SHA], new Set(), loader([]));
+    const { promoted, events } = await promoteOrphanSidechains([ghost], [BRANCH_SHA], new Set(), loader([]));
     expect(promoted).toHaveLength(0);
+    // SPEC-0044 B4 — a sidechain we couldn't READ is now counted (floors `≥`),
+    // distinct from the "read, no own SHA" silent skip which stays silent.
+    expect(events).toContainEqual({ kind: "unreadable-session", sessionId: "ghost.jsonl" });
   });
 
   it("orders promotions chronologically by start, then id (deterministic)", async () => {

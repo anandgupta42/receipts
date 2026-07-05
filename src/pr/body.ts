@@ -309,6 +309,31 @@ function totalBlocks(input: PrBodyInput): Block[] {
     });
     blocks.push({ kind: "note", text: "(see docs/cost-model.md)", muted: true });
   }
+  // SPEC-0044 B4 — in-window candidates we couldn't READ (load/parse failed),
+  // outside this worktree so the excluded note above never saw them. Counted,
+  // never silent: "couldn't read" ≠ "not ours".
+  const unreadable = input.confidence?.unreadableSession ?? 0;
+  if (unreadable > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(unreadable, "session")} touched this branch but couldn't be read`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(see docs/trust.md)", muted: true });
+  }
+  // SPEC-0044 B3 — a credited session whose transcript had records skipped at
+  // parse time: its `$` is a lower bound (dropped records carried real usage).
+  const droppedRecords = input.confidence?.droppedTranscriptRecords ?? 0;
+  if (droppedRecords > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(droppedRecords, "session")} had unreadable transcript records skipped`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(total is a lower bound — see docs/trust.md)", muted: true });
+  }
   // SPEC-0026 R4 (round 2) — the route to the full per-tool story, always the
   // last note: point at the details section when one follows, else the command.
   blocks.push(

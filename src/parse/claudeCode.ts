@@ -190,7 +190,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   // summary (or two summary shapes) at the same position collapse to one event.
   const compactionByTurn = new Map<number, number | undefined>();
 
-  await readJsonl(filePath, (raw) => {
+  const droppedRecords = await readJsonl(filePath, (raw) => {
     const r = raw as RawRecord;
 
     // SPEC-0017 R1 — extract compactions BEFORE the isMeta/command-echo filters
@@ -357,7 +357,9 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     .sort((a, b) => a[0] - b[0])
     .map(([turnIndex, atMs]) => (atMs === undefined ? { turnIndex } : { turnIndex, atMs }));
 
-  return withTurns ? { summary, turns, compactions } : { summary, turns: [] as Turn[], compactions: [] as Compaction[] };
+  return withTurns
+    ? { summary, turns, compactions, droppedRecords }
+    : { summary, turns: [] as Turn[], compactions: [] as Compaction[], droppedRecords: 0 };
 }
 
 const ROOT = "~/.claude/projects";
@@ -423,8 +425,10 @@ export class ClaudeCodeAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns, compactions } = await parseTranscript(id, true);
-      return { ...summary, turns, compactions };
+      const { summary, turns, compactions, droppedRecords } = await parseTranscript(id, true);
+      // SPEC-0044 B3: only present when > 0 (absent → clean), so a clean
+      // session's shape is unchanged.
+      return { ...summary, turns, compactions, ...(droppedRecords > 0 ? { droppedRecords } : {}) };
     } catch {
       return null;
     }

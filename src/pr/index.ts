@@ -199,6 +199,24 @@ async function resolveContributors(
  * renders (R2/R3). The sliced `ReceiptModel` is returned alongside the view —
  * SPEC-0027's artifact page renders it in full instead of discarding it.
  */
+/**
+ * SPEC-0044 B3 — a credited session (or one of its rolled-up subagents) whose
+ * transcript had records skipped at parse time under-reports its cost; emit a
+ * dropped-transcript-records event so the total floors `≥` and the receipt says
+ * so. Runs in the cost loop (like A3's emitter), so the explicit `pr --session`
+ * path — which flows through the SAME loop — is covered without a separate site.
+ */
+function pushDroppedRecordEvents(events: ConfidenceEvent[], raw: RawContributor, subagents: SubagentRow[]): void {
+  if ((raw.session.droppedRecords ?? 0) > 0) {
+    events.push({ kind: "dropped-transcript-records", sessionId: raw.summary.filePath });
+  }
+  for (const row of subagents) {
+    if ((row.droppedRecords ?? 0) > 0) {
+      events.push({ kind: "dropped-transcript-records", sessionId: row.filePath });
+    }
+  }
+}
+
 async function buildContributorView(raw: RawContributor, deps: PrDeps, excludedChildren?: ReadonlySet<string>): Promise<{ view: ContributorView; model: ReceiptModel }> {
   const rendered = raw.slice.kind === "slice" ? sliceSessionForReceipt(raw.session, raw.slice) : raw.session;
   const model = await buildReceiptModel(rendered);
@@ -377,6 +395,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     if (model.costLowerBoundCacheTier) {
       costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
     }
+    pushDroppedRecordEvents(costEvents, raw, view.subagents);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const { promoted, events: promoteEvents } = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
@@ -385,6 +404,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     if (model.costLowerBoundCacheTier) {
       costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
     }
+    pushDroppedRecordEvents(costEvents, raw, view.subagents);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const allEvents = [...resolved.events, ...promoteEvents, ...costEvents];

@@ -353,3 +353,37 @@ Codex review, which turned the "future work" note above into a fix:
 3. LOW — stale test comment corrected. Goldens byte-identical (fixtures carry
    no helper subagents). Final Codex verdict: PASS, no HIGH/MED. The invariant
    now holds for BOTH the priced-`$` and unpriced-token subtotals.
+
+**2026-07-05 · R9/R10 (B3 + B4) build — silent-drop holes closed.** Two new
+ConfidenceEvent variants: `unreadable-session` (B4 — an in-window candidate
+that failed to LOAD, outside the current worktree, emitted in
+`contributors.ts`/`promote.ts`; "couldn't read" ≠ "read, no anchor") and
+`dropped-transcript-records` (B3 — `readJsonl` now returns its skipped-line
+count, threaded to `session.droppedRecords` across all four adapters incl.
+opencode's per-row loop; a credited session or rolled-up subagent with drops
+emits the event in the `index.ts` cost loop + a single-session receipt caveat).
+Both floor `≥` and render a note; `droppedRecords` is omitted-when-0 (clean
+sessions' shape unchanged — the discovery-cache deep-equal). Red-then-green: the
+`contributors.ts`/`promote.ts` "silently ignores/skips" tests inverted to assert
+the new counts; a `dropped-record-midstream` fixture (one truncated line, three
+valid) proves the count + caveat + a still-priced total; a negative control (a
+clean transcript) trips nothing.
+
+**2026-07-05 · S5 (Codex, B3/B4): REWORK → 3 fixed, 1 deferred.**
+1. HIGH — rolled-up subagents with drops were silent → B3 emission moved to the
+   `index.ts` cost loop and now also scans `view.subagents` (added
+   `droppedRecords` to `SubagentRow`); covers subagent drops.
+2. HIGH — `pr --session` returned `events:[]`, bypassing B3 → fixed for free by
+   moving emission to the cost loop, which `--session` contributors flow
+   through (verified).
+3. MEDIUM — `dropped-transcript-records` missing from the `--json` export enum →
+   added; a test asserts a B3 receipt stays schema-valid.
+4. HIGH (DEFERRED, honest) — a session that fails FULL-LOAD during
+   `listFullSessions()` discovery is filtered before selection, so B4 (which
+   covers selection-time `loadSession` failures) never sees it. This is a
+   distinct, deeper discovery-layer gap the B4 finding didn't scope (a session
+   that passes lazy first-line discovery but fails full parse — rarer than the
+   partial-corruption B3 now handles). Recorded as follow-up work, not silently
+   dropped from the record. Final Codex verdict after fixes: the three in-scope
+   findings resolved; 506 pr/receipt/parse/matrix tests green, hygiene + spec-
+   lint OK, goldens byte-identical (caveats fire only on drop/load-failure).

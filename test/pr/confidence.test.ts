@@ -40,6 +40,11 @@ describe("SPEC-0044 · summarizeConfidence", () => {
     expect(isFloored(summarizeConfidence([]))).toBe(false);
     expect(isFloored(summarizeConfidence([{ kind: "cost-lower-bound-cache-tier", sessionId: "x" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "unattributable-anchor-pool", sessionId: "y" }]))).toBe(true);
+    // each disjunct isolated (so a deleted one is caught, not masked by a sibling):
+    expect(isFloored(summarizeConfidence([{ kind: "silenced-git-write", sessionId: "s" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "unreadable-subagent", sessionId: "sub" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "unreadable-session", sessionId: "u" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "dropped-transcript-records", sessionId: "d" }]))).toBe(true);
   });
 });
 
@@ -61,5 +66,30 @@ describe("SPEC-0044 A1 · counted-absence renders (not silent)", () => {
     const body = renderPrReceiptText({ contributors: [builder()], excludedCount: 0 });
     expect(body).not.toContain("couldn't be attributed precisely");
     expect(body).not.toMatch(/TOTAL priced\.+≥/);
+  });
+});
+
+describe("SPEC-0044 B4 · unreadable-session renders (not silent)", () => {
+  it("floors the total AND renders the couldn't-be-read note", () => {
+    const body = renderPrReceiptText({
+      contributors: [builder()],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "unreadable-session", sessionId: "ghost.jsonl" }]),
+    });
+    expect(body).toMatch(/TOTAL priced\.+≥/);
+    expect(body).toContain("1 session touched this branch but couldn't be read");
+  });
+});
+
+describe("SPEC-0044 B3 · dropped-transcript-records renders (not silent)", () => {
+  it("floors the total AND renders the skipped-records note as a lower bound", () => {
+    const body = renderPrReceiptText({
+      contributors: [builder()],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "dropped-transcript-records", sessionId: "torn.jsonl" }]),
+    });
+    expect(body).toMatch(/TOTAL priced\.+≥/);
+    expect(body).toContain("1 session had unreadable transcript records skipped");
+    expect(body).toContain("lower bound");
   });
 });

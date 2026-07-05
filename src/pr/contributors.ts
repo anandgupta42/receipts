@@ -163,9 +163,14 @@ export async function selectContributors(
   for (const l of loaded) {
     const { summary, here, session, anchors } = l;
     if (!session || !anchors) {
-      // A candidate we can't load can't be proven — count it only if it's plausibly ours.
+      // A candidate we can't load can't be proven. In the current worktree it's
+      // the classic excluded count; OUTSIDE it (anchor pool / sibling worktree)
+      // it used to vanish silently — SPEC-0044 B4: "couldn't read" ≠ "not ours",
+      // so its absence is now counted via a typed event (floors the total).
       if (here) {
         excludeHere(summary);
+      } else {
+        events.push({ kind: "unreadable-session", sessionId: summary.filePath });
       }
       continue;
     }

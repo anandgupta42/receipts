@@ -261,6 +261,16 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
       text: "caveat: cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)",
     });
   }
+  // SPEC-0044 B3 — the parse layer skipped malformed/truncated transcript
+  // records (a crash-torn JSONL line, a corrupt DB row); their token usage is
+  // lost, so this session's total is a lower bound, not exact.
+  if ((session.droppedRecords ?? 0) > 0) {
+    const n = session.droppedRecords as number;
+    caveats.push({
+      kind: "dropped-transcript-records",
+      text: `caveat: ${n} unreadable transcript record${n === 1 ? "" : "s"} skipped — total may be incomplete`,
+    });
+  }
 
   const durationMs =
     session.totals.durationMs ??

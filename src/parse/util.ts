@@ -107,16 +107,20 @@ export function truncate(text: string, max = 120): string {
 }
 
 /**
- * Read a JSONL file, yielding each parsed record. Malformed lines are skipped.
- * Streams line-by-line so large transcripts don't load fully into memory.
+ * Read a JSONL file, yielding each parsed record. Malformed (non-empty,
+ * unparseable) lines are skipped; the RETURNED count of skipped lines lets a
+ * caller record `session.droppedRecords` so a torn transcript's under-report is
+ * flagged, not silent (SPEC-0044 B3). Streams line-by-line so large transcripts
+ * don't load fully into memory. Blank lines are not records and never counted.
  */
 export async function readJsonl(
   filePath: string,
   onRecord: (record: unknown, lineNo: number) => void,
-): Promise<void> {
+): Promise<number> {
   const stream = fs.createReadStream(filePath, { encoding: "utf8" });
   const rl = readline.createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
   let lineNo = 0;
+  let dropped = 0;
   try {
     for await (const line of rl) {
       lineNo++;
@@ -127,13 +131,14 @@ export async function readJsonl(
       try {
         onRecord(JSON.parse(trimmed), lineNo);
       } catch {
-        // skip malformed line
+        dropped++;
       }
     }
   } finally {
     rl.close();
     stream.close();
   }
+  return dropped;
 }
 
 /** Recursively list files under `dir` matching `predicate`. Returns [] if dir is absent. */

@@ -123,12 +123,14 @@ interface ParsedRecords {
   firstUserText?: string;
   /** insertion-ordered, last-wins by message id (R1: dedupe + rewind) */
   messages: Map<string, GeminiMessage>;
+  /** SPEC-0044 B3 — malformed JSONL records skipped while reading. */
+  droppedRecords?: number;
 }
 
 async function readRecords(filePath: string): Promise<ParsedRecords> {
   const out: ParsedRecords = { messages: new Map() };
 
-  await readJsonl(filePath, (record) => {
+  out.droppedRecords = await readJsonl(filePath, (record) => {
     if (!record || typeof record !== "object") {
       return;
     }
@@ -203,7 +205,7 @@ async function readRecords(filePath: string): Promise<ParsedRecords> {
 }
 
 /** Materialize the deduped/rewound records into a normalized session. */
-function buildSession(filePath: string, records: ParsedRecords): { summary: SessionSummary; turns: Turn[] } {
+function buildSession(filePath: string, records: ParsedRecords): { summary: SessionSummary; turns: Turn[]; droppedRecords: number } {
   const turns: Turn[] = [];
   let totalUsage = emptyUsage();
   let toolCallCount = 0;
@@ -247,7 +249,7 @@ function buildSession(filePath: string, records: ParsedRecords): { summary: Sess
     isSidechain: records.isSidechain,
   };
 
-  return { summary, turns };
+  return { summary, turns, droppedRecords: records.droppedRecords ?? 0 };
 }
 
 const ROOT = "~/.gemini/tmp";
@@ -300,8 +302,9 @@ export class GeminiAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns } = buildSession(id, await readRecords(id));
-      return { ...summary, turns };
+      const { summary, turns, droppedRecords } = buildSession(id, await readRecords(id));
+      // SPEC-0044 B3: present only when > 0 (absent → clean).
+      return { ...summary, turns, ...(droppedRecords > 0 ? { droppedRecords } : {}) };
     } catch {
       return null;
     }

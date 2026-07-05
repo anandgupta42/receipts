@@ -148,7 +148,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     return current;
   }
 
-  await readJsonl(filePath, (record) => {
+  const droppedRecords = await readJsonl(filePath, (record) => {
     if (!record || typeof record !== "object") {
       return;
     }
@@ -303,7 +303,9 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     e.atMs === undefined ? { turnIndex: e.turnIndex } : { turnIndex: e.turnIndex, atMs: e.atMs },
   );
 
-  return withTurns ? { summary, turns, compactions } : { summary, turns: [] as Turn[], compactions: [] as Compaction[] };
+  return withTurns
+    ? { summary, turns, compactions, droppedRecords }
+    : { summary, turns: [] as Turn[], compactions: [] as Compaction[], droppedRecords: 0 };
 }
 
 const ROOT = "~/.codex/sessions";
@@ -356,9 +358,13 @@ export class CodexAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns, compactions } = await parseTranscript(id, true);
-      // SPEC-0040 R5 — absent (not `[]`) when the transcript records none.
-      return compactions.length > 0 ? { ...summary, turns, compactions } : { ...summary, turns };
+      const { summary, turns, compactions, droppedRecords } = await parseTranscript(id, true);
+      // SPEC-0040 R5 — compactions absent (not `[]`) when none; SPEC-0044 B3 —
+      // droppedRecords present only when > 0 (absent → clean).
+      const dropped = droppedRecords > 0 ? { droppedRecords } : {};
+      return compactions.length > 0
+        ? { ...summary, turns, compactions, ...dropped }
+        : { ...summary, turns, ...dropped };
     } catch {
       return null;
     }

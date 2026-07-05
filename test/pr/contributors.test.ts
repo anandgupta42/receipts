@@ -11,6 +11,7 @@ import { emptyUsage, withTotal } from "../../src/parse/util.js";
 import { loadById } from "../../src/parse/load.js";
 import { classifyBranchAnchors } from "../../src/pr/slice.js";
 import { deriveRole, selectContributors, type PoolCandidate } from "../../src/pr/contributors.js";
+import { summarizeConfidence } from "../../src/pr/confidence.js";
 
 const BRANCH_SHA = "b1c2d3e4f5061728394a5b6c7d8e9f0011223344";
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
@@ -194,11 +195,15 @@ describe("SPEC-0024 R1 anchor pool (SHA anchor is the only key)", () => {
     expect(sel.contributors.map((c) => c.summary.id)).toEqual(["gem"]);
   });
 
-  it("an unloadable anchor-pool candidate is ignored, never counted in the excluded note", async () => {
+  it("an unloadable anchor-pool candidate is counted as unreadable, never silent (B4)", async () => {
     const ghost = anchor(makeSession("anchor-ghost", []));
     const sel = await selectContributors([ghost], [BRANCH_SHA], loaderFor([]));
     expect(sel.contributors).toHaveLength(0);
+    // Not the classic excluded count (that's "read, no SHA") …
     expect(sel.excludedCount).toBe(0);
+    // … but its absence is NOT silent: "couldn't read" is counted distinctly so
+    // the total floors `≥` (SPEC-0044 B4 — the honesty red-team gap).
+    expect(summarizeConfidence(sel.events).unreadableSession).toBe(1);
   });
 });
 

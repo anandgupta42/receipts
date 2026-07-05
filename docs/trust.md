@@ -146,3 +146,16 @@ that tells you exactly what it knows.
     against an uncited rate — a session priced entirely against vendors that
     cite the applicable tier rate, or with no cache-write at all, never trips
     it. Details: [cost-model.md](cost-model.md).
+15. **A session we couldn't read** (SPEC-0044 B4). A candidate in the branch
+    window whose transcript failed to load, sitting outside the current
+    worktree, used to vanish silently — "couldn't read" is not the same as
+    "read and found it isn't ours". It is now counted: the total floors `≥` and
+    a note reads "N session(s) touched this branch but couldn't be read". (A
+    read-but-unproven session is still a correct silent skip; only a genuine
+    read *failure* trips this.)
+16. **A transcript with records skipped at parse time** (SPEC-0044 B3). A
+    malformed or crash-truncated record (a torn JSONL line, a corrupt DB row)
+    is skipped while the rest of the session parses fine. When such a session is
+    credited, its total is a lower bound: the receipt says "N unreadable
+    transcript record(s) skipped — total may be incomplete" and the PR total
+    floors `≥`. A clean transcript never trips it.

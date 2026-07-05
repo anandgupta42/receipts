@@ -34,9 +34,15 @@ export async function promoteOrphanSidechains(
     }
     const session = await loadSession(summary);
     if (!session) {
+      // SPEC-0044 B4 — a sidechain we couldn't READ (vs. read-and-found-no-own-
+      // anchor below): "couldn't read" ≠ "not ours", so count its absence
+      // rather than dropping it silently. Floors the total `≥`.
+      events.push({ kind: "unreadable-session", sessionId: summary.filePath });
       continue;
     }
     if (!classifyBranchAnchors(session.turns, branchShas).hasOwn) {
+      // Read fine, but no own branch-SHA — genuinely another parent's work, not
+      // ours; a silent skip here is correct (never noise).
       continue;
     }
     // SPEC-0038 R2b — promotion requires a sliceable commit anchor: `hasOwn`

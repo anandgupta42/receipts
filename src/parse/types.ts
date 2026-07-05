@@ -159,6 +159,13 @@ export interface Session extends SessionSummary {
   turns: Turn[];
   /** SPEC-0017 — raw compaction events, ordered by `turnIndex`. Absent when the adapter records none. */
   compactions?: Compaction[];
+  /**
+   * SPEC-0044 B3 — count of transcript records the adapter skipped because they
+   * were malformed/truncated (a crash-torn JSONL line, a corrupt DB row). `> 0`
+   * means this session's totals under-report by the dropped records' usage, so
+   * a receipt that credits it must floor `≥` and say so. Absent/0 → clean.
+   */
+  droppedRecords?: number;
 }
 
 export interface ListSessionsOptions {
