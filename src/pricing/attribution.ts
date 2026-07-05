@@ -37,6 +37,13 @@ export interface AttributionResult {
   totalUsd: number | null;
   totalTokens: TokenUsage;
   methodology: string;
+  /**
+   * SPEC-0044 A3 — true when at least one PRICED turn's cache-write cost took
+   * the unsplit-remainder fallback (assumed 5m tier), so `totalUsd` may be a
+   * lower bound rather than an exact figure. Checked only for priced turns
+   * (`turnUsd !== null`) — an unpriced turn's tokens don't affect any `$`.
+   */
+  costLowerBoundCacheTier: boolean;
 }
 
 interface Accumulator {
@@ -56,6 +63,7 @@ interface Accumulator {
  */
 export async function attributeByTool(session: Session, dataDir: string = defaultDataDir()): Promise<AttributionResult> {
   const acc = new Map<string, Accumulator>();
+  let costLowerBoundCacheTier = false;
 
   for (const turn of session.turns) {
     const units = turn.toolCalls.length > 0 ? turn.toolCalls.map((c) => c.name) : [THINKING_REPLY];
@@ -63,15 +71,19 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
     const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
-    const turnUsd = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
+    const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
+
+    if (priced !== null && priced.cacheWriteLowerBound) {
+      costLowerBoundCacheTier = true;
+    }
 
     for (const tool of units) {
       const entry = acc.get(tool) ?? { usd: 0, priced: false, tokens: emptyUsage(), callCount: 0 };
       entry.tokens = addUsage(entry.tokens, tokenShare);
       entry.callCount += 1;
-      if (turnUsd !== null) {
-        entry.usd += turnUsd * share;
+      if (priced !== null) {
+        entry.usd += priced.usd * share;
         entry.priced = true;
       }
       acc.set(tool, entry);
@@ -89,5 +101,5 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
   const totalUsd = pricedEntries.length > 0 ? pricedEntries.reduce((sum, t) => sum + (t.usd as number), 0) : null;
   const totalTokens = byTool.reduce((sum, t) => addUsage(sum, t.tokens), emptyUsage());
 
-  return { byTool, totalUsd, totalTokens, methodology: METHODOLOGY };
+  return { byTool, totalUsd, totalTokens, methodology: METHODOLOGY, costLowerBoundCacheTier };
 }

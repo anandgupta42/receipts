@@ -129,3 +129,20 @@ that tells you exactly what it knows.
     contributor. *Marker:* none yet — a documented blind spot pending its own
     spec (PR-scoping needs the background-agent schema). Details:
     [cost-model.md](cost-model.md).
+
+15. **Cache-write cost is a lower bound when the vendor's price row cites no
+    cache-write rate** (SPEC-0044 A3, row-aware). An unsplit (or partially
+    split) cache-write turn is priced under the assumed 5m-tier rate — and
+    that's *exact*, not a caveat, whenever the price row cites
+    `input_cache_write_5m` (every Anthropic model does, so Claude Code sessions
+    never trip this, split or not). It's a genuine under-report only for
+    vendors whose price row cites no cache-write rate at all (openai, google,
+    deepseek today — every opencode session touching one of those models
+    inherits the gap; opencode's own schema has no tier-split concept, but that
+    alone isn't the trigger). *Direction:* under-report. *Marker:* the total
+    floors `≥`, the single-session receipt carries a muted "cache-write cost is
+    a lower bound for this session" caveat, and the PR body's confidence
+    summary counts affected sessions. Fires only on the fallback's actual use
+    against an uncited rate — a session priced entirely against vendors that
+    cite the applicable tier rate, or with no cache-write at all, never trips
+    it. Details: [cost-model.md](cost-model.md).

@@ -7,6 +7,8 @@
 
 bash...............................$0.01  (1 call)
 read...............................$0.00  (1 call)
+
+caveat: cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)
 --------------------------------------------------
 TOTAL........................................$0.01
 

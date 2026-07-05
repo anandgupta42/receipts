@@ -88,6 +88,14 @@ describe("SPEC-0044 · cost matrix — every populated cell reconciles + matches
         for (const w of exp.waste ?? []) {
           expect(m.wasteLines.some((l) => l.kind === w), `waste ${w} detected`).toBe(true);
         }
+        for (const e of exp.events ?? []) {
+          // ConfidenceEvents that mirror onto the single-session receipt are
+          // surfaced as caveats (the PR-layer allEvents array itself is only
+          // assembled in src/pr/index.ts, which this per-session runner never
+          // exercises) — so a receipt-level caveat of the same kind is the
+          // correct, observable proxy for "this event fires for this cell."
+          expect(m.caveats.some((c) => c.kind === e), `event ${e} detected`).toBe(true);
+        }
       });
     }
   }

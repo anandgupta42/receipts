@@ -58,14 +58,14 @@ async function flattenCalls(session: Session, dataDir: string): Promise<FlatCall
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
     const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
-    const turnUsd = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
+    const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const share = 1 / turn.toolCalls.length;
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
     for (const call of turn.toolCalls) {
       out.push({
         tool: call.name,
         normalizedInput: normalizedInput(call.input),
-        usd: turnUsd !== null ? turnUsd * share : null,
+        usd: priced !== null ? priced.usd * share : null,
         tokens: tokenShare,
         turnIndex: turn.index,
         startedAt: call.startedAt,
@@ -311,11 +311,11 @@ export async function detectContextThrash(session: Session, dataDir: string = de
       const model = turn.model ?? session.model;
       const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
       const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
-      const turnUsd = await priceTurn(vendor, model, dateISO, sliced, dataDir);
-      if (turnUsd === null) {
+      const priced = await priceTurn(vendor, model, dateISO, sliced, dataDir);
+      if (priced === null) {
         usd = null;
       } else if (usd !== null) {
-        usd += turnUsd;
+        usd += priced.usd;
       }
     }
 

@@ -364,20 +364,30 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   const nestedContributorPaths = new Set(
     resolved.contributors.filter((r) => isChildPath(r.summary.filePath)).map((r) => r.summary.filePath),
   );
+  // SPEC-0044 A3 — collected across BOTH contributor loops below (main +
+  // promoted sidechains) and folded into `allEvents` before any
+  // `summarizeConfidence` call sees it.
+  const costEvents: ConfidenceEvent[] = [];
   for (const raw of resolved.contributors) {
     const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
     covered.add(raw.summary.filePath);
     for (const row of view.subagents) {
       covered.add(row.filePath);
     }
+    if (model.costLowerBoundCacheTier) {
+      costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
+    }
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const { promoted, events: promoteEvents } = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
-  const allEvents = [...resolved.events, ...promoteEvents];
   for (const raw of promoted) {
     const { view, model } = await buildContributorView(raw, deps, nestedContributorPaths);
+    if (model.costLowerBoundCacheTier) {
+      costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
+    }
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
+  const allEvents = [...resolved.events, ...promoteEvents, ...costEvents];
   if (entries.length === 0) {
     // SPEC-0044 A1 (S2 finding 1): if the ONLY thing that touched the branch was
     // an unattributable anchor-pool session, don't claim "no match" — say so.

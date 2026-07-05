@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  cacheWriteIsLowerBound,
   cheapestCurrentRow,
   costOf,
   isoDateOf,
@@ -70,6 +71,56 @@ describe("costOf / cacheWriteCost fallback chain", () => {
     // known1h=500000 @ fallback input rate 2.0 = 1.0; unsplit=800000-0-500000=300000 @ cited 5m rate 2.5 = 0.75
     // cacheWriteCost = 0(known5m) + 1.0 + 0.75 = 1.75
     expect(costOf(u, r)).toBeCloseTo(2.0 + 1.75, 10);
+  });
+});
+
+describe("cacheWriteIsLowerBound (SPEC-0044 A3 — row-aware, not usage-only)", () => {
+  it("is false for an unsplit cache-write when the row cites the 5m rate (e.g. Anthropic) — priced exactly, no caveat", () => {
+    const r = row({ input: 4, output: 8, input_cache_write_5m: 5.0, input_cache_write_1h: 10.0 });
+    const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(false);
+  });
+
+  it("is true for an unsplit cache-write when the row does NOT cite the 5m rate — falls back to base input, genuine lower bound", () => {
+    const r = row({ input: 4, output: 8 }); // no input_cache_write_5m/1h cited
+    const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(true);
+  });
+
+  it("is false when the split fields fully account for cacheCreation and both tiers are cited (no remainder, no fallback)", () => {
+    const r = row({ input: 4, output: 8, input_cache_write_5m: 5.0, input_cache_write_1h: 10.0 });
+    const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000, cacheCreation5m: 600, cacheCreation1h: 400 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(false);
+  });
+
+  it("is true when a partial split leaves a nonzero remainder and the 5m rate is uncited", () => {
+    const r = row({ input: 4, output: 8 });
+    const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000, cacheCreation5m: 300 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(true);
+  });
+
+  it("is false when a partial split leaves a nonzero remainder but the 5m rate IS cited (remainder priced at the cited 5m rate)", () => {
+    const r = row({ input: 4, output: 8, input_cache_write_5m: 5.0 });
+    const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000, cacheCreation5m: 300 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(false);
+  });
+
+  it("is false when the known 1h-tier chunk is zero, even though the row cites no input_cache_write_1h (the 1h-uncited branch only fires on a nonzero 1h chunk)", () => {
+    const r = row({ input: 4, output: 8, input_cache_write_5m: 5.0 }); // no input_cache_write_1h
+    const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000, cacheCreation5m: 1_000, cacheCreation1h: 0 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(false); // known1h is 0, so the 1h-uncited branch never fires here
+  });
+
+  it("is true when a known 1h-tier chunk is nonzero and the 1h rate is uncited, independent of the 5m citation", () => {
+    const r = row({ input: 4, output: 8, input_cache_write_5m: 5.0 }); // no input_cache_write_1h
+    const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000, cacheCreation5m: 600, cacheCreation1h: 400 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(true);
+  });
+
+  it("is false when there is no cache-write at all, regardless of what the row cites", () => {
+    const r = row({ input: 4, output: 8 });
+    const u = usage({ input: 1_000, output: 1_000, cacheRead: 0, cacheCreation: 0 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(false);
   });
 });
 
@@ -139,7 +190,18 @@ describe("priceTurn", () => {
 
   it("resolves and costs the turn against the real cited row on the happy path", async () => {
     const result = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", validUsage, realDataDir);
-    expect(result).toBeCloseTo(1.0, 10);
+    expect(result?.usd).toBeCloseTo(1.0, 10);
+  });
+
+  it("carries cacheWriteLowerBound: false for a turn with no cache-write at all", async () => {
+    const result = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", validUsage, realDataDir);
+    expect(result?.cacheWriteLowerBound).toBe(false);
+  });
+
+  it("carries cacheWriteLowerBound: false for an unsplit cache-write against Anthropic's cited 5m rate", async () => {
+    const withCacheWrite = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000 });
+    const result = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", withCacheWrite, realDataDir);
+    expect(result?.cacheWriteLowerBound).toBe(false);
   });
 });
 

@@ -51,7 +51,7 @@ JSON export.
 | `totalTokens` | TokenUsage | Attributed token totals. |
 | `sessionTotalTokens` | TokenUsage | Adapter-reported session totals (the only real number for Cursor). |
 | `wasteLines` | array | Fired waste findings; see WasteLine. |
-| `caveats` | array | Time-integrity caveats (SPEC-0028): `kind` (`time-mtime` \| `time-span`) + `text`. Facts only — never affect `$`. Empty for consistent sessions. |
+| `caveats` | array | Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier`) + `text`. Never affects `$` itself. Empty when nothing to flag. |
 | `budget` | array (optional) | Advisory budget lines (SPEC-0009); present only when `~/.aireceipts/budget.json` is configured. |
 | `priceDelta` | PriceDelta \| null | Cheapest-current-model arithmetic, or null in tokens-only mode. |
 | `methodology` | string | The attribution methodology string (I3). |
@@ -85,11 +85,11 @@ JSON export.
 | `usd` | number \| null | Cost attributed to this tool, or null when its turns never priced (I2). |
 | `callCount` | number | Number of calls to this tool. |
 
-### Caveat (SPEC-0028 time-integrity)
+### Caveat (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound)
 
 | Field | Type | Meaning |
 |---|---|---|
-| `kind` | enum | `time-mtime` (a turn timestamp postdates the transcript file) or `time-span` (non-positive span carrying usage). |
+| `kind` | enum | `time-mtime` (a turn timestamp postdates the transcript file), `time-span` (non-positive span carrying usage), or `cost-lower-bound-cache-tier` (a priced turn's cache-write fell back to the base `input` rate because the vendor's price row cites no cache-write rate — row-aware, not just "unsplit": an unsplit write against a row that cites the 5m rate, e.g. Anthropic, is priced exactly and never sets this). |
 | `text` | string | The rendered caveat line, verbatim. |
 
 ### WasteLine (discriminated on `kind`)
