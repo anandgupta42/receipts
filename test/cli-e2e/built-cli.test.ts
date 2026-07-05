@@ -507,7 +507,7 @@ describe("built CLI e2e", () => {
     expect(textRun.code, textRun.stderr).toBe(0);
     expect(textRun.stdout).toContain("handoff: ");
     expect(textRun.stdout).toContain("total $");
-    expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste lines");
+    expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
   });
 
   it("treats malformed budget config as stderr-only advisory and still renders the receipt", async () => {
