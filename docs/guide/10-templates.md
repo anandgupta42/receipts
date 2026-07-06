@@ -69,11 +69,6 @@ same tokens on claude-haiku-4-5..............$0.04
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-opus-4-8
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
       THANK YOU FOR VIBING WITH Claude Code       
             || |||| || || | | || ||||             
