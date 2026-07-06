@@ -52,7 +52,9 @@ const NAV_SECTIONS = Object.freeze([
 
 // Directories under docs/ that are intentionally never published to the site.
 // releases/ holds release-board verdicts — repo bookkeeping, like internal/.
-const EXCLUDED_DIRS = Object.freeze(["internal", "spikes", "releases"]);
+// agents/ is SPEC-0058's per-agent pages — deliberately GitHub-rendered markdown,
+// not site pages (that spec's "SEO landing pages on the website" non-goal).
+const EXCLUDED_DIRS = Object.freeze(["internal", "spikes", "releases", "agents"]);
 
 const RESOURCE_LOAD_PATTERNS = [
   /<script\b[^>]*\bsrc=["']https?:/iu,
