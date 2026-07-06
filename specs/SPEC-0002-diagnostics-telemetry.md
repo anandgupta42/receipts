@@ -103,3 +103,16 @@ performance improvement and latency regressions need success durations — but p
 minimized (commandClass enum {receipt, compare, other}, no raw commands) to be useless
 as usage analytics. **S3 (value):** parse_failure is the format-drift sensor the
 maintenance loop needs; cli_error is table-stakes for an npx tool. **S4:** spec-lint green.
+
+**2026-07-05 · Amendment (maintainer decision):** R4 is extended — telemetry also
+defaults to disabled when running in CI (`CI`/`GITHUB_ACTIONS` env detected, same
+signal as SPEC-0043's `isCI` field), unless explicitly re-enabled with
+`AIRECEIPTS_TELEMETRY=on`. This is a default, not a third kill switch: `off`/`0`/`false`
+and `DO_NOT_TRACK=1` still disable unconditionally and win over `on` even in CI. Rationale:
+a fleet of automated runs shouldn't silently dwarf human usage in the data, and CI
+shouldn't need a separate manual opt-out. Implemented in `src/telemetry/config.ts`
+(`ciDefaultOffActive`); `docs/telemetry.md` kill-switches section updated;
+`config.test.ts` covers the full precedence table (CI+unset→off, CI+on→on, CI+off→off,
+CI+DO_NOT_TRACK→off even combined with `on`, non-CI unchanged). No change to the `isCI`
+event field itself, which still reports raw CI-env presence independent of whether
+telemetry is enabled (see `src/telemetry/index.ts#noteRunStart`).

@@ -1,0 +1,47 @@
+# OpenSSF Scorecard — automated supply-chain posture score, published so the
+# README badge and the public Scorecard API reflect this repo's real settings
+# (pinned actions, token permissions, branch protection, CodeQL, etc.).
+# Weekly + on pushes to main (protection/workflow changes move the score).
+name: scorecard
+
+on:
+  schedule:
+    - cron: "29 5 * * 2"
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions: read-all
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    if: github.repository == 'anandgupta42/receipts'
+    permissions:
+      # Job-level permissions REPLACE the top-level block (unlisted scopes
+      # become none), so checkout's read access must be restated here.
+      contents: read
+      # Publish results to the OpenSSF REST API (badge) and sign them.
+      id-token: write
+      # Upload SARIF so findings appear under Security → Code scanning.
+      security-events: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+
+      - uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        with:
+          sarif_file: results.sarif

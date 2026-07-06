@@ -1,3 +1,5 @@
+import { isCiEnv } from "./helpers.js";
+
 /**
  * Kill-switch and connection-string resolution (SPEC-0002 R4, and the
  * connection-string-honesty success criterion). Resolved at call time from
@@ -6,6 +8,15 @@
  * `AIRECEIPTS_TELEMETRY_CONNECTION` overrides set after import (as tests
  * do) are always honored, mirroring `parse/cursor.ts`'s `CURSOR_DB_PATH`
  * resolve-at-call-time convention.
+ *
+ * Amendment (2026-07-05, maintainer decision): telemetry also defaults to
+ * disabled when running in CI (same `CI`/`GITHUB_ACTIONS` detection as the
+ * `isCI` event field — see `helpers.ts#isCiEnv`), so a fleet of automated
+ * runs doesn't silently dwarf human usage in the data. This is a *default*,
+ * not a third kill switch: an explicit `AIRECEIPTS_TELEMETRY=on` re-enables
+ * it in CI for orgs that intentionally want that signal. The two real kill
+ * switches (`AIRECEIPTS_TELEMETRY=off|0|false`, `DO_NOT_TRACK=1`) are
+ * checked first and always win, in CI or not, even if `on` is also set.
  */
 
 /**
@@ -29,12 +40,36 @@ export interface TelemetryConfig {
   ingestionEndpoint: string | undefined;
 }
 
-function killSwitchActive(env: NodeJS.ProcessEnv): boolean {
+/** The explicit value of `AIRECEIPTS_TELEMETRY`, normalized — `undefined` when unset or unrecognized. */
+function explicitTelemetryValue(env: NodeJS.ProcessEnv): "on" | "off" | undefined {
   const telemetryEnv = env.AIRECEIPTS_TELEMETRY?.trim().toLowerCase();
   if (telemetryEnv === "off" || telemetryEnv === "0" || telemetryEnv === "false") {
+    return "off";
+  }
+  if (telemetryEnv === "on" || telemetryEnv === "1" || telemetryEnv === "true") {
+    return "on";
+  }
+  return undefined;
+}
+
+function killSwitchActive(env: NodeJS.ProcessEnv): boolean {
+  if (explicitTelemetryValue(env) === "off") {
     return true;
   }
   return env.DO_NOT_TRACK === "1";
+}
+
+/**
+ * CI default-off (2026-07-05 amendment): active when running in CI and the
+ * user hasn't explicitly opted back in with `AIRECEIPTS_TELEMETRY=on`.
+ * Checked only after {@link killSwitchActive} — `off`/`DO_NOT_TRACK` always
+ * win regardless of CI.
+ */
+function ciDefaultOffActive(env: NodeJS.ProcessEnv): boolean {
+  if (explicitTelemetryValue(env) === "on") {
+    return false;
+  }
+  return isCiEnv(env);
 }
 
 function resolveConnectionString(env: NodeJS.ProcessEnv): string {
@@ -76,6 +111,9 @@ function parseConnectionString(raw: string): { instrumentationKey: string; inges
  */
 export function resolveTelemetryConfig(env: NodeJS.ProcessEnv = process.env): TelemetryConfig {
   if (killSwitchActive(env)) {
+    return { enabled: false, instrumentationKey: undefined, ingestionEndpoint: undefined };
+  }
+  if (ciDefaultOffActive(env)) {
     return { enabled: false, instrumentationKey: undefined, ingestionEndpoint: undefined };
   }
   const parsed = parseConnectionString(resolveConnectionString(env));
