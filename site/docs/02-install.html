@@ -309,6 +309,7 @@ footer{
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
+        <li><a href="15-integrations.html">Choose an integration</a></li>
       </ul>
       <p class="toc-section">Reference</p>
       <ul>
@@ -336,16 +337,18 @@ footer{
 
 <h2 id="the-short-version-dont-install">The short version: don't install</h2>
 
-<pre class="doc-code"><code class="language-sh">npx aireceipts-cli</code></pre>
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli
+npx aireceipts-cli setup</code></pre>
 
-<p><code>npx</code> fetches and runs the latest published version each time. For an occasional receipt, that's the whole story — skip the rest of this page.</p>
+<p><code>npx</code> fetches and runs the latest published version each time. The first command prints the newest receipt; <code>setup</code> prints what sessions were found and which local integrations are available. For occasional use, that's the whole story — skip the rest of this page.</p>
 
 <h2 id="install-it-globally">Install it globally</h2>
 
 <p>If you run it often, put <code>aireceipts</code> on your <code>PATH</code>:</p>
 
 <pre class="doc-code"><code class="language-sh">npm install -g aireceipts-cli
-aireceipts            # now available directly</code></pre>
+aireceipts            # now available directly
+aireceipts setup      # same setup report, without npx</code></pre>
 
 <blockquote><strong>Prefer not to install?</strong> <code>npx aireceipts-cli</code> runs the latest release without a global install — the command inside is the same <code>aireceipts</code>.</blockquote>
 
@@ -372,8 +375,9 @@ aireceipts            # now available directly</code></pre>
 <h2 id="next">Next</h2>
 
 <ul>
-  <li><strong><a href="01-getting-started.html">Get started</a></strong> — your first receipt, week, and hook.</li>
+  <li><strong><a href="01-getting-started.html">Get started</a></strong> — your first receipt, setup report, week, and hook.</li>
   <li><strong><a href="03-install-hook.html">Install the agent hook</a></strong> — a receipt after every session.</li>
+  <li><strong><a href="15-integrations.html">Choose an integration</a></strong> — assistant snippets and GitHub checks.</li>
 </ul>
     </article>
   </main>

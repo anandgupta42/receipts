@@ -11,11 +11,6 @@ read...............................$0.00  (1 call)
 caveat: cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)
 --------------------------------------------------
 TOTAL........................................$0.01
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -

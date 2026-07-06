@@ -286,31 +286,18 @@ describe("R4 — field-set parity between the terminal and SVG renderers", () =>
   });
 });
 
-describe("renderReceiptSvg — R2 drawn samosa glyph (SPEC-0034)", () => {
-  // The glyph's signature anchor path — unique to samosaGlyphGroup's PATH
+describe("renderReceiptSvg — no samosa glyph on the receipt card (SPEC-0055)", () => {
+  // The glyph's signature anchor path — unique to samosa-glyph.ts's PATH
   // constant, so its presence/absence is unambiguous in the raw SVG bytes.
   const GLYPH_ANCHOR = 'd="M24 5 L43 39';
 
-  it("draws the samosa glyph in the classic footer, in the theme's fixed stroke color", async () => {
+  it("no template's SVG carries the glyph path, in either theme", async () => {
     const model = await modelFor(PRICED.source, PRICED.path);
-    const light = renderReceiptSvg(model, { theme: "light", template: "classic" });
-    const dark = renderReceiptSvg(model, { theme: "dark", template: "classic" });
-    expect(light).toContain(GLYPH_ANCHOR);
-    expect(dark).toContain(GLYPH_ANCHOR);
-    expect(light).toContain('stroke="#1f2328"');
-    expect(dark).toContain('stroke="#e6edf3"');
-  });
-
-  it("draws the samosa glyph in the datavis footer too", async () => {
-    const model = await modelFor(PRICED.source, PRICED.path);
-    const svg = renderReceiptSvg(model, { template: "datavis" });
-    expect(svg).toContain(GLYPH_ANCHOR);
-  });
-
-  it("omits the glyph from the grocery footer (R1 — grocery untouched)", async () => {
-    const model = await modelFor(PRICED.source, PRICED.path);
-    const svg = renderReceiptSvg(model, { template: "grocery" });
-    expect(svg).not.toContain(GLYPH_ANCHOR);
+    for (const template of ["classic", "grocery", "datavis"] as const) {
+      for (const theme of ["light", "dark"] as ThemeName[]) {
+        expect(renderReceiptSvg(model, { theme, template })).not.toContain(GLYPH_ANCHOR);
+      }
+    }
   });
 
   it("never emits a raw 🥟 or 🔺 codepoint in any template's SVG bytes", async () => {

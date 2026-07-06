@@ -74,13 +74,8 @@ Read...............................$0.02  (1 call)
 TOTAL........................................$0.18
 same tokens on claude-haiku-4-5..............$0.04
   (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
@@ -148,11 +143,11 @@ Full methodology: `aireceipts --methodology`.
 
 | Agent | Depth |
 |---|---|
-| Claude Code | Full: per-turn models, tools, cache tiers |
-| Codex CLI | Full per-turn parsing |
-| Gemini CLI | Full: per-turn models, tools, cache tokens |
-| Cursor | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
-| opencode | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
+| [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
+| [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
+| [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
+| [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
+| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
 
 Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
 independent dataset and opens an issue when they disagree; every table change lands

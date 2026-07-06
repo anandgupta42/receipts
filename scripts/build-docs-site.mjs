@@ -28,6 +28,7 @@ const NAV_SECTIONS = Object.freeze([
       "guide/09-handoff.md",
       "guide/10-templates.md",
       "guide/11-share-and-export.md",
+      "guide/15-integrations.md",
     ],
   },
   {

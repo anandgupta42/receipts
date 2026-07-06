@@ -309,6 +309,7 @@ footer{
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
+        <li><a href="15-integrations.html">Choose an integration</a></li>
       </ul>
       <p class="toc-section">Reference</p>
       <ul>
@@ -334,7 +335,7 @@ footer{
 
 <p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost. No account, no API key; your transcripts and code are never uploaded (anonymous diagnostics are opt-out — see <a href="telemetry.html">docs/telemetry.md</a>).</p>
 
-<p>This page takes you from nothing to a receipt, a weekly total, and an automatic receipt after every session — in about a minute.</p>
+<p>This page takes you from nothing to a receipt, a setup report, a weekly total, and optional automation — in about a minute.</p>
 
 <h2 id="1-run-it">1. Run it</h2>
 
@@ -360,20 +361,36 @@ Read...............................$0.02  (1 call)
 TOTAL........................................$0.18
 same tokens on claude-haiku-4-5..............$0.04
   (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
 
 <p>That's a real session: which models ran, where the tokens went by tool, and what it cost — priced against dated, cited price tables. The <code>same tokens on claude-haiku-4-5</code> line re-prices the identical token counts on a cheaper model; it's arithmetic, not a claim that Haiku would have finished the job.</p>
 
 <p>If instead you see <code>no agent session data detected</code>, your agent's logs are somewhere aireceipts doesn't look yet — jump to <a href="12-troubleshooting.html">Troubleshooting</a>.</p>
 
-<h2 id="2-add-up-the-week">2. Add up the week</h2>
+<p>No sessions of your own yet? See one now:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli --demo</code></pre>
+
+<p>It renders a bundled example session through the same pipeline your real sessions use — a genuine receipt, not a mockup — so you can see the output before your first run.</p>
+
+<h2 id="2-run-setup">2. Run setup</h2>
+
+<p>Ask aireceipts what it found and what to do next:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli setup</code></pre>
+
+<p>The setup report is read-only. It shows supported-agent session counts, the latest session's priced-or-token total, the trailing-week total, and local integration options. It does not post to GitHub, install hooks, or upload transcripts. If no sessions are found, it exits 0, lists the searched roots, and tells you to run a supported agent session first.</p>
+
+<p>For exact snippets by assistant or CI surface:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli integrations
+npx aireceipts-cli integrations opencode</code></pre>
+
+<p>See <a href="15-integrations.html">Choose an integration</a>.</p>
+
+<h2 id="3-add-up-the-week">3. Add up the week</h2>
 
 <p>One session is a number. The trailing week is a habit:</p>
 
@@ -395,15 +412,15 @@ Top waste
   trivial-spans.................$0.00 · 2 sessions
 
 vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
-  Priced $ Δ................................+$0.12
-  Tokens Δ.............................+93,700 tok
+  Priced $ Δ.........................+$0.12 (more)
+  Tokens Δ......................+93,700 tok (more)
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
-       aireceipts · local · buy me a samosa       </code></pre>
+     aireceipts · local · npx aireceipts-cli      </code></pre>
 
 <p>Every session on your machine, across every supported agent, totalled for the last seven days — still local, still no upload.</p>
 
-<h2 id="3-make-it-automatic">3. Make it automatic</h2>
+<h2 id="4-make-it-automatic">4. Make it automatic</h2>
 
 <p>You won't remember to run a command after every session. Let Claude Code run it for you:</p>
 
@@ -416,6 +433,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
 <ul>
   <li><strong><a href="02-install.html">Install</a></strong> — run it without <code>npx</code> on every invocation.</li>
   <li><strong><a href="04-read-a-receipt.html">Read a receipt</a></strong> — pick any session, not just the newest.</li>
+  <li><strong><a href="15-integrations.html">Choose an integration</a></strong> — local hooks, assistant snippets, and GitHub checks.</li>
   <li><strong><a href="08-budget.html">Set a budget</a></strong> — get an exit code when the week crosses a cap.</li>
   <li><strong><a href="faq.html">FAQ</a></strong> — how this differs from usage dashboards, what the dollars mean on a subscription, what leaves your machine (nothing but disclosed, content-free telemetry), and more.</li>
 </ul>

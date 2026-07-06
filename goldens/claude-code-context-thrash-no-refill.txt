@@ -9,11 +9,6 @@
 TOTAL........................................$0.56
 same tokens on claude-haiku-4-5..............$0.56
   (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -

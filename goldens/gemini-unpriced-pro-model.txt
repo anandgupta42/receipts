@@ -8,11 +8,6 @@ read_file.....................31,600 tok  (1 call)
 --------------------------------------------------
 TOTAL...................................31,600 tok
 no price table matched
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -

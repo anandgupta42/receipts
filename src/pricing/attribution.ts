@@ -5,7 +5,7 @@ import { isoDateOf, priceTurn, vendorForTurn } from "./resolve.js";
 
 const THINKING_REPLY = "(thinking/reply)";
 
-/** R3's one exported methodology string — the receipt prints this verbatim so the attribution is self-explaining (I3). */
+/** R3's one exported methodology string — `aireceipts --methodology` prints this verbatim and `--json` ships it, so the attribution is self-explaining (I3; SPEC-0055 removed the on-card brief). */
 export const METHODOLOGY =
   "Cost is attributed per assistant turn: each turn's priced usage (tokens × the " +
   "dated price row matching its model and date) is split evenly across the tool(s) " +
@@ -17,11 +17,6 @@ export const METHODOLOGY =
   "priced at that rate, or the plain input rate if the price row cites neither — " +
   "a conservative fallback that may understate real cost (cache-write billing " +
   "runs ≥1.25× input) but never overstates it with a guessed premium.";
-
-/** Short form of {@link METHODOLOGY} printed on the receipt card itself (R5 polish — the full text is ~17 lines). `--methodology` prints the full text; `--json` still carries the full string. */
-export const METHODOLOGY_BRIEF =
-  "Per-turn cost split evenly across that turn's tool calls; unpriced models " +
-  "show tokens only, never guessed dollars. Full method: aireceipts --methodology";
 
 export interface ToolAttribution {
   tool: string;
