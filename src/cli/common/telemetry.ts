@@ -45,6 +45,8 @@ export function receiptTelemetryFromModels(input: {
     hasTrivialSpansWaste: waste.some((line) => line.kind === "trivial-spans"),
     hasContextThrashWaste: waste.some((line) => line.kind === "context-thrash"),
     hasPriceDelta: input.models.some((model) => model.priceDelta !== null),
+    // SPEC-0061 R6 — boolean only, never a count (I4).
+    hasSubagents: input.models.some((model) => model.subagents !== undefined),
     detailsView: input.detailsView,
     turnCount: input.turnCount,
     toolCallCount: input.toolCallCount,

@@ -6,6 +6,7 @@ import { loadSession } from "../../index.js";
 import { evaluateBudget } from "../../budget/index.js";
 import { getExporter } from "../../receipt/exporters.js";
 import { buildReceiptModel } from "../../receipt/model.js";
+import { attachSubagentRollup } from "../../receipt/subagents.js";
 import { renderReceipt } from "../../receipt/render.js";
 import { renderReceiptSvg } from "../../receipt/svg.js";
 import { rasterizeSvgToPng } from "../../receipt/png.js";
@@ -48,7 +49,8 @@ async function run(ctx: CommandContext): Promise<number> {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
     return 1;
   }
-  const model = await buildReceiptModel(session);
+  // SPEC-0061 — fold the session's subagents into the model before any format renders.
+  const model = await attachSubagentRollup(await buildReceiptModel(session), session.filePath);
   const svgOut = svgOutOf(options);
   if (svgOut.svg) {
     await writeSvg(ctx, renderReceiptSvg(model, { theme: svgOut.theme, template, details: options.details }), svgOut.output ?? "receipt.svg");

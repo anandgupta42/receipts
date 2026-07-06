@@ -63,6 +63,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `hasTrivialSpansWaste` | boolean | | |
 | `hasContextThrashWaste` | boolean | | |
 | `hasPriceDelta` | boolean | | Whether the receipt had an arithmetic cheaper-model delta line. |
+| `hasSubagents` | boolean | | Whether subagent (child) transcripts were folded into the receipt's totals (SPEC-0061). A boolean, never a count. |
 | `detailsView` | boolean | | Whether the receipt rendered the opt-in `--details` section. |
 | `turnCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw turn count. |
 | `toolCallCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw tool-call count. |
@@ -106,6 +107,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `integration` | enum | `statusline` \| `quota` | `mini` is a receipt, not an integration event. |
 | `inputMode` | enum | `stdin_payload` \| `disk_fallback` \| `none` | |
 | `payloadValid` | boolean | | Whether the stdin payload was usable for the integration. |
+| `customFormat` | boolean (optional) | | statusline only (SPEC-0062): an explicit `--format` was passed. The boolean only — never the format string. |
 | `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
 
 ### `activation_milestone` — once per milestone per local state file

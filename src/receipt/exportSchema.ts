@@ -128,10 +128,21 @@ const receiptBodyShape = {
   totalTokens: tokenUsageSchema,
   sessionTotalTokens: tokenUsageSchema,
   wasteLines: z.array(wasteLineSchema),
-  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span", "cost-lower-bound-cache-tier", "dropped-transcript-records", "partial-priced-coverage"]), text: z.string() }).strict()),
+  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span", "cost-lower-bound-cache-tier", "dropped-transcript-records", "partial-priced-coverage", "subagents-unreadable", "subagents-unpriced", "subagents-priced-tokens-only", "subagents-dropped-records"]), text: z.string() }).strict()),
   priceDelta: priceDeltaSchema.nullable(),
   methodology: z.string(),
   priceRowsUsed: z.array(priceRowUsedSchema),
+  /** SPEC-0061 R5 — subagent rollup aggregate; present only when the session has children. Counts and sums only — never child ids, titles, or paths. */
+  subagents: z
+    .object({
+      count: z.number().int().nonnegative(),
+      pricedUsd: z.number().nullable(),
+      tokensTotal: z.number().int().nonnegative(),
+      unpricedCount: z.number().int().nonnegative(),
+      unreadableCount: z.number().int().nonnegative(),
+    })
+    .strict()
+    .optional(),
 } as const;
 
 export const receiptBodySchema = z.object(receiptBodyShape).strict();

@@ -12,7 +12,8 @@ import { buildReceiptModel } from "../src/receipt/model.js";
 import { renderReceiptSvg } from "../src/receipt/svg.js";
 import { rasterizeSvgToPng } from "../src/receipt/png.js";
 import { renderCompare } from "../src/receipt/compare.js";
-import { renderStatusline } from "../src/receipt/mini.js";
+import { buildMiniSummary } from "../src/receipt/mini.js";
+import { parseFormat, renderSegments, DEFAULT_FORMAT } from "../src/cli/statuslineSegments.js";
 import { renderWeek } from "../src/receipt/week.js";
 import { assembleWeekDigest, windowBounds } from "../src/aggregate/week.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
@@ -60,7 +61,10 @@ const digest = await assembleWeekDigest(windowBounds(now), [
 
 const compareText = renderCompare(clean, loop, { color: false, termWidth: 120 });
 const weekText = renderWeek(digest, { color: false });
-const statuslineText = renderStatusline(loop);
+// SPEC-0062 — the site sample shows the stdin-mode default line (no quota payload here, so the quota segment self-omits).
+const statuslineFormat = parseFormat(DEFAULT_FORMAT);
+if ("unknown" in statuslineFormat) { throw new Error("default statusline format failed to parse"); }
+const statuslineText = renderSegments(statuslineFormat.segments, { summary: buildMiniSummary(loop), inputMode: "stdin_payload", payload: null, nowMs: 0 });
 
 const banner = (t: string) => `\n===== ${t} =====\n`;
 process.stdout.write(banner("COMPARE (clean vs loop, side-by-side)") + compareText + "\n");

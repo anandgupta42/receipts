@@ -143,6 +143,8 @@ export interface RecordReceiptGeneratedInput {
   hasTrivialSpansWaste: boolean;
   hasContextThrashWaste: boolean;
   hasPriceDelta: boolean;
+  /** SPEC-0061 R6 — subagent transcripts were folded into the rendered totals. */
+  hasSubagents: boolean;
   /** SPEC-0054 R8 — the render carried the opt-in `--details` section. */
   detailsView: boolean;
   turnCount: number;
@@ -164,6 +166,7 @@ export function recordReceiptGenerated(input: RecordReceiptGeneratedInput): void
       hasTrivialSpansWaste: input.hasTrivialSpansWaste,
       hasContextThrashWaste: input.hasContextThrashWaste,
       hasPriceDelta: input.hasPriceDelta,
+      hasSubagents: input.hasSubagents,
       detailsView: input.detailsView,
       turnCountBucket: bucketCount(input.turnCount),
       toolCallCountBucket: bucketCount(input.toolCallCount),
@@ -228,6 +231,8 @@ export interface RecordIntegrationSurfaceRenderedInput {
   inputMode: InputModeValue;
   payloadValid: boolean;
   result: ResultValue;
+  /** SPEC-0062 R5 — statusline only: an explicit `--format` was passed (boolean, never the format string). */
+  customFormat?: boolean;
 }
 
 export function recordIntegrationSurfaceRendered(input: RecordIntegrationSurfaceRenderedInput): void {

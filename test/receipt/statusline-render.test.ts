@@ -1,8 +1,10 @@
-// SPEC-0007 R1 test matrix: the statusline one-liner's rendering rules,
-// exercised directly against constructed `ReceiptModel`s (no fixture I/O
-// needed — `renderStatusline` is a pure function of the model).
+// SPEC-0007 R1 rules on the SPEC-0062 segments engine: the one-liner's
+// rendering rules, exercised directly against constructed `ReceiptModel`s (no
+// fixture I/O — `renderSegments` over `buildMiniSummary` is pure given a
+// context). The default line is the format `brand,cost,tokens,waste,quota5h`.
 import { describe, expect, it } from "vitest";
-import { buildMiniSummary, renderStatusline } from "../../src/receipt/mini.js";
+import { buildMiniSummary } from "../../src/receipt/mini.js";
+import { DEFAULT_FORMAT, parseFormat, renderSegments, type SegmentContext } from "../../src/cli/statuslineSegments.js";
 import type { ReceiptModel, StuckLoopWasteLine, ToolRow, TrivialSpansWasteLine } from "../../src/receipt/model.js";
 import type { TokenUsage } from "../../src/parse/types.js";
 
@@ -31,18 +33,46 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     methodology: "test",
     priceRowsUsed: [],
     unpriceable: false,
+    costLowerBoundCacheTier: false,
+    turnCount: 4,
+    toolCallCount: 4,
+    cacheReadAtInputRateUsd: null,
     ...overrides,
   };
 }
 
-describe("renderStatusline (R1 priced, no waste)", () => {
-  it("renders [agent] $usd · Nk tok with no waste-flag segment", () => {
+const DEFAULT_SEGMENTS = (() => {
+  const parsed = parseFormat(DEFAULT_FORMAT);
+  if ("unknown" in parsed) {
+    throw new Error("default format failed to parse");
+  }
+  return parsed.segments;
+})();
+
+/** Render the default line the way the command does — stdin mode, no quota payload unless supplied. */
+function renderDefault(model: ReceiptModel, over: Partial<SegmentContext> = {}): string {
+  return renderSegments(DEFAULT_SEGMENTS, {
+    summary: buildMiniSummary(model),
+    inputMode: "stdin_payload",
+    payload: null,
+    nowMs: 0,
+    ...over,
+  });
+}
+
+describe("default line (R1 priced, no waste)", () => {
+  it("renders [aireceipts] $usd · Nk tok with no waste-flag segment", () => {
     const model = baseModel({ totalUsd: 1.23, totalTokens: usage(12345) });
-    expect(renderStatusline(model)).toBe("[Claude Code] $1.23 · 12k tok");
+    expect(renderDefault(model)).toBe("[aireceipts] $1.23 · 12k tok");
+  });
+
+  it("disk-fallback mode names the session's agent in the brand", () => {
+    const model = baseModel({ agentLabel: "Codex", source: "codex" });
+    expect(renderDefault(model, { inputMode: "disk_fallback" })).toBe("[aireceipts · Codex] $1.23 · 12k tok");
   });
 });
 
-describe("renderStatusline (R1 unpriced — I2: zero $ bytes)", () => {
+describe("default line (R1 unpriced — I2: zero $ bytes)", () => {
   it("renders tokens-only when unpriceable, even if totalUsd is somehow set", () => {
     const model = baseModel({
       agentLabel: "Cursor",
@@ -54,20 +84,20 @@ describe("renderStatusline (R1 unpriced — I2: zero $ bytes)", () => {
       totalTokens: usage(0),
       sessionTotalTokens: usage(8000),
     });
-    const line = renderStatusline(model);
-    expect(line).toBe("[Cursor] 8k tok");
+    const line = renderDefault(model);
+    expect(line).toBe("[aireceipts] 8k tok");
     expect(line).not.toContain("$");
   });
 
   it("renders tokens-only when nothing in the session priced (totalUsd null)", () => {
     const model = baseModel({ totalUsd: null, totalTokens: usage(500) });
-    const line = renderStatusline(model);
-    expect(line).toBe("[Claude Code] 1k tok");
+    const line = renderDefault(model);
+    expect(line).toBe("[aireceipts] 1k tok");
     expect(line).not.toContain("$");
   });
 });
 
-describe("renderStatusline (R1 waste flags)", () => {
+describe("default line (R1 waste flags)", () => {
   it("appends a stuck-loop flag with the tool name and run length", () => {
     const waste: StuckLoopWasteLine = {
       kind: "stuck-loop",
@@ -78,7 +108,7 @@ describe("renderStatusline (R1 waste flags)", () => {
       wallClockMs: 15000,
     };
     const model = baseModel({ totalUsd: 2.5, totalTokens: usage(20000), wasteLines: [waste] });
-    expect(renderStatusline(model)).toBe("[Claude Code] $2.50 · 20k tok · ⚠ Bash loop ×5");
+    expect(renderDefault(model)).toBe("[aireceipts] $2.50 · 20k tok · ⚠ Bash loop ×5");
   });
 
   it("appends a trivial-spans flag with the eligible turn count", () => {
@@ -90,12 +120,12 @@ describe("renderStatusline (R1 waste flags)", () => {
       cheaperModel: "claude-haiku-4-5",
     };
     const model = baseModel({ totalUsd: 2.5, totalTokens: usage(20000), wasteLines: [waste] });
-    expect(renderStatusline(model)).toBe("[Claude Code] $2.50 · 20k tok · ⚠ 7 trivial spans");
+    expect(renderDefault(model)).toBe("[aireceipts] $2.50 · 20k tok · ⚠ 7 trivial spans");
   });
 
   it("omits the waste segment entirely when nothing fired (I6: absence, not a claim)", () => {
     const model = baseModel({ wasteLines: [] });
-    expect(renderStatusline(model)).not.toContain("⚠");
+    expect(renderDefault(model)).not.toContain("⚠");
   });
 
   it("only surfaces the first waste line (wasteLines[0]) even when multiple fired", () => {
@@ -115,9 +145,34 @@ describe("renderStatusline (R1 waste flags)", () => {
       cheaperModel: "claude-haiku-4-5",
     };
     const model = baseModel({ wasteLines: [stuckLoop, trivialSpans] });
-    const line = renderStatusline(model);
+    const line = renderDefault(model);
     expect(line).toContain("Read loop ×3");
     expect(line).not.toContain("trivial spans");
+  });
+});
+
+describe("SPEC-0062 R2 — quota on the default line", () => {
+  const payload = { rate_limits: { five_hour: { used_percentage: 23.5, resets_at: 1_800_000_000 } } };
+
+  it("appends the official 5h percentage, integer-rounded", () => {
+    expect(renderDefault(baseModel(), { payload })).toBe("[aireceipts] $1.23 · 12k tok · 5h 24%");
+  });
+
+  it("omits the segment for an out-of-range percentage (SPEC-0014 R4: never a guess)", () => {
+    const bad = { rate_limits: { five_hour: { used_percentage: 130 } } };
+    expect(renderDefault(baseModel(), { payload: bad })).toBe("[aireceipts] $1.23 · 12k tok");
+  });
+
+  it("the 7d window stays off the default line", () => {
+    const both = {
+      rate_limits: {
+        five_hour: { used_percentage: 10 },
+        seven_day: { used_percentage: 55 },
+      },
+    };
+    const line = renderDefault(baseModel(), { payload: both });
+    expect(line).toContain("5h 10%");
+    expect(line).not.toContain("7d");
   });
 });
 

@@ -63,6 +63,24 @@ export type WasteLine = StuckLoopWasteLine | TrivialSpansWasteLine | ContextThra
 /** One dated price row actually consulted while building this receipt — the `--json` "price rows used" requirement (I3: every number traceable). */
 export type PriceRowUsed = ResolvedPrice;
 
+/**
+ * SPEC-0061 — one aggregate over a session's subagent (child) transcripts,
+ * folded from the same priced atoms the PR rollup sums (I3). Attached
+ * post-build by session surfaces (`src/receipt/subagents.ts`); absent when the
+ * session has no children.
+ */
+export interface SubagentAggregate {
+  /** Every discovered child, readable or not — the count stays honest. */
+  count: number;
+  /** Sum over priced children; `null` when no child priced — render tokens, never `$` (I2). */
+  pricedUsd: number | null;
+  /** Total tokens across readable children; unreadable children contribute nothing (counted, never guessed). */
+  tokensTotal: number;
+  /** Readable children with no matching price row. */
+  unpricedCount: number;
+  unreadableCount: number;
+}
+
 export interface ReceiptModel {
   agentLabel: string;
   source: AgentSource;
@@ -97,6 +115,8 @@ export interface ReceiptModel {
   peakTurn?: { tokens: number; turnNumber: number };
   /** SPEC-0054 R4 — `attribution.cacheReadAtInputRateUsd`; see that field for the all-or-null completeness rule. */
   cacheReadAtInputRateUsd: number | null;
+  /** SPEC-0061 — subagent rollup, composed after build by session surfaces; absent ⇒ no children discovered (or the surface didn't compose it) and output stays byte-identical (I5). */
+  subagents?: SubagentAggregate;
 }
 
 /**

@@ -198,6 +198,8 @@ export const receiptGeneratedPropertiesSchema = z
     hasTrivialSpansWaste: z.boolean(),
     hasContextThrashWaste: z.boolean(),
     hasPriceDelta: z.boolean(),
+    /** SPEC-0061 R6 — the session had discovered subagent (child) transcripts folded into its totals (boolean, never a count — I4). */
+    hasSubagents: z.boolean(),
     /** SPEC-0054 R8 — the receipt rendered with the opt-in `--details` section (boolean, never content). */
     detailsView: z.boolean(),
     turnCountBucket: z.enum(COUNT_BUCKET_VALUES),
@@ -248,6 +250,8 @@ export const integrationSurfaceRenderedPropertiesSchema = z
     inputMode: z.enum(INPUT_MODE_VALUES),
     payloadValid: z.boolean(),
     result: z.enum(RESULT_VALUES),
+    /** SPEC-0062 R5 — statusline only: the invocation carried an explicit `--format` (boolean, never the format string). */
+    customFormat: z.boolean().optional(),
   })
   .strict();
 export type IntegrationSurfaceRenderedProperties = z.infer<typeof integrationSurfaceRenderedPropertiesSchema>;
