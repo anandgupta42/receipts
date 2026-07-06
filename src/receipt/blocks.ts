@@ -10,7 +10,6 @@
 // user-supplied template file (~/.aireceipts/templates/<name>.json) that
 // `validateReceiptBlocks` can validate at load time, so the honesty invariants
 // (I2/I3) are non-removable by construction rather than by renderer politeness.
-import { METHODOLOGY_BRIEF } from "../pricing/attribution.js";
 import type { ReceiptModel } from "./model.js";
 import { formatCentsAmount, formatUsd, reconcileCents } from "./format.js";
 
@@ -70,16 +69,12 @@ export type Block =
   | { kind: "total"; label: string; value: string; columns?: GroceryCols }
   /** A single annotation line (degraded-mode note, price-delta note, TXN#, CARDHOLDER, section/category labels). */
   | { kind: "note"; text: string; indent?: number; align?: NoteAlign; muted?: boolean; spaceBefore?: boolean }
-  /** The methodology brief, wrapped and muted. */
+  /** A wrapped, muted fine-print paragraph (no core template emits one since SPEC-0055 dropped the on-card methodology brief; the kind stays for renderer parity). */
   | { kind: "footnote"; text: string; spaceBefore?: boolean }
   /** Grocery's deterministic pipe-barcode. */
   | { kind: "barcode"; pattern: string }
-  /**
-   * The closing line. `samosaMark` asks graphical renderers to draw the real
-   * samosa glyph beside the text; terminal output stays text-only (maintainer:
-   * 🔺 rejected — "not a samosa" — and this product prints no approximations).
-   */
-  | { kind: "footer"; text: string; samosaMark?: true };
+  /** The closing line (SPEC-0055: plain text — the receipt card draws no samosa glyph or mark). */
+  | { kind: "footer"; text: string };
 
 /** The layout-agnostic receipt: an ordered block list every renderer interprets. */
 export interface ReceiptView {
@@ -143,7 +138,7 @@ export function groceryLine(item: string, qty: string, amt: string): string {
 
 /** One honesty-invariant breach found by {@link validateReceiptBlocks}. */
 export interface BlockViolation {
-  code: "dollar-in-unpriced" | "untraced-dollar" | "missing-methodology" | "missing-delta-note" | "waste-label-drift";
+  code: "dollar-in-unpriced" | "untraced-dollar" | "missing-delta-note" | "waste-label-drift";
   detail: string;
 }
 
@@ -198,7 +193,6 @@ function blockStrings(b: Block): string[] {
     case "barcode":
       return [b.pattern];
     case "footer":
-      // `samosaMark` is a drawn-glyph request, not text content — no field.
       return [b.text];
     case "rule":
       return [];
@@ -218,10 +212,6 @@ export function validateReceiptBlocks(blocks: Block[], model: ReceiptModel): Blo
   const priced = model.totalUsd !== null;
 
   if (priced) {
-    const hasMethodology = blocks.some((b) => b.kind === "footnote" && b.text === METHODOLOGY_BRIEF);
-    if (!hasMethodology) {
-      violations.push({ code: "missing-methodology", detail: "priced receipt lacks the exact METHODOLOGY_BRIEF footnote" });
-    }
     const allowedDollars = tracedDollarAmounts(model);
     for (const b of blocks) {
       for (const s of blockStrings(b)) {

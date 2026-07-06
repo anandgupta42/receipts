@@ -21,6 +21,9 @@
   .fact{margin-top:22px;padding-top:18px;border-top:1px solid var(--rule);text-align:left;font-size:12px}
   .fact dt{color:var(--muted)}
   .fact dd{margin:0 0 10px;color:var(--ink)}
+  .chip{margin-top:22px;padding-top:18px;border-top:1px solid var(--rule)}
+  .chip a{color:var(--ink);font-size:13px;text-decoration:underline}
+  .chip a:hover{color:var(--muted)}
   .back{display:inline-block;margin-top:26px;font-size:12px;color:var(--muted);text-decoration:none}
   .back:hover{color:var(--ink)}
 </style>
@@ -36,21 +39,16 @@
       </g>
     </svg>
     <h1>the samosa</h1>
-    <p class="lede">Every receipt this tool prints closes with &ldquo;buy me a samosa&rdquo; — a nod to the maintainer's favorite snack.</p>
+    <p class="lede">&ldquo;Buy me a samosa&rdquo; is this project's tip jar — a nod to the maintainer's favorite snack. The receipt card itself stays clean; the invitation lives on pages like this one.</p>
     <p>Unicode ships no samosa emoji. Searching U+1F300–U+1FAFF for SAMOSA or PASTRY returns nothing; the nearest matches are DUMPLING (U+1F95F) and PIE. For a tool whose entire premise is that every character on a receipt is true, shipping a dumpling labeled &ldquo;samosa&rdquo; was the one mislabel we couldn't keep.</p>
-    <p>And this product does not print approximations: the terminal footer stays plain text — no stand-in emoji at all — while every graphical surface draws the real thing: the hand-authored outline above.</p>
+    <p>And this product does not print approximations: the receipt prints no stand-in emoji at all — where a samosa appears (this site, the PR artifact page), it is the real thing: the hand-authored outline above.</p>
     <dl class="fact">
-      <dt>terminal</dt>
-      <dd>plain text — no font ships a samosa, so we print none</dd>
-      <dt>everywhere else</dt>
+      <dt>the receipt card</dt>
+      <dd>plain text, no samosa — the card states facts only</dd>
+      <dt>clickable surfaces</dt>
       <dd>the drawn outline above, one path, no external image</dd>
     </dl>
-    <!--
-      No payment mechanism ships by default (SPEC-0034 R4 non-goal — this
-      page is samosa awareness, not fundraising). If the maintainer later
-      wants a real link here, it goes in this block:
-      <p><a href="REPLACE_WITH_REAL_LINK">chip in for a samosa</a></p>
-    -->
+    <p class="chip"><a href="https://github.com/sponsors/anandgupta42">chip in for a samosa &rarr;</a></p>
     <a class="back" href="index.html">&larr; back to aireceipts</a>
   </div>
 </main>
