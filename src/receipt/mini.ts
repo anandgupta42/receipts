@@ -6,7 +6,7 @@
 // renderer emits exactly 6 lines of plain text (no ANSI — the hook/statusline
 // context is not guaranteed to interpret it), deterministic and golden-gated
 // (I5), obeying the same $-honesty rules as the full receipt (I2).
-import { formatDuration, formatInt, formatTokensK, formatUsd } from "./format.js";
+import { formatDuration, formatInt, formatUsd } from "./format.js";
 import type { ReceiptModel, ToolRow, WasteLine } from "./model.js";
 
 export interface MiniTopTool {
@@ -145,9 +145,12 @@ export function renderMiniSummary(s: MiniSummary): string {
  * Terse, factual waste flag for the one-line statusline (I6: never a
  * good/bad framing, just what fired). Deliberately shorter than the 6-line
  * receipt's `wasteLine` — no `$`/token value, since the total is already on
- * the same line.
+ * the same line. SPEC-0062 moved the one-line renderer itself to the segments
+ * engine (`src/cli/statuslineSegments.ts`), which composes this flag; the
+ * `waste` segment's copy is still pinned here so both surfaces share one
+ * truth.
  */
-function statuslineWasteFlag(waste: WasteLine): string {
+export function statuslineWasteFlag(waste: WasteLine): string {
   if (waste.kind === "stuck-loop") {
     return `⚠ ${waste.tool} loop ×${waste.runLength}`;
   }
@@ -155,28 +158,4 @@ function statuslineWasteFlag(waste: WasteLine): string {
     return `⚠ context thrash ×${waste.compactionCount}`;
   }
   return `⚠ ${formatInt(waste.eligibleTurnCount)} trivial spans`;
-}
-
-/**
- * Render `model` as SPEC-0007's R1 one-line statusline string:
- * `[agent] $X.XX · Nk tok · <waste-flag>` when priced,
- * `[agent] Nk tok · <waste-flag>` when unpriced (I2). The waste-flag segment
- * is omitted entirely when no waste fired (I6: absence of a flag, not a
- * "no waste detected" statement, is the neutral-good signal).
- */
-export function renderStatusline(model: ReceiptModel): string {
-  return renderStatuslineSummary(buildMiniSummary(model));
-}
-
-/** Render a pre-built `MiniSummary` as the R1 one-liner. */
-export function renderStatuslineSummary(s: MiniSummary): string {
-  const segments = [`[${s.agentLabel}]`];
-  if (!s.unpriceable && s.totalUsd !== null) {
-    segments.push(`$${formatUsd(s.totalUsd)}`);
-  }
-  segments.push(formatTokensK(s.totalTokens));
-  if (s.topWaste) {
-    segments.push(statuslineWasteFlag(s.topWaste));
-  }
-  return `${segments[0]} ${segments.slice(1).join(" · ")}`;
 }

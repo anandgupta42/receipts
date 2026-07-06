@@ -1,7 +1,7 @@
 ---
 id: SPEC-0062
 title: "Statusline v2 — brand prefix, quota default-on, opt-in segments with a labeled quota ETA"
-status: approved # maintainer button 1, 2026-07-06 (interactive session)
+status: building # PR open; shipped flips on merge
 milestone: M5
 depends: [SPEC-0007, SPEC-0014, SPEC-0061]
 ---
@@ -48,8 +48,11 @@ first (small, self-contained), R3/R4 second on the same spec.
   `brand, cost, tokens, waste, quota5h, quota7d, quotaEta`.
   `cost`/`tokens`/`waste` reuse the SPEC-0007/0061 values byte-for-byte;
   `quota5h`/`quota7d` are R2's passthrough facts (7d available here even though the
-  default omits it). Stdin-only segments (`quota*`) omit themselves in disk-fallback
-  mode. The default line ≡ `brand, cost, tokens, waste, quota5h` — one renderer, the
+  default omits it). Quota segments are payload-derived, not
+  session-derived: they render whenever the stdin payload carries usable
+  fields — including when the payload's `transcript_path` fails to load and
+  the SESSION falls back to disk (the reading is official either way) — and
+  omit themselves only when no payload arrived (true R3b disk fallback). The default line ≡ `brand, cost, tokens, waste, quota5h` — one renderer, the
   default is just a format (no duplicated truths).
 - **R4 — Quota ETA, labeled arithmetic.** `quotaEta` renders
   `≈ 5h cap <UTC HH:MM>` by straight-line interpolation between exactly two observed
@@ -117,6 +120,7 @@ first (small, self-contained), R3/R4 second on the same spec.
 | R3 waste segment | session with a fired waste line | `⚠` segment renders in a custom format |
 | R3 quota7d | payload with both windows, `--format "quota7d"` | `7d <pct>%` renders |
 | R3 disk-fallback quota | no payload, `--format "brand,quota5h"` | quota segment omitted, brand renders |
+| R3 mixed mode | payload with quota but dead `transcript_path` | brand renders the fallback form; quota still renders (payload-derived) |
 | R4 eta happy path | two same-window readings, rising, 5m apart | `≈ 5h cap <UTC HH:MM>`, time < resets_at |
 | R4 eta cold start | no state file | segment omitted, no error |
 | R4 eta window rollover | `resets_at` differs between readings | segment omitted, state replaced |
@@ -131,11 +135,11 @@ first (small, self-contained), R3/R4 second on the same spec.
 
 ## Success criteria
 
-- [ ] R1–R5 implemented (staged: R1/R2 may land first); statusline tests updated
+- [x] R1–R5 implemented (staged: R1/R2 may land first); statusline tests updated
       (no loosened assertions) plus the R4 state-file battery.
-- [ ] `docs/statusline.md` segment reference + ETA honesty note; `docs/telemetry.md`
+- [x] `docs/statusline.md` segment reference + ETA honesty note; `docs/telemetry.md`
       `customFormat` row — same PR as the code they describe.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked

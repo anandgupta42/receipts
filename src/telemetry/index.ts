@@ -231,6 +231,8 @@ export interface RecordIntegrationSurfaceRenderedInput {
   inputMode: InputModeValue;
   payloadValid: boolean;
   result: ResultValue;
+  /** SPEC-0062 R5 — statusline only: an explicit `--format` was passed (boolean, never the format string). */
+  customFormat?: boolean;
 }
 
 export function recordIntegrationSurfaceRendered(input: RecordIntegrationSurfaceRenderedInput): void {

@@ -7,7 +7,7 @@ running a command yourself.
 Code's `statusLine` config:
 
 ```
-[Claude Code] $0.18 · 147k tok
+[aireceipts] $0.18 · 147k tok
 ```
 
 ## Set it up
