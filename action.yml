@@ -32,13 +32,10 @@ inputs:
 runs:
   using: composite
   steps:
-    # Check out THIS repo at the action's own ref for the verdict script — a
-    # PR must not be able to tamper with the logic it is being checked by.
-    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      with:
-        repository: anandgupta42/receipts
-        ref: ${{ github.action_ref }}
-        path: .aireceipts-action
+    # The runner materializes this action's own files (at the exact ref the
+    # caller pinned) at github.action_path before running it — the verdict
+    # script ships WITH the action, so a PR cannot tamper with the logic it
+    # is being checked by, and no self-checkout is needed.
     - name: Check for the aireceipts receipt comment
       shell: bash
       env:
@@ -47,18 +44,20 @@ runs:
         HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         BASE_REPO: ${{ github.repository }}
         REQUIRE_PR_RECEIPT: ${{ inputs.require-receipt }}
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         set -euo pipefail
         if [ -z "${PR_NUMBER:-}" ]; then
           echo "::error::aireceipts receipt check must run on a pull_request event."
           exit 1
         fi
-        gh api --paginate "repos/${BASE_REPO}/issues/${PR_NUMBER}/comments" > comments.json || echo "[]" > comments.json
-        args=(comments.json --head-repo "$HEAD_REPO" --base-repo "$BASE_REPO")
+        comments="$(mktemp "${RUNNER_TEMP:-/tmp}/aireceipts-comments.XXXXXX")"
+        gh api --paginate "repos/${BASE_REPO}/issues/${PR_NUMBER}/comments" > "$comments" || echo "[]" > "$comments"
+        args=("$comments" --head-repo "$HEAD_REPO" --base-repo "$BASE_REPO")
         if [ "${REQUIRE_PR_RECEIPT:-}" = "true" ]; then
           args+=(--require-same-repo)
         fi
-        verdict=$(node .aireceipts-action/scripts/check-pr-receipt.mjs "${args[@]}")
+        verdict=$(node "$ACTION_PATH/scripts/check-pr-receipt.mjs" "${args[@]}")
         case "$verdict" in
           found)
             echo "aireceipts receipt comment present."

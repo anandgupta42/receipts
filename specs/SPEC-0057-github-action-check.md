@@ -27,13 +27,16 @@ skill/button territory).
 
 - **R1 — Root `action.yml`, composite.** A composite action at the repo root:
   inputs `require-receipt` (default `"false"`) and `github-token` (default
-  `${{ github.token }}`); steps that fetch the PR's issue comments via `gh api`
-  and evaluate them with the SAME `scripts/check-pr-receipt.mjs` (checked out
-  from this repo at the action's own ref — never the caller's repo, so a PR
-  cannot tamper with the verdict logic). Verdict semantics identical to the
-  workflow: `found` → pass; `missing-required` → error exit 1 (only when
-  `require-receipt: true` and the PR is same-repo); `missing-notice` → neutral
-  `::notice`, exit 0.
+  `${{ github.token }}`); one step that fetches the PR's issue comments via
+  `gh api` into a `RUNNER_TEMP` scratch file (never the caller's workspace)
+  and evaluates them with the SAME `scripts/check-pr-receipt.mjs`, resolved
+  from `github.action_path` — the runner materializes the action's own files
+  at the caller-pinned ref, so a PR cannot tamper with the verdict logic and
+  no self-checkout is needed (`github.action_ref` inside a composite step
+  names the wrong ref — review finding, 2026-07-05). Verdict semantics
+  identical to the workflow: `found` → pass; `missing-required` → error exit 1
+  (only when `require-receipt: true` and the PR is same-repo);
+  `missing-notice` → neutral `::notice`, exit 0.
 - **R2 — No duplicated verdict logic.** The action shells into
   `scripts/check-pr-receipt.mjs`; no logic is copied into YAML beyond arg
   plumbing (the no-duplicated-truths rule).
@@ -82,7 +85,8 @@ skill/button territory).
 |---|---|---|
 | R1/R3 metadata | parse `action.yml` | valid YAML; `runs.using: composite`; branding icon+color; inputs `require-receipt` default `"false"`, `github-token` defaulting to the workflow token |
 | R2 wraps script | `action.yml` steps text | references `scripts/check-pr-receipt.mjs`; contains no `missing-required`/`missing-notice` string literals beyond verdict `case` arms (no re-implementation) |
-| R1 checkout pin | `action.yml` steps text | checks out `anandgupta42/receipts` at the action ref, never the caller repo |
+| R1 script resolution | `action.yml` steps | no `uses:` steps; script runs from `github.action_path`; scratch file under `RUNNER_TEMP` |
+| R1 live verdicts | real `scripts/check-pr-receipt.mjs` runs with the action's arg plumbing | `found` / `missing-required` / `missing-notice` for present, same-repo-required-missing, fork/default cases |
 | R5 hygiene | `node scripts/hygiene.mjs` with `action.yml` at root | passes (allowlisted) |
 | R4 docs parity | docs files | maintainer section shows both adoption paths; `docs/adopt/pr-receipt-check-action.yml` exists and parses |
 | R6 dogfood unchanged | `.github/workflows/pr-receipt-check.yml` | untouched by this spec's diff — the reusable workflow remains this repo's own check |
