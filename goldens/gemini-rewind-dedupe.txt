@@ -12,5 +12,5 @@ TOTAL........................................$0.00
 same tokens on gemini-2.5-flash-lite.........$0.00
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-                aireceipts · local                
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -
