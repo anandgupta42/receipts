@@ -8,14 +8,14 @@ subagent chats. (SPEC-0058; depth facts match `src/parse/gemini.ts`.)
 - **Per-turn parsing.** Each turn's model, token usage (with cache tokens),
   and tool calls — priced per tool line when a cited price row matches the
   model and date.
-- **Subagents counted.** Subagent chats nest under the session's chat
-  directory and roll into the parent receipt.
+- **Subagent chats recognized.** A chat recorded as a subagent is labeled a
+  sidechain and joins discovery alongside the main session's chats.
 - **Honest unpriced rendering.** A Gemini model without a cited, dated price
   row shows tokens only — never a guessed dollar (I2).
 
 ## Where transcripts live
 
-`~/.gemini/tmp/<projectHash>/chats/*.json` — one file per session, written by
+`~/.gemini/tmp/<projectHash>/chats/*.jsonl` — one file per session, written by
 Gemini CLI itself; aireceipts only reads them.
 
 ## Quick start

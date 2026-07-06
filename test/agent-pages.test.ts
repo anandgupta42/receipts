@@ -2,17 +2,21 @@
 // one page per registered source id (a new adapter without a page fails
 // here), required sections present, README table links every page, and
 // Cursor's degraded-mode honesty leads its page.
-import { existsSync, readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { AGENT_SOURCES } from "../src/parse/types.js";
+import { agentIds } from "../src/parse/registry.js";
 
 const readme = readFileSync("README.md", "utf8");
+// R1 names the registry as the source of truth — not the AGENT_SOURCES type list.
+const AGENT_SOURCES = agentIds();
 
 describe("SPEC-0058 · per-agent pages", () => {
-  it("R1/R4: exactly one page per registered adapter source id", () => {
-    for (const source of AGENT_SOURCES) {
-      expect(existsSync(`docs/agents/${source}.md`), `missing page for adapter "${source}" — a new adapter ships with its docs page`).toBe(true);
-    }
+  it("R1/R4: exactly one page per registered adapter — no missing, no orphan pages", () => {
+    const pages = readdirSync("docs/agents")
+      .filter((f) => f.endsWith(".md") && f !== "README.md")
+      .map((f) => f.replace(/\.md$/, ""))
+      .sort();
+    expect(pages, "docs/agents/*.md must be exactly the registry's adapter ids").toEqual([...AGENT_SOURCES].sort());
   });
 
   it("R1: every page carries the required sections", () => {
@@ -43,6 +47,10 @@ describe("SPEC-0058 · per-agent pages", () => {
     const page = readFileSync("docs/agents/cursor.md", "utf8");
     const firstLines = page.split("\n").slice(0, 15).join("\n");
     expect(firstLines).toContain("session totals only");
+    // The shipped adapter flags every session unpriceable — the page must say
+    // dollars never render, and must not claim priced totals.
+    expect(firstLines).toContain("never renders dollars");
+    expect(page).not.toContain("priced total");
   });
 
   it("R3: the README Supported-agents table links every page, and the index lists all five", () => {
