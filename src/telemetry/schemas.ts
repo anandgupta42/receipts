@@ -250,6 +250,8 @@ export const integrationSurfaceRenderedPropertiesSchema = z
     inputMode: z.enum(INPUT_MODE_VALUES),
     payloadValid: z.boolean(),
     result: z.enum(RESULT_VALUES),
+    /** SPEC-0062 R5 — statusline only: the invocation carried an explicit `--format` (boolean, never the format string). */
+    customFormat: z.boolean().optional(),
   })
   .strict();
 export type IntegrationSurfaceRenderedProperties = z.infer<typeof integrationSurfaceRenderedPropertiesSchema>;

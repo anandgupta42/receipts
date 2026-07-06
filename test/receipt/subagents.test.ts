@@ -11,12 +11,26 @@ import type { ReceiptModel, SubagentAggregate, ToolRow } from "../../src/receipt
 import { attachSubagentRollup, foldSubagentRows, subagentCaveats } from "../../src/receipt/subagents.js";
 import { renderReceipt } from "../../src/receipt/render.js";
 import { renderReceiptSvg } from "../../src/receipt/svg.js";
-import { renderMiniReceipt, renderStatusline } from "../../src/receipt/mini.js";
+import { buildMiniSummary, renderMiniReceipt } from "../../src/receipt/mini.js";
+import { DEFAULT_FORMAT, parseFormat, renderSegments } from "../../src/cli/statuslineSegments.js";
 import { toJsonModel } from "../../src/receipt/json.js";
 import { receiptJsonSchema } from "../../src/receipt/exportSchema.js";
 import { receiptTelemetryFromModels } from "../../src/cli/common/telemetry.js";
 
 const PARENT_FIXTURE = "test/fixtures/claude-code/clean-with-subagents.jsonl";
+
+const DEFAULT_SEGMENTS = (() => {
+  const parsed = parseFormat(DEFAULT_FORMAT);
+  if ("unknown" in parsed) {
+    throw new Error("default format failed to parse");
+  }
+  return parsed.segments;
+})();
+
+function renderStatusline(model: ReceiptModel): string {
+  return renderSegments(DEFAULT_SEGMENTS, { summary: buildMiniSummary(model), inputMode: "stdin_payload", payload: null, nowMs: 0 });
+}
+
 
 function usage(total: number): TokenUsage {
   return { input: total, output: 0, cacheRead: 0, cacheCreation: 0, total };
@@ -195,7 +209,7 @@ describe("SPEC-0061 R1 — the SUBAGENTS row across templates", () => {
 describe("SPEC-0061 R3/R4 — statusline and mini fold the aggregate in", () => {
   it("statusline $ and tokens cover parent + children, format unchanged", () => {
     const model = baseModel({ subagents: { ...AGG, pricedUsd: 9.85, tokensTotal: 1_000_000 } });
-    expect(renderStatusline(model)).toBe("[Claude Code] $10.03 · 1,012k tok");
+    expect(renderStatusline(model)).toBe("[aireceipts] $10.03 · 1,012k tok");
   });
 
   it("statusline stays tokens-only when the parent is unpriced (I2)", () => {

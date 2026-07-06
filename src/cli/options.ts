@@ -58,6 +58,8 @@ export interface CliOptions {
   readonly demo: boolean;
   /** SPEC-0054 R4: render the opt-in DETAILS section (classic template only). */
   readonly details: boolean;
+  /** SPEC-0062 R3: `aireceipts statusline --format "<segments>"` — comma-separated segment names. */
+  readonly format?: string;
 }
 
 /** Value-consuming flags: `--theme dark`, `-o out.svg`. Anything else is a boolean flag or positional. */
@@ -91,6 +93,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let share = false;
   let limit: number | undefined;
   let outDir: string | undefined;
+  let format: string | undefined;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -151,6 +154,12 @@ export function parseOptions(argv: string[]): CliOptions {
       outDir = argv[++i];
     } else if (arg.startsWith("--out=")) {
       outDir = arg.slice("--out=".length);
+    } else if (arg === "--format") {
+      // A bare `--format` (no value) must fail fast downstream, not silently
+      // fall back to the default line (SPEC-0062 R3) — normalize to "".
+      format = argv[++i] ?? "";
+    } else if (arg.startsWith("--format=")) {
+      format = arg.slice("--format=".length);
     } else if (arg === "--svg") {
       svg = true;
     } else if (arg === "--png") {
@@ -203,5 +212,6 @@ export function parseOptions(argv: string[]): CliOptions {
     version,
     demo,
     details,
+    format,
   };
 }

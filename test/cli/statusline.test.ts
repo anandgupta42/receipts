@@ -130,7 +130,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     const { code, output } = await captureStdout(() => runStatusline(stdin, loadFromDiskFn));
     expect(code).toBe(0);
     expect(diskFallbackCalled.value).toBe(false);
-    expect(output).toContain("[Claude Code]");
+    expect(output).toContain("[aireceipts]");
   });
 
   it("R3b: falls back to disk when stdin is empty (TTY)", async () => {
@@ -139,7 +139,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     const loadFromDiskFn = async (): Promise<Session | null> => loadById("claude-code", transcriptPath);
     const { code, output } = await captureStdout(() => runStatusline(stdin, loadFromDiskFn));
     expect(code).toBe(0);
-    expect(output).toContain("[Claude Code]");
+    expect(output).toContain("[aireceipts · Claude Code]");
   });
 
   it("R3b: falls back to disk when stdin is malformed JSON", async () => {
@@ -148,7 +148,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     const loadFromDiskFn = async (): Promise<Session | null> => loadById("claude-code", transcriptPath);
     const { code, output } = await captureStdout(() => runStatusline(stdin, loadFromDiskFn));
     expect(code).toBe(0);
-    expect(output).toContain("[Claude Code]");
+    expect(output).toContain("[aireceipts · Claude Code]");
   });
 
   it("R1: renders a stuck-loop waste flag for the 5x Bash loop fixture", async () => {
@@ -156,7 +156,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     const stdin = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
     const { code, output } = await captureStdout(() => runStatusline(stdin));
     expect(code).toBe(0);
-    expect(output).toContain("[Claude Code]");
+    expect(output).toContain("[aireceipts]");
     expect(output).toContain("⚠");
     expect(output).toContain("Bash loop ×");
   });
@@ -166,7 +166,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     const stdin = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
     const { code, output } = await captureStdout(() => runStatusline(stdin));
     expect(code).toBe(0);
-    expect(output).toContain("[Claude Code]");
+    expect(output).toContain("[aireceipts]");
     // Whichever waste kind this fixture actually trips (stuck-loop or
     // trivial-spans), the line must carry exactly one factual waste flag —
     // asserting on the flag's presence/shape rather than a hardcoded magic
@@ -202,6 +202,67 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
       const elapsedMs = performance.now() - started;
       expect(elapsedMs).toBeLessThanOrEqual(200);
     }
+  });
+
+  it("SPEC-0062 R3: a bare --format (no value) fails fast instead of silently rendering the default line", async () => {
+    const { parseOptions } = await import("../../src/cli/options.js");
+    expect(parseOptions(["statusline", "--format"]).format).toBe("");
+    let err = "";
+    const code = await runStatusline(stdinStub("", true), async () => null, () => {}, undefined, {
+      format: "",
+      writeError: (s) => {
+        err += s;
+      },
+    });
+    expect(code).toBe(1);
+    expect(err).toContain("unknown statusline segment");
+  });
+
+  it("SPEC-0062 R5: telemetry customFormat is false by default and true under --format", async () => {
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const stdin1 = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
+    const infos: { customFormat: boolean }[] = [];
+    await captureStdout(() => runStatusline(stdin1, async () => null, undefined, (i) => void infos.push(i)));
+    const stdin2 = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
+    await captureStdout(() => runStatusline(stdin2, async () => null, undefined, (i) => void infos.push(i), { format: "brand,cost" }));
+    expect(infos.map((i) => i.customFormat)).toEqual([false, true]);
+  });
+
+  it("SPEC-0062 R3 mixed mode: dead transcript_path falls back to disk for the session, but payload quota still renders", async () => {
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const payload = JSON.stringify({
+      transcript_path: "/no/such/file.jsonl",
+      rate_limits: { five_hour: { used_percentage: 50, resets_at: 1_800_018_000 } },
+    });
+    const loadFromDiskFn = async (): Promise<Session | null> => loadById("claude-code", transcriptPath);
+    const { code, output } = await captureStdout(() => runStatusline(stdinStub(payload), loadFromDiskFn));
+    expect(code).toBe(0);
+    expect(output).toContain("[aireceipts · Claude Code]");
+    expect(output).toContain("5h 50%");
+  });
+
+  it("SPEC-0062 R5 latency: rollup + quota parsing + state read/write stays within the 200ms budget", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const statePath = path.join(mkdtempSync(path.join(tmpdir(), "aireceipts-lat-")), "quota-window.json");
+    const transcriptPath = fixturePath("clean-with-subagents.jsonl");
+    const payload = JSON.stringify({
+      transcript_path: transcriptPath,
+      rate_limits: { five_hour: { used_percentage: 23.5, resets_at: 1_800_018_000 } },
+    });
+    const started = performance.now();
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, {
+        format: "brand,cost,tokens,waste,quota5h,quota7d,quotaEta",
+        nowMs: 1_800_000_000_000,
+        quotaStatePath: statePath,
+      }),
+    );
+    const elapsedMs = performance.now() - started;
+    expect(code).toBe(0);
+    expect(output).toContain("[aireceipts]");
+    expect(output).toContain("5h 24%");
+    expect(elapsedMs).toBeLessThanOrEqual(200);
   });
 
   it("SPEC-0061 R3 latency: the subagent rollup (children present) stays within the same 200ms budget", async () => {
