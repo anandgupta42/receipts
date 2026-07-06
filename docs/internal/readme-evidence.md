@@ -45,7 +45,7 @@ renderer didn't produce it, the README can't show it.
 ## Prior art & the prepared launch-thread reply (SPEC-0030 R2)
 
 Positioning rules: never argue priority or state of mind; cite the lineage
-(ccusage → claude-receipts → Infracost-for-infra); make the difference
+(ccusage → claude-receipts → the cost-diff-PR-bot pattern from infra tooling); make the difference
 categorical ("a souvenir vs bookkeeping"). Facts checked 2026-07-03:
 claude-receipts created 2026-01-29, 616 stars, no HN front-page moment
 (4 and 1 points on its two submissions), thermal-printer novelty over
@@ -62,7 +62,7 @@ Paste-ready reply for "this already exists":
 > attribution — every PR in our repo carries the receipt of the agent
 > sessions that built it, with explicit floors when anything can't be
 > proven, and a doc on what a receipt can and can't prove. Same good
-> metaphor — Infracost did it for Terraform PRs years ago — different
+> metaphor — infra cost-diff bots did it for Terraform PRs years ago — different
 > category of tool.
 
 If someone asks directly whether the author knew of claude-receipts:

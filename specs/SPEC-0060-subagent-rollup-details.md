@@ -1,7 +1,7 @@
 ---
 id: SPEC-0060
 title: "PR-comment subagent rollup — one aggregate row in the fence, the breakdown in details"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0026, SPEC-0044]
 ---
@@ -90,9 +90,9 @@ drawn-row granularity.
 
 ## Success criteria
 
-- [ ] R1–R5 implemented in `src/pr/body.ts` / `src/pr/index.ts`; `test/pr/body.test.ts` updated (no loosened assertions — the old per-row expectations are replaced by aggregate + details-table expectations).
-- [ ] `docs/pr-receipts.md` reflects the new fence/details split.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] R1–R5 implemented in `src/pr/body.ts` / `src/pr/index.ts`; `test/pr/body.test.ts` updated (no loosened assertions — the old per-row expectations are replaced by aggregate + details-table expectations).
+- [x] `docs/pr-receipts.md` reflects the new fence/details split.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked.

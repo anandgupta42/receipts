@@ -1,7 +1,7 @@
 ---
 id: SPEC-0058
 title: "Per-agent doc pages — one landing page per supported agent"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0010, SPEC-0018, SPEC-0050]
 ---
@@ -70,8 +70,8 @@ Maintainer-directed (2026-07-05).
 
 ## Success criteria
 
-- [ ] R1–R4 implemented; guard test green.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] R1–R4 implemented; guard test green.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked.

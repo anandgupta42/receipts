@@ -3,6 +3,68 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.3.0 — 2026-07-06
+
+Minor: background-agent (subagent) spend becomes visible on every surface, the
+statusline is rebranded and extensible, and receipts get sharper defaults plus
+retroactive/first-run tooling. Per the 0.x policy, this minor deliberately
+changes rendered output — the callouts below list every change.
+
+### Output changes (deliberate, golden-gated)
+
+- Statusline prefix is now `[aireceipts]` in stdin mode and
+  `[aireceipts · <agent>]` in disk-fallback mode (was `[Claude Code]` etc.),
+  and the default line appends your official 5h quota window (`5h N%`) when
+  Claude Code's payload carries it (SPEC-0062).
+- Session receipts draw one `SUBAGENTS (N)` row (with `TOTAL` covering it) when
+  the session has child transcripts; SPEC-0061 itself adds nothing to childless
+  sessions (their v0.2.0→v0.3.0 rendering differences come only from the
+  SPEC-0054/0055 changes above).
+- The receipt footer now carries the install CTA (`npx aireceipts-cli`) instead
+  of the samosa link, and the inline methodology paragraph moved behind
+  `--methodology` (SPEC-0055).
+- The `same tokens on <model>` line gains a `(N% less)` suffix when it is real
+  savings (SPEC-0054).
+
+### Added
+
+- **Subagent rollups everywhere** (SPEC-0060, SPEC-0061): PR comments aggregate
+  each contributor's subagents into one fence row plus a capped details table;
+  session receipts, the statusline, the `install-hook` mini-receipt, and
+  `--json` (optional `subagents` object) fold the same priced atoms in, with
+  floor caveats for anything unreadable or unpriced — never a fabricated `$`.
+- **Statusline v2** (SPEC-0062): `--format <segments>` engine
+  (`brand,cost,tokens,waste,quota5h,quota7d,quotaEta`); `quotaEta` is a
+  labeled `≈` cap-crossing estimate from two observed readings, rendered only
+  when its guards hold (state file: `~/.aireceipts/quota-window.json`).
+- **`--details`** (SPEC-0054): opt-in receipt section — token/cache anatomy,
+  turns, peak turn, cache-read repricing, BY MODEL split.
+- **`backfill`** (SPEC-0056): bulk retroactive receipts for every existing
+  session on disk.
+- **`--demo`** (SPEC-0051): a bundled sample session renders a real receipt on
+  a machine with no sessions yet; both empty-state messages point at it.
+- **`setup` + `integrations`** (SPEC-0050): first-run report and exact local
+  integration snippets for Claude Code, Codex, opencode, Cursor, and GitHub.
+- **Savings slip** (SPEC-0059): could-have-saved handoff block and PR section.
+- **`--version`**, NOTICE file, and the OIDC release pipeline (#134); OpenSSF
+  Scorecard, community files, and CI telemetry default-off (#139).
+- Per-agent docs pages for the five supported agents (SPEC-0058); discovery
+  now flags unreadable sessions instead of silently skipping them (SPEC-0045).
+
+### Fixed
+
+- Weekly-digest delta-direction labels now match the sign of the change
+  (SPEC-0008, #150).
+- spec-lint catches duplicate spec ids across filenames (#136).
+
+### Docs
+
+- README rebuilt PR-receipt-first with a real merged-PR receipt comment as the
+  hero, then trimmed to one receipt showing per format (SPEC-0053, #153).
+- Positioning pass across README/FAQ/landing (SPEC-0048/0049); Show HN launch
+  kit and GTM sequencing docs; statusline docs cover the new segments and the
+  host refresh-cadence limitation.
+
 ## v0.2.0 — 2026-07-05
 
 Minor: adds adoption telemetry + a local `stats` command (SPEC-0043), and lands

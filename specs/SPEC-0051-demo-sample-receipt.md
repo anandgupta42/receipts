@@ -1,7 +1,7 @@
 ---
 id: SPEC-0051
 title: "Demo sample receipt — `--demo` renders a bundled example so an empty machine still sees value"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0001, SPEC-0018, SPEC-0043]
 ---
@@ -130,12 +130,12 @@ default receipt command computes it; stdout gets `renderReceipt(...)` with no ba
 
 ## Success criteria
 
-- [ ] `aireceipts --demo` prints the sample receipt on a machine with zero sessions;
+- [x] `aireceipts --demo` prints the sample receipt on a machine with zero sessions;
       stdout equals the golden with colour off.
-- [ ] `data/demo` ships in the package and matches its source fixture byte-for-byte.
-- [ ] Empty-state message points to `--demo`; JSON empty paths unchanged.
-- [ ] `demo` is a telemetry command value; docs updated; help golden updated.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `data/demo` ships in the package and matches its source fixture byte-for-byte.
+- [x] Empty-state message points to `--demo`; JSON empty paths unchanged.
+- [x] `demo` is a telemetry command value; docs updated; help golden updated.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked

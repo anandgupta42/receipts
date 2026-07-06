@@ -1,7 +1,7 @@
 ---
 id: SPEC-0055
 title: "Receipt card cleanup — drop the samosa footer + methodology brief, samosa link goes real"
-status: approved
+status: shipped
 milestone: M4
 depends: [SPEC-0020, SPEC-0034]
 ---

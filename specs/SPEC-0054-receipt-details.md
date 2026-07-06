@@ -1,7 +1,7 @@
 ---
 id: SPEC-0054
 title: "Full-receipt details — sharper default lines + an opt-in `--details` section"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0001, SPEC-0017, SPEC-0018, SPEC-0020, SPEC-0043]
 ---
@@ -215,7 +215,7 @@ The `--details` section (opt-in; default output untouched):
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked
       (`echo $?`).
-- [ ] Mutation testing on `src/pricing/**` (per-model + counterfactual
+- [x] Mutation testing on `src/pricing/**` (per-model + counterfactual
       accumulators) survives Stryker.
 
 ## Validation

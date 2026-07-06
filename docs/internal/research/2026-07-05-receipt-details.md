@@ -8,11 +8,11 @@ below is the top consensus cluster.*
 
 ## What the research found
 
-**Adoption surfaces (Infracost, Codecov, size-limit, Lighthouse CI, npm audit,
+**Adoption surfaces (cost-diff PR bots, Codecov, size-limit, Lighthouse CI, npm audit,
 Receiptify/Wrapped, GH job summaries):**
 - Every number should carry its delta/context, not sit alone — Codecov renders
-  `absolute <relative> (impact)`; Infracost leads with the diff and its cause
-  (docs.codecov.com/docs/pull-request-comments, infracost.io/docs).
+  `absolute <relative> (impact)`; cost-diff PR bots lead with the diff and its cause
+  (docs.codecov.com/docs/pull-request-comments).
 - Progressive disclosure is a first-class feature: short scannable top, full detail
   behind an expand (Codecov `condensed_*` modes; GH `<details>` guidance —
   github.blog "Supercharging GitHub Actions with job summaries").
