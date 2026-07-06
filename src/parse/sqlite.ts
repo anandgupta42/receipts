@@ -6,13 +6,58 @@ export interface SqliteReader {
   close(): void;
 }
 
+let sqliteWarningFilterInstalled = false;
+let sqlite3ProbeUsable: boolean | undefined;
+
+type WarningConstructor = (...args: never[]) => unknown;
+type EmitWarningArgs =
+  | [warning: string | Error]
+  | [warning: string | Error, type: string]
+  | [warning: string | Error, type: string, code: string]
+  | [warning: string | Error, type: string, code: string, ctor: WarningConstructor]
+  | [warning: string | Error, options: NodeJS.EmitWarningOptions];
+type EmitWarningDelegate = (...args: EmitWarningArgs) => void;
+
+function warningMessage(warning: string | Error): string {
+  return warning instanceof Error ? warning.message : warning;
+}
+
+function warningType(warning: string | Error, typeOrOptions?: string | NodeJS.EmitWarningOptions): string | undefined {
+  if (warning instanceof Error) return warning.name;
+  if (typeof typeOrOptions === "string") return typeOrOptions;
+  return typeOrOptions?.type;
+}
+
+function isNodeSqliteExperimentalWarning(
+  warning: string | Error,
+  typeOrOptions?: string | NodeJS.EmitWarningOptions,
+): boolean {
+  return warningType(warning, typeOrOptions) === "ExperimentalWarning" && warningMessage(warning).includes("SQLite");
+}
+
+function installNodeSqliteWarningFilter(): void {
+  if (sqliteWarningFilterInstalled) return;
+  sqliteWarningFilterInstalled = true;
+
+  const emitWarning = process.emitWarning.bind(process) as unknown as EmitWarningDelegate;
+  process.emitWarning = ((...args: EmitWarningArgs): void => {
+    const [warning, typeOrOptions] = args;
+    if (isNodeSqliteExperimentalWarning(warning, typeOrOptions)) return;
+    emitWarning(...args);
+  }) as typeof process.emitWarning;
+}
+
 /**
- * Node's built-in SQLite (Node ≥ 22.5). Available only when started with
- * `--experimental-sqlite`; otherwise the import/construct throws and we fall back
- * to the CLI. Opened read-only — we never write to the agent's DB.
+ * Node's built-in SQLite is preferred when present: in-process reads avoid a
+ * spawn per query. Node ≥22.13 loads it unflagged but emits an ExperimentalWarning
+ * that embeds the PID; suppressing only that SQLite warning preserves I1/I5
+ * byte-determinism and keeps user stderr clean. The sqlite3 CLI remains the
+ * portable fallback for Node without node:sqlite. Opened read-only — we never
+ * write to the agent's DB.
  */
 async function tryNodeSqlite(dbPath: string): Promise<SqliteReader | null> {
   try {
+    installNodeSqliteWarningFilter();
     const { DatabaseSync } = (await import("node:sqlite")) as {
       DatabaseSync: new (
         path: string,
@@ -21,7 +66,15 @@ async function tryNodeSqlite(dbPath: string): Promise<SqliteReader | null> {
     };
     const db = new DatabaseSync(dbPath, { readOnly: true });
     return {
-      all: (sql) => db.prepare(sql).all() as Record<string, unknown>[],
+      // Same error contract as the CLI fallback: a failing query (missing
+      // table, schema drift) yields [] on every runtime, never a throw.
+      all: (sql) => {
+        try {
+          return db.prepare(sql).all() as Record<string, unknown>[];
+        } catch {
+          return [];
+        }
+      },
       close: () => db.close(),
     };
   } catch {
@@ -31,8 +84,11 @@ async function tryNodeSqlite(dbPath: string): Promise<SqliteReader | null> {
 
 /** The `sqlite3` CLI in read-only JSON mode — the portable fallback (no npm dep). */
 function trySqlite3Cli(dbPath: string): SqliteReader | null {
-  const probe = spawnSync("sqlite3", ["-version"], { encoding: "utf8" });
-  if (probe.error || probe.status !== 0) {
+  if (sqlite3ProbeUsable === undefined) {
+    const probe = spawnSync("sqlite3", ["-version"], { encoding: "utf8" });
+    sqlite3ProbeUsable = !probe.error && probe.status === 0;
+  }
+  if (!sqlite3ProbeUsable) {
     return null;
   }
   return {
@@ -55,12 +111,11 @@ function trySqlite3Cli(dbPath: string): SqliteReader | null {
 }
 
 /**
- * Open a SQLite database read-only. Prefers the stable `sqlite3` CLI so normal
- * CLI/golden runs do not emit Node's process-specific experimental
- * `node:sqlite` warning; falls back to `node:sqlite` when the CLI is absent.
+ * Open a SQLite database read-only. Prefers node:sqlite for in-process reads and
+ * falls back to the sqlite3 CLI on runtimes where node:sqlite is unavailable.
  * Returns null when neither is usable — callers degrade gracefully (e.g. the
  * Cursor adapter reports not-detected).
  */
 export async function openReadOnly(dbPath: string): Promise<SqliteReader | null> {
-  return trySqlite3Cli(dbPath) ?? (await tryNodeSqlite(dbPath));
+  return (await tryNodeSqlite(dbPath)) ?? trySqlite3Cli(dbPath);
 }
