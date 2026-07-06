@@ -87,8 +87,26 @@ who viewed which receipt.
 
 ## For maintainers (repo integration, 2 minutes)
 
-1. Paste the 3-line caller as `.github/workflows/pr-receipt-check.yml`
-   ([template](adopt/pr-receipt-check-caller.yml)):
+1. Add the check, either way:
+
+   **As an action step** ([paste-ready file](adopt/pr-receipt-check-action.yml)):
+
+   ```yaml
+   name: pr-receipt-check
+   on: [pull_request]
+   permissions:
+     contents: read
+     pull-requests: read
+   jobs:
+     check:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: anandgupta42/receipts@main
+           # with:
+           #   require-receipt: "true"
+   ```
+
+   **Or as a reusable workflow** ([template](adopt/pr-receipt-check-caller.yml)):
 
    ```yaml
    name: pr-receipt-check
@@ -98,16 +116,19 @@ who viewed which receipt.
        uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
    ```
 
+   Same check either way — pick whichever fits your workflow layout. The action
+   form takes `require-receipt: "true"` as an input; the workflow form reads the
+   repo variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`.
+
 2. Add one line to `CONTRIBUTING.md`:
 
    > Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.
 
-That's it. By default, the workflow emits a neutral `::notice` when a PR has no receipt
-comment and never fails the build. To enforce receipts for same-repo PRs, set the repo
-variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`; fork PRs stay notice-only because source
-transcripts remain on the contributor's machine. CI still never generates a receipt
-itself: the source transcripts stay local. Rolling out across a whole org:
-[docs/adopt/org-rollout.md](adopt/org-rollout.md).
+That's it. By default, the check emits a neutral `::notice` when a PR has no receipt
+comment and never fails the build. Enforcement applies to same-repo PRs only; fork PRs
+stay notice-only because source transcripts remain on the contributor's machine. CI
+still never generates a receipt itself: the source transcripts stay local. Rolling out
+across a whole org: [docs/adopt/org-rollout.md](adopt/org-rollout.md).
 
 There is no aireceipts GitHub App or bot: receipts are generated and posted locally by
 design, and a hosted App could never see the transcripts they're built from — the

@@ -21,6 +21,9 @@ export const LINE_BUDGETS = Object.freeze([
 export const ROOT_ALLOWLIST = Object.freeze([
   ".claude",
   ".github",
+  // SPEC-0057: the composite action MUST live at the repo root to be
+  // `uses: anandgupta42/receipts@ref`-addressable and Marketplace-listable.
+  "action.yml",
   ".gitleaksignore",
   ".gitignore",
   "AGENTS.md",
