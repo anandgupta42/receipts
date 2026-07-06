@@ -1,7 +1,7 @@
 ---
 id: SPEC-0059
 title: Savings slip — could-have-saved handoff body + PR comment section
-status: approved
+status: shipped
 milestone: M5
 depends: [SPEC-0013, SPEC-0017, SPEC-0026, SPEC-0042, SPEC-0043]
 ---
@@ -199,13 +199,15 @@ session is an immediate fix or removal.
 
 ## Success criteria
 
-- [ ] Local `--handoff` renders the slip per R1–R4; goldens updated deliberately.
-- [ ] PR comment + HTML artifact render the section per R5–R6; clean PRs
-      byte-identical to pre-SPEC-0059 output.
-- [ ] R7 JSON and R8 telemetry fields land with schema/allowlist coverage.
-- [ ] R9 docs shipped in the same PR.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
-      `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
+- [x] Local `--handoff` renders the slip per R1–R4; goldens updated deliberately
+      (one golden: `goldens/handoff-claude-code-loop-bash-5x.txt`, diff reviewed).
+- [x] PR comment + HTML artifact render the section per R5–R6; clean PRs
+      byte-identical to pre-SPEC-0059 output (pinned by test).
+- [x] R7 JSON and R8 telemetry fields land with schema/allowlist coverage.
+- [x] R9 docs shipped in the same PR.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+      `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?` = 0 each,
+      1387/1387 tests, 95 golden artifacts byte-identical).
 
 ## Validation
 

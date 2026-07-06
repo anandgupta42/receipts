@@ -12,19 +12,33 @@ handoff: Can you fix the flaky login test in src/auth/login.test.ts? It's failin
 Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s
 claude-opus-4-8 100%
 total $0.09 · 6 turns · 5 tool calls
-- Bash loop ×5: $0.08, 3m 45s wall-clock
+--------------------------------------------------
+COULD HAVE SAVED...........................≤ $0.08
+  81% of $0.09 · arithmetic, not a prediction
+
+⚠ Bash loop ×5......................$0.08 (3m 45s)
+  → change or stop after two identical failures
 
 covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line
 ```
 
 The block opens with the session's state — agent, when, how long, which models,
 what it cost, how many turns and tool calls (plus a compaction count when any
-fired) — then lists the waste lines with what each one cost, and closes with a
-`covers:` line stating exactly what the packet accounts for. Everything is
-extracted from the transcript, never summarized, so nothing can be paraphrased
-away. Paste it into your next prompt (or your `CLAUDE.md`) so the agent knows
+fired). Then comes the savings slip: a `COULD HAVE SAVED` ceiling summing the
+fired waste lines (the `≤` and the hedge line are the honesty contract — this
+is arithmetic over what the detectors found, never a prediction that a
+different run would have gone better), each waste line as evidence with the
+same `⚠`/`≈` glyphs the receipt prints, and under each class a one-line `→`
+rule your agent can follow next time. The rules are fixed strings keyed to the
+waste class — extracted evidence plus a static instruction, never generated
+prose. It closes with a `covers:` line stating exactly what the packet
+accounts for. Paste the whole block into your next prompt so the agent knows
 what to avoid — here, a Bash command it re-ran five times over nearly four
 minutes.
+
+The same slip rides the PR comment: `aireceipts pr` adds a collapsed
+`handoff — could have saved ≤ $X` section after the full receipts whenever a
+counted session fired a waste line (and adds nothing at all on a clean PR).
 
 ## Machine-readable form
 

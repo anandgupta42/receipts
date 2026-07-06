@@ -7,7 +7,8 @@
 // the samosa link lives only in the details section below, via SAMOSA_LINK).
 import type { TokenUsage } from "../parse/types.js";
 import type { Block } from "../receipt/blocks.js";
-import type { ModelMixEntry } from "../receipt/model.js";
+import type { ModelMixEntry, WasteLine } from "../receipt/model.js";
+import { couldHaveSavedOf, couldHaveSavedValue, prCoverageLine, savingsSlipLines } from "../receipt/handoff.js";
 import { formatCentsAmount, formatInt, formatUsd, reconcileCents } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
 import { MESSAGE_BASIS_LABEL } from "./messageAnchor.js";
@@ -403,11 +404,23 @@ export interface DetailReceipt {
   text: string;
 }
 
+/** SPEC-0059 R5 — the raw facts the handoff section aggregates (index.ts builds these from the sliced models). */
+export interface HandoffSectionData {
+  /** Every fired waste line across the counted sessions' sliced models, fence order. */
+  wasteLines: WasteLine[];
+  /** Counted sessions behind the PR (the covers line's first fact). */
+  sessionCount: number;
+  /** Summed counted turns across those sessions. */
+  turnCount: number;
+}
+
 export interface PrBodyExtras {
   /** SPEC-0027 R3 — present only after a confirmed artifact push. */
   artifactLink?: { fileName: string; url: string };
   /** SPEC-0026 R5 — per-session full receipts, row order; omitted under `--no-details`. */
   details?: DetailReceipt[];
+  /** SPEC-0059 R5 — handoff slip facts; omitted under `--no-details` (index.ts gates it). */
+  handoff?: HandoffSectionData;
 }
 
 const FENCE = "```";
@@ -454,12 +467,58 @@ function detailsSection(details: DetailReceipt[], budget: number): string | null
   return [header, "", ...parts, "", SAMOSA_LINK, "", "</details>"].join("\n");
 }
 
+/** SPEC-0059 R5 — the slip strings shared by the comment section and the artifact page (R6): one builder, no drift. */
+export interface HandoffSlipView {
+  /** The collapsed row's text — dollars visible before any click. */
+  summary: string;
+  /** The fenced slip body: headline, hedge, evidence + rule lines, covers. */
+  text: string;
+}
+
+/**
+ * SPEC-0059 R5 — the aggregated slip over every counted session's fired waste
+ * lines, or `null` when none fired (a clean PR's comment stays byte-identical).
+ * The percent (summary and hedge) is withheld when the PR total renders with
+ * the `≥` floor marker — a percent of a floor overstates (I3) — by denying the
+ * slip its denominator; the `≤ $` ceiling itself is still an extracted sum.
+ */
+export function buildHandoffSlip(data: HandoffSectionData, input: PrBodyInput): HandoffSlipView | null {
+  if (data.wasteLines.length === 0) {
+    return null;
+  }
+  const totals = totalsFor(input.contributors);
+  const floored =
+    input.excludedCount > 0 || totals.unreadableCount > 0 || (input.confidence !== undefined && isFloored(input.confidence));
+  const denominator = floored || totals.pricedCount === 0 ? null : totals.pricedSubtotal;
+  const saved = couldHaveSavedOf(data.wasteLines, denominator);
+  const pct = saved.pctOfTotal !== null ? ` (${saved.pctOfTotal}%)` : "";
+  const summary = `handoff — could have saved ${couldHaveSavedValue(saved)}${pct}`;
+  const text = [
+    ...savingsSlipLines(data.wasteLines, denominator),
+    "",
+    prCoverageLine(data.sessionCount, data.turnCount, data.wasteLines.length),
+  ].join("\n");
+  return { summary, text };
+}
+
+/** The R5 handoff `<details>` block — all-or-nothing against `budget`: advice is never truncated mid-slip. */
+function handoffSection(slip: HandoffSlipView, budget: number): string | null {
+  const section = [`<details><summary>${slip.summary}</summary>`, "", FENCE, slip.text, FENCE, "", "</details>"].join("\n");
+  return [...section].length + 1 <= budget ? section : null;
+}
+
 /**
  * The complete comment body: marker line, fenced receipt blocks, the R5
- * details section, then the SPEC-0027 artifact link (present only after a
- * confirmed push) — printed and posted bodies are always identical.
+ * details section, the SPEC-0059 handoff section (waste-carrying PRs only),
+ * then the SPEC-0027 artifact link (present only after a confirmed push) —
+ * printed and posted bodies are always identical. The detailed form also
+ * reports whether the handoff section made the body (the R8 telemetry
+ * boolean) — assembly state, never a substring scan of the body.
  */
-export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): string {
+export function renderPrBodyDetailed(
+  input: PrBodyInput,
+  extras: PrBodyExtras = {},
+): { body: string; handoffSectionIncluded: boolean } {
   const linkLine = extras.artifactLink
     ? `full receipt: [${extras.artifactLink.fileName}](${extras.artifactLink.url})`
     : undefined;
@@ -468,6 +527,7 @@ export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): str
   // states what the FINAL body actually contains — a dropped section must
   // never leave a "section below" pointing at nothing.
   let section: string | null = null;
+  let handoff: string | null = null;
   if (extras.details !== undefined && extras.details.length > 0) {
     const budgetFence = renderPrReceiptText({ ...input, detailsBelow: true });
     const used =
@@ -475,6 +535,14 @@ export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): str
       (linkLine === undefined ? 0 : [...linkLine].length + 1) +
       3;
     section = detailsSection(extras.details, COMMENT_SIZE_CAP - used);
+    // SPEC-0059 R5 — a sibling of the full-receipts section, decided against
+    // what that section actually consumed (+2: its trailing blank-line join).
+    if (section !== null && extras.handoff !== undefined) {
+      const slip = buildHandoffSlip(extras.handoff, input);
+      if (slip !== null) {
+        handoff = handoffSection(slip, COMMENT_SIZE_CAP - used - [...section].length - 2);
+      }
+    }
   }
   const fence = renderPrReceiptText({ ...input, detailsBelow: section !== null });
   const lines = [DOGFOOD_MARKER, "```", fence, "```"];
@@ -483,9 +551,16 @@ export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): str
     // one, the link after </details> renders as raw text, not a link.
     lines.push(section, "");
   }
+  if (handoff !== null) {
+    lines.push(handoff, "");
+  }
   if (linkLine !== undefined) {
     lines.push(linkLine);
   }
   lines.push("");
-  return lines.join("\n");
+  return { body: lines.join("\n"), handoffSectionIncluded: handoff !== null };
+}
+
+export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): string {
+  return renderPrBodyDetailed(input, extras).body;
 }

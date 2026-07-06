@@ -42,36 +42,42 @@ const toolRowSchema = z
   })
   .strict();
 
+const stuckLoopWasteShape = {
+  kind: z.literal("stuck-loop"),
+  tool: z.string(),
+  runLength: z.number(),
+  usd: z.number().nullable(),
+  tokens: tokenUsageSchema,
+  wallClockMs: z.number().nullable(),
+} as const;
+const trivialSpansWasteShape = {
+  kind: z.literal("trivial-spans"),
+  eligibleTurnCount: z.number(),
+  usd: z.number(),
+  tokens: tokenUsageSchema,
+  cheaperModel: z.string(),
+} as const;
+const contextThrashWasteShape = {
+  kind: z.literal("context-thrash"),
+  compactionCount: z.number(),
+  turnSpan: z.number(),
+  turnIndices: z.array(z.number()),
+  tokens: tokenUsageSchema,
+  usd: z.number().nullable(),
+} as const;
+
 const wasteLineSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("stuck-loop"),
-      tool: z.string(),
-      runLength: z.number(),
-      usd: z.number().nullable(),
-      tokens: tokenUsageSchema,
-      wallClockMs: z.number().nullable(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("trivial-spans"),
-      eligibleTurnCount: z.number(),
-      usd: z.number(),
-      tokens: tokenUsageSchema,
-      cheaperModel: z.string(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("context-thrash"),
-      compactionCount: z.number(),
-      turnSpan: z.number(),
-      turnIndices: z.array(z.number()),
-      tokens: tokenUsageSchema,
-      usd: z.number().nullable(),
-    })
-    .strict(),
+  z.object(stuckLoopWasteShape).strict(),
+  z.object(trivialSpansWasteShape).strict(),
+  z.object(contextThrashWasteShape).strict(),
+]);
+
+/** SPEC-0059 R7 — the handoff export's waste lines additionally carry the class's fixed rule string (`null` for a class without one). */
+const slipRuleField = { rule: z.string().nullable() } as const;
+const handoffWasteLineSchema = z.discriminatedUnion("kind", [
+  z.object({ ...stuckLoopWasteShape, ...slipRuleField }).strict(),
+  z.object({ ...trivialSpansWasteShape, ...slipRuleField }).strict(),
+  z.object({ ...contextThrashWasteShape, ...slipRuleField }).strict(),
 ]);
 
 const priceDeltaSchema = z
@@ -164,7 +170,15 @@ export const handoffJsonSchema = z
         toolCallCount: z.number(),
       })
       .strict(),
-    wasteLines: z.array(wasteLineSchema),
+    wasteLines: z.array(handoffWasteLineSchema),
+    /** SPEC-0059 R7 — extracted could-have-saved ceiling; additive to the SPEC-0042-pinned list, no version bump (line 14's contract). */
+    couldHaveSaved: z
+      .object({
+        usd: z.number().nullable(),
+        tokens: z.number(),
+        pctOfTotal: z.number().nullable(),
+      })
+      .strict(),
     suggestions: z.array(z.string()),
     threshold: z.number(),
     coverage: z

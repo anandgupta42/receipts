@@ -156,6 +156,7 @@ describe("SPEC-0043 recorders", () => {
       commentResult: "skipped",
       artifactResult: "skipped",
       shareResult: "skipped",
+      handoffSectionIncluded: false,
       result: "success",
     });
     recordHookConfigured({ operation: "install", promptOutcome: "accepted", result: "success" });
