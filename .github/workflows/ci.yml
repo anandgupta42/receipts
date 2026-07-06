@@ -14,7 +14,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [20, 22]
+        # Node 20 is EOL; CI runs a single supported version. `engines` still
+        # allows >=20, and the one path the dropped Node 20 job used to cover —
+        # the sqlite3-CLI fallback, exercised only when node:sqlite is absent —
+        # now has direct coverage in test/parse/sqlite.test.ts (forced-CLI +
+        # node:sqlite parity), so a single Node version loses no coverage.
+        node-version: [22]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 

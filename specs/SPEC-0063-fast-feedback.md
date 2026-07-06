@@ -34,9 +34,13 @@ I1/I5: determinism is proven more often per minute, not less).
   embeds the PID) never reaches stderr: a process-wide, idempotent `emitWarning` filter
   — installed once before the first import, never uninstalled, safe under concurrent
   adapter discovery — suppresses exactly that warning and nothing else.
-- **R3** — Receipt output stays byte-identical on both reader paths. The CI matrix
-  already proves this: Node 20 jobs exercise the CLI fallback, Node 22 jobs exercise
-  `node:sqlite`, and both must pass the same goldens + determinism gates.
+- **R3** — Receipt output stays byte-identical on both reader paths.
+  `test/parse/sqlite.test.ts` proves it end-to-end: it renders the full opencode
+  receipt (real adapter SQL — `json_extract`/`json_each` aggregates, message loading)
+  once through the sqlite3-CLI reader and once through `node:sqlite` and asserts the
+  two receipts are byte-identical, plus direct reader-level checks (real-data reads and
+  the `[]`-on-error contract). So the fallback stays covered even though CI runs a
+  single Node version (see the CI-matrix note under Non-goals).
 - **R4** — `verify-goldens.mjs` keeps its exact CLI contract (same invocation, same
   output, argv passthrough) but caches the compiled output under
   `node_modules/.cache/aireceipts-goldens/<hash>`, keyed by the content of every
@@ -63,8 +67,9 @@ I1/I5: determinism is proven more often per minute, not less).
 - **Given** Node ≥ 22.13 **When** any adapter opens a transcript DB **Then** queries run
   in-process via `node:sqlite`, stderr carries no ExperimentalWarning, and the rendered
   receipt is byte-identical to the sqlite3-CLI rendering of the same transcript.
-- **Given** Node 20 (no `node:sqlite`) **When** the same DB is opened **Then** the
-  sqlite3 CLI fallback is used and all goldens still pass.
+- **Given** a runtime without `node:sqlite` (Node 20, or Node 22 before it was
+  built in) **When** the same DB is opened **Then** the sqlite3 CLI fallback is used
+  and returns rows identical to the `node:sqlite` path.
 - **Given** two concurrent `verify-goldens.mjs` runs on a cold cache **When** both
   compile **Then** one entry wins the rename, both runs verify successfully, and no
   partially-written entry is ever read (sentinel).
@@ -76,8 +81,11 @@ I1/I5: determinism is proven more often per minute, not less).
 
 ## Non-goals
 
-- Dropping Node 20 from the support matrix or the CI matrix (EOL, but `engines` still
-  says `>=20`; a support-policy change is a separate maintainer decision).
+- Dropping Node 20 *support*: `engines` stays `>=20`, so Node 20 users still install
+  and run. The Node 20 **CI-matrix** job was removed as a follow-up (maintainer
+  decision, 2026-07-06) — it duplicated the Node 22 coverage except for the sqlite3-CLI
+  fallback path, which `test/parse/sqlite.test.ts` now covers directly. Bumping
+  `engines` to `>=22` (a user-facing breaking change) remains a separate future call.
 - Reducing determinism runs below 10, skipping tests, or weakening/removing any gate —
   the point is faster proof, not less proof.
 - Caching across CI jobs (actions/cache for the goldens build): each job compiles once
@@ -91,7 +99,7 @@ I1/I5: determinism is proven more often per minute, not less).
 |---|---|---|
 | R1 node:sqlite preferred | Node ≥ 22.13, fixture DB | in-process reads; probe cached; CLI used only when node:sqlite absent |
 | R2 warning suppressed | node:sqlite path active | no ExperimentalWarning on stderr; non-SQLite warnings pass through |
-| R3 both paths byte-equal | Node 20 (CLI) and Node 22 (node:sqlite) CI jobs | same goldens pass on both |
+| R3 both paths byte-equal | full opencode receipt rendered via CLI reader and node:sqlite (`test/parse/sqlite.test.ts`) | byte-identical receipts; CLI real-data + `[]`-on-error hold |
 | R4 cache hit | 2nd verify-goldens run, no edits | no tsc invocation; identical stdout; exit 0 |
 | R4 cache invalidation | edit a src file / a price table | key changes; recompile; exit reflects verification result |
 | R4 concurrent cold cache | two simultaneous runs | both exit 0; single valid (sentinel-complete) cache entry |
