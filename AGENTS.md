@@ -81,15 +81,19 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 *Updated only by the `release` skill. Keep this section, and only this section, current
 after each release — don't hand-edit it elsewhere.*
 
-- **Shipped (npm `aireceipts-cli`, v0.2.0):** the receipt engine and its whole surface
+- **Shipped (npm `aireceipts-cli`, v0.3.0):** the receipt engine and its whole surface
   are live — parse adapters (Claude Code, Codex, Cursor, Gemini, opencode), cited price
   tables, per-tool attribution, waste lines (stuck-loop, trivial-spans, context-thrash
-  incl. Codex compactions), price-delta + routable-spend, `compare`, `week`, `--handoff`
-  (resume packet + standing rules), local budget line, quota context, statusline, PR
-  receipts (multi-session, SHA-anchored, artifact/share), SVG/PNG export, receipt
-  templates, the landing + docs sites, adoption telemetry + a local `stats`
-  counter command (SPEC-0043), and disclosed opt-out diagnostics telemetry. 21
-  specs at `status: shipped`.
+  incl. Codex compactions), price-delta + routable-spend (now with `% less`), `compare`,
+  `week`, `--handoff` (resume packet + standing rules + savings slip), local budget
+  line, quota context, statusline v2 (brand prefix, quota default-on, `--format`
+  segments, labeled `≈` quota ETA — SPEC-0062), subagent rollups on every surface (PR
+  fence + details table, session receipt `SUBAGENTS` row, statusline/mini/`--json` —
+  SPEC-0060/0061), `--details`, `backfill`, `--demo`, `setup` + `integrations`
+  (day-1 kit), per-agent docs pages, PR receipts (multi-session, SHA-anchored,
+  artifact/share), SVG/PNG export, receipt templates, the landing + docs sites,
+  adoption telemetry + a local `stats` counter command (SPEC-0043), and disclosed
+  opt-out diagnostics telemetry. 35 specs at `status: shipped`.
 - **In progress (`building`):** SPEC-0044 cost-attribution confidence — its
   implemented slices ship in v0.2.0 (ConfidenceEvent contract + no-silent-drop,
   cost matrix, rows-sum-to-total, cache-write caveat, parse-skip/load-failure

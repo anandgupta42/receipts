@@ -1,7 +1,7 @@
 ---
 id: SPEC-0056
 title: "aireceipts backfill — bulk retroactive receipts for sessions you already ran"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0001, SPEC-0018, SPEC-0043, SPEC-0045]
 ---
@@ -203,16 +203,16 @@ GitHub/PR involvement at all; the shared word "backfill" is coincidental.
 
 ## Success criteria
 
-- [ ] `aireceipts backfill` prints a deterministic summary with zero sessions on disk and
+- [x] `aireceipts backfill` prints a deterministic summary with zero sessions on disk and
       with a real history, and writes files only when `--out` is given.
-- [ ] `--out` produces one byte-stable receipt per session (I5) plus a deterministic
+- [x] `--out` produces one byte-stable receipt per session (I5) plus a deterministic
       `index.txt`; a second identical run reproduces the same bytes (I1).
-- [ ] The refuse-to-clobber check protects a non-empty, non-backfill directory.
-- [ ] `--since`/`--limit` filter correctly and compose; degraded/unreadable/load-failed
+- [x] The refuse-to-clobber check protects a non-empty, non-backfill directory.
+- [x] `--since`/`--limit` filter correctly and compose; degraded/unreadable/load-failed
       sessions are counted, never silently dropped (SPEC-0045).
-- [ ] `backfill` is a valid telemetry command; `export_generated` fires exactly per the
+- [x] `backfill` is a valid telemetry command; `export_generated` fires exactly per the
       decision tree in R9; `docs/telemetry.md` stays in parity.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked

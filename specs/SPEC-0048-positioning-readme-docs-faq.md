@@ -1,7 +1,7 @@
 ---
 id: SPEC-0048
 title: "Positioning pass — work-unit receipts lead the README, plus an end-user FAQ"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0025, SPEC-0029]
 ---

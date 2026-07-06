@@ -1,7 +1,7 @@
 ---
 id: SPEC-0061
 title: "Session-surface subagent rollup — receipts and statusline stop undercounting background agents"
-status: building # PR open; shipped flips on merge
+status: shipped
 milestone: M5
 depends: [SPEC-0019, SPEC-0044, SPEC-0060]
 ---

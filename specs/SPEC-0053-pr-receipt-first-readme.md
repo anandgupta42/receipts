@@ -1,7 +1,7 @@
 ---
 id: SPEC-0053
 title: "PR-receipt-first README — the receipt on a merged PR is the first visual"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0029, SPEC-0048, SPEC-0050]
 ---
@@ -97,8 +97,8 @@ visual in the first 30 lines in 86% of the winning corpus). Maintainer-directed
 
 ## Success criteria
 
-- [ ] R1–R6 implemented; readme-guard extended for R1 and green.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] R1–R6 implemented; readme-guard extended for R1 and green.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked

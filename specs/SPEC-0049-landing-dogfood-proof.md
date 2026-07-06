@@ -1,7 +1,7 @@
 ---
 id: SPEC-0049
 title: "Landing-page parity — the dogfood proof on the PR-receipt tile"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0021, SPEC-0048]
 ---
@@ -77,10 +77,10 @@ Exact paragraph, verbatim (link text and href verbatim):
 
 ## Success criteria
 
-- [ ] The dogfood line renders on the PR-receipt tile; the PRs link resolves.
-- [ ] `node scripts/check-landing-css.mjs` passes; landing page issues zero external
+- [x] The dogfood line renders on the PR-receipt tile; the PRs link resolves.
+- [x] `node scripts/check-landing-css.mjs` passes; landing page issues zero external
       requests (text + anchor only).
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked

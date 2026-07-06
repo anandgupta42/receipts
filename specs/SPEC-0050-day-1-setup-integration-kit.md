@@ -1,7 +1,7 @@
 ---
 id: SPEC-0050
 title: "Day-1 setup and integration kit"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0036, SPEC-0037]
 ---

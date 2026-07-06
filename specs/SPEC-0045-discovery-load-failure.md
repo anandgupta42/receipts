@@ -1,7 +1,7 @@
 ---
 id: SPEC-0045
 title: "Discovery-layer load failures — the session that never became a candidate"
-status: building
+status: shipped
 milestone: M4
 depends: [SPEC-0044]
 ---
@@ -130,13 +130,13 @@ event.
 
 ## Success criteria
 
-- [ ] A repo-scoped degraded session flags `unreadable-session`; a no-cwd /
+- [x] A repo-scoped degraded session flags `unreadable-session`; a no-cwd /
       out-of-repo degraded file does NOT (red-then-green, both directions).
-- [ ] `week`/`compare`/budget/`--list`/`--json`/default-receipt never render a
+- [x] `week`/`compare`/budget/`--list`/`--json`/default-receipt never render a
       degraded summary's total (a test per surface).
-- [ ] Sub-case 2 + unscopeable degraded are docs-only; no receipt caveat.
-- [ ] `docs/trust.md` gains the discovery-layer limitation entry.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] Sub-case 2 + unscopeable degraded are docs-only; no receipt caveat.
+- [x] `docs/trust.md` gains the discovery-layer limitation entry.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` pass unmasked; the
