@@ -59,7 +59,7 @@ const COMMENT_SIZE_CAP = 65_000;
 const OMITTED_NOTE = "full receipt omitted (comment size limit)";
 
 const WORDMARK = "AIRECEIPTS";
-const FOOTER_TEXT = "aireceipts · local";
+const FOOTER_TEXT = "aireceipts · local · npx aireceipts-cli";
 const NOTE_INDENT = 2;
 
 /** The R1e(e) header line: the turn range, or the honesty label for a full-session fallback. */

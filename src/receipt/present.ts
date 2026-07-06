@@ -31,7 +31,7 @@ export const CURSOR_DEGRADED_NOTE = "Cursor transcripts carry no per-turn model/
 export const NO_PRICE_MATCH_NOTE = "no price table matched";
 
 const WORDMARK = "AIRECEIPTS";
-const FOOTER_TEXT = "aireceipts · local";
+const FOOTER_TEXT = "aireceipts · local · npx aireceipts-cli";
 const THINKING_REPLY = "(thinking/reply)";
 
 const TITLE_MAX = 46;

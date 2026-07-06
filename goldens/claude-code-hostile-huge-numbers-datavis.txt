@@ -13,5 +13,5 @@ TOTAL...................................$12,500.00
 same tokens on claude-haiku-4-5..........$2,500.00
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-                aireceipts · local                
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -
