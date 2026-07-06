@@ -124,11 +124,11 @@ Full methodology: `aireceipts --methodology`.
 
 | Agent | Depth |
 |---|---|
-| Claude Code | Full: per-turn models, tools, cache tiers |
-| Codex CLI | Full per-turn parsing |
-| Gemini CLI | Full: per-turn models, tools, cache tokens |
-| Cursor | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
-| opencode | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
+| [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
+| [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
+| [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
+| [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
+| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
 
 ## Telemetry, disclosed
 
