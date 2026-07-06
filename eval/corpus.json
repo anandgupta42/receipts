@@ -7,6 +7,11 @@
       "expected": []
     },
     {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/clean-with-subagents.jsonl",
+      "expected": []
+    },
+    {
       "source": "codex",
       "path": "test/fixtures/codex/clean-session.jsonl",
       "expected": []

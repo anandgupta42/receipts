@@ -6,6 +6,7 @@
 import { listSessions, loadById, loadSession } from "../../index.js";
 import type { Session, SessionSummary } from "../../parse/types.js";
 import { buildReceiptModel } from "../../receipt/model.js";
+import { attachSubagentRollup } from "../../receipt/subagents.js";
 import { renderStatusline } from "../../receipt/mini.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import type { InputModeValue, ResultValue } from "../../telemetry/schemas.js";
@@ -103,7 +104,8 @@ export async function runStatusline(
     await record?.({ inputMode, payloadValid, result: "no_data" });
     return 0;
   }
-  const model = await buildReceiptModel(session);
+  // SPEC-0061 R3 — the one-liner covers parent + subagents (no children → zero extra transcript reads).
+  const model = await attachSubagentRollup(await buildReceiptModel(session), session.filePath);
   write(`${renderStatusline(model)}\n`);
   await record?.({ inputMode, payloadValid, result: "success" });
   return 0;

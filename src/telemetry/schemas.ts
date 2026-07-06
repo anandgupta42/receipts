@@ -198,6 +198,8 @@ export const receiptGeneratedPropertiesSchema = z
     hasTrivialSpansWaste: z.boolean(),
     hasContextThrashWaste: z.boolean(),
     hasPriceDelta: z.boolean(),
+    /** SPEC-0061 R6 — the session had discovered subagent (child) transcripts folded into its totals (boolean, never a count — I4). */
+    hasSubagents: z.boolean(),
     /** SPEC-0054 R8 — the receipt rendered with the opt-in `--details` section (boolean, never content). */
     detailsView: z.boolean(),
     turnCountBucket: z.enum(COUNT_BUCKET_VALUES),

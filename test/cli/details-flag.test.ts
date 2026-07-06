@@ -79,6 +79,7 @@ describe("SPEC-0054 --details CLI surface", () => {
           hasTrivialSpansWaste: false,
           hasContextThrashWaste: false,
           hasPriceDelta: false,
+          hasSubagents: false,
           detailsView,
           turnCountBucket: "2-3",
           toolCallCountBucket: "4-10",

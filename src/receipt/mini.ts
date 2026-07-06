@@ -37,6 +37,8 @@ export interface MiniSummary {
   topWaste: WasteLine | null;
   /** Cursor's degraded mode: session totals only, no per-turn model/usage. */
   unpriceable: boolean;
+  /** SPEC-0061 — discovered subagent (child) sessions folded into the totals above; `0` when none. */
+  subagentCount: number;
 }
 
 function topToolOf(toolRows: ToolRow[]): MiniTopTool | null {
@@ -47,17 +49,20 @@ function topToolOf(toolRows: ToolRow[]): MiniTopTool | null {
   return { tool: row.tool, usd: row.usd, tokens: row.tokens.total, callCount: row.callCount };
 }
 
-/** Reduce a full `ReceiptModel` to the shared mini-summary. Pure; no I/O, no recompute. */
+/** Reduce a full `ReceiptModel` to the shared mini-summary. Pure; no I/O, no recompute. SPEC-0061 R3/R4: the totals fold in the subagent aggregate — priced children join `$` (only on a priced parent, I2), child tokens always join the token count. */
 export function buildMiniSummary(model: ReceiptModel): MiniSummary {
+  const agg = model.subagents;
+  const parentTokens = model.unpriceable ? model.sessionTotalTokens.total : model.totalTokens.total;
   return {
     agentLabel: model.agentLabel,
     model: model.modelMix[0]?.model ?? null,
     durationMs: model.durationMs,
-    totalUsd: model.totalUsd,
-    totalTokens: model.unpriceable ? model.sessionTotalTokens.total : model.totalTokens.total,
+    totalUsd: model.totalUsd !== null ? model.totalUsd + (agg?.pricedUsd ?? 0) : null,
+    totalTokens: parentTokens + (agg?.tokensTotal ?? 0),
     topTool: topToolOf(model.toolRows),
     topWaste: model.wasteLines[0] ?? null,
     unpriceable: model.unpriceable,
+    subagentCount: agg?.count ?? 0,
   };
 }
 
@@ -67,10 +72,12 @@ function callLabel(callCount: number, tool: string): string {
 }
 
 function totalLine(s: MiniSummary): string {
+  // SPEC-0061 R4 — say when the total covers more than the parent transcript.
+  const suffix = s.subagentCount > 0 ? ` (incl. ${formatInt(s.subagentCount)} subagent${s.subagentCount === 1 ? "" : "s"})` : "";
   if (!s.unpriceable && s.totalUsd !== null) {
-    return `total  $${formatUsd(s.totalUsd)}`;
+    return `total  $${formatUsd(s.totalUsd)}${suffix}`;
   }
-  return `total  ${formatInt(s.totalTokens)} tok`;
+  return `total  ${formatInt(s.totalTokens)} tok${suffix}`;
 }
 
 function topToolLine(s: MiniSummary): string {

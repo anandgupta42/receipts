@@ -8,6 +8,7 @@ import { loadById } from "../src/index.js";
 import type { AgentSource } from "../src/index.js";
 import { buildReceiptModel } from "../src/receipt/model.js";
 import type { ReceiptModel } from "../src/receipt/model.js";
+import { attachSubagentRollup } from "../src/receipt/subagents.js";
 import { renderReceipt } from "../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../src/receipt/svg.js";
 import { renderMiniReceipt } from "../src/receipt/mini.js";
@@ -50,7 +51,9 @@ function check(file: string, content: string): void {
 for (const e of corpus) {
   const session = await loadById(e.source, e.path);
   if (!session) { console.error(`goldens: failed to load ${e.path}`); process.exit(1); }
-  const model = await buildReceiptModel(session);
+  // SPEC-0061 — compose the subagent rollup exactly as the CLI does; fixtures
+  // without a `subagents/` dir return unchanged, so their goldens stay byte-stable.
+  const model = await attachSubagentRollup(await buildReceiptModel(session), session.filePath);
   loadedModels.set(`${e.source}:${e.path}`, model);
   const stem = `${e.source}-${e.path.split("/").pop()!.replace(/\.jsonl$/, "")}`;
   check(`goldens/${stem}.txt`, renderReceipt(model, { color: false }) + "\n");

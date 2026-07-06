@@ -154,25 +154,49 @@ function countLabel(row: ToolRow): string {
   return `(${formatInt(row.callCount)} ${unit}${row.callCount === 1 ? "" : "s"})`;
 }
 
-/** B1 — every priced row's cent-reconciled display string, keyed by object reference (`buildDatavis` filters `toolRows` into subsets, so a position-based lookup would misalign). Same atom universe `model.totalUsd` itself sums, so rows always add up to TOTAL by construction. */
-function reconciledRowText(model: ReceiptModel): Map<ToolRow, string> {
+/** B1/SPEC-0061 — the cent-reconciliation result: every priced tool row's display string plus, when the subagent aggregate is priced on a priced receipt, its own reconciled amount from the SAME cents universe — so the rows a receipt draws still sum byte-exactly to TOTAL. */
+interface ReconciledAmounts {
+  /** Keyed by object reference (`buildDatavis` filters `toolRows` into subsets, so a position-based lookup would misalign). */
+  rows: Map<ToolRow, string>;
+  /** The `SUBAGENTS (N)` row's `$` text; `undefined` when the aggregate renders tokens (I2) or the session has no children. */
+  subagents?: string;
+}
+
+function reconciledRowText(model: ReceiptModel): ReconciledAmounts {
   const priced = model.toolRows.filter((r) => r.usd !== null);
-  const cents = reconcileCents(priced.map((r) => r.usd as number));
-  const map = new Map<ToolRow, string>();
-  priced.forEach((row, i) => map.set(row, formatCentsAmount(cents[i])));
-  return map;
+  const values = priced.map((r) => r.usd as number);
+  const agg = model.subagents;
+  const aggPriced = agg !== undefined && agg.pricedUsd !== null && model.totalUsd !== null;
+  if (aggPriced) {
+    values.push(agg.pricedUsd as number);
+  }
+  const cents = reconcileCents(values);
+  const rows = new Map<ToolRow, string>();
+  priced.forEach((row, i) => rows.set(row, formatCentsAmount(cents[i])));
+  return { rows, ...(aggPriced ? { subagents: formatCentsAmount(cents[priced.length]) } : {}) };
+}
+
+/** SPEC-0061 R1 — the one `SUBAGENTS (N)` spend row: `$` only when the aggregate joined the reconciled universe; tokens otherwise (I2). `undefined` when the session has no children, keeping every existing render byte-identical (I5). */
+function subagentRowParts(model: ReceiptModel, reconciled: ReconciledAmounts): { label: string; amount: string } | undefined {
+  const agg = model.subagents;
+  if (!agg) {
+    return undefined;
+  }
+  const label = `SUBAGENTS (${formatInt(agg.count)})`;
+  const amount = reconciled.subagents !== undefined ? `$${reconciled.subagents}` : `${formatInt(agg.tokensTotal)} tok`;
+  return { label, amount };
 }
 
 /** The bare amount for one tool row: `$X.XX`, `N tok`, or `""` in Cursor's degraded (per-tool tokens always zero) mode. */
-function rowAmount(row: ToolRow, model: ReceiptModel, reconciled: Map<ToolRow, string>): string {
+function rowAmount(row: ToolRow, model: ReceiptModel, reconciled: ReconciledAmounts): string {
   if (model.unpriceable) {
     return "";
   }
-  return row.usd !== null ? `$${reconciled.get(row) ?? formatUsd(row.usd)}` : `${formatInt(row.tokens.total)} tok`;
+  return row.usd !== null ? `$${reconciled.rows.get(row) ?? formatUsd(row.usd)}` : `${formatInt(row.tokens.total)} tok`;
 }
 
 /** The classic `.`-leader value: amount + count (or count alone in Cursor mode). */
-function classicRowValue(row: ToolRow, model: ReceiptModel, reconciled: Map<ToolRow, string>): string {
+function classicRowValue(row: ToolRow, model: ReceiptModel, reconciled: ReconciledAmounts): string {
   const amt = rowAmount(row, model, reconciled);
   return amt === "" ? countLabel(row) : `${amt}  ${countLabel(row)}`;
 }
@@ -200,10 +224,14 @@ function totalParts(model: ReceiptModel): TotalParts {
   if (model.unpriceable) {
     return { value: `${formatInt(model.sessionTotalTokens.total)} tok`, note: CURSOR_DEGRADED_NOTE };
   }
+  // SPEC-0061 R1 — TOTAL covers parent + subagent aggregate: priced children join
+  // the `$` sum; on an unpriced receipt children join the token count. Unpriced
+  // children under a priced total stay out of the `$` (their floor caveat says so).
+  const agg = model.subagents;
   if (model.totalUsd !== null) {
-    return { value: `$${formatUsd(model.totalUsd)}` };
+    return { value: `$${formatUsd(model.totalUsd + (agg?.pricedUsd ?? 0))}` };
   }
-  return { value: `${formatInt(model.totalTokens.total)} tok`, note: NO_PRICE_MATCH_NOTE };
+  return { value: `${formatInt(model.totalTokens.total + (agg?.tokensTotal ?? 0))} tok`, note: NO_PRICE_MATCH_NOTE };
 }
 
 /**
@@ -215,6 +243,13 @@ function totalParts(model: ReceiptModel): TotalParts {
  */
 function priceDeltaParts(model: ReceiptModel): { label: string; value: string } | undefined {
   if (!model.priceDelta) {
+    return undefined;
+  }
+  // SPEC-0061 — the delta re-prices the PARENT session's tokens only; under a
+  // TOTAL that includes priced children, the line (and its `% less`) would read
+  // against the wrong base. Suppress rather than mislead (I3); `--json` still
+  // carries the labeled usd/actualUsd pair.
+  if (model.subagents !== undefined && model.subagents.pricedUsd !== null) {
     return undefined;
   }
   const { cheaperModel, usd, actualUsd } = model.priceDelta;
@@ -390,6 +425,11 @@ function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[
   model.toolRows.forEach((row, i) => {
     blocks.push({ kind: "row", label: row.tool, value: classicRowValue(row, model, reconciled), spaceBefore: i === 0 });
   });
+  const subagents = subagentRowParts(model, reconciled);
+  if (subagents) {
+    // SPEC-0061 R1 — the last spend row: after tool rows, before waste rows.
+    blocks.push({ kind: "row", label: subagents.label, value: subagents.amount, spaceBefore: model.toolRows.length === 0 });
+  }
   model.wasteLines.forEach((waste, i) => {
     const block = wasteRowBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
@@ -414,6 +454,11 @@ function buildGrocery(model: ReceiptModel): Block[] {
   for (const row of model.toolRows) {
     const amt = rowAmount(row, model, reconciled);
     blocks.push({ kind: "row", label: row.tool, value: amt, columns: { qty: formatInt(row.callCount), amt } });
+  }
+  const subagents = subagentRowParts(model, reconciled);
+  if (subagents) {
+    // SPEC-0061 R1 — qty carries the child count; amt the aggregate.
+    blocks.push({ kind: "row", label: "SUBAGENTS", value: subagents.amount, columns: { qty: formatInt(model.subagents?.count ?? 0), amt: subagents.amount } });
   }
   if (model.wasteLines.length > 0) {
     blocks.push({ kind: "note", text: "--- RETURN/REFUND ---", align: "center", spaceBefore: true });
@@ -444,16 +489,28 @@ function buildGrocery(model: ReceiptModel): Block[] {
 
 const DATAVIS_LEGEND = "[##########] = priciest line; others in proportion";
 
-function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number, reconciled: Map<ToolRow, string>): Block {
+function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number, reconciled: ReconciledAmounts): Block {
   const amt = rowAmount(row, model, reconciled);
   const bar = normalizedBar(rowMetric(row, model), max);
   const value = amt === "" ? bar : `${amt} ${bar}`;
   return { kind: "row", label: row.tool, value };
 }
 
+/** SPEC-0061 — the datavis metric for the subagent aggregate, on the same one-unit-per-receipt rule as {@link rowMetric}. */
+function subagentMetric(model: ReceiptModel): number {
+  const agg = model.subagents;
+  if (!agg) {
+    return 0;
+  }
+  if (model.totalUsd !== null) {
+    return agg.pricedUsd ?? 0;
+  }
+  return model.unpriceable ? 0 : agg.tokensTotal;
+}
+
 function buildDatavis(model: ReceiptModel): Block[] {
   const reconciled = reconciledRowText(model);
-  const max = model.toolRows.reduce((m, row) => Math.max(m, rowMetric(row, model)), 0);
+  const max = model.toolRows.reduce((m, row) => Math.max(m, rowMetric(row, model)), subagentMetric(model));
   const modelOutput = model.toolRows.filter((r) => r.tool === THINKING_REPLY);
   const toolCalls = model.toolRows.filter((r) => r.tool !== THINKING_REPLY);
 
@@ -473,6 +530,12 @@ function buildDatavis(model: ReceiptModel): Block[] {
     for (const row of toolCalls) {
       blocks.push(datavisRowBlock(row, model, max, reconciled));
     }
+  }
+  const subagents = subagentRowParts(model, reconciled);
+  if (subagents) {
+    const bar = normalizedBar(subagentMetric(model), max);
+    blocks.push({ kind: "note", text: "--- SUBAGENTS ---", spaceBefore: true });
+    blocks.push({ kind: "row", label: subagents.label, value: `${subagents.amount} ${bar}` });
   }
   model.wasteLines.forEach((waste, i) => {
     const block = wasteRowBlock(waste);

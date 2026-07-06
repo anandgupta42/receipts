@@ -51,3 +51,15 @@ instead of `aireceipts` in the `command` field (for example, the output of
   view. Nothing streams mid-session (see the CLI's non-goals).
 - Sessions that can't be priced (missing price rows) render tokens-only —
   `aireceipts` never estimates a dollar figure it can't source to a price row.
+- Subagent spend is included (SPEC-0061): background agents write their
+  transcripts to separate files under the session's `subagents/` directory,
+  and the statusline's `$` and token counts fold that rollup in — the same
+  aggregate the session receipt draws as its `SUBAGENTS (N)` row.
+
+## Known limitation: refresh cadence
+
+Claude Code re-invokes the statusline command only when the main conversation
+updates. During a long stretch of background-agent work with the main loop
+idle, the line is not re-invoked and can sit stale until the next
+main-conversation event — that is host behavior, not a rendering bug: every
+invocation reads the transcripts fresh.

@@ -4,6 +4,7 @@
 // never block or fail Claude Code's own shutdown.
 import { loadSession } from "../../index.js";
 import { buildReceiptModel } from "../../receipt/model.js";
+import { attachSubagentRollup } from "../../receipt/subagents.js";
 import { renderMiniReceipt } from "../../receipt/mini.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { resolveSelector } from "../common/session.js";
@@ -20,7 +21,8 @@ async function run(ctx: CommandContext): Promise<number> {
     if (!session) {
       return 0;
     }
-    const model = await buildReceiptModel(session);
+    // SPEC-0061 R4 — subagent rollup; attach is itself fail-safe (parent-only on error).
+    const model = await attachSubagentRollup(await buildReceiptModel(session), session.filePath);
     ctx.stdout.write(`${renderMiniReceipt(model)}\n`);
     await ctx.telemetry.noteReceiptGenerated(
       receiptTelemetryFromModels({

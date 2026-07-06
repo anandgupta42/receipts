@@ -203,4 +203,16 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
       expect(elapsedMs).toBeLessThanOrEqual(200);
     }
   });
+
+  it("SPEC-0061 R3 latency: the subagent rollup (children present) stays within the same 200ms budget", async () => {
+    const { buildReceiptModel } = await import("../../src/receipt/model.js");
+    const { attachSubagentRollup } = await import("../../src/receipt/subagents.js");
+    const started = performance.now();
+    const session = await loadById("claude-code", fixturePath("clean-with-subagents.jsonl"));
+    expect(session).not.toBeNull();
+    const model = await attachSubagentRollup(await buildReceiptModel(session!), session!.filePath);
+    const elapsedMs = performance.now() - started;
+    expect(model.subagents?.count).toBe(2);
+    expect(elapsedMs).toBeLessThanOrEqual(200);
+  });
 });

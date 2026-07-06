@@ -1,0 +1,15 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Refactor the parser and fan the test files ou…” 
+ Claude Code · Jun 27 2026 12:00:00 UTC · 3m 10s  
+               claude-opus-4-8 100%               
+         cache served 29% of input tokens         
+
+Task...............................$0.01  (1 call)
+Edit...............................$0.01  (1 call)
+SUBAGENTS (2)................................$0.02
+--------------------------------------------------
+TOTAL........................................$0.04
+- - - - - - - - - - - - - - - - - - - - - - - - -
+     aireceipts · local · npx aireceipts-cli      
+- - - - - - - - - - - - - - - - - - - - - - - - -
