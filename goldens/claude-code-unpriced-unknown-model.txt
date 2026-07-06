@@ -11,5 +11,5 @@ Read.............................940 tok  (1 call)
 TOTAL....................................3,325 tok
 no price table matched
 - - - - - - - - - - - - - - - - - - - - - - - - -
-                aireceipts · local                
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -

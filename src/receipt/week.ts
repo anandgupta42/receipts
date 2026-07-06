@@ -128,7 +128,7 @@ export function renderWeek(digest: WeekDigest, opts: RenderWeekOptions = {}): st
   lines.push(...deltaBody(digest));
 
   lines.push(dim("-".repeat(WIDTH)));
-  lines.push(center("aireceipts · local", WIDTH));
+  lines.push(center("aireceipts · local · npx aireceipts-cli", WIDTH));
 
   return lines.join("\n");
 }

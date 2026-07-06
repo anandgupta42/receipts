@@ -36,11 +36,20 @@ historical record; this spec is the amendment going forward.
 in a single commit via `verify-goldens.mjs --update`, `determinism-check
 --runs=10` stable, no second churn within this PR.
 
+**Amendment (maintainer decision, in-session 2026-07-05, follow-up on PR
+#145):** the footer becomes `aireceipts · local · npx aireceipts-cli`
+(39 columns, within the ≤50-col centered constraint). Rationale: receipts
+circulate on public PRs, so the footer carries the shortest true install
+CTA; the terminal stays link-free. R1 below is read with this text. This
+amendment adds one more golden regen commit on the PR branch — the
+one-shot kill criterion applies per decision, not across amendments.
+
 ## Requirements
 
 - **R1 — Footer text loses the samosa, everywhere the receipt card renders
-  it.** `FOOTER_TEXT` becomes `"aireceipts · local"` at all three hardcoded
-  sites: `src/receipt/present.ts:35` (feeds classic + datavis), `src/pr/body.ts:61`
+  it.** `FOOTER_TEXT` becomes `"aireceipts · local · npx aireceipts-cli"`
+  (per the Amendment above; the directive's original wording was
+  `"aireceipts · local"`) at all three hardcoded sites: `src/receipt/present.ts:35` (feeds classic + datavis), `src/pr/body.ts:61`
   (feeds the fenced receipt in the PR comment), `src/receipt/week.ts:112`
   (the standalone weekly-digest footer, not part of the `Block` AST). `grocery`
   never had the samosa in its footer (`THANK YOU FOR VIBING WITH...`,
@@ -145,8 +154,8 @@ in a single commit via `verify-goldens.mjs --update`, `determinism-check
 ## Scenarios
 
 - **Given** any terminal receipt (classic/datavis) after R1, **then** the
-  footer reads `aireceipts · local`, centered, no methodology footnote above
-  it (R2).
+  footer reads `aireceipts · local · npx aireceipts-cli`, centered, no
+  methodology footnote above it (R2).
 - **Given** the SVG export, **then** the footer shows plain text only — no
   drawn samosa glyph, no emoji.
 - **Given** `aireceipts --methodology`, **then** the full methodology prints
@@ -181,7 +190,7 @@ in a single commit via `verify-goldens.mjs --update`, `determinism-check
 
 | Case | Input | Expected |
 |---|---|---|
-| R1 footer text | every terminal template's footer | `aireceipts · local`, no samosa clause |
+| R1 footer text | every terminal template's footer | `aireceipts · local · npx aireceipts-cli` (39 cols), no samosa clause |
 | R1 all hardcoded sites | grep shipped receipts incl. week | no `buy me a samosa` in `present.ts`/`body.ts`/`week.ts` footer strings |
 | R1 samosaMark removed | `Block` "footer" kind, `present.ts` push sites, `svg.ts` | field/branch/Paints entry/imports all gone |
 | R1 SVG no glyph | `renderReceiptSvg` every template, light+dark | no glyph anchor path, no 🥟/🔺 bytes |
