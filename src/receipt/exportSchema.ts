@@ -9,9 +9,11 @@
 // producing it, so no render ever routes through zod.
 import { z } from "zod";
 import { AGENT_SOURCES } from "../parse/types.js";
+import { SCHEMA_VERSION } from "./schemaVersion.js";
 
-/** Bumped only on a breaking `--json` shape change (R4). Mirrored in `docs/json-schema.md`. */
-export const SCHEMA_VERSION = 1;
+// Re-exported so existing importers keep one canonical path; the constant itself
+// lives in the zod-free `schemaVersion.ts` (see the rationale there).
+export { SCHEMA_VERSION } from "./schemaVersion.js";
 
 const tokenUsageSchema = z
   .object({
@@ -204,6 +206,35 @@ export const compareJsonSchema = z
   .strict();
 
 /**
+ * SPEC-0056 R8 — `aireceipts backfill --json`, the bulk-sweep summary. Counts are
+ * honest per SPEC-0045: `loadFailureCount` covers degraded summaries and failed
+ * loads (never silently dropped), and `sessions` carries one row per matched
+ * session with the file name written (or `null` when nothing was written for it).
+ */
+export const backfillJsonSchema = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION),
+    discoveredCount: z.number(),
+    matchedCount: z.number(),
+    loadFailureCount: z.number(),
+    writtenCount: z.number(),
+    wroteFiles: z.boolean(),
+    sessions: z.array(
+      z
+        .object({
+          source: z.enum(AGENT_SOURCES),
+          sessionId: z.string(),
+          title: z.string().nullable(),
+          startedAtMs: z.number().nullable(),
+          fileName: z.string().nullable(),
+          loadFailed: z.boolean(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+/**
  * Minimal structural view over a zod node's introspection surface — enough to
  * walk the schema tree without depending on zod's internal class identities
  * (which don't survive bundling). Present-or-absent by node kind: `def.type`
@@ -257,5 +288,6 @@ export function collectFieldNames(schema: z.ZodTypeAny, into: Set<string> = new 
 export function allExportFieldNames(): Set<string> {
   const names = collectFieldNames(receiptJsonSchema);
   collectFieldNames(compareJsonSchema, names);
+  collectFieldNames(backfillJsonSchema, names);
   return collectFieldNames(handoffJsonSchema, names);
 }

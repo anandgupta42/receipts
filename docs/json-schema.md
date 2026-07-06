@@ -180,6 +180,26 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 | `class` | string | (aggregates) Waste class name. |
 | `distinctSessionCount` | number | (aggregates) Distinct recent sessions the class fired in. |
 
+### Backfill envelope (`backfillJsonSchema`) — SPEC-0056
+
+`aireceipts backfill --json`: the bulk-sweep summary. Counts are honest per
+SPEC-0045 — degraded/unloadable sessions are counted in `loadFailureCount`, never
+silently dropped. `sessions` is one row per matched session (after
+`--since`/`--limit`), newest-first; rows also carry `source`, `sessionId`, `title`,
+`startedAtMs` with the same meanings as the handoff envelope above.
+
+| Field | Type | Notes |
+|---|---|---|
+| `schemaVersion` | number | Same envelope as receipt/compare/handoff. |
+| `discoveredCount` | number | Every discovered session summary, degraded ones included. |
+| `matchedCount` | number | After the `--since`/`--limit` filters. |
+| `loadFailureCount` | number | Honest per SPEC-0045, mode-dependent: on an `--out` run (loads attempted), degraded summaries plus failed loads; on a dry run only known-unreadable summaries — a lower bound (labelled `Known unreadable` in the text summary). |
+| `writtenCount` | number | Receipt files written this run; `0` without `--out`. |
+| `wroteFiles` | boolean | `true` only when `--out` wrote files. |
+| `sessions` | array | One row per matched session, newest-first. |
+| `fileName` | string \| null | (sessions) File written under `--out`, or `null` (dry run / load failed). |
+| `loadFailed` | boolean | (sessions) `true` when the session is known unreadable or (on an `--out` run) its load failed. |
+
 <!-- json-fields:end -->
 
 ## CSV

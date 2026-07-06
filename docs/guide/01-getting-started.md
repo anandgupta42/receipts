@@ -119,6 +119,29 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
 Every session on your machine, across every supported agent, totalled for the
 last seven days — still local, still no upload.
 
+## Already have sessions? aireceipts works retroactively
+
+Installed today after weeks of agent use? Your history is already on disk, and
+aireceipts reads it as-is — no re-running anything. Sweep every existing session
+in one command:
+
+```sh
+npx aireceipts-cli backfill
+```
+
+That prints a summary of what it found (and writes nothing). To generate the
+receipts, add `--out`:
+
+```sh
+npx aireceipts-cli backfill --out ./receipts
+```
+
+You get one receipt file per session — byte-identical to running
+`aireceipts <selector>` on each — plus an `index.txt` manifest. `--since <date>`
+and `--limit N` narrow the sweep; `--json` emits the summary machine-readably.
+Re-running against the same directory is safe (it refuses to write into a
+directory it didn't create).
+
 ## 4. Make it automatic
 
 You won't remember to run a command after every session. Let Claude Code run it

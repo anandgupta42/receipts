@@ -6,6 +6,10 @@ Usage:
   aireceipts setup [--json]             first-run report and local integration next steps
   aireceipts integrations [target] [--json]  print setup recipes for assistants and CI
   aireceipts --list [--json]            list sessions, newest first
+  aireceipts backfill [--since <date>] [--limit N] [--out <dir>] [--json]
+                                        bulk receipts for your existing session
+                                         history (summary only; --out writes one
+                                         receipt file per session + index.txt)
   aireceipts stats                      local usage counters (receipts generated on this machine)
   aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
   aireceipts --handoff [selector] [--handoff-threshold N] [--json]
