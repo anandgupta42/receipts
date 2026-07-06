@@ -60,6 +60,7 @@ const stuckLoop: StuckLoopWasteLine = {
   usd: 0.5,
   tokens: usage(1000),
   wallClockMs: null,
+  turnIndices: [1, 2, 3, 4, 5],
 };
 const trivialSpans: TrivialSpansWasteLine = {
   kind: "trivial-spans",
@@ -145,6 +146,7 @@ describe("renderHandoff v2 (SPEC-0013 R3/R5)", () => {
       "  ≈ arithmetic, not a prediction",
       "",
       "⚠ Bash loop ×5...............................$0.50",
+      "  at turns 2-6",
       "  → change or stop after two identical failures",
       "≈ re-priced eligible trivial spans...........$0.02",
       "  (4 tiny turns, priced at a cheaper model)",
@@ -172,6 +174,7 @@ describe("renderHandoff v2 (SPEC-0013 R3/R5)", () => {
         "  arithmetic, not a prediction",
         "",
         "⚠ Bash loop ×5...............................$0.50",
+        "  at turns 2-6",
         "  → change or stop after two identical failures",
         "",
         "suggested CLAUDE.md rules (recurring across recent sessions — paste manually):",

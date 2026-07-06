@@ -35,6 +35,7 @@ const loop = (usd: number | null, tokens = 1000): StuckLoopWasteLine => ({
   usd,
   tokens: usage(tokens),
   wallClockMs: null,
+  turnIndices: [2, 3, 4, 5],
 });
 const trivial = (usd: number): TrivialSpansWasteLine => ({
   kind: "trivial-spans",

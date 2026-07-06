@@ -11,7 +11,7 @@ import type { ReceiptModel, WasteLine } from "../../src/receipt/model.js";
 
 const usage = (input: number) => ({ input, output: 0, cacheRead: 0, cacheCreation: 0, total: input });
 
-const stuckLoop: WasteLine = { kind: "stuck-loop", tool: "Bash", runLength: 5, usd: 0.08, tokens: usage(1000), wallClockMs: 225_000 };
+const stuckLoop: WasteLine = { kind: "stuck-loop", tool: "Bash", runLength: 5, usd: 0.08, tokens: usage(1000), wallClockMs: 225_000, turnIndices: [1, 2, 3, 4, 5] };
 
 function model(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
   return {
@@ -52,6 +52,7 @@ describe("SPEC-0042 R1 — state header", () => {
       "  89% of $0.09 · arithmetic, not a prediction",
       "",
       "⚠ Bash loop ×5......................$0.08 (3m 45s)",
+      "  at turns 2-6",
       "  → change or stop after two identical failures",
       "",
       "covers: 6 turns · 5 tool calls · 2 compactions · 1 waste line",
@@ -95,6 +96,7 @@ describe("SPEC-0042 R6 — SPEC-0013 contracts preserved byte-for-byte", () => {
       "  89% of $0.09 · arithmetic, not a prediction",
       "",
       "⚠ Bash loop ×5......................$0.08 (3m 45s)",
+      "  at turns 2-6",
       "  → change or stop after two identical failures",
     ]);
   });
