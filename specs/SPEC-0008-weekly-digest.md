@@ -44,6 +44,9 @@ rounding, nothing a maintainer would act on), cut it.
   `$` delta, an all-sessions token delta, and the excluded/unpriced session count for
   each window — so a change in price *coverage* can never masquerade as a change in
   *spend* (S2). Prior window with zero sessions renders "no prior data", never 0%.
+  Each `$`/token delta carries a plain-language direction — `(more)`,
+  `(less)`/`(fewer)`, or `(flat)`, read against the "vs. prior 7 days" header — so a
+  signed figure like `-93,700 tok (fewer)` cannot be misread as an increase.
 - **R7 — CLI.** `aireceipts week` (table), `aireceipts week --json`, `--since <date>` to
   override the trailing-7-days default.
 
@@ -55,6 +58,8 @@ rounding, nothing a maintainer would act on), cut it.
   priced-subset `$` line and an all-sessions token line appear, never merged.
 - **Given** zero sessions in the prior window, **when** it renders, **then** the delta
   line reads "no prior data".
+- **Given** this week burned fewer tokens (and less `$`) than the prior window, **when**
+  it renders, **then** the deltas read `(fewer)`/`(less)`, not a bare minus sign.
 - **Given** 4 waste classes fired, **when** it renders, **then** only the top 3 by cost
   appear.
 - **Given** `--json`, **when** parsed, **then** it matches the documented schema
@@ -78,6 +83,7 @@ retention beyond what adapters already keep on disk.
 | R6 coverage honesty | window w/ changed priced-coverage | $ delta + token delta + excluded counts, separate |
 | R5 top-3 waste | 4 distinct classes fired | only top 3 by cost render |
 | R6 no prior data | empty prior window | "no prior data", no fabricated 0% |
+| R6 delta direction | this week below prior | deltas read `(fewer)`/`(less)`, not a bare sign |
 | R7 --json / --since | flags exercised | valid schema; custom window honored |
 
 ## Success criteria
