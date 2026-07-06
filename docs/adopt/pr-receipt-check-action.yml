@@ -1,0 +1,17 @@
+# Adopt the aireceipts PR-receipt check as a step in any workflow: paste this
+# file at .github/workflows/pr-receipt-check.yml. Notice-only by default; set
+# require-receipt: "true" to enforce same-repo PRs (forks stay notice-only).
+# Generation is local — the action only checks for the marked comment; see
+# https://github.com/anandgupta42/receipts/blob/main/docs/pr-receipts.md.
+name: pr-receipt-check
+on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: anandgupta42/receipts@main
+        # with:
+        #   require-receipt: "true"

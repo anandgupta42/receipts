@@ -1,0 +1,77 @@
+# SPEC-0057 — the PR-receipt presence check as a composite action, so adopters
+# can `uses: anandgupta42/receipts@<ref>` from any workflow (and it can be
+# listed on the GitHub Marketplace). Same check as the reusable workflow
+# (.github/workflows/pr-receipt-check.yml): it READS the PR's comments for the
+# marked aireceipts receipt — receipts are generated on the developer's
+# machine (`npx aireceipts-cli pr --post`), never on the runner (SPEC-0052).
+# Verdict logic lives in scripts/check-pr-receipt.mjs — one implementation,
+# two packagings.
+name: "aireceipts PR receipt check"
+description: >-
+  Check that a pull request carries its aireceipts build receipt — the cost of
+  the AI coding-agent sessions behind the PR, posted locally by
+  `npx aireceipts-cli pr --post`. Notice-only by default; opt into enforcement
+  for same-repo PRs with require-receipt.
+author: anandgupta42
+branding:
+  icon: file-text
+  color: gray-dark
+
+inputs:
+  require-receipt:
+    description: >-
+      Set "true" to fail same-repo PRs that carry no receipt comment. Fork PRs
+      always stay notice-only (transcripts live on the contributor's machine).
+    required: false
+    default: "false"
+  github-token:
+    description: Token used to read the PR's comments (contents/pull-requests read).
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    # Check out THIS repo at the action's own ref for the verdict script — a
+    # PR must not be able to tamper with the logic it is being checked by.
+    - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      with:
+        repository: anandgupta42/receipts
+        ref: ${{ github.action_ref }}
+        path: .aireceipts-action
+    - name: Check for the aireceipts receipt comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        BASE_REPO: ${{ github.repository }}
+        REQUIRE_PR_RECEIPT: ${{ inputs.require-receipt }}
+      run: |
+        set -euo pipefail
+        if [ -z "${PR_NUMBER:-}" ]; then
+          echo "::error::aireceipts receipt check must run on a pull_request event."
+          exit 1
+        fi
+        gh api --paginate "repos/${BASE_REPO}/issues/${PR_NUMBER}/comments" > comments.json || echo "[]" > comments.json
+        args=(comments.json --head-repo "$HEAD_REPO" --base-repo "$BASE_REPO")
+        if [ "${REQUIRE_PR_RECEIPT:-}" = "true" ]; then
+          args+=(--require-same-repo)
+        fi
+        verdict=$(node .aireceipts-action/scripts/check-pr-receipt.mjs "${args[@]}")
+        case "$verdict" in
+          found)
+            echo "aireceipts receipt comment present."
+            ;;
+          missing-required)
+            echo "::error::No aireceipts receipt comment found. This repo requires receipts on same-repo PRs — run \`npx aireceipts-cli pr --post\` from your worktree and rerun this check."
+            exit 1
+            ;;
+          missing-notice)
+            echo "::notice::No aireceipts receipt comment found. Run \`npx aireceipts-cli pr --post\` from your worktree to attach one. Enforce for same-repo PRs with the require-receipt input."
+            ;;
+          *)
+            echo "::error::Unexpected pr receipt verdict: $verdict"
+            exit 1
+            ;;
+        esac

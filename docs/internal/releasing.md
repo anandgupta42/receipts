@@ -118,3 +118,21 @@ Done manually because npm can't pre-register a trusted publisher for a
 not-yet-existent package ([npm/cli#8544](https://github.com/npm/cli/issues/8544)):
 `npm login` (passkey) → `npm publish` from clean `main`. v0.1.0 therefore carries
 **no provenance attestation**; every release from v0.1.1 does, via the workflow.
+
+## GitHub Action / Marketplace (SPEC-0057, maintainer-only)
+
+The root `action.yml` packages the PR-receipt presence check as a composite
+action (`uses: anandgupta42/receipts@<ref>`). Publishing it to the Marketplace
+is a maintainer button:
+
+1. Once `action.yml` is on `main`, GitHub offers **Publish this Action to the
+   GitHub Marketplace** on the release-draft page. First time: accept the
+   Marketplace Developer Agreement and pick categories (*Continuous
+   integration* + *Utilities* fit).
+2. Marketplace consumers expect a moving **major version tag** (`v0`, later
+   `v1`): after any release touching `action.yml` or
+   `scripts/check-pr-receipt.mjs`, re-point it (`git tag -f v0 <release-sha>`,
+   then force-push that tag).
+3. The action resolves its verdict script at `github.action_ref`, so a `v0`
+   consumer runs the script exactly as tagged — never the caller's copy.
+   Adopters who pin `@main` opt into floating behavior themselves.
