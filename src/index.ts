@@ -51,3 +51,9 @@ export {
   windowBounds,
 } from "./aggregate/week.js";
 export { renderWeek, weekToJson } from "./receipt/week.js";
+
+// SPEC-0056 backfill — bulk retroactive receipt sweep.
+export type { BackfillFilters, BackfillPlan, BackfillPlanEntry } from "./aggregate/backfill.js";
+export { backfillFileName, buildManifest, filterSummaries, MANIFEST_MARKER, planBackfill, slugForId } from "./aggregate/backfill.js";
+export type { BackfillReport, BackfillReportEntry } from "./receipt/backfill.js";
+export { backfillToJson, renderBackfillSummary } from "./receipt/backfill.js";
