@@ -21,6 +21,9 @@ const SAMPLE_MODEL: ReceiptModel = {
   priceRowsUsed: [],
   unpriceable: false,
   costLowerBoundCacheTier: false,
+  turnCount: 0,
+  toolCallCount: 0,
+  cacheReadAtInputRateUsd: null,
 };
 
 function inputStream(line: string): Readable {

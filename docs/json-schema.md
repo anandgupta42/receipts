@@ -51,7 +51,7 @@ JSON export.
 | `totalTokens` | TokenUsage | Attributed token totals. |
 | `sessionTotalTokens` | TokenUsage | Adapter-reported session totals (the only real number for Cursor). |
 | `wasteLines` | array | Fired waste findings; see WasteLine. |
-| `caveats` | array | Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier`) + `text`. Never affects `$` itself. Empty when nothing to flag. |
+| `caveats` | array | Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier` \| `dropped-transcript-records` \| `partial-priced-coverage`) + `text`. Never affects `$` itself. Empty when nothing to flag. |
 | `budget` | array (optional) | Advisory budget lines (SPEC-0009); present only when `~/.aireceipts/budget.json` is configured. |
 | `priceDelta` | PriceDelta \| null | Cheapest-current-model arithmetic, or null in tokens-only mode. |
 | `methodology` | string | The attribution methodology string (I3). |

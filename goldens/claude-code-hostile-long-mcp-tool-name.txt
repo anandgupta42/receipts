@@ -8,7 +8,7 @@
 mcp__claude-in-chrome__browser_…...$0.01  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.01
-same tokens on claude-haiku-4-5..............$0.00
+same tokens on claude-haiku-4-5...$0.00 (50% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      

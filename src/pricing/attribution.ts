@@ -1,7 +1,7 @@
 import type { Session, TokenUsage } from "../parse/types.js";
 import { addUsage, emptyUsage, scaleUsage } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
-import { isoDateOf, priceTurn, vendorForTurn } from "./resolve.js";
+import { isoDateOf, priceTurn, resolvePrice, vendorForTurn } from "./resolve.js";
 
 const THINKING_REPLY = "(thinking/reply)";
 
@@ -39,6 +39,27 @@ export interface AttributionResult {
    * (`turnUsd !== null`) — an unpriced turn's tokens don't affect any `$`.
    */
   costLowerBoundCacheTier: boolean;
+  /** SPEC-0054 R4 — priced cost per model (`turn.model ?? session.model`), summed over PRICED turns only; an unpriced turn contributes nothing (I2). */
+  byModelUsd: { model: string; usd: number }[];
+  /**
+   * SPEC-0054 R3 — turn-level coverage: of the turns that carried token usage,
+   * how many priced. Turn-level (not per-tool-row) because a tool row mixing a
+   * priced and an unpriced turn still shows a `$` — only the turn count can
+   * disclose that TOTAL excludes some tokens (I2).
+   */
+  usageTurnCount: number;
+  unpricedUsageTurnCount: number;
+  /**
+   * SPEC-0054 R4 — the counterfactual "what these cache-read tokens would have
+   * cost at the plain input rate", summed per priced turn as
+   * `cacheRead * (row.input - row.input_cached) / 1_000_000` over that turn's
+   * own resolved row (mirrors `costOf`'s rate arithmetic, `resolve.ts:107-114`).
+   * Non-null ONLY when the session priced, total `cacheRead > 0`, and every
+   * turn carrying `usage.cacheRead > 0` resolved a row citing `input_cached` —
+   * all-or-null completeness, so a partial counterfactual never implies a
+   * completeness it lacks (the `StuckLoopFinding.usd` precedent).
+   */
+  cacheReadAtInputRateUsd: number | null;
 }
 
 interface Accumulator {
@@ -59,6 +80,13 @@ interface Accumulator {
 export async function attributeByTool(session: Session, dataDir: string = defaultDataDir()): Promise<AttributionResult> {
   const acc = new Map<string, Accumulator>();
   let costLowerBoundCacheTier = false;
+  const modelUsdAcc = new Map<string, number>();
+  let cacheReadAtInputRateUsd = 0;
+  let usageTurnCount = 0;
+  let unpricedUsageTurnCount = 0;
+  // SPEC-0054 R4 — starts true; any cacheRead-carrying turn that can't cite
+  // both rates flips it false, making the counterfactual all-or-null (I2).
+  let cacheReadCounterfactualComplete = true;
 
   for (const turn of session.turns) {
     const units = turn.toolCalls.length > 0 ? turn.toolCalls.map((c) => c.name) : [THINKING_REPLY];
@@ -69,8 +97,26 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
     const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
 
+    if (turn.usage && turn.usage.total > 0) {
+      usageTurnCount++;
+      if (priced === null) {
+        unpricedUsageTurnCount++;
+      }
+    }
     if (priced !== null && priced.cacheWriteLowerBound) {
       costLowerBoundCacheTier = true;
+    }
+    if (priced !== null && model !== undefined) {
+      modelUsdAcc.set(model, (modelUsdAcc.get(model) ?? 0) + priced.usd);
+    }
+
+    if (turn.usage && turn.usage.cacheRead > 0) {
+      const row = vendor !== undefined && model !== undefined && dateISO !== undefined ? await resolvePrice(vendor, model, dateISO, dataDir) : null;
+      if (row && row.input_cached !== undefined) {
+        cacheReadAtInputRateUsd += (turn.usage.cacheRead * (row.input - row.input_cached)) / 1_000_000;
+      } else {
+        cacheReadCounterfactualComplete = false;
+      }
     }
 
     for (const tool of units) {
@@ -95,6 +141,17 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
   const pricedEntries = byTool.filter((t) => t.usd !== null);
   const totalUsd = pricedEntries.length > 0 ? pricedEntries.reduce((sum, t) => sum + (t.usd as number), 0) : null;
   const totalTokens = byTool.reduce((sum, t) => addUsage(sum, t.tokens), emptyUsage());
+  const byModelUsd = [...modelUsdAcc.entries()].map(([model, usd]) => ({ model, usd }));
 
-  return { byTool, totalUsd, totalTokens, methodology: METHODOLOGY, costLowerBoundCacheTier };
+  return {
+    byTool,
+    totalUsd,
+    totalTokens,
+    methodology: METHODOLOGY,
+    costLowerBoundCacheTier,
+    byModelUsd,
+    usageTurnCount,
+    unpricedUsageTurnCount,
+    cacheReadAtInputRateUsd: totalUsd !== null && totalTokens.cacheRead > 0 && cacheReadCounterfactualComplete ? cacheReadAtInputRateUsd : null,
+  };
 }

@@ -9,9 +9,10 @@ Bash..............................$0.07  (5 calls)
 (thinking/reply)...................$0.02  (1 turn)
 
 ⚠ Bash loop ×5......................$0.08 (3m 45s)
+  at turns 1-5
 --------------------------------------------------
 TOTAL........................................$0.09
-same tokens on claude-haiku-4-5..............$0.02
+same tokens on claude-haiku-4-5...$0.02 (80% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      

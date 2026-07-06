@@ -56,6 +56,8 @@ export interface CliOptions {
   readonly mini: boolean;
   readonly version: boolean;
   readonly demo: boolean;
+  /** SPEC-0054 R4: render the opt-in DETAILS section (classic template only). */
+  readonly details: boolean;
 }
 
 /** Value-consuming flags: `--theme dark`, `-o out.svg`. Anything else is a boolean flag or positional. */
@@ -72,6 +74,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let mini = false;
   let version = false;
   let demo = false;
+  let details = false;
   let csvMode: "session" | "tool" | undefined;
   let dryRun = false;
   let checkBudget = false;
@@ -162,6 +165,8 @@ export function parseOptions(argv: string[]): CliOptions {
       version = true;
     } else if (arg === "--demo") {
       demo = true;
+    } else if (arg === "--details") {
+      details = true;
     } else {
       positional.push(arg);
     }
@@ -197,5 +202,6 @@ export function parseOptions(argv: string[]): CliOptions {
     mini,
     version,
     demo,
+    details,
   };
 }

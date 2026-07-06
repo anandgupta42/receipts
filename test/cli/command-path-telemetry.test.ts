@@ -45,16 +45,16 @@ function opencodeRoot(home: string): string {
 
 describe("SPEC-0043 command-path telemetry", () => {
   const home = homedir(); // the mocked, factory-created temp home
-  let origOut: typeof process.stdout.write;
-  let origErr: typeof process.stderr.write;
+  // Captured ONCE at module scope: a beforeEach save would capture the previous
+  // test's mock on the second run, and afterAll would then restore the mock.
+  const origOut = process.stdout.write.bind(process.stdout);
+  const origErr = process.stderr.write.bind(process.stderr);
 
   beforeEach(() => {
     mkdirSync(join(home, ".aireceipts"), { recursive: true });
     writeFileSync(join(home, ".aireceipts", "telemetry.json"), JSON.stringify({ shown: true }));
     mkdirSync(opencodeRoot(home), { recursive: true });
     copyFileSync(join(fixturesDir, "opencode", "clean-multi-vendor.db"), join(opencodeRoot(home), "opencode.db"));
-    origOut = process.stdout.write.bind(process.stdout);
-    origErr = process.stderr.write.bind(process.stderr);
     process.stdout.write = (() => true) as typeof process.stdout.write;
     process.stderr.write = (() => true) as typeof process.stderr.write;
     __resetQueueForTests();
@@ -105,5 +105,24 @@ describe("SPEC-0043 command-path telemetry", () => {
     const runs = events.filter((e) => e.name === "cli_run");
     expect(runs).toHaveLength(1);
     expect((runs[0].properties as Record<string, unknown>).commandClass).toBe("receipt");
+  });
+
+  // SPEC-0054 R8 — detailsView is true only for renders that carry the DETAILS
+  // section: text with the flag → true; --json ignores the flag (the export
+  // never renders the section) → false.
+  it("--details flips detailsView on the text render and stays false on --json", async () => {
+    expect(await main(["--details"])).toBe(0);
+    expect(await main(["--details", "--json"])).toBe(0);
+
+    const receipts = peekQueuedEvents().filter((e) => e.name === "receipt_generated");
+    expect(receipts).toHaveLength(2);
+    for (const event of receipts) {
+      expect(validateEvent(event as TelemetryEvent)).toBe(true);
+    }
+    const [text, json] = receipts.map((e) => e.properties as Record<string, unknown>);
+    expect(text.outputMode).toBe("text");
+    expect(text.detailsView).toBe(true);
+    expect(json.outputMode).toBe("json");
+    expect(json.detailsView).toBe(false);
   });
 });

@@ -22,6 +22,7 @@ async function run(ctx: CommandContext): Promise<number> {
         template: "none",
         turnCount: result.receipt.turnCount,
         toolCallCount: result.receipt.toolCallCount,
+        detailsView: false,
       }),
       "pr",
     );

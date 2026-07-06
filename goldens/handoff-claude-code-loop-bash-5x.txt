@@ -7,6 +7,7 @@ COULD HAVE SAVED...........................≤ $0.08
   81% of $0.09 · arithmetic, not a prediction
 
 ⚠ Bash loop ×5......................$0.08 (3m 45s)
+  at turns 1-5
   → change or stop after two identical failures
 
 covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line

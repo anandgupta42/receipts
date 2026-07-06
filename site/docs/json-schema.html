@@ -370,7 +370,7 @@ footer{
     <tr><td><code>totalTokens</code></td><td>TokenUsage</td><td>Attributed token totals.</td></tr>
     <tr><td><code>sessionTotalTokens</code></td><td>TokenUsage</td><td>Adapter-reported session totals (the only real number for Cursor).</td></tr>
     <tr><td><code>wasteLines</code></td><td>array</td><td>Fired waste findings; see WasteLine.</td></tr>
-    <tr><td><code>caveats</code></td><td>array</td><td>Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code> | <code>cost-lower-bound-cache-tier</code>) + <code>text</code>. Never affects <code>$</code> itself. Empty when nothing to flag.</td></tr>
+    <tr><td><code>caveats</code></td><td>array</td><td>Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code> | <code>cost-lower-bound-cache-tier</code> | <code>dropped-transcript-records</code> | <code>partial-priced-coverage</code>) + <code>text</code>. Never affects <code>$</code> itself. Empty when nothing to flag.</td></tr>
     <tr><td><code>budget</code></td><td>array (optional)</td><td>Advisory budget lines (SPEC-0009); present only when <code>~/.aireceipts/budget.json</code> is configured.</td></tr>
     <tr><td><code>priceDelta</code></td><td>PriceDelta | null</td><td>Cheapest-current-model arithmetic, or null in tokens-only mode.</td></tr>
     <tr><td><code>methodology</code></td><td>string</td><td>The attribution methodology string (I3).</td></tr>

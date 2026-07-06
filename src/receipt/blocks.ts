@@ -154,6 +154,18 @@ function addDollar(out: Set<string>, usd: number | null | undefined): void {
   }
 }
 
+/**
+ * SPEC-0054 R4/R5 — the priced subset of `model.modelMix` (its existing,
+ * deterministic order), cent-reconciled via {@link reconcileCents} — the
+ * exact split BY MODEL rows render. Exported so `present.ts`'s row builder
+ * and {@link tracedDollarAmounts} draw from one source of truth rather than
+ * two independently-computed splits that could drift.
+ */
+export function reconciledModelCents(model: ReceiptModel): number[] {
+  const priced = model.modelMix.filter((m) => m.usd !== null).map((m) => m.usd as number);
+  return reconcileCents(priced);
+}
+
 function tracedDollarAmounts(model: ReceiptModel): Set<string> {
   const out = new Set<string>();
   addDollar(out, model.totalUsd);
@@ -168,6 +180,11 @@ function tracedDollarAmounts(model: ReceiptModel): Set<string> {
     addDollar(out, waste.usd);
   }
   addDollar(out, model.priceDelta?.usd);
+  // SPEC-0054 R4/R5 — DETAILS' cache counterfactual and BY MODEL splits.
+  addDollar(out, model.cacheReadAtInputRateUsd);
+  for (const cents of reconciledModelCents(model)) {
+    out.add(`$${formatCentsAmount(cents)}`);
+  }
   return out;
 }
 

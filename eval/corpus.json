@@ -141,6 +141,11 @@
       "expected": [
         "context-thrash"
       ]
+    },
+    {
+      "source": "claude-code",
+      "path": "test/fixtures/claude-code/mixed-priced-coverage.jsonl",
+      "expected": []
     }
   ]
 }

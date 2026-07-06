@@ -63,6 +63,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `hasTrivialSpansWaste` | boolean | | |
 | `hasContextThrashWaste` | boolean | | |
 | `hasPriceDelta` | boolean | | Whether the receipt had an arithmetic cheaper-model delta line. |
+| `detailsView` | boolean | | Whether the receipt rendered the opt-in `--details` section. |
 | `turnCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw turn count. |
 | `toolCallCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw tool-call count. |
 | `receiptOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime local receipt ordinal bucket. |

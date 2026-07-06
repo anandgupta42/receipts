@@ -9,7 +9,7 @@ exec_command......................$0.02  (2 calls)
 apply_patch........................$0.01  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.03
-same tokens on gpt-5.4-mini..................$0.01
+same tokens on gpt-5.4-mini.......$0.01 (64% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      

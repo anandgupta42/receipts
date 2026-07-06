@@ -52,7 +52,9 @@ const NAV_SECTIONS = Object.freeze([
 
 // Directories under docs/ that are intentionally never published to the site.
 // releases/ holds release-board verdicts — repo bookkeeping, like internal/.
-const EXCLUDED_DIRS = Object.freeze(["internal", "spikes", "releases"]);
+// agents/ is SPEC-0058's per-agent pages — deliberately GitHub-rendered markdown,
+// not site pages (that spec's "SEO landing pages on the website" non-goal).
+const EXCLUDED_DIRS = Object.freeze(["internal", "spikes", "releases", "agents"]);
 
 const RESOURCE_LOAD_PATTERNS = [
   /<script\b[^>]*\bsrc=["']https?:/iu,
@@ -100,7 +102,17 @@ function normalizeHref(href) {
   const [pathPart, fragment = ""] = href.split("#", 2);
   const hash = fragment === "" ? "" : `#${fragment}`;
   if (/^(?:https?:|mailto:|#)/iu.test(href)) return href;
-  if (pathPart.endsWith(".md")) return `${basename(pathPart, ".md")}.html${hash}`;
+  if (pathPart.endsWith(".md")) {
+    // A doc link into an EXCLUDED_DIRS tree (e.g. `../agents/README.md`) has no
+    // site page — flattening it to `<basename>.html` would mint a dead link.
+    // Send it to the GitHub-rendered markdown instead, which is those pages'
+    // canonical surface (SPEC-0058 non-goal).
+    const segments = pathPart.split("/").filter((seg) => seg !== "..");
+    if (EXCLUDED_DIRS.includes(segments[0])) {
+      return `https://github.com/anandgupta42/receipts/blob/main/docs/${segments.join("/")}${hash}`;
+    }
+    return `${basename(pathPart, ".md")}.html${hash}`;
+  }
   return `${pathPart}${hash}`;
 }
 

@@ -27,6 +27,7 @@ async function recordCompareTelemetry(
       template: "none",
       turnCount: totals.turnCount,
       toolCallCount: totals.toolCallCount,
+      detailsView: false,
     }),
     "compare",
   );

@@ -9,7 +9,7 @@ ITEM                              QTY          AMT
 Bash                                1   $12,500.00
 --------------------------------------------------
 TOTAL                                   $12,500.00
-same tokens on claude-haiku-4-5..........$2,500.00
+same tokens on claude-haik…...$2,500.00 (80% less)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-opus-4-8
