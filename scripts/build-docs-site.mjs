@@ -102,7 +102,17 @@ function normalizeHref(href) {
   const [pathPart, fragment = ""] = href.split("#", 2);
   const hash = fragment === "" ? "" : `#${fragment}`;
   if (/^(?:https?:|mailto:|#)/iu.test(href)) return href;
-  if (pathPart.endsWith(".md")) return `${basename(pathPart, ".md")}.html${hash}`;
+  if (pathPart.endsWith(".md")) {
+    // A doc link into an EXCLUDED_DIRS tree (e.g. `../agents/README.md`) has no
+    // site page — flattening it to `<basename>.html` would mint a dead link.
+    // Send it to the GitHub-rendered markdown instead, which is those pages'
+    // canonical surface (SPEC-0058 non-goal).
+    const segments = pathPart.split("/").filter((seg) => seg !== "..");
+    if (EXCLUDED_DIRS.includes(segments[0])) {
+      return `https://github.com/anandgupta42/receipts/blob/main/docs/${segments.join("/")}${hash}`;
+    }
+    return `${basename(pathPart, ".md")}.html${hash}`;
+  }
   return `${pathPart}${hash}`;
 }
 
