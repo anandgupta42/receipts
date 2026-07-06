@@ -223,11 +223,13 @@ interface FenceRows {
  * SPEC-0044/B1 — reconcile every DRAWN priced row so the rows this comment
  * actually renders sum exactly to "TOTAL priced". Since SPEC-0054 the fence
  * draws one aggregate row per contributor's subagents instead of one row per
- * child, so reconciliation runs at that granularity: the aggregate's cents are
- * apportioned against the same raw-dollar universe {@link totalsFor} sums
- * (aggregation is a re-grouping of the same atoms, never a new number). Rows
- * and the total used to round independently; this computes the split once, up
- * front, over largest-remainder cents (see `reconcileCents`).
+ * child, but reconciliation still runs at ATOM granularity — the exact
+ * universe (and float-summation order) {@link totalsFor} sums into the total —
+ * and each aggregate's cents are the integer sum of its children's reconciled
+ * cents. Regrouping integers preserves the total exactly; apportioning against
+ * a pre-summed aggregate dollar instead re-rounds a different float and can
+ * land one cent off the displayed TOTAL at a half-cent boundary (fast-check
+ * ledger counterexample: two children summing to an exact .5 cent).
  */
 function fenceRows(contributors: ContributorView[]): FenceRows {
   const aggregates = new Map<ContributorView, SubagentAggregate>();
@@ -236,22 +238,35 @@ function fenceRows(contributors: ContributorView[]): FenceRows {
       aggregates.set(c, aggregateSubagents(c.subagents));
     }
   }
-  const keys: (ContributorView | SubagentAggregate)[] = [];
+  const keys: (ContributorView | SubagentRow)[] = [];
   const amounts: number[] = [];
   for (const c of contributors) {
     if (c.usd !== null) {
       keys.push(c);
       amounts.push(c.usd);
     }
-    const agg = aggregates.get(c);
-    if (agg !== undefined && agg.usd !== null) {
-      keys.push(agg);
-      amounts.push(agg.usd);
+    for (const s of c.subagents) {
+      if (s.usd !== null) {
+        keys.push(s);
+        amounts.push(s.usd);
+      }
     }
   }
   const cents = reconcileCents(amounts);
+  const centOf = new Map<ContributorView | SubagentRow, number>();
+  keys.forEach((k, i) => centOf.set(k, cents[i]));
   const reconciled: FenceRows["reconciled"] = new Map();
-  keys.forEach((k, i) => reconciled.set(k, formatCentsAmount(cents[i])));
+  for (const c of contributors) {
+    const own = centOf.get(c);
+    if (own !== undefined) {
+      reconciled.set(c, formatCentsAmount(own));
+    }
+    const agg = aggregates.get(c);
+    if (agg !== undefined && agg.usd !== null) {
+      const aggCents = c.subagents.reduce((sum, s) => sum + (centOf.get(s) ?? 0), 0);
+      reconciled.set(agg, formatCentsAmount(aggCents));
+    }
+  }
   return { reconciled, aggregates };
 }
 
