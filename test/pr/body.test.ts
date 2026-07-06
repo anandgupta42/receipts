@@ -1,11 +1,13 @@
 // SPEC-0023 R4 — the multi-session comment body: marker-first, then a fenced
 // receipt rendered through the shared block interpreter: masthead + session
-// count, dotted per-session role/model rows, muted slice provenance, SUBAGENTS
-// sub-rows, separate priced/unpriced totals (I2/I3), and the classic footer.
+// count, dotted per-session role/model rows, muted slice provenance, one
+// SUBAGENTS aggregate row per contributor (SPEC-0060 — the per-child breakdown
+// lives in the details table), separate priced/unpriced totals (I2/I3), and
+// the classic footer.
 import { describe, expect, it } from "vitest";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
 import type { ModelMixEntry } from "../../src/receipt/model.js";
-import { DOGFOOD_MARKER, HELPER_FULL_LABEL, renderPrBody, renderPrReceiptText, sliceHeaderLine, type ContributorView } from "../../src/pr/body.js";
+import { DOGFOOD_MARKER, HELPER_FULL_LABEL, renderPrBody, renderPrReceiptText, sliceHeaderLine, subagentDetailsTable, type ContributorView } from "../../src/pr/body.js";
 import { cacheServedText } from "../../src/receipt/present.js";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 import { FULL_FALLBACK_LABEL } from "../../src/pr/slice.js";
@@ -144,14 +146,43 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
       { name: "reviewer", usd: null, tokens: emptyUsage(), unreadable: true, filePath: "b" },
     ];
     const body = renderPrBody({ contributors: [builder({ usd: 1.5, subagents })], excludedCount: 0 });
-    expect(body).toContain("SUBAGENTS (2)");
-    expect(body).toContain("tester · claude-opus-4-8...................$0.25");
-    expect(body).toContain("(unreadable)");
+    // SPEC-0060 R1: ONE aggregate row in the fence — never per-child rows.
+    expect(body).toContain("SUBAGENTS (2)..............................$0.25");
+    expect(body).not.toContain("tester · claude-opus-4-8");
     // parent $1.50 + tester $0.25 = $1.75; the unreadable child makes the
     // total a FLOOR (SPEC-0028 R1) on top of the not-priced note.
     expect(body).toContain("TOTAL priced...............................≥ $1.75");
     expect(body).toContain("counted: 1 session + 2 subagents");
     expect(body).toContain("1 unreadable subagent not priced");
+  });
+
+  it("SPEC-0060 R1/R2: the aggregate row sums the priced children and drawn rows sum to the total", () => {
+    const subagents: SubagentRow[] = [
+      { name: "verifier", model: "claude-fable-5", usd: 0.25, tokens: tokens(400), unreadable: false, filePath: "a" },
+      { name: "searcher", model: "claude-fable-5", usd: 0.1, tokens: tokens(200), unreadable: false, filePath: "b" },
+    ];
+    const body = renderPrBody({ contributors: [builder({ usd: 1.5, subagents })], excludedCount: 0 });
+    expect(body).toContain("SUBAGENTS (2)..............................$0.35");
+    expect(body).not.toContain("verifier");
+    expect(body).toContain("TOTAL priced.................................$1.85");
+    // Drawn `$` rows sum byte-exactly to the drawn total (SPEC-0044/B1 at the
+    // SPEC-0060 aggregate granularity).
+    const fence = fencedLines(body);
+    const rowDollars = fence
+      .filter((l) => l.includes("$") && !l.includes("TOTAL"))
+      .map((l) => Number(/\$([\d,]+\.\d\d)/.exec(l)![1].replace(",", "")));
+    const total = Number(/TOTAL priced\.+\$([\d,]+\.\d\d)/.exec(body)![1].replace(",", ""));
+    expect(rowDollars.reduce((a, b) => a + b, 0)).toBeCloseTo(total, 10);
+  });
+
+  it("SPEC-0060 R1: an all-unpriced subagent set renders a tokens aggregate, never `$`", () => {
+    const subagents: SubagentRow[] = [
+      { name: "a", usd: null, tokens: tokens(1000), unreadable: false, filePath: "a" },
+      { name: "b", usd: null, tokens: tokens(500), unreadable: false, filePath: "b" },
+    ];
+    const body = renderPrBody({ contributors: [builder({ usd: null, tokens: tokens(100), subagents })], excludedCount: 0 });
+    expect(body).toMatch(/SUBAGENTS \(2\)\.+1,500 tokens/);
+    expect(body).not.toContain("$");
   });
 
   it("appends an honest not-attributed note when candidates were excluded", () => {
@@ -312,6 +343,117 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
     expect(body).not.toContain("<details>");
   });
+
+  it("SPEC-0060 R3: a detail entry's subagent table renders inside the section, under its receipt", () => {
+    const table = subagentDetailsTable([
+      { name: "verifier", model: "claude-fable-5", usd: 0.25, tokens: tokens(400), unreadable: false, filePath: "a" },
+    ]);
+    const body = renderPrBody(
+      { contributors: [builder()], excludedCount: 0 },
+      { details: [{ ...detail("builder · abc123", "AAA"), subagents: table }] },
+    );
+    expect(body).toContain("##### subagents (1)");
+    expect(body.indexOf("##### subagents (1)")).toBeGreaterThan(body.indexOf("AAA"));
+    expect(body.indexOf("##### subagents (1)")).toBeLessThan(body.indexOf("</details>"));
+  });
+
+  it("SPEC-0060 R5: no breakdown appears anywhere without details", () => {
+    const subagents: SubagentRow[] = [{ name: "verifier", usd: 0.25, tokens: tokens(400), unreadable: false, filePath: "a" }];
+    const body = renderPrBody({ contributors: [builder({ subagents })], excludedCount: 0 });
+    expect(body).toContain("SUBAGENTS (1)");
+    expect(body).not.toContain("##### subagents");
+  });
+});
+
+describe("SPEC-0060 R3 · subagentDetailsTable", () => {
+  const row = (name: string, usd: number | null, over: Partial<SubagentRow> = {}): SubagentRow => ({
+    name,
+    model: "claude-fable-5",
+    usd,
+    tokens: tokens(100),
+    unreadable: false,
+    filePath: name,
+    ...over,
+  });
+
+  it("sorts by cost descending and renders mixed priced/unpriced/unreadable cells", () => {
+    const table = subagentDetailsTable([
+      row("cheap", 0.1),
+      row("ghost", null, { unreadable: true, tokens: emptyUsage() }),
+      row("dear", 5.05),
+      row("tokens-only", null, { tokens: tokens(1234) }),
+    ]);
+    const lines = table.split("\n");
+    expect(lines[0]).toBe("##### subagents (4)");
+    const dearIdx = lines.findIndex((l) => l.includes("dear"));
+    const cheapIdx = lines.findIndex((l) => l.includes("cheap"));
+    expect(dearIdx).toBeGreaterThan(-1);
+    expect(dearIdx).toBeLessThan(cheapIdx);
+    expect(table).toContain("| dear · claude-fable-5 | $5.05 |");
+    expect(table).toContain("| cheap · claude-fable-5 | $0.10 |");
+    expect(table).toContain("| tokens-only · claude-fable-5 | 1,234 tokens |");
+    expect(table).toContain("| ghost · claude-fable-5 | (unreadable) |");
+  });
+
+  it("caps at 20 rows and the remainder row carries the leftover sum (never a silent drop)", () => {
+    const rows = Array.from({ length: 25 }, (_, i) => row(`agent-${i}`, 1.0));
+    const table = subagentDetailsTable(rows);
+    const dataRows = table.split("\n").filter((l) => l.startsWith("| agent-"));
+    expect(dataRows.length).toBe(19);
+    expect(table).toContain("| 6 more subagents | $6.00 |");
+    expect(table).toContain("##### subagents (25)");
+  });
+
+  it("cap boundary: exactly 20 children render whole, 21 fold into a 2-row remainder", () => {
+    const twenty = subagentDetailsTable(Array.from({ length: 20 }, (_, i) => row(`agent-${i}`, 1.0)));
+    expect(twenty.split("\n").filter((l) => l.startsWith("| agent-")).length).toBe(20);
+    expect(twenty).not.toContain("more subagent");
+    const twentyOne = subagentDetailsTable(Array.from({ length: 21 }, (_, i) => row(`agent-${i}`, 1.0)));
+    expect(twentyOne.split("\n").filter((l) => l.startsWith("| agent-")).length).toBe(19);
+    expect(twentyOne).toContain("| 2 more subagents | $2.00 |");
+  });
+
+  it("a mixed remainder states dollars, tokens, and unreadable count separately — nothing dropped (I2)", () => {
+    const rows = [
+      ...Array.from({ length: 19 }, (_, i) => row(`agent-${i}`, 1.0)),
+      row("late-priced", 0.5),
+      row("late-tokens", null, { tokens: tokens(500) }),
+      row("late-ghost", null, { unreadable: true, tokens: emptyUsage() }),
+    ];
+    const table = subagentDetailsTable(rows);
+    expect(table).toContain("| 3 more subagents | $0.50 + 500 tokens + 1 unreadable |");
+  });
+
+  it("the priced column (shown cells + remainder dollars) sums to the children's rounded total", () => {
+    // 21 children at $0.335: raw sum $7.035 → $7.04 (formatUsd rounding). Naive
+    // per-cell rounding gives 20 × $0.34 + remainder — largest-remainder must
+    // land the column exactly on 704 cents.
+    const table = subagentDetailsTable(Array.from({ length: 21 }, (_, i) => row(`agent-${i}`, 0.335)));
+    const cents = [...table.matchAll(/\$(\d+\.\d\d)/g)].map((m) => Math.round(Number(m[1]) * 100));
+    expect(cents.reduce((a, b) => a + b, 0)).toBe(704);
+  });
+
+  it("escapes pipes and flattens newlines in prompt-derived names", () => {
+    const table = subagentDetailsTable([row("a|b\nc", 0.5, { model: undefined })]);
+    expect(table).toContain("| a\\|b c | $0.50 |");
+  });
+
+  it("escapes backslashes before pipes — a name's own backslash can't neutralize the pipe escape", () => {
+    const table = subagentDetailsTable([row("a\\|b", 0.5, { model: undefined })]);
+    expect(table).toContain("| a\\\\\\|b | $0.50 |");
+  });
+
+  it("reconciles the priced column so cells sum to the rounded total", () => {
+    // 3 × $0.335 = $1.005 → rounds to $1.01; naive per-cell rounding would
+    // print 3 × $0.34 = $1.02. Largest-remainder must keep the column at $1.01.
+    const table = subagentDetailsTable([row("a", 0.335), row("b", 0.335), row("c", 0.335)]);
+    const cents = [...table.matchAll(/\$(\d+\.\d\d)/g)].map((m) => Math.round(Number(m[1]) * 100));
+    expect(cents.reduce((a, b) => a + b, 0)).toBe(101);
+  });
+});
+
+describe("SPEC-0026 R5 · details size cap", () => {
+  const detail = (label: string, text = "RECEIPT-TEXT") => ({ label, row: ["**r**", "`id`", "scope", "1", "1m", "1 / 1", "—"], text });
 
   it("drops trailing receipts to omission notes under the size cap — never mid-receipt truncation", () => {
     const big = "X".repeat(40_000);

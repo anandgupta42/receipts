@@ -28,6 +28,7 @@ import { discoverChildFiles, isChildPath } from "../parse/children.js";
 import {
   buildHandoffSlip,
   renderPrBodyDetailed,
+  subagentDetailsTable,
   type ContributorView,
   type HandoffSectionData,
   type HandoffSlipView,
@@ -559,7 +560,15 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   // SPEC-0026 R5 (round 2) — per-session full receipts, collapsed, unless
   // --no-details. The label is the stat line: everything the fence dropped
   // (id, slice reason) plus the session's anatomy, in one place.
-  const details = opts.details === false ? undefined : fenceOrdered.map((e) => ({ label: detailHeading(e.view), row: detailRow(e.view, e.model), text: renderReceipt(e.model, { color: false }) }));
+  const details = opts.details === false
+    ? undefined
+    : fenceOrdered.map((e) => ({
+        label: detailHeading(e.view),
+        row: detailRow(e.view, e.model),
+        text: renderReceipt(e.model, { color: false }),
+        // SPEC-0060 R3 — the per-child breakdown the fence no longer draws.
+        subagents: e.view.subagents.length > 0 ? subagentDetailsTable(e.view.subagents) : undefined,
+      }));
   // SPEC-0059 R5 — the comment's handoff section is a sibling of the details
   // section and shares its --no-details gate; R8's boolean is the assembler's
   // own decision, not a scan of the body.
