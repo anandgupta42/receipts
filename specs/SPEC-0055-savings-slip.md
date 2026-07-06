@@ -1,7 +1,7 @@
 ---
 id: SPEC-0055
 title: Savings slip — could-have-saved handoff body + PR comment section
-status: draft
+status: approved
 milestone: M5
 depends: [SPEC-0013, SPEC-0017, SPEC-0026, SPEC-0042, SPEC-0043]
 ---
