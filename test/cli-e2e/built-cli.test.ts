@@ -241,8 +241,9 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("AIRECEIPTS");
     expect(result.stdout).toContain("Claude Code");
     expect(result.stdout).toContain("TOTAL");
-    // SPEC-0055: the card carries no methodology footnote and no samosa footer.
-    expect(result.stdout).toContain("aireceipts · local");
+    // SPEC-0055 (amended): the card carries no methodology footnote and no
+    // samosa footer — the footer is the plain install CTA.
+    expect(result.stdout).toContain("aireceipts · local · npx aireceipts-cli");
     expect(result.stdout).not.toContain("Per-turn cost split");
     expect(result.stdout).not.toContain("buy me a samosa");
   });

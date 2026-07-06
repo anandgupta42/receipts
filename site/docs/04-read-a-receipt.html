@@ -358,7 +358,7 @@ TOTAL........................................$0.18
 same tokens on claude-haiku-4-5..............$0.04
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-                aireceipts · local                
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
 
 <p>Reading it top to bottom: the <strong>title</strong> is your opening prompt; the header line gives the <strong>agent, start time, and duration</strong>; then the <strong>model mix</strong> (share of tokens per model) and how much of the input was served from <strong>cache</strong>. The body lists <strong>cost per tool</strong>, highest first. <code>(thinking/reply)</code> is the model's own output on turns that called no tool. <code>TOTAL</code> is the sum; <code>same tokens on …</code> re-prices those exact tokens on a cheaper model as a reference point.</p>
