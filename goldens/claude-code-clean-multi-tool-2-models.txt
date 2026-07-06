@@ -12,7 +12,7 @@ Write.............................$0.03  (2 calls)
 Read...............................$0.02  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.18
-same tokens on claude-haiku-4-5..............$0.04
+same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool

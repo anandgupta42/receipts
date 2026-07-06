@@ -11,7 +11,7 @@ exec_command......................$0.23  (3 calls)
   context refilled ≥80% of peak within 5 turns
 --------------------------------------------------
 TOTAL........................................$0.23
-same tokens on gpt-5.4-mini..................$0.10
+same tokens on gpt-5.4-mini.......$0.10 (59% less)
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool

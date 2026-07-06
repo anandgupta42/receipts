@@ -144,6 +144,7 @@ describe("SPEC-0043 recorders", () => {
       hasTrivialSpansWaste: false,
       hasContextThrashWaste: false,
       hasPriceDelta: false,
+      detailsView: false,
       turnCount: 1,
       toolCallCount: 2,
     });
@@ -180,6 +181,7 @@ describe("SPEC-0043 recorders", () => {
       hasTrivialSpansWaste: false,
       hasContextThrashWaste: true,
       hasPriceDelta: true,
+      detailsView: false,
       turnCount: 7,
       toolCallCount: 60,
     });

@@ -10,7 +10,7 @@ read_file..........................$0.00  (1 call)
 run_shell_command..................$0.00  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.01
-same tokens on gemini-2.5-flash-lite.........$0.00
+same tokens on gemini-2.5-flas…...$0.00 (75% less)
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool

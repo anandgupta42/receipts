@@ -309,6 +309,7 @@ footer{
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
+        <li><a href="15-integrations.html">Choose an integration</a></li>
       </ul>
       <p class="toc-section">Reference</p>
       <ul>
@@ -354,7 +355,7 @@ Write.............................$0.03  (2 calls)
 Read...............................$0.02  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.18
-same tokens on claude-haiku-4-5..............$0.04
+same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
@@ -365,7 +366,34 @@ guessed dollars. Full method: aireceipts
        aireceipts · local · buy me a samosa       
 - - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
 
-<p>Reading it top to bottom: the <strong>title</strong> is your opening prompt; the header line gives the <strong>agent, start time, and duration</strong>; then the <strong>model mix</strong> (share of tokens per model) and how much of the input was served from <strong>cache</strong>. The body lists <strong>cost per tool</strong>, highest first. <code>(thinking/reply)</code> is the model's own output on turns that called no tool. <code>TOTAL</code> is the sum; <code>same tokens on …</code> re-prices those exact tokens on a cheaper model as a reference point.</p>
+<p>Reading it top to bottom: the <strong>title</strong> is your opening prompt; the header line gives the <strong>agent, start time, and duration</strong>; then the <strong>model mix</strong> (share of tokens per model) and how much of the input was served from <strong>cache</strong>. The body lists <strong>cost per tool</strong>, highest first. <code>(thinking/reply)</code> is the model's own output on turns that called no tool. <code>TOTAL</code> is the sum; <code>same tokens on …</code> re-prices those exact tokens on a cheaper model as a reference point — the <code>(78% less)</code> is the same arithmetic as a percentage, never a prediction.</p>
+
+<p>Three lines appear only when they have something to say:</p>
+
+<ul>
+  <li>a <strong>stuck-loop waste line</strong> names where to look — <code>at turns 1-5</code> — so you can jump straight to the loop in your own transcript;</li>
+  <li>a <strong>coverage caveat</strong> — <code>caveat: 2 of 3 tool rows unpriced — TOTAL excludes their tokens</code> — whenever a session mixed a priced model with one that has no cited price row, so a partial TOTAL never poses as a complete one;</li>
+  <li>time-integrity caveats (inconsistent timestamps, skipped records) as before.</li>
+</ul>
+
+<h2 id="the-details-section">The <code>--details</code> section</h2>
+
+<p>When the one question you have is <em>&quot;what's inside that number?&quot;</em>, ask for it:</p>
+
+<pre class="doc-code"><code class="language-sh">aireceipts --details</code></pre>
+
+<pre class="doc-code"><code>DETAILS
+tokens in / out..........................20k / 897
+cache read / write.....................124k / 2.1k
+turns / tool calls..........................10 / 8
+peak turn.........................24k tok (turn 7)
+same reads at uncached input rate............$0.52
+  (arithmetic, not a prediction)
+BY MODEL
+claude-opus-4-8........................87% · $0.17
+claude-sonnet-5........................13% · $0.01</code></pre>
+
+<p>The section slots between the price-delta line and the methodology footnote. Line by line: <strong>tokens in / out</strong> is the raw prompt/completion split; <strong>cache read / write</strong> shows whether caching is actually working (when the transcript reports the cache-write TTL tiers, a <code>writes: 5m … · 1h …</code> sub-line appears — absent data renders nothing, never a fabricated 0); <strong>turns / tool calls</strong> is the session's shape; <strong>peak turn</strong> is the single most context-heavy request; <strong>same reads at uncached input rate</strong> re-prices your cache-read tokens at the plain input rate — the dollar figure caching saved you, arithmetic on the same cited price rows as everything else; <strong>BY MODEL</strong> splits the priced total per model (the rows always sum to <code>TOTAL</code>). Every line renders only when its data exists in the transcript. <code>--details</code> composes with the default template only; it also works with <code>--svg</code>.</p>
 
 <h2 id="pick-a-different-session">Pick a different session</h2>
 

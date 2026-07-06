@@ -11,7 +11,7 @@
 Read............................$0.01 [##########]
 --------------------------------------------------
 TOTAL........................................$0.01
-same tokens on claude-haiku-4-5..............$0.00
+same tokens on claude-haiku-4-5...$0.00 (50% less)
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool

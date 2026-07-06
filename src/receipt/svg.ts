@@ -41,6 +41,8 @@ export interface SvgOptions {
   theme?: ThemeName;
   /** SPEC-0020: which template to render (default `classic`). */
   template?: TemplateName;
+  /** SPEC-0054 R4/R7 — render the opt-in DETAILS section (`classic` only; the CLI guards other templates). */
+  details?: boolean;
 }
 
 /** Themed paint strings (literal hex) resolved once per render and threaded through the layout. */
@@ -295,13 +297,14 @@ function layoutBlock(block: Block, cur: Cursor, p: Paints, els: string[]): void 
       return;
     }
     case "wasteRow": {
+      // SPEC-0054 R2 — badged (stuck-loop) and unbadged rows share the same
+      // detail sub-line rendering; the badge only changes the label's start X
+      // and prefixes the triangle marker.
       if (block.badge) {
         els.push(wasteBadge(cur.y + 11, p.flag));
-        els.push(...rowElements(block.label, block.value, cur.y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.flag, labelStartX: WASTE_LABEL_X, muted: p.muted }));
-        cur.y += ROW_H;
-        return;
       }
-      els.push(...rowElements(block.label, block.value, cur.y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.flag, labelStartX: LEFT, muted: p.muted }));
+      const labelStartX = block.badge ? WASTE_LABEL_X : LEFT;
+      els.push(...rowElements(block.label, block.value, cur.y, { size: SZ_BODY, labelFill: p.ink, valueFill: p.flag, labelStartX, muted: p.muted }));
       if (block.detail !== undefined) {
         cur.y += ROW_H - 4;
         els.push(textEl(LEFT + 12, cur.y + 10, block.detail, { size: SZ_FOOT, fill: p.muted }));
@@ -427,7 +430,7 @@ export function renderReceiptSvg(model: ReceiptModel, opts: SvgOptions = {}): st
   const themeName = opts.theme ?? "light";
   const theme = THEMES[themeName];
   const p = paintsFor(theme, themeName);
-  const { els, height } = layoutContent(buildReceiptView(model, opts.template ?? "classic"), p);
+  const { els, height } = layoutContent(buildReceiptView(model, opts.template ?? "classic", { details: opts.details }), p);
   const body = cardGroup(els, height, 0, "0", p.card);
   return svgDocument(WIDTH, height, body, "aireceipts cost receipt");
 }

@@ -31,6 +31,11 @@ async function run(ctx: CommandContext): Promise<number> {
     return 1;
   }
   const template = resolvedTemplate.template;
+  // SPEC-0054 R6 — the DETAILS section is designed for classic's layout only.
+  if (options.details && template !== "classic") {
+    ctx.stderr.write("--details supports the classic template only\n");
+    return 1;
+  }
   const resolved = await resolveSelector(options.positional[0]);
   if ("error" in resolved) {
     ctx.stderr.write(`${resolved.error}\n`);
@@ -46,7 +51,7 @@ async function run(ctx: CommandContext): Promise<number> {
   const model = await buildReceiptModel(session);
   const svgOut = svgOutOf(options);
   if (svgOut.svg) {
-    await writeSvg(ctx, renderReceiptSvg(model, { theme: svgOut.theme, template }), svgOut.output ?? "receipt.svg");
+    await writeSvg(ctx, renderReceiptSvg(model, { theme: svgOut.theme, template, details: options.details }), svgOut.output ?? "receipt.svg");
     await ctx.telemetry.noteReceiptGenerated(
       receiptTelemetryFromModels({
         surface: "receipt",
@@ -55,6 +60,7 @@ async function run(ctx: CommandContext): Promise<number> {
         template: templateTelemetryValue(options.template),
         turnCount: session.totals.turnCount,
         toolCallCount: session.totals.toolCallCount,
+        detailsView: options.details,
       }),
       "receipt",
     );
@@ -62,7 +68,7 @@ async function run(ctx: CommandContext): Promise<number> {
     return 0;
   }
   if (svgOut.png) {
-    const svg = renderReceiptSvg(model, { theme: svgOut.theme, template });
+    const svg = renderReceiptSvg(model, { theme: svgOut.theme, template, details: options.details });
     await writePng(ctx, rasterizeSvgToPng(svg), svgOut.output ?? "receipt.png");
     await ctx.telemetry.noteReceiptGenerated(
       receiptTelemetryFromModels({
@@ -72,6 +78,7 @@ async function run(ctx: CommandContext): Promise<number> {
         template: templateTelemetryValue(options.template),
         turnCount: session.totals.turnCount,
         toolCallCount: session.totals.toolCallCount,
+        detailsView: options.details,
       }),
       "receipt",
     );
@@ -94,6 +101,8 @@ async function run(ctx: CommandContext): Promise<number> {
         template: templateTelemetryValue(options.template),
         turnCount: session.totals.turnCount,
         toolCallCount: session.totals.toolCallCount,
+        // CSV never renders the DETAILS section — the flag is inert here (R7/R8).
+        detailsView: false,
       }),
       "receipt",
     );
@@ -119,13 +128,15 @@ async function run(ctx: CommandContext): Promise<number> {
         template: templateTelemetryValue(options.template),
         turnCount: session.totals.turnCount,
         toolCallCount: session.totals.toolCallCount,
+        // JSON never renders the DETAILS section — the flag is inert here (R7/R8).
+        detailsView: false,
       }),
       "receipt",
     );
     await recordReceiptExport(ctx, "json", false);
   } else {
     const budgetSuffix = budget.lines.length > 0 ? `\n\n${budget.lines.join("\n")}` : "";
-    ctx.stdout.write(`${renderReceipt(model, { template })}${budgetSuffix}\n`);
+    ctx.stdout.write(`${renderReceipt(model, { template, details: options.details })}${budgetSuffix}\n`);
     await ctx.telemetry.noteReceiptGenerated(
       receiptTelemetryFromModels({
         surface: "receipt",
@@ -134,6 +145,7 @@ async function run(ctx: CommandContext): Promise<number> {
         template: templateTelemetryValue(options.template),
         turnCount: session.totals.turnCount,
         toolCallCount: session.totals.toolCallCount,
+        detailsView: options.details,
       }),
       "receipt",
     );

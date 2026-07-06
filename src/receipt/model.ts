@@ -18,6 +18,8 @@ export interface ModelMixEntry {
   tokens: TokenUsage;
   /** 0..1 share of the session's total per-turn priced-or-not tokens. */
   tokenShare: number;
+  /** SPEC-0054 R4 — this model's priced cost (`attribution.byModelUsd`); `null` when none of its turns priced (I2). */
+  usd: number | null;
 }
 
 export interface ToolRow {
@@ -35,6 +37,8 @@ export interface StuckLoopWasteLine {
   usd: number | null;
   tokens: TokenUsage;
   wallClockMs: number | null;
+  /** SPEC-0054 R2 — distinct 0-based turn indices the run's calls came from (renders as 1-based `at turn(s) A-B`). */
+  turnIndices: number[];
 }
 
 export interface TrivialSpansWasteLine {
@@ -86,6 +90,13 @@ export interface ReceiptModel {
   unpriceable: boolean;
   /** SPEC-0044 A3 — true when `totalUsd` includes a cache-write fallback price (unsplit TTL remainder), so the total is a lower bound. Mirrored into `caveats` as a rendered note; also folded into a `ConfidenceEvent` at the PR layer (src/pr/index.ts). */
   costLowerBoundCacheTier: boolean;
+  /** SPEC-0054 R4 — from `session.totals`, so a PR-sliced receipt (`sliceSessionForReceipt`) reflects only its slice. */
+  turnCount: number;
+  toolCallCount: number;
+  /** SPEC-0054 R4 — the single turn with the highest `usage.total`; 1-based `turnNumber`. Absent when no turn carries usage; a tie keeps the first turn reached. */
+  peakTurn?: { tokens: number; turnNumber: number };
+  /** SPEC-0054 R4 — `attribution.cacheReadAtInputRateUsd`; see that field for the all-or-null completeness rule. */
+  cacheReadAtInputRateUsd: number | null;
 }
 
 /**
@@ -140,7 +151,7 @@ export function sliceSessionForReceipt(session: Session, range: { startTurn: num
   };
 }
 
-async function buildModelMix(session: Session): Promise<ModelMixEntry[]> {
+async function buildModelMix(session: Session, byModelUsd: { model: string; usd: number }[]): Promise<ModelMixEntry[]> {
   const mixMap = new Map<string, TokenUsage>();
   for (const turn of session.turns) {
     const model = turn.model ?? session.model;
@@ -149,10 +160,31 @@ async function buildModelMix(session: Session): Promise<ModelMixEntry[]> {
     }
     mixMap.set(model, addUsage(mixMap.get(model) ?? emptyUsage(), turn.usage));
   }
+  // SPEC-0054 R4 — looked up by the raw (pre-sanitize) model id, matching how `attributeByTool` keys `byModelUsd`.
+  const usdMap = new Map(byModelUsd.map((m) => [m.model, m.usd]));
   const grandTotal = [...mixMap.values()].reduce((sum, t) => sum + t.total, 0);
   return [...mixMap.entries()]
-    .map(([model, tokens]) => ({ model: sanitizeText(model), tokens, tokenShare: grandTotal > 0 ? tokens.total / grandTotal : 0 }))
+    .map(([model, tokens]) => ({
+      model: sanitizeText(model),
+      tokens,
+      tokenShare: grandTotal > 0 ? tokens.total / grandTotal : 0,
+      usd: usdMap.get(model) ?? null,
+    }))
     .sort((a, b) => b.tokenShare - a.tokenShare || a.model.localeCompare(b.model));
+}
+
+/** SPEC-0054 R4 — the turn with the highest `usage.total`, 1-based `turnNumber`; `undefined` when no turn carries usage. Strict `>` keeps the first turn on a tie. */
+function findPeakTurn(session: Session): { tokens: number; turnNumber: number } | undefined {
+  let best: { tokens: number; turnNumber: number } | undefined;
+  for (const turn of session.turns) {
+    if (!turn.usage) {
+      continue;
+    }
+    if (!best || turn.usage.total > best.tokens) {
+      best = { tokens: turn.usage.total, turnNumber: turn.index + 1 };
+    }
+  }
+  return best;
 }
 
 function sortToolRows(rows: ToolRow[]): ToolRow[] {
@@ -207,7 +239,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
       ? await priceDeltaFootnote(session, attribution.totalTokens, attribution.totalUsd, dataDir)
       : null;
 
-  const modelMix = await buildModelMix(session);
+  const modelMix = await buildModelMix(session, attribution.byModelUsd);
   const toolRows = sortToolRows(attribution.byTool);
 
   const wasteLines: WasteLine[] = [
@@ -219,6 +251,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
         usd: f.usd,
         tokens: f.tokens,
         wallClockMs: f.wallClockMs,
+        turnIndices: f.turnIndices,
       }),
     ),
     ...(trivialSpans
@@ -271,6 +304,19 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
       text: `caveat: ${n} unreadable transcript record${n === 1 ? "" : "s"} skipped — total may be incomplete`,
     });
   }
+  // SPEC-0054 R3 — a session that priced but left some tool rows unpriced (a
+  // mixed-model or partial-coverage transcript) gets one caveat naming the
+  // gap; fully-priced and fully-unpriced (`totalUsd === null`) sessions push
+  // nothing, so their output stays byte-identical (I5).
+  if (attribution.totalUsd !== null) {
+    const unpricedRows = toolRows.filter((r) => r.usd === null).length;
+    if (unpricedRows > 0) {
+      caveats.push({
+        kind: "partial-priced-coverage",
+        text: `caveat: ${unpricedRows} of ${toolRows.length} tool rows unpriced — TOTAL excludes their tokens`,
+      });
+    }
+  }
 
   const durationMs =
     session.totals.durationMs ??
@@ -297,5 +343,9 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     priceRowsUsed,
     unpriceable: session.unpriceable === true,
     costLowerBoundCacheTier: attribution.costLowerBoundCacheTier,
+    turnCount: session.totals.turnCount,
+    toolCallCount: session.totals.toolCallCount,
+    peakTurn: findPeakTurn(session),
+    cacheReadAtInputRateUsd: attribution.cacheReadAtInputRateUsd,
   };
 }

@@ -30,6 +30,8 @@ export function receiptTelemetryFromModels(input: {
   template: TemplateTelemetryValue;
   turnCount: number;
   toolCallCount: number;
+  /** SPEC-0054 R8 — true only when the render carried the `--details` section. */
+  detailsView: boolean;
 }): Omit<RecordReceiptGeneratedInput, "receiptOrdinal"> {
   const waste = input.models.flatMap((model) => model.wasteLines);
   return {
@@ -43,6 +45,7 @@ export function receiptTelemetryFromModels(input: {
     hasTrivialSpansWaste: waste.some((line) => line.kind === "trivial-spans"),
     hasContextThrashWaste: waste.some((line) => line.kind === "context-thrash"),
     hasPriceDelta: input.models.some((model) => model.priceDelta !== null),
+    detailsView: input.detailsView,
     turnCount: input.turnCount,
     toolCallCount: input.toolCallCount,
   };

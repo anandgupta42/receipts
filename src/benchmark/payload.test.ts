@@ -22,6 +22,9 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     priceRowsUsed: [],
     unpriceable: false,
     costLowerBoundCacheTier: false,
+    turnCount: 0,
+    toolCallCount: 0,
+    cacheReadAtInputRateUsd: null,
     ...overrides,
   };
 }
@@ -97,7 +100,7 @@ describe("buildBenchmarkPayload", () => {
   });
 
   it("maps a stuck-loop waste line to hasStuckLoopWaste=true, hasTrivialSpanWaste=false", () => {
-    const wasteLines: WasteLine[] = [{ kind: "stuck-loop", tool: "bash", runLength: 4, usd: null, tokens: EMPTY_USAGE, wallClockMs: null }];
+    const wasteLines: WasteLine[] = [{ kind: "stuck-loop", tool: "bash", runLength: 4, usd: null, tokens: EMPTY_USAGE, wallClockMs: null, turnIndices: [0, 1, 2, 3] }];
     const payload = buildBenchmarkPayload(baseModel({ wasteLines }), 3);
     expect(payload.properties.hasStuckLoopWaste).toBe(true);
     expect(payload.properties.hasTrivialSpanWaste).toBe(false);

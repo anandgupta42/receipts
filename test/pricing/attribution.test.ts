@@ -9,12 +9,39 @@
 // (same pattern as `resolve.test.ts`) so every dollar figure traces to a
 // cited row, never a fabricated one (I2/I3).
 import { fileURLToPath } from "node:url";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { attributeByTool, METHODOLOGY } from "../../src/pricing/attribution.js";
 import type { Session, SessionTotals, TokenUsage, Turn } from "../../src/parse/types.js";
+import type { PriceTable } from "../../src/pricing/types.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
+
+// SPEC-0054 R4 — a synthetic "anthropic" table (matched by the `claude-`
+// prefix in `vendorForModel`) with one model that cites `input_cached` and
+// one that doesn't, so the `cacheReadAtInputRateUsd` all-or-null completeness
+// rule can be exercised without depending on every real cited row having (or
+// lacking) that field.
+const cacheTestDir = mkdtempSync(path.join(tmpdir(), "aireceipts-attribution-cache-"));
+afterAll(() => rmSync(cacheTestDir, { recursive: true, force: true }));
+
+const CACHE_TEST_TABLE: PriceTable = {
+  vendor: "anthropic",
+  models: {
+    "claude-with-cache-rate": {
+      price_history: [{ input: 10, output: 20, input_cached: 2, from_date: "2026-01-01", to_date: null, sources: [] }],
+    },
+    "claude-with-cache-rate-2": {
+      price_history: [{ input: 4, output: 8, input_cached: 1, from_date: "2026-01-01", to_date: null, sources: [] }],
+    },
+    "claude-no-cache-rate": {
+      price_history: [{ input: 10, output: 20, from_date: "2026-01-01", to_date: null, sources: [] }],
+    },
+  },
+};
+writeFileSync(path.join(cacheTestDir, "anthropic.json"), JSON.stringify(CACHE_TEST_TABLE));
 
 const JUNE_15_2026 = Date.UTC(2026, 5, 15, 10, 0, 0);
 
@@ -228,5 +255,165 @@ describe("attributeByTool", () => {
 
     const result = await attributeByTool(session({ turns: [] }), dataDir);
     expect(result.methodology).toBe(METHODOLOGY);
+  });
+});
+
+describe("attributeByTool byModelUsd (SPEC-0054 R4)", () => {
+  it("sums each PRICED turn's full cost onto that turn's model (turn.model, not split by tool share)", async () => {
+    const turnA: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-opus-4-8",
+      usage: usage({ input: 1000, output: 500, cacheRead: 0, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }, { name: "read" }], // split across 2 tools, but byModelUsd wants the whole turn cost
+    };
+    const turnB: Turn = {
+      index: 1,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 2000, output: 0, cacheRead: 0, cacheCreation: 0 }),
+      toolCalls: [{ name: "grep" }],
+    };
+    const result = await attributeByTool(session({ turns: [turnA, turnB] }), dataDir);
+
+    // opus: rate(5,1000)+rate(25,500) = 0.005+0.0125 = 0.0175
+    // haiku: rate(1,2000) = 0.002
+    expect(result.byModelUsd).toHaveLength(2);
+    const opus = result.byModelUsd.find((m) => m.model === "claude-opus-4-8")!;
+    const haiku = result.byModelUsd.find((m) => m.model === "claude-haiku-4-5")!;
+    expect(opus.usd).toBeCloseTo(0.0175, 10);
+    expect(haiku.usd).toBeCloseTo(0.002, 10);
+  });
+
+  it("omits an unpriced model entirely (contributes nothing, not a zero entry)", async () => {
+    const priced: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 1_000_000, output: 0, cacheRead: 0, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const unpriced: Turn = {
+      index: 1,
+      timestamp: JUNE_15_2026,
+      model: "claude-unknown-model-xyz",
+      usage: usage({ input: 500, output: 500, cacheRead: 0, cacheCreation: 0 }),
+      toolCalls: [{ name: "grep" }],
+    };
+    const result = await attributeByTool(session({ turns: [priced, unpriced] }), dataDir);
+
+    expect(result.byModelUsd).toEqual([{ model: "claude-haiku-4-5", usd: 1 }]);
+    expect(result.byModelUsd.some((m) => m.model === "claude-unknown-model-xyz")).toBe(false);
+  });
+});
+
+describe("attributeByTool cacheReadAtInputRateUsd (SPEC-0054 R4)", () => {
+  it("sums the exact per-turn counterfactual across turns/models when every cacheRead-carrying turn cites input_cached", async () => {
+    const turnA: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-with-cache-rate",
+      usage: usage({ input: 1000, output: 500, cacheRead: 200_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const turnB: Turn = {
+      index: 1,
+      timestamp: JUNE_15_2026,
+      model: "claude-with-cache-rate-2",
+      usage: usage({ input: 2000, output: 0, cacheRead: 100_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "read" }],
+    };
+    const result = await attributeByTool(session({ turns: [turnA, turnB] }), cacheTestDir);
+
+    // turnA: rate(10,1000)+rate(20,500)+rate(2,200000) = 0.01+0.01+0.4 = 0.42
+    // turnB: rate(4,2000)+rate(1,100000) = 0.008+0.1 = 0.108
+    expect(result.totalUsd).toBeCloseTo(0.528, 10);
+    // counterfactual: 200000*(10-2)/1e6 + 100000*(4-1)/1e6 = 1.6 + 0.3 = 1.9
+    expect(result.cacheReadAtInputRateUsd).toBeCloseTo(1.9, 10);
+  });
+
+  it("is null when nothing in the session priced, even with cacheRead > 0 (an unpriced model's cache tokens can't be counterfactualized)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-unknown-model-xyz",
+      usage: usage({ input: 1000, output: 0, cacheRead: 500_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalUsd).toBeNull();
+    expect(result.cacheReadAtInputRateUsd).toBeNull();
+  });
+
+  it("is null when the session priced but total cacheRead is 0 (nothing to counterfactualize)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-opus-4-8",
+      usage: usage({ input: 1000, output: 500, cacheRead: 0, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.cacheReadAtInputRateUsd).toBeNull();
+  });
+
+  it("is null when a cacheRead-carrying turn prices against a row that doesn't cite input_cached (all-or-null, even though totalUsd is still non-null)", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-no-cache-rate",
+      usage: usage({ input: 1000, output: 0, cacheRead: 200_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), cacheTestDir);
+
+    // Still prices (costOf falls back to the base input rate for cacheRead), just not counterfactualizable.
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.cacheReadAtInputRateUsd).toBeNull();
+  });
+
+  it("is null when one of two cacheRead-carrying turns lacks a cited rate, even though the other one has an exact figure", async () => {
+    const good: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-with-cache-rate",
+      usage: usage({ input: 1000, output: 0, cacheRead: 100_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const bad: Turn = {
+      index: 1,
+      timestamp: JUNE_15_2026,
+      model: "claude-no-cache-rate",
+      usage: usage({ input: 1000, output: 0, cacheRead: 50_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "read" }],
+    };
+    const result = await attributeByTool(session({ turns: [good, bad] }), cacheTestDir);
+
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.cacheReadAtInputRateUsd).toBeNull();
+  });
+
+  it("is null when one of two cacheRead-carrying turns has no price row at all (unknown model, not merely missing a rate)", async () => {
+    const priced: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-with-cache-rate",
+      usage: usage({ input: 1000, output: 0, cacheRead: 100_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const unpriced: Turn = {
+      index: 1,
+      timestamp: JUNE_15_2026,
+      model: "claude-unknown-in-this-table",
+      usage: usage({ input: 1000, output: 0, cacheRead: 50_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "read" }],
+    };
+    const result = await attributeByTool(session({ turns: [priced, unpriced] }), cacheTestDir);
+
+    expect(result.totalUsd).not.toBeNull(); // the "good" turn still prices
+    expect(result.cacheReadAtInputRateUsd).toBeNull();
   });
 });

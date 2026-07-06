@@ -32,6 +32,8 @@ Usage:
   aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
                                          contract only, sends disabled)
   aireceipts [selector] --template <name>  render a receipt style (classic|grocery|datavis)
+  aireceipts [selector] --details       add a DETAILS section (token composition, session
+                                         shape, per-model split; classic template only)
   aireceipts templates                  list the templates with a live preview of each
   aireceipts --mini [selector]          6-line mini-receipt (newest session)
   aireceipts install-hook               add a Claude Code SessionEnd auto-receipt hook

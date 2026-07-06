@@ -106,4 +106,23 @@ describe("SPEC-0043 command-path telemetry", () => {
     expect(runs).toHaveLength(1);
     expect((runs[0].properties as Record<string, unknown>).commandClass).toBe("receipt");
   });
+
+  // SPEC-0054 R8 — detailsView is true only for renders that carry the DETAILS
+  // section: text with the flag → true; --json ignores the flag (the export
+  // never renders the section) → false.
+  it("--details flips detailsView on the text render and stays false on --json", async () => {
+    expect(await main(["--details"])).toBe(0);
+    expect(await main(["--details", "--json"])).toBe(0);
+
+    const receipts = peekQueuedEvents().filter((e) => e.name === "receipt_generated");
+    expect(receipts).toHaveLength(2);
+    for (const event of receipts) {
+      expect(validateEvent(event as TelemetryEvent)).toBe(true);
+    }
+    const [text, json] = receipts.map((e) => e.properties as Record<string, unknown>);
+    expect(text.outputMode).toBe("text");
+    expect(text.detailsView).toBe(true);
+    expect(json.outputMode).toBe("json");
+    expect(json.detailsView).toBe(false);
+  });
 });

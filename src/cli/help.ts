@@ -25,6 +25,13 @@ const OUTPUT_MODE_ENTRIES: readonly HelpEntry[] = [
   { order: 70, lines: ["  aireceipts [selector] --png [-o f]    write a rasterized PNG receipt (default receipt.png)"] },
   { order: 80, lines: ["  aireceipts compare <a> <b> --svg      write a side-by-side SVG (default compare.svg)"] },
   { order: 130, lines: ["  aireceipts [selector] --template <name>  render a receipt style (classic|grocery|datavis)"] },
+  {
+    order: 135,
+    lines: [
+      "  aireceipts [selector] --details       add a DETAILS section (token composition, session",
+      "                                         shape, per-model split; classic template only)",
+    ],
+  },
 ];
 
 /**

@@ -197,6 +197,8 @@ export const receiptGeneratedPropertiesSchema = z
     hasTrivialSpansWaste: z.boolean(),
     hasContextThrashWaste: z.boolean(),
     hasPriceDelta: z.boolean(),
+    /** SPEC-0054 R8 — the receipt rendered with the opt-in `--details` section (boolean, never content). */
+    detailsView: z.boolean(),
     turnCountBucket: z.enum(COUNT_BUCKET_VALUES),
     toolCallCountBucket: z.enum(COUNT_BUCKET_VALUES),
     receiptOrdinalBucket: z.enum(ORDINAL_BUCKET_VALUES),

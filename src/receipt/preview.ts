@@ -20,8 +20,8 @@ export function previewModel(): ReceiptModel {
     startedAtMs: Date.UTC(2026, 5, 18, 9, 30, 30),
     durationMs: 630000,
     modelMix: [
-      { model: "claude-opus-4-8", tokens: usage(8000), tokenShare: 0.87 },
-      { model: "claude-sonnet-5", tokens: usage(1200), tokenShare: 0.13 },
+      { model: "claude-opus-4-8", tokens: usage(8000), tokenShare: 0.87, usd: 0.15 },
+      { model: "claude-sonnet-5", tokens: usage(1200), tokenShare: 0.13, usd: 0.03 },
     ],
     toolRows: [
       { tool: "Bash", usd: 0.05, tokens: usage(3200), callCount: 3 },
@@ -40,5 +40,9 @@ export function previewModel(): ReceiptModel {
     priceRowsUsed: [],
     unpriceable: false,
     costLowerBoundCacheTier: false,
+    turnCount: 6,
+    toolCallCount: 10,
+    peakTurn: { tokens: 3200, turnNumber: 4 },
+    cacheReadAtInputRateUsd: 0.12,
   };
 }

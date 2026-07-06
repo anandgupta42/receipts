@@ -110,7 +110,7 @@ Edit_002                            1        $0.00
 Read_001                            1        $0.00
 --------------------------------------------------
 TOTAL                                        $0.36
-same tokens on claude-haiku-4-5..............$0.18
+same tokens on claude-haiku-4-5...$0.18 (50% less)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-sonnet-5

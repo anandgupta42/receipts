@@ -16,11 +16,12 @@ import {
   TRIVIAL_SPANS_LABEL,
   barcodePattern,
   normalizedBar,
+  reconciledModelCents,
   sessionToken,
 } from "./blocks.js";
 import type { Block, ReceiptView, TemplateName } from "./blocks.js";
-import { formatAbsoluteUtc, formatCentsAmount, formatDuration, formatInt, formatUsd, reconcileCents } from "./format.js";
-import type { ReceiptModel, ToolRow, WasteLine } from "./model.js";
+import { formatAbsoluteUtc, formatCentsAmount, formatDuration, formatInt, formatShortTokens, formatUsd, reconcileCents } from "./format.js";
+import type { ModelMixEntry, ReceiptModel, ToolRow, WasteLine } from "./model.js";
 import type { TokenUsage } from "../parse/types.js";
 
 export type { ReceiptView } from "./blocks.js";
@@ -69,6 +70,23 @@ export function cacheServedPct(t: TokenUsage): string | undefined {
   // "100%" — a real session always has SOME uncached prompt. True 100% (synthetic
   // fixtures) may say it; 99.5%+ says ">99%".
   return ratio >= 1 ? "100" : Math.round(ratio * 100) >= 100 ? ">99" : String(Math.round(ratio * 100));
+}
+
+/**
+ * Round a 0..1 share to an integer percent without ever claiming the
+ * impossible-sounding "0%"/"100%" for a genuinely partial share — the same
+ * display-honesty rule as {@link cacheServedPct} and `src/pr/body.ts`'s
+ * `sharePct`. Shared by R1's price-delta suffix and R4's BY MODEL row.
+ */
+function honestPct(ratio: number): string {
+  const pct = Math.round(ratio * 100);
+  if (pct <= 0 && ratio > 0) {
+    return "<1";
+  }
+  if (pct >= 100 && ratio < 1) {
+    return ">99";
+  }
+  return String(pct);
 }
 
 export function cacheServedText(t: TokenUsage): string | undefined {
@@ -189,12 +207,30 @@ function totalParts(model: ReceiptModel): TotalParts {
   return { value: `${formatInt(model.totalTokens.total)} tok`, note: NO_PRICE_MATCH_NOTE };
 }
 
-/** The `same tokens on <model>` price-delta value, or `undefined` when the session did not price. */
+/**
+ * The `same tokens on <model>` price-delta value, or `undefined` when the
+ * session did not price. SPEC-0054 R1: when the delta is real savings
+ * (`actualUsd > 0` and `usd < actualUsd`), the value gains a `(N% less)`
+ * suffix — arithmetic on the already-traced `usd`/`actualUsd` pair, not a new
+ * dollar figure, so the honesty battery's allowlist needs no change.
+ */
 function priceDeltaParts(model: ReceiptModel): { label: string; value: string } | undefined {
   if (!model.priceDelta) {
     return undefined;
   }
-  return { label: `same tokens on ${model.priceDelta.cheaperModel}`, value: `$${formatUsd(model.priceDelta.usd)}` };
+  const { cheaperModel, usd, actualUsd } = model.priceDelta;
+  const suffix = actualUsd > 0 && usd < actualUsd ? ` (${honestPct((actualUsd - usd) / actualUsd)}% less)` : "";
+  return { label: `same tokens on ${cheaperModel}`, value: `$${formatUsd(usd)}${suffix}` };
+}
+
+/** SPEC-0054 R2 — the stuck-loop turn location, 1-based (`turnIndices` is 0-based): `at turn N` for a single turn, `at turns A-B` for a span. */
+function stuckLoopDetail(turnIndices: number[]): string | undefined {
+  if (turnIndices.length === 0) {
+    return undefined;
+  }
+  const min = Math.min(...turnIndices) + 1;
+  const max = Math.max(...turnIndices) + 1;
+  return min === max ? `at turn ${min}` : `at turns ${min}-${max}`;
 }
 
 /** A classic waste block: stuck-loop carries the ⚠ badge, trivial-spans carries the `≈` label and a detail sub-line. */
@@ -202,7 +238,14 @@ function classicWasteBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" 
   if (waste.kind === "stuck-loop") {
     const valuePart = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
     const clockPart = waste.wallClockMs !== null ? ` (${formatDuration(waste.wallClockMs)})` : "";
-    return { kind: "wasteRow", label: `${waste.tool} loop ×${waste.runLength}`, value: valuePart + clockPart, badge: true };
+    const detail = stuckLoopDetail(waste.turnIndices);
+    return {
+      kind: "wasteRow",
+      label: `${waste.tool} loop ×${waste.runLength}`,
+      value: valuePart + clockPart,
+      badge: true,
+      ...(detail !== undefined ? { detail } : {}),
+    };
   }
   if (waste.kind === "context-thrash") {
     // R7: `≈ context thrash: N compactions in M turns` + a methodology sub-line.
@@ -226,6 +269,76 @@ function classicWasteBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" 
   };
 }
 
+// --- DETAILS section (R4, opt-in, classic-only) ------------------------------
+
+/** The token composition DETAILS reads from: real per-turn totals normally, session totals for Cursor's degraded mode (its per-turn usage is always absent). */
+function detailsTokens(model: ReceiptModel): TokenUsage {
+  return model.unpriceable ? model.sessionTotalTokens : model.totalTokens;
+}
+
+/**
+ * BY MODEL rows, cent-reconciled across priced entries only (same
+ * `reconcileCents` universe {@link reconciledRowText} uses for tool rows) so
+ * the displayed rows sum to the displayed TOTAL; an unpriced entry (a
+ * Cursor-style per-model gap) renders its token share instead of a fabricated
+ * `$` (I2).
+ */
+function byModelRows(model: ReceiptModel): Block[] {
+  const priced = model.modelMix.filter((m) => m.usd !== null);
+  const cents = reconciledModelCents(model);
+  const centText = new Map<ModelMixEntry, string>();
+  priced.forEach((m, i) => centText.set(m, formatCentsAmount(cents[i])));
+  return model.modelMix.map((m): Block => {
+    const pct = honestPct(m.tokenShare);
+    const value = m.usd !== null ? `${pct}% · $${centText.get(m)}` : `${pct}% · ${formatShortTokens(m.tokens.total)} tok`;
+    return { kind: "row", label: m.model, value };
+  });
+}
+
+/**
+ * SPEC-0054 R4 — the opt-in `DETAILS` section (`--details`), classic-only.
+ * Built entirely from `note`/`row` blocks (no new `Block` kind). Every line is
+ * omitted when its underlying data is absent — never a fabricated 0 (I2).
+ * Exported so tests can assert its output directly.
+ */
+export function detailsBlocks(model: ReceiptModel): Block[] {
+  const blocks: Block[] = [{ kind: "note", text: "DETAILS", spaceBefore: true }];
+  const tokens = detailsTokens(model);
+
+  if (tokens.input + tokens.output > 0) {
+    blocks.push({ kind: "row", label: "tokens in / out", value: `${formatShortTokens(tokens.input)} / ${formatShortTokens(tokens.output)}` });
+  }
+  if (tokens.cacheRead + tokens.cacheCreation > 0) {
+    blocks.push({ kind: "row", label: "cache read / write", value: `${formatShortTokens(tokens.cacheRead)} / ${formatShortTokens(tokens.cacheCreation)}` });
+    // TTL sub-line carries only the tiers the transcript actually reported —
+    // an absent tier is unknown, never a fabricated 0 (I2's tier-unknown-vs-zero
+    // distinction, parse/types.ts).
+    const tiers: string[] = [];
+    if (tokens.cacheCreation5m !== undefined) {
+      tiers.push(`5m ${formatShortTokens(tokens.cacheCreation5m)}`);
+    }
+    if (tokens.cacheCreation1h !== undefined) {
+      tiers.push(`1h ${formatShortTokens(tokens.cacheCreation1h)}`);
+    }
+    if (tiers.length > 0) {
+      blocks.push({ kind: "note", text: `writes: ${tiers.join(" · ")}`, indent: 2, muted: true });
+    }
+  }
+  blocks.push({ kind: "row", label: "turns / tool calls", value: `${formatInt(model.turnCount)} / ${formatInt(model.toolCallCount)}` });
+  if (model.peakTurn) {
+    blocks.push({ kind: "row", label: "peak turn", value: `${formatShortTokens(model.peakTurn.tokens)} tok (turn ${model.peakTurn.turnNumber})` });
+  }
+  if (model.cacheReadAtInputRateUsd !== null) {
+    blocks.push({ kind: "row", label: "same reads at uncached input rate", value: `$${formatUsd(model.cacheReadAtInputRateUsd)}` });
+    blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
+  }
+  if (model.totalUsd !== null && model.modelMix.length > 1) {
+    blocks.push({ kind: "note", text: "BY MODEL" });
+    blocks.push(...byModelRows(model));
+  }
+  return blocks;
+}
+
 // --- Shared tail: rule → total → price-delta → methodology footnote ----------
 
 /** SPEC-0028 R3 — muted time-integrity caveat notes; empty for consistent sessions so existing renders stay byte-identical (I5). */
@@ -233,8 +346,13 @@ function caveatBlocks(model: ReceiptModel): Block[] {
   return model.caveats.map((c, i): Block => ({ kind: "note", text: c.text, muted: true, spaceBefore: i === 0 }));
 }
 
-/** The rule/total/price-delta/footnote sequence every template ends its body with (honesty invariants live here — I3). */
-function tailBlocks(model: ReceiptModel, footer: Block): Block[] {
+/**
+ * The rule/total/price-delta/footnote sequence every template ends its body
+ * with (honesty invariants live here — I3). `extra` (R4's DETAILS blocks,
+ * classic-only) inserts between the price-delta block and the methodology
+ * footnote.
+ */
+function tailBlocks(model: ReceiptModel, footer: Block, extra?: Block[]): Block[] {
   const blocks: Block[] = [];
   blocks.push(...caveatBlocks(model));
   const total = totalParts(model);
@@ -248,6 +366,9 @@ function tailBlocks(model: ReceiptModel, footer: Block): Block[] {
     blocks.push({ kind: "row", label: delta.label, value: delta.value, muted: true });
     blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
   }
+  if (extra) {
+    blocks.push(...extra);
+  }
   blocks.push({ kind: "footnote", text: METHODOLOGY_BRIEF, spaceBefore: true });
   blocks.push(footer);
   return blocks;
@@ -255,7 +376,7 @@ function tailBlocks(model: ReceiptModel, footer: Block): Block[] {
 
 // --- classic (default; byte-identical to pre-SPEC-0020) ----------------------
 
-function buildClassic(model: ReceiptModel): Block[] {
+function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[] {
   const reconciled = reconciledRowText(model);
   const blocks: Block[] = [
     { kind: "masthead", text: WORDMARK },
@@ -268,7 +389,8 @@ function buildClassic(model: ReceiptModel): Block[] {
     const block = classicWasteBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
-  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, samosaMark: true }));
+  const extra = view?.details ? detailsBlocks(model) : undefined;
+  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, samosaMark: true }, extra));
   return blocks;
 }
 
@@ -356,13 +478,18 @@ function buildDatavis(model: ReceiptModel): Block[] {
   return blocks;
 }
 
-const BUILDERS: Record<TemplateName, (model: ReceiptModel) => Block[]> = {
+const BUILDERS: Record<TemplateName, (model: ReceiptModel, view?: { details?: boolean }) => Block[]> = {
   classic: buildClassic,
   grocery: buildGrocery,
   datavis: buildDatavis,
 };
 
-/** Build the shared, layout-agnostic block list a renderer formats. Pure over the already-priced {@link ReceiptModel} — no pricing/attribution here. */
-export function buildReceiptView(model: ReceiptModel, template: TemplateName = "classic"): ReceiptView {
-  return { template, blocks: BUILDERS[template](model) };
+/**
+ * Build the shared, layout-agnostic block list a renderer formats. Pure over
+ * the already-priced {@link ReceiptModel} — no pricing/attribution here.
+ * `view.details` (SPEC-0054 R4/R6) is honored by `classic` only; `grocery`
+ * and `datavis` ignore it — the CLI guards the combination.
+ */
+export function buildReceiptView(model: ReceiptModel, template: TemplateName = "classic", view?: { details?: boolean }): ReceiptView {
+  return { template, blocks: BUILDERS[template](model, view) };
 }

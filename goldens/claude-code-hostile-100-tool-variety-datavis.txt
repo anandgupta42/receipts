@@ -111,7 +111,7 @@ Edit_002........................$0.00 [#########-]
 Read_001........................$0.00 [#########-]
 --------------------------------------------------
 TOTAL........................................$0.36
-same tokens on claude-haiku-4-5..............$0.18
+same tokens on claude-haiku-4-5...$0.18 (50% less)
   (arithmetic, not a prediction)
 
 Per-turn cost split evenly across that turn's tool
