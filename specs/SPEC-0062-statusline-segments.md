@@ -1,7 +1,7 @@
 ---
 id: SPEC-0062
 title: "Statusline v2 — brand prefix, quota default-on, opt-in segments with a labeled quota ETA"
-status: draft
+status: approved # maintainer button 1, 2026-07-06 (interactive session)
 milestone: M5
 depends: [SPEC-0007, SPEC-0014, SPEC-0061]
 ---
