@@ -3,7 +3,8 @@
 // marker first (unchanged, so R5's presence check and the gh upsert still find
 // it), then a fenced 50-column receipt with masthead, per-session dotted rows,
 // muted provenance/subagent rows, separate priced/unpriced totals, and the
-// classic samosa footer.
+// plain closing footer (SPEC-0055: no samosa on the fenced receipt itself —
+// the samosa link lives only in the details section below, via SAMOSA_LINK).
 import type { TokenUsage } from "../parse/types.js";
 import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry } from "../receipt/model.js";
@@ -58,7 +59,7 @@ const COMMENT_SIZE_CAP = 65_000;
 const OMITTED_NOTE = "full receipt omitted (comment size limit)";
 
 const WORDMARK = "AIRECEIPTS";
-const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
+const FOOTER_TEXT = "aireceipts · local";
 const NOTE_INDENT = 2;
 
 /** The R1e(e) header line: the turn range, or the honesty label for a full-session fallback. */
