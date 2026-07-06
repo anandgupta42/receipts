@@ -27,7 +27,7 @@ Write.............................$0.03  (2 calls)
 Read...............................$0.02  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.18
-same tokens on claude-haiku-4-5..............$0.04
+same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      
@@ -39,7 +39,51 @@ gives the **agent, start time, and duration**; then the **model mix** (share of
 tokens per model) and how much of the input was served from **cache**. The body
 lists **cost per tool**, highest first. `(thinking/reply)` is the model's own
 output on turns that called no tool. `TOTAL` is the sum; `same tokens on …`
-re-prices those exact tokens on a cheaper model as a reference point.
+re-prices those exact tokens on a cheaper model as a reference point — the
+`(78% less)` is the same arithmetic as a percentage, never a prediction.
+
+Three lines appear only when they have something to say:
+
+- a **stuck-loop waste line** names where to look — `at turns 1-5` — so you
+  can jump straight to the loop in your own transcript;
+- a **coverage caveat** — `caveat: 2 of 3 turns unpriced — TOTAL excludes
+  their tokens` — whenever a session mixed a priced model with one that has no
+  cited price row, so a partial TOTAL never poses as a complete one;
+- time-integrity caveats (inconsistent timestamps, skipped records) as before.
+
+## The `--details` section
+
+When the one question you have is *"what's inside that number?"*, ask for it:
+
+```sh
+aireceipts --details
+```
+
+```
+DETAILS
+tokens in / out..........................20k / 897
+cache read / write.....................124k / 2.1k
+turns / tool calls..........................10 / 8
+peak turn.........................24k tok (turn 7)
+same reads at uncached input rate............$0.52
+  (arithmetic, not a prediction)
+BY MODEL
+claude-opus-4-8........................87% · $0.17
+claude-sonnet-5........................13% · $0.01
+```
+
+The section slots between the price-delta line and the footer.
+Line by line: **tokens in / out** is the raw prompt/completion split; **cache
+read / write** shows whether caching is actually working (when the transcript
+reports the cache-write TTL tiers, a `writes: 5m … · 1h …` sub-line appears —
+absent data renders nothing, never a fabricated 0); **turns / tool calls** is
+the session's shape; **peak turn** is the single most context-heavy request;
+**same reads at uncached input rate** re-prices your cache-read tokens at the
+plain input rate — the dollar figure caching saved you, arithmetic on the same
+cited price rows as everything else; **BY MODEL** splits the priced total per
+model (the rows always sum to `TOTAL`). Every line renders only when its data
+exists in the transcript. `--details` composes with the default template only;
+it also works with `--svg`.
 
 ## Pick a different session
 

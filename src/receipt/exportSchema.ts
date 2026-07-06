@@ -9,9 +9,11 @@
 // producing it, so no render ever routes through zod.
 import { z } from "zod";
 import { AGENT_SOURCES } from "../parse/types.js";
+import { SCHEMA_VERSION } from "./schemaVersion.js";
 
-/** Bumped only on a breaking `--json` shape change (R4). Mirrored in `docs/json-schema.md`. */
-export const SCHEMA_VERSION = 1;
+// Re-exported so existing importers keep one canonical path; the constant itself
+// lives in the zod-free `schemaVersion.ts` (see the rationale there).
+export { SCHEMA_VERSION } from "./schemaVersion.js";
 
 const tokenUsageSchema = z
   .object({
@@ -42,36 +44,42 @@ const toolRowSchema = z
   })
   .strict();
 
+const stuckLoopWasteShape = {
+  kind: z.literal("stuck-loop"),
+  tool: z.string(),
+  runLength: z.number(),
+  usd: z.number().nullable(),
+  tokens: tokenUsageSchema,
+  wallClockMs: z.number().nullable(),
+} as const;
+const trivialSpansWasteShape = {
+  kind: z.literal("trivial-spans"),
+  eligibleTurnCount: z.number(),
+  usd: z.number(),
+  tokens: tokenUsageSchema,
+  cheaperModel: z.string(),
+} as const;
+const contextThrashWasteShape = {
+  kind: z.literal("context-thrash"),
+  compactionCount: z.number(),
+  turnSpan: z.number(),
+  turnIndices: z.array(z.number()),
+  tokens: tokenUsageSchema,
+  usd: z.number().nullable(),
+} as const;
+
 const wasteLineSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("stuck-loop"),
-      tool: z.string(),
-      runLength: z.number(),
-      usd: z.number().nullable(),
-      tokens: tokenUsageSchema,
-      wallClockMs: z.number().nullable(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("trivial-spans"),
-      eligibleTurnCount: z.number(),
-      usd: z.number(),
-      tokens: tokenUsageSchema,
-      cheaperModel: z.string(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("context-thrash"),
-      compactionCount: z.number(),
-      turnSpan: z.number(),
-      turnIndices: z.array(z.number()),
-      tokens: tokenUsageSchema,
-      usd: z.number().nullable(),
-    })
-    .strict(),
+  z.object(stuckLoopWasteShape).strict(),
+  z.object(trivialSpansWasteShape).strict(),
+  z.object(contextThrashWasteShape).strict(),
+]);
+
+/** SPEC-0059 R7 — the handoff export's waste lines additionally carry the class's fixed rule string (`null` for a class without one). */
+const slipRuleField = { rule: z.string().nullable() } as const;
+const handoffWasteLineSchema = z.discriminatedUnion("kind", [
+  z.object({ ...stuckLoopWasteShape, ...slipRuleField }).strict(),
+  z.object({ ...trivialSpansWasteShape, ...slipRuleField }).strict(),
+  z.object({ ...contextThrashWasteShape, ...slipRuleField }).strict(),
 ]);
 
 const priceDeltaSchema = z
@@ -120,7 +128,7 @@ const receiptBodyShape = {
   totalTokens: tokenUsageSchema,
   sessionTotalTokens: tokenUsageSchema,
   wasteLines: z.array(wasteLineSchema),
-  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span", "cost-lower-bound-cache-tier", "dropped-transcript-records"]), text: z.string() }).strict()),
+  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span", "cost-lower-bound-cache-tier", "dropped-transcript-records", "partial-priced-coverage"]), text: z.string() }).strict()),
   priceDelta: priceDeltaSchema.nullable(),
   methodology: z.string(),
   priceRowsUsed: z.array(priceRowUsedSchema),
@@ -164,7 +172,15 @@ export const handoffJsonSchema = z
         toolCallCount: z.number(),
       })
       .strict(),
-    wasteLines: z.array(wasteLineSchema),
+    wasteLines: z.array(handoffWasteLineSchema),
+    /** SPEC-0059 R7 — extracted could-have-saved ceiling; additive to the SPEC-0042-pinned list, no version bump (line 14's contract). */
+    couldHaveSaved: z
+      .object({
+        usd: z.number().nullable(),
+        tokens: z.number(),
+        pctOfTotal: z.number().nullable(),
+      })
+      .strict(),
     suggestions: z.array(z.string()),
     threshold: z.number(),
     coverage: z
@@ -186,6 +202,35 @@ export const compareJsonSchema = z
     a: receiptBodySchema,
     b: receiptBodySchema,
     delta: z.string(),
+  })
+  .strict();
+
+/**
+ * SPEC-0056 R8 — `aireceipts backfill --json`, the bulk-sweep summary. Counts are
+ * honest per SPEC-0045: `loadFailureCount` covers degraded summaries and failed
+ * loads (never silently dropped), and `sessions` carries one row per matched
+ * session with the file name written (or `null` when nothing was written for it).
+ */
+export const backfillJsonSchema = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION),
+    discoveredCount: z.number(),
+    matchedCount: z.number(),
+    loadFailureCount: z.number(),
+    writtenCount: z.number(),
+    wroteFiles: z.boolean(),
+    sessions: z.array(
+      z
+        .object({
+          source: z.enum(AGENT_SOURCES),
+          sessionId: z.string(),
+          title: z.string().nullable(),
+          startedAtMs: z.number().nullable(),
+          fileName: z.string().nullable(),
+          loadFailed: z.boolean(),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
@@ -243,5 +288,6 @@ export function collectFieldNames(schema: z.ZodTypeAny, into: Set<string> = new 
 export function allExportFieldNames(): Set<string> {
   const names = collectFieldNames(receiptJsonSchema);
   collectFieldNames(compareJsonSchema, names);
+  collectFieldNames(backfillJsonSchema, names);
   return collectFieldNames(handoffJsonSchema, names);
 }

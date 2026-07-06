@@ -7,7 +7,7 @@
 (thinking/reply).................$5.50  (30 turns)
 --------------------------------------------------
 TOTAL........................................$5.50
-same tokens on claude-haiku-4-5..............$5.50
+same tokens on claude-haiku-4-5...$5.50 (<1% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      

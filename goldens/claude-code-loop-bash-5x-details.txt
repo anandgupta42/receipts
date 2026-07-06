@@ -1,0 +1,27 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Can you fix the flaky login test in src/auth/…” 
+ Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s  
+               claude-opus-4-8 100%               
+         cache served 88% of input tokens         
+
+Bash..............................$0.07  (5 calls)
+(thinking/reply)...................$0.02  (1 turn)
+
+⚠ Bash loop ×5......................$0.08 (3m 45s)
+  at turns 1-5
+--------------------------------------------------
+TOTAL........................................$0.09
+same tokens on claude-haiku-4-5...$0.02 (80% less)
+  (arithmetic, not a prediction)
+
+DETAILS
+tokens in / out.........................8.1k / 688
+cache read / write.......................63k / 900
+turns / tool calls...........................6 / 5
+peak turn.........................16k tok (turn 6)
+same reads at uncached input rate............$0.28
+  (arithmetic, not a prediction)
+- - - - - - - - - - - - - - - - - - - - - - - - -
+     aireceipts · local · npx aireceipts-cli      
+- - - - - - - - - - - - - - - - - - - - - - - - -

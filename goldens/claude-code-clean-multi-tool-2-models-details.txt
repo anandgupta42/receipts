@@ -1,0 +1,30 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Add email format validation to the signup for…” 
+ Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s 
+    claude-opus-4-8 87% · claude-sonnet-5 13%     
+         cache served 85% of input tokens         
+
+Bash..............................$0.05  (3 calls)
+Edit..............................$0.05  (2 calls)
+(thinking/reply)..................$0.03  (2 turns)
+Write.............................$0.03  (2 calls)
+Read...............................$0.02  (1 call)
+--------------------------------------------------
+TOTAL........................................$0.18
+same tokens on claude-haiku-4-5...$0.04 (78% less)
+  (arithmetic, not a prediction)
+
+DETAILS
+tokens in / out..........................20k / 897
+cache read / write.....................124k / 2.1k
+turns / tool calls..........................10 / 8
+peak turn.........................24k tok (turn 7)
+same reads at uncached input rate............$0.52
+  (arithmetic, not a prediction)
+BY MODEL
+claude-opus-4-8........................87% · $0.17
+claude-sonnet-5........................13% · $0.01
+- - - - - - - - - - - - - - - - - - - - - - - - -
+     aireceipts · local · npx aireceipts-cli      
+- - - - - - - - - - - - - - - - - - - - - - - - -

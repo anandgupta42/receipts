@@ -30,6 +30,7 @@ async function run(ctx: CommandContext): Promise<number> {
         template: "none",
         turnCount: session.totals.turnCount,
         toolCallCount: session.totals.toolCallCount,
+        detailsView: false,
       }),
       "mini",
     );

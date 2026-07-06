@@ -122,7 +122,7 @@ decision record is [SPEC-0052](../specs/SPEC-0052-github-app-deferral.md).
   (session id + `session slice: turns A–B of N`, or `entire session (slice
   unavailable)` when the work can't be cut cleanly — ambiguity is labeled, never
   presented as PR cost), and one indented `SUBAGENTS (N)` aggregate row summing
-  any subagent sessions a contributor launched (SPEC-0054).
+  any subagent sessions a contributor launched (SPEC-0060).
 - One combined total. Priced and unpriced sessions are never blended: dollars and
   tokens total separately.
 - An honest note counting any plausible-but-unproven sessions that were **not**

@@ -17,6 +17,7 @@ const PRICED_FIXTURES = [
   { source: "claude-code", file: "claude-code/clean-multi-tool-2-models.jsonl" },
   { source: "claude-code", file: "claude-code/loop-bash-5x.jsonl" }, // fires a stuck-loop wasteLine
   { source: "codex", file: "codex/trivial-spans-r4b.jsonl" }, // fires a trivial-spans wasteLine
+  { source: "claude-code", file: "claude-code/mixed-priced-coverage.jsonl" }, // fires the SPEC-0054 partial-priced-coverage caveat
 ] as const;
 
 async function modelFor(source: string, file: string): Promise<ReceiptModel> {

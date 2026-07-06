@@ -41,6 +41,10 @@ export interface CliOptions {
   readonly noDetails: boolean;
   /** SPEC-0035 R5: `aireceipts pr --post --artifact --share` prints share intent URLs to stderr. */
   readonly share: boolean;
+  /** SPEC-0056: `aireceipts backfill --limit N` caps the swept set to the N most recent matches. */
+  readonly limit?: number;
+  /** SPEC-0056: `aireceipts backfill --out <dir>` — distinct from `output` (SVG/PNG's `-o`/`--output`). */
+  readonly outDir?: string;
   // Command-selecting boolean flags (consumed by the registry, not the commands):
   readonly help: boolean;
   readonly methodology: boolean;
@@ -52,6 +56,8 @@ export interface CliOptions {
   readonly mini: boolean;
   readonly version: boolean;
   readonly demo: boolean;
+  /** SPEC-0054 R4: render the opt-in DETAILS section (classic template only). */
+  readonly details: boolean;
 }
 
 /** Value-consuming flags: `--theme dark`, `-o out.svg`. Anything else is a boolean flag or positional. */
@@ -68,6 +74,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let mini = false;
   let version = false;
   let demo = false;
+  let details = false;
   let csvMode: "session" | "tool" | undefined;
   let dryRun = false;
   let checkBudget = false;
@@ -82,6 +89,8 @@ export function parseOptions(argv: string[]): CliOptions {
   let artifact = false;
   let noDetails = false;
   let share = false;
+  let limit: number | undefined;
+  let outDir: string | undefined;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -134,6 +143,14 @@ export function parseOptions(argv: string[]): CliOptions {
       prSession = argv[++i];
     } else if (arg.startsWith("--session=")) {
       prSession = arg.slice("--session=".length);
+    } else if (arg === "--limit") {
+      limit = Number(argv[++i]);
+    } else if (arg.startsWith("--limit=")) {
+      limit = Number(arg.slice("--limit=".length));
+    } else if (arg === "--out") {
+      outDir = argv[++i];
+    } else if (arg.startsWith("--out=")) {
+      outDir = arg.slice("--out=".length);
     } else if (arg === "--svg") {
       svg = true;
     } else if (arg === "--png") {
@@ -148,6 +165,8 @@ export function parseOptions(argv: string[]): CliOptions {
       version = true;
     } else if (arg === "--demo") {
       demo = true;
+    } else if (arg === "--details") {
+      details = true;
     } else {
       positional.push(arg);
     }
@@ -171,6 +190,8 @@ export function parseOptions(argv: string[]): CliOptions {
     artifact,
     noDetails,
     share,
+    limit,
+    outDir,
     help,
     methodology,
     telemetryShow,
@@ -181,5 +202,6 @@ export function parseOptions(argv: string[]): CliOptions {
     mini,
     version,
     demo,
+    details,
   };
 }

@@ -143,6 +143,8 @@ export interface RecordReceiptGeneratedInput {
   hasTrivialSpansWaste: boolean;
   hasContextThrashWaste: boolean;
   hasPriceDelta: boolean;
+  /** SPEC-0054 R8 — the render carried the opt-in `--details` section. */
+  detailsView: boolean;
   turnCount: number;
   toolCallCount: number;
   receiptOrdinal?: number;
@@ -162,6 +164,7 @@ export function recordReceiptGenerated(input: RecordReceiptGeneratedInput): void
       hasTrivialSpansWaste: input.hasTrivialSpansWaste,
       hasContextThrashWaste: input.hasContextThrashWaste,
       hasPriceDelta: input.hasPriceDelta,
+      detailsView: input.detailsView,
       turnCountBucket: bucketCount(input.turnCount),
       toolCallCountBucket: bucketCount(input.toolCallCount),
       receiptOrdinalBucket: bucketOrdinal(input.receiptOrdinal),
@@ -188,6 +191,8 @@ export interface RecordPrFlowCompletedInput {
   commentResult: StepResultValue;
   artifactResult: StepResultValue;
   shareResult: StepResultValue;
+  /** SPEC-0059 R8. */
+  handoffSectionIncluded: boolean;
   result: ResultValue;
 }
 
@@ -202,6 +207,7 @@ export function recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void {
       commentResult: input.commentResult,
       artifactResult: input.artifactResult,
       shareResult: input.shareResult,
+      handoffSectionIncluded: input.handoffSectionIncluded,
       result: input.result,
     },
   });

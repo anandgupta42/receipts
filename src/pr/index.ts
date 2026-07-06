@@ -25,7 +25,15 @@ import { promoteOrphanSidechains } from "./promote.js";
 import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js";
 import { nestedCandidates } from "./nested.js";
 import { discoverChildFiles, isChildPath } from "../parse/children.js";
-import { renderPrBody, subagentDetailsTable, type ContributorView, type PrBodyInput } from "./body.js";
+import {
+  buildHandoffSlip,
+  renderPrBodyDetailed,
+  subagentDetailsTable,
+  type ContributorView,
+  type HandoffSectionData,
+  type HandoffSlipView,
+  type PrBodyInput,
+} from "./body.js";
 import { summarizeConfidence, type ConfidenceEvent } from "./confidence.js";
 import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
@@ -70,6 +78,8 @@ export interface PrRunResult {
   commentResult: StepResultValue;
   artifactResult: StepResultValue;
   shareResult: StepResultValue;
+  /** SPEC-0059 R8 — the rendered body carried the handoff section (the kill criterion's observable denominator). */
+  handoffSectionIncluded: boolean;
   result: ResultValue;
 }
 
@@ -98,6 +108,7 @@ function prResult(input: Partial<PrRunResult> & { code: number; result: ResultVa
     contributorCount: 0,
     commentResult: "skipped",
     artifactResult: "skipped",
+    handoffSectionIncluded: false,
     shareResult: "skipped",
     ...input,
   };
@@ -284,7 +295,7 @@ function publishAndLink(
   bodyInput: PrBodyInput,
   sessions: ArtifactSession[],
   deps: PrDeps,
-  extras?: { notAttributable?: string[]; perCommitJson?: string },
+  extras?: { notAttributable?: string[]; perCommitJson?: string; handoff?: HandoffSlipView },
 ): { fileName: string; url: string; ownerRepo: string } | null {
   const pr = resolvePr(deps.runGh);
   if (!pr.ok) {
@@ -502,6 +513,14 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     turnCount: entries.reduce((sum, e) => sum + countedTurns(e.raw), 0),
     toolCallCount: entries.reduce((sum, e) => sum + countedToolCalls(e.raw), 0),
   };
+  // SPEC-0059 R5 — the handoff slip's raw facts, from the same sliced models
+  // the details section prints. Built here so the artifact (R6) and the
+  // comment section share one aggregation.
+  const handoffData: HandoffSectionData = {
+    wasteLines: fenceOrdered.flatMap((e) => e.model.wasteLines),
+    sessionCount: entries.length,
+    turnCount: receipt.turnCount,
+  };
 
   // SPEC-0027 R3: push the artifact BEFORE rendering the one final body, so
   // the printed and posted bodies are identical and the link only renders
@@ -531,6 +550,9 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     link = publishAndLink(bodyInput, sessions, deps, {
       notAttributable: notAttributable.length === fenceOrdered.length ? notAttributable : notAttributable.length > 0 ? notAttributable : undefined,
       perCommitJson: islandData.length > 0 ? JSON.stringify(islandData) : undefined,
+      // SPEC-0059 R6 — same slip, same builder; the artifact always carries its
+      // full receipts, so its handoff section ignores --no-details too.
+      handoff: buildHandoffSlip(handoffData, bodyInput) ?? undefined,
     });
     artifactFailed = link === null;
     artifactResult = link === null ? "failed" : "success";
@@ -544,10 +566,17 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
         label: detailHeading(e.view),
         row: detailRow(e.view, e.model),
         text: renderReceipt(e.model, { color: false }),
-        // SPEC-0054 R3 — the per-child breakdown the fence no longer draws.
+        // SPEC-0060 R3 — the per-child breakdown the fence no longer draws.
         subagents: e.view.subagents.length > 0 ? subagentDetailsTable(e.view.subagents) : undefined,
       }));
-  const body = renderPrBody(bodyInput, { artifactLink: link ?? undefined, details });
+  // SPEC-0059 R5 — the comment's handoff section is a sibling of the details
+  // section and shares its --no-details gate; R8's boolean is the assembler's
+  // own decision, not a scan of the body.
+  const { body, handoffSectionIncluded } = renderPrBodyDetailed(bodyInput, {
+    artifactLink: link ?? undefined,
+    details,
+    handoff: opts.details === false ? undefined : handoffData,
+  });
 
   // R3 (SPEC-0019): render before the comment upsert, unconditionally.
   deps.out(body);
@@ -559,6 +588,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       contributorCount: entries.length,
       receipt,
       artifactResult,
+      handoffSectionIncluded,
       result: "success",
     });
   }
@@ -573,6 +603,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       receipt,
       commentResult: "failed",
       artifactResult,
+      handoffSectionIncluded,
       result: comment.missing ? "external_missing" : "external_failed",
     });
   }
@@ -615,6 +646,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     commentResult: "success",
     artifactResult,
     shareResult,
+    handoffSectionIncluded,
     result: artifactFailed ? "external_failed" : "success",
   });
 }

@@ -10,7 +10,7 @@ ITEM                              QTY          AMT
 mcp__claude-in-chrome__brow…        1        $0.01
 --------------------------------------------------
 TOTAL                                        $0.01
-same tokens on claude-haiku-4-5..............$0.00
+same tokens on claude-haiku-4-5...$0.00 (50% less)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-sonnet-5

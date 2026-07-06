@@ -51,7 +51,7 @@ JSON export.
 | `totalTokens` | TokenUsage | Attributed token totals. |
 | `sessionTotalTokens` | TokenUsage | Adapter-reported session totals (the only real number for Cursor). |
 | `wasteLines` | array | Fired waste findings; see WasteLine. |
-| `caveats` | array | Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier`) + `text`. Never affects `$` itself. Empty when nothing to flag. |
+| `caveats` | array | Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier` \| `dropped-transcript-records` \| `partial-priced-coverage`) + `text`. Never affects `$` itself. Empty when nothing to flag. |
 | `budget` | array (optional) | Advisory budget lines (SPEC-0009); present only when `~/.aireceipts/budget.json` is configured. |
 | `priceDelta` | PriceDelta \| null | Cheapest-current-model arithmetic, or null in tokens-only mode. |
 | `methodology` | string | The attribution methodology string (I3). |
@@ -166,7 +166,10 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 | `totals` | object | `tokens` (TokenUsage object) + `turnCount` + `toolCallCount`. |
 | `turnCount` | number | (totals) Assistant turns in the session. |
 | `toolCallCount` | number | (totals) Tool calls in the session. |
-| `wasteLines` | array | Same WasteLine union as the receipt. |
+| `wasteLines` | array | Same WasteLine union as the receipt, plus a per-line `rule` (SPEC-0059). |
+| `rule` | string \| null | (wasteLines) The class's fixed one-line next-time rule; `null` for a class without one. |
+| `couldHaveSaved` | object | SPEC-0059: the extracted savings ceiling — `usd` (sum of priced waste lines, `null` when none priced), `tokens` (sum over all fired lines), `pctOfTotal`. Arithmetic, never a prediction. |
+| `pctOfTotal` | number \| null | (couldHaveSaved) `round(100 · usd / totalUsd)`; `null` without both dollar sides. |
 | `suggestions` | array | Standing-rule suggestion strings (SPEC-0013), possibly empty. |
 | `threshold` | number | The distinct-session recurrence threshold in effect. |
 | `coverage` | object | What the packet covers, checkably: `turns`, `toolCalls`, `compactions`, `wasteLines` (all numbers). |
@@ -176,6 +179,26 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 | `aggregates` | array | `{class, distinctSessionCount}` — exactly the waste classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent). |
 | `class` | string | (aggregates) Waste class name. |
 | `distinctSessionCount` | number | (aggregates) Distinct recent sessions the class fired in. |
+
+### Backfill envelope (`backfillJsonSchema`) — SPEC-0056
+
+`aireceipts backfill --json`: the bulk-sweep summary. Counts are honest per
+SPEC-0045 — degraded/unloadable sessions are counted in `loadFailureCount`, never
+silently dropped. `sessions` is one row per matched session (after
+`--since`/`--limit`), newest-first; rows also carry `source`, `sessionId`, `title`,
+`startedAtMs` with the same meanings as the handoff envelope above.
+
+| Field | Type | Notes |
+|---|---|---|
+| `schemaVersion` | number | Same envelope as receipt/compare/handoff. |
+| `discoveredCount` | number | Every discovered session summary, degraded ones included. |
+| `matchedCount` | number | After the `--since`/`--limit` filters. |
+| `loadFailureCount` | number | Honest per SPEC-0045, mode-dependent: on an `--out` run (loads attempted), degraded summaries plus failed loads; on a dry run only known-unreadable summaries — a lower bound (labelled `Known unreadable` in the text summary). |
+| `writtenCount` | number | Receipt files written this run; `0` without `--out`. |
+| `wroteFiles` | boolean | `true` only when `--out` wrote files. |
+| `sessions` | array | One row per matched session, newest-first. |
+| `fileName` | string \| null | (sessions) File written under `--out`, or `null` (dry run / load failed). |
+| `loadFailed` | boolean | (sessions) `true` when the session is known unreadable or (on an `--out` run) its load failed. |
 
 <!-- json-fields:end -->
 

@@ -57,6 +57,7 @@ describe("SPEC-0043 R9: docs parity", () => {
       "hasTrivialSpansWaste",
       "hasContextThrashWaste",
       "hasPriceDelta",
+      "detailsView",
       "turnCountBucket",
       "toolCallCountBucket",
       "receiptOrdinalBucket",
@@ -70,6 +71,7 @@ describe("SPEC-0043 R9: docs parity", () => {
       "commentResult",
       "artifactResult",
       "shareResult",
+      "handoffSectionIncluded",
       "result",
     ],
     hook_configured: ["operation", "promptOutcome", "result"],
@@ -88,9 +90,10 @@ describe("SPEC-0043 R9: docs parity", () => {
 });
 
 describe("SPEC-0043 R2: command enum", () => {
-  it("pins the 19 command files plus stats", () => {
+  it("pins the 20 command files plus stats", () => {
     expect([...COMMAND_VALUES].sort()).toEqual(
       [
+        "backfill",
         "benchmark",
         "check-budget",
         "compare",
@@ -175,6 +178,7 @@ describe("SPEC-0043 R1-R5: valid events pass their schema", () => {
         hasTrivialSpansWaste: false,
         hasContextThrashWaste: false,
         hasPriceDelta: true,
+        detailsView: false,
         turnCountBucket: "4-10",
         toolCallCountBucket: "11-50",
         receiptOrdinalBucket: "2-3",
@@ -191,6 +195,7 @@ describe("SPEC-0043 R1-R5: valid events pass their schema", () => {
         commentResult: "success",
         artifactResult: "success",
         shareResult: "skipped",
+        handoffSectionIncluded: true,
         result: "success",
       },
     ],

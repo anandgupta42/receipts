@@ -1,7 +1,7 @@
 // SPEC-0023 R4 — the multi-session comment body: marker-first, then a fenced
 // receipt rendered through the shared block interpreter: masthead + session
 // count, dotted per-session role/model rows, muted slice provenance, one
-// SUBAGENTS aggregate row per contributor (SPEC-0054 — the per-child breakdown
+// SUBAGENTS aggregate row per contributor (SPEC-0060 — the per-child breakdown
 // lives in the details table), separate priced/unpriced totals (I2/I3), and
 // the classic footer.
 import { describe, expect, it } from "vitest";
@@ -146,7 +146,7 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
       { name: "reviewer", usd: null, tokens: emptyUsage(), unreadable: true, filePath: "b" },
     ];
     const body = renderPrBody({ contributors: [builder({ usd: 1.5, subagents })], excludedCount: 0 });
-    // SPEC-0054 R1: ONE aggregate row in the fence — never per-child rows.
+    // SPEC-0060 R1: ONE aggregate row in the fence — never per-child rows.
     expect(body).toContain("SUBAGENTS (2)..............................$0.25");
     expect(body).not.toContain("tester · claude-opus-4-8");
     // parent $1.50 + tester $0.25 = $1.75; the unreadable child makes the
@@ -156,7 +156,7 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     expect(body).toContain("1 unreadable subagent not priced");
   });
 
-  it("SPEC-0054 R1/R2: the aggregate row sums the priced children and drawn rows sum to the total", () => {
+  it("SPEC-0060 R1/R2: the aggregate row sums the priced children and drawn rows sum to the total", () => {
     const subagents: SubagentRow[] = [
       { name: "verifier", model: "claude-fable-5", usd: 0.25, tokens: tokens(400), unreadable: false, filePath: "a" },
       { name: "searcher", model: "claude-fable-5", usd: 0.1, tokens: tokens(200), unreadable: false, filePath: "b" },
@@ -166,7 +166,7 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     expect(body).not.toContain("verifier");
     expect(body).toContain("TOTAL priced.................................$1.85");
     // Drawn `$` rows sum byte-exactly to the drawn total (SPEC-0044/B1 at the
-    // SPEC-0054 aggregate granularity).
+    // SPEC-0060 aggregate granularity).
     const fence = fencedLines(body);
     const rowDollars = fence
       .filter((l) => l.includes("$") && !l.includes("TOTAL"))
@@ -175,7 +175,7 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     expect(rowDollars.reduce((a, b) => a + b, 0)).toBeCloseTo(total, 10);
   });
 
-  it("SPEC-0054 R1: an all-unpriced subagent set renders a tokens aggregate, never `$`", () => {
+  it("SPEC-0060 R1: an all-unpriced subagent set renders a tokens aggregate, never `$`", () => {
     const subagents: SubagentRow[] = [
       { name: "a", usd: null, tokens: tokens(1000), unreadable: false, filePath: "a" },
       { name: "b", usd: null, tokens: tokens(500), unreadable: false, filePath: "b" },
@@ -344,7 +344,7 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     expect(body).not.toContain("<details>");
   });
 
-  it("SPEC-0054 R3: a detail entry's subagent table renders inside the section, under its receipt", () => {
+  it("SPEC-0060 R3: a detail entry's subagent table renders inside the section, under its receipt", () => {
     const table = subagentDetailsTable([
       { name: "verifier", model: "claude-fable-5", usd: 0.25, tokens: tokens(400), unreadable: false, filePath: "a" },
     ]);
@@ -357,7 +357,7 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     expect(body.indexOf("##### subagents (1)")).toBeLessThan(body.indexOf("</details>"));
   });
 
-  it("SPEC-0054 R5: no breakdown appears anywhere without details", () => {
+  it("SPEC-0060 R5: no breakdown appears anywhere without details", () => {
     const subagents: SubagentRow[] = [{ name: "verifier", usd: 0.25, tokens: tokens(400), unreadable: false, filePath: "a" }];
     const body = renderPrBody({ contributors: [builder({ subagents })], excludedCount: 0 });
     expect(body).toContain("SUBAGENTS (1)");
@@ -365,7 +365,7 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
   });
 });
 
-describe("SPEC-0054 R3 · subagentDetailsTable", () => {
+describe("SPEC-0060 R3 · subagentDetailsTable", () => {
   const row = (name: string, usd: number | null, over: Partial<SubagentRow> = {}): SubagentRow => ({
     name,
     model: "claude-fable-5",

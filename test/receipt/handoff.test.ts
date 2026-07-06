@@ -60,6 +60,7 @@ const stuckLoop: StuckLoopWasteLine = {
   usd: 0.5,
   tokens: usage(1000),
   wallClockMs: null,
+  turnIndices: [1, 2, 3, 4, 5],
 };
 const trivialSpans: TrivialSpansWasteLine = {
   kind: "trivial-spans",
@@ -135,24 +136,46 @@ describe("renderHandoff v2 (SPEC-0013 R3/R5)", () => {
     expect(renderHandoff(baseModel(), [])).toBe("nothing to hand off");
   });
 
-  it("R5: waste lines with no suggestions are byte-identical to the pre-spec block", () => {
+  it("SPEC-0059 R1: the waste body is the savings slip — headline, hedge, evidence + rule per class (golden)", () => {
     const model = baseModel({ title: "my session", wasteLines: [stuckLoop, trivialSpans] });
+    // ≈-hedge: a trivial-spans estimate contributes; no percent: totalUsd null.
     const expected = [
       "handoff: my session",
-      "- Bash loop ×5: $0.50",
-      "- ≈ re-priced eligible trivial spans: $0.02 (4 turns → a cheaper model)",
+      "--------------------------------------------------",
+      "COULD HAVE SAVED...........................≤ $0.52",
+      "  ≈ arithmetic, not a prediction",
+      "",
+      "⚠ Bash loop ×5...............................$0.50",
+      "  at turns 2-6",
+      "  → change or stop after two identical failures",
+      "≈ re-priced eligible trivial spans...........$0.02",
+      "  (4 tiny turns, priced at a cheaper model)",
+      "  → route short replies to a cheaper model",
     ].join("\n");
     expect(renderHandoff(model)).toBe(expected);
     expect(renderHandoff(model, [])).toBe(expected);
   });
 
-  it("R3: a trailing, clearly-labeled suggestion section is appended after the waste block", () => {
+  it("SPEC-0059 R1: every slip line fits the receipt's 50-column width", () => {
+    const model = baseModel({ title: "my session", wasteLines: [stuckLoop, trivialSpans] });
+    for (const line of renderHandoff(model).split("\n")) {
+      expect([...line].length).toBeLessThanOrEqual(50);
+    }
+  });
+
+  it("R3: a trailing, clearly-labeled suggestion section is appended after the slip", () => {
     const model = baseModel({ title: "my session", wasteLines: [stuckLoop] });
     const out = renderHandoff(model, [STUCK_LOOP_LINE]);
     expect(out).toBe(
       [
         "handoff: my session",
-        "- Bash loop ×5: $0.50",
+        "--------------------------------------------------",
+        "COULD HAVE SAVED...........................≤ $0.50",
+        "  arithmetic, not a prediction",
+        "",
+        "⚠ Bash loop ×5...............................$0.50",
+        "  at turns 2-6",
+        "  → change or stop after two identical failures",
         "",
         "suggested CLAUDE.md rules (recurring across recent sessions — paste manually):",
         `- ${STUCK_LOOP_LINE}`,

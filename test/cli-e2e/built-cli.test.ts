@@ -248,6 +248,27 @@ describe("built CLI e2e", () => {
     expect(result.stdout).not.toContain("buy me a samosa");
   });
 
+  // SPEC-0054 R9 e2e: `--details` through real argv parsing renders the
+  // DETAILS section byte-identically to its committed golden; the R6 template
+  // guard fires before any session work.
+  it("renders the --details section from a sandboxed fixture home, matching the committed golden", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "clean-multi-tool-2-models.jsonl");
+
+    const result = await runCli(["--details"], home);
+    expectSuccess(result);
+    const golden = await readFile(path.join(repoRoot, "goldens", "claude-code-clean-multi-tool-2-models-details.txt"), "utf8");
+    expect(result.stdout).toBe(golden);
+
+    const guarded = await runCli(["--details", "--template", "grocery"], home);
+    expect(guarded.code).toBe(1);
+    expect(guarded.stderr).toContain("--details supports the classic template only");
+
+    const classic = await runCli(["--details", "--template", "classic"], home);
+    expectSuccess(classic);
+    expect(classic.stdout).toContain("DETAILS");
+  });
+
   // SPEC-0044 A3 (e2e through the real built CLI, not just runPr): the caveat
   // is row-aware, not usage-only — it fires only when the vendor's price row
   // doesn't cite a cache-write rate, so the fallback to base `input` actually
@@ -488,6 +509,7 @@ describe("built CLI e2e", () => {
       "durationMs",
       "totals",
       "wasteLines",
+      "couldHaveSaved",
       "suggestions",
       "threshold",
       "coverage",
@@ -499,6 +521,9 @@ describe("built CLI e2e", () => {
     expect(textRun.code, textRun.stderr).toBe(0);
     expect(textRun.stdout).toContain("handoff: ");
     expect(textRun.stdout).toContain("total $");
+    // SPEC-0059 R1/R3 — the slip headline and the class's rule line ride the packet.
+    expect(textRun.stdout).toContain("COULD HAVE SAVED");
+    expect(textRun.stdout).toContain("→ change or stop after two identical failures");
     expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
   });
 

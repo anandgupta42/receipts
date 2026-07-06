@@ -22,6 +22,7 @@ async function run(ctx: CommandContext): Promise<number> {
         template: "none",
         turnCount: result.receipt.turnCount,
         toolCallCount: result.receipt.toolCallCount,
+        detailsView: false,
       }),
       "pr",
     );
@@ -35,6 +36,7 @@ async function run(ctx: CommandContext): Promise<number> {
     commentResult: result.commentResult,
     artifactResult: result.artifactResult,
     shareResult: result.shareResult,
+    handoffSectionIncluded: result.handoffSectionIncluded,
     result: result.result,
   });
   if (result.commentResult === "success") {

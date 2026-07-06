@@ -1,12 +1,12 @@
 ---
-id: SPEC-0054
+id: SPEC-0060
 title: "PR-comment subagent rollup — one aggregate row in the fence, the breakdown in details"
 status: building
 milestone: M5
 depends: [SPEC-0026, SPEC-0044]
 ---
 
-# SPEC-0054: PR-comment subagent rollup — one aggregate row in the fence, the breakdown in details
+# SPEC-0060: PR-comment subagent rollup — one aggregate row in the fence, the breakdown in details
 
 ## Purpose
 

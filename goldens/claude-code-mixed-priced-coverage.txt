@@ -1,0 +1,18 @@
+- - - - - - - - - - - - - - - - - - - - - - - - -
+                    AIRECEIPTS                    
+ “Read the config file and then run the linter.”  
+ Claude Code · Jun 20 2026 10:00:00 UTC · 1m 50s  
+  claude-opus-4-legacy 78% · claude-opus-4-8 22%  
+
+Read...............................$0.01  (1 call)
+(thinking/reply)...............2,335 tok  (1 turn)
+Bash...........................2,160 tok  (1 call)
+
+caveat: 2 of 3 turns unpriced — TOTAL excludes their tokens
+--------------------------------------------------
+TOTAL........................................$0.01
+same tokens on claude-haiku-4-5...$0.01 (12% less)
+  (arithmetic, not a prediction)
+- - - - - - - - - - - - - - - - - - - - - - - - -
+     aireceipts · local · npx aireceipts-cli      
+- - - - - - - - - - - - - - - - - - - - - - - - -

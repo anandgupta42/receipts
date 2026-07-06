@@ -17,6 +17,7 @@ export const OS_VALUES = ["darwin", "linux", "win32", "other"] as const;
 export type OsValue = (typeof OS_VALUES)[number];
 
 export const COMMAND_VALUES = [
+  "backfill",
   "benchmark",
   "check-budget",
   "compare",
@@ -84,10 +85,10 @@ export type OutputModeValue = (typeof OUTPUT_MODE_VALUES)[number];
 export const RECEIPT_SURFACE_VALUES = ["receipt", "compare", "mini", "pr"] as const;
 export type ReceiptSurfaceValue = (typeof RECEIPT_SURFACE_VALUES)[number];
 
-export const EXPORT_SURFACE_VALUES = ["receipt", "compare", "week", "list", "pr"] as const;
+export const EXPORT_SURFACE_VALUES = ["receipt", "compare", "week", "list", "pr", "backfill"] as const;
 export type ExportSurfaceValue = (typeof EXPORT_SURFACE_VALUES)[number];
 
-export const EXPORT_FORMAT_VALUES = ["json", "csv_session", "csv_tool", "svg", "png", "markdown", "html"] as const;
+export const EXPORT_FORMAT_VALUES = ["json", "csv_session", "csv_tool", "svg", "png", "markdown", "html", "text"] as const;
 export type ExportFormatValue = (typeof EXPORT_FORMAT_VALUES)[number];
 
 export const TEMPLATE_TELEMETRY_VALUES = [...TEMPLATE_NAMES, "none"] as const;
@@ -197,6 +198,8 @@ export const receiptGeneratedPropertiesSchema = z
     hasTrivialSpansWaste: z.boolean(),
     hasContextThrashWaste: z.boolean(),
     hasPriceDelta: z.boolean(),
+    /** SPEC-0054 R8 — the receipt rendered with the opt-in `--details` section (boolean, never content). */
+    detailsView: z.boolean(),
     turnCountBucket: z.enum(COUNT_BUCKET_VALUES),
     toolCallCountBucket: z.enum(COUNT_BUCKET_VALUES),
     receiptOrdinalBucket: z.enum(ORDINAL_BUCKET_VALUES),
@@ -223,6 +226,8 @@ export const prFlowCompletedPropertiesSchema = z
     commentResult: z.enum(STEP_RESULT_VALUES),
     artifactResult: z.enum(STEP_RESULT_VALUES),
     shareResult: z.enum(STEP_RESULT_VALUES),
+    /** SPEC-0059 R8 — the body carried the handoff section (rendering rate, never engagement). */
+    handoffSectionIncluded: z.boolean(),
     result: z.enum(RESULT_VALUES),
   })
   .strict();

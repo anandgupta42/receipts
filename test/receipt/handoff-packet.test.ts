@@ -11,7 +11,7 @@ import type { ReceiptModel, WasteLine } from "../../src/receipt/model.js";
 
 const usage = (input: number) => ({ input, output: 0, cacheRead: 0, cacheCreation: 0, total: input });
 
-const stuckLoop: WasteLine = { kind: "stuck-loop", tool: "Bash", runLength: 5, usd: 0.08, tokens: usage(1000), wallClockMs: 225_000 };
+const stuckLoop: WasteLine = { kind: "stuck-loop", tool: "Bash", runLength: 5, usd: 0.08, tokens: usage(1000), wallClockMs: 225_000, turnIndices: [1, 2, 3, 4, 5] };
 
 function model(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
   return {
@@ -39,7 +39,7 @@ function model(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
 const counts: HandoffCounts = { turns: 6, toolCalls: 5, compactions: 2 };
 
 describe("SPEC-0042 R1 — state header", () => {
-  it("renders header lines in fixed order before the bullets and closes with coverage", () => {
+  it("renders header lines in fixed order before the slip and closes with coverage (SPEC-0059 R1/R4 layout)", () => {
     const out = renderHandoff(model(), [], counts);
     expect(out.split("\n")).toEqual([
       "handoff: Fix the flaky login test",
@@ -47,7 +47,13 @@ describe("SPEC-0042 R1 — state header", () => {
       "claude-opus-4-8 100%",
       "total $0.09 · 6 turns · 5 tool calls",
       "compactions: 2",
-      "- Bash loop ×5: $0.08, 3m 45s wall-clock",
+      "--------------------------------------------------",
+      "COULD HAVE SAVED...........................≤ $0.08",
+      "  89% of $0.09 · arithmetic, not a prediction",
+      "",
+      "⚠ Bash loop ×5......................$0.08 (3m 45s)",
+      "  at turns 2-6",
+      "  → change or stop after two identical failures",
       "",
       "covers: 6 turns · 5 tool calls · 2 compactions · 1 waste line",
     ]);
@@ -55,7 +61,7 @@ describe("SPEC-0042 R1 — state header", () => {
 
   it("omits the model-mix line when empty and the compaction line when zero", () => {
     const out = renderHandoff(model({ modelMix: [] }), [], { ...counts, compactions: 0 });
-    expect(out).not.toContain("%");
+    expect(out).not.toContain("claude-opus-4-8");
     expect(out).not.toContain("compactions:");
     expect(out).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
   });
@@ -81,11 +87,17 @@ describe("SPEC-0042 R6 — SPEC-0013 contracts preserved byte-for-byte", () => {
     expect(renderHandoff(noWaste, [], counts)).toBe("nothing to hand off");
   });
 
-  it("waste without counts renders the pre-packet block (no header, no coverage)", () => {
+  it("waste without counts renders the slip with no header and no coverage", () => {
     const out = renderHandoff(model(), []);
     expect(out.split("\n")).toEqual([
       "handoff: Fix the flaky login test",
-      "- Bash loop ×5: $0.08, 3m 45s wall-clock",
+      "--------------------------------------------------",
+      "COULD HAVE SAVED...........................≤ $0.08",
+      "  89% of $0.09 · arithmetic, not a prediction",
+      "",
+      "⚠ Bash loop ×5......................$0.08 (3m 45s)",
+      "  at turns 2-6",
+      "  → change or stop after two identical failures",
     ]);
   });
 });
@@ -107,6 +119,7 @@ describe("SPEC-0042 R3/R4 — machine-readable packet", () => {
       "durationMs",
       "totals",
       "wasteLines",
+      "couldHaveSaved",
       "suggestions",
       "threshold",
       "coverage",

@@ -20,6 +20,8 @@ export interface RenderOptions {
   width?: number;
   /** SPEC-0020: which template to render (default `classic`). */
   template?: TemplateName;
+  /** SPEC-0054 R4/R7 — render the opt-in DETAILS section (`classic` only; the CLI guards other templates). */
+  details?: boolean;
 }
 
 export interface RenderBlockOptions {
@@ -119,7 +121,7 @@ export function renderBlockLines(blocks: Block[], opts: RenderBlockOptions = {})
 
 /** Renders `model` as an array of lines (no trailing newline join) at a fixed width, so `compare.ts` can zip two receipts side by side. */
 export function renderReceiptLines(model: ReceiptModel, opts: RenderOptions = {}): string[] {
-  const { blocks } = buildReceiptView(model, opts.template ?? "classic");
+  const { blocks } = buildReceiptView(model, opts.template ?? "classic", { details: opts.details });
   return renderBlockLines(blocks, opts);
 }
 

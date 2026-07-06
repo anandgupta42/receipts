@@ -11,7 +11,7 @@
   (3 tiny turns, priced at gpt-5.4-mini)
 --------------------------------------------------
 TOTAL........................................$0.00
-same tokens on gpt-5.4-mini..................$0.00
+same tokens on gpt-5.4-mini.......$0.00 (65% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      

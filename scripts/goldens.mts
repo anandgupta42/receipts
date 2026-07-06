@@ -104,6 +104,13 @@ for (const template of ["grocery", "datavis"] as const) {
   check(`goldens/svg/${stem}-${template}-light.svg`, renderReceiptSvg(pricedModel, { theme: "light", template }));
 }
 
+// SPEC-0054 R9: the opt-in DETAILS view — the priced fixture (composition,
+// counterfactual, BY MODEL) and the loop fixture (waste + details together) in
+// terminal form, plus one SVG parity artifact for the priced fixture.
+check(`goldens/${stem}-details.txt`, renderReceipt(pricedModel, { color: false, details: true }) + "\n");
+check(`goldens/${LOOP.source}-${nameOf(LOOP.path)}-details.txt`, renderReceipt(loopModel, { color: false, details: true }) + "\n");
+check(`goldens/svg/${stem}-details-light.svg`, renderReceiptSvg(pricedModel, { theme: "light", details: true }));
+
 // Hostile fixtures are a visual-regression battery: every one renders through
 // every receipt template in both terminal and SVG form, not only the default
 // classic text path the eval corpus already covers.
