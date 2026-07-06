@@ -309,6 +309,7 @@ footer{
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
+        <li><a href="15-integrations.html">Choose an integration</a></li>
       </ul>
       <p class="toc-section">Reference</p>
       <ul>
@@ -341,6 +342,7 @@ footer{
   <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.</li>
   <li><strong>Pseudonymous install identity</strong>: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete <code>~/.aireceipts/state.json</code> to reset it.</li>
   <li><strong>Disable anytime</strong>: <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code>. Either one results in <strong>zero network calls</strong> and prevents install-id creation on a fresh install.</li>
+  <li><strong>Off by default in CI</strong>: when <code>CI</code> or <code>GITHUB_ACTIONS</code> is set, telemetry defaults to disabled — no separate opt-out needed. Set <code>AIRECEIPTS_TELEMETRY=on</code> to opt a CI environment back in; the kill switches above still win over that.</li>
   <li><strong>Inspect before you decide</strong>: <code>aireceipts --telemetry-show</code> prints exactly what the current run would send, and sends nothing.</li>
   <li><strong>Bounded and fail-safe</strong>: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code.</li>
 </ul>
@@ -357,11 +359,11 @@ footer{
     <tr><td><code>cliVersion</code></td><td>string</td><td>semver</td><td>From this package's <code>package.json</code>.</td></tr>
     <tr><td><code>os</code></td><td>enum</td><td><code>darwin</code> | <code>linux</code> | <code>win32</code> | <code>other</code></td><td>Collapsed from <code>process.platform</code>.</td></tr>
     <tr><td><code>nodeMajor</code></td><td>integer</td><td>e.g. <code>22</code></td><td>Major Node version only.</td></tr>
-    <tr><td><code>commandClass</code></td><td>enum</td><td><code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>handoff</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
+    <tr><td><code>commandClass</code></td><td>enum</td><td><code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>demo</code> | <code>handoff</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>version</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
     <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td>Which agent format was parsed, if known.</td></tr>
     <tr><td><code>durationBucket</code></td><td>enum</td><td><code>&lt;100ms</code> | <code>100-500ms</code> | <code>500ms-2s</code> | <code>2-10s</code> | <code>&gt;10s</code></td><td>Coarse bucket; never raw milliseconds.</td></tr>
     <tr><td><code>ok</code></td><td>boolean</td><td></td><td>Whether the command returned exit code 0.</td></tr>
-    <tr><td><code>isCI</code></td><td>boolean</td><td></td><td>True when <code>CI</code> or <code>GITHUB_ACTIONS</code> is set and not false.</td></tr>
+    <tr><td><code>isCI</code></td><td>boolean</td><td></td><td>True when <code>CI</code> or <code>GITHUB_ACTIONS</code> is set and not false. Note: telemetry is disabled by default in CI (see Kill switches below), so this field is <code>true</code> only on the runs where <code>AIRECEIPTS_TELEMETRY=on</code> explicitly re-enabled it.</td></tr>
     <tr><td><code>installHash</code></td><td>string</td><td>64-hex sha256 or <code>unavailable</code></td><td>Salted hash of the random local install id; raw id never leaves disk.</td></tr>
     <tr><td><code>runOrdinalBucket</code></td><td>enum</td><td><code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code> | <code>unavailable</code></td><td>Lifetime run ordinal bucket; never the raw count.</td></tr>
     <tr><td><code>handoffFormat</code></td><td>enum (optional)</td><td><code>text</code> | <code>json</code></td><td>SPEC-0042: emission mode, present only on handoff-command runs — never content.</td></tr>
@@ -374,7 +376,7 @@ footer{
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>errorClass</code></td><td>enum</td><td><code>parse_error</code> | <code>io_error</code> | <code>network_error</code> | <code>validation_error</code> | <code>unknown_error</code></td><td>Derived from bounded error metadata; never <code>error.message</code>.</td></tr>
-    <tr><td><code>command</code></td><td>enum</td><td>same 18-command enum as <code>cli_run.commandClass</code></td><td>Never raw argv.</td></tr>
+    <tr><td><code>command</code></td><td>enum</td><td>same 19-command enum as <code>cli_run.commandClass</code></td><td>Never raw argv.</td></tr>
     <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td></td></tr>
     <tr><td><code>inPackage</code></td><td>boolean</td><td></td><td>Whether the top stack frame is inside aireceipts; the stack text never leaves the process.</td></tr>
   </tbody>
@@ -469,7 +471,7 @@ footer{
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>milestone</code></td><td>enum</td><td><code>first_run</code> | <code>first_receipt</code> | <code>third_receipt</code> | <code>tenth_receipt</code> | <code>first_export</code> | <code>first_compare</code> | <code>first_week</code> | <code>first_hook_install</code> | <code>first_pr</code> | <code>first_pr_post</code> | <code>first_artifact</code></td><td></td></tr>
-    <tr><td><code>command</code></td><td>enum</td><td>same 18-command enum as <code>cli_run.commandClass</code></td><td>Command that caused the milestone.</td></tr>
+    <tr><td><code>command</code></td><td>enum</td><td>same 19-command enum as <code>cli_run.commandClass</code></td><td>Command that caused the milestone.</td></tr>
     <tr><td><code>installAgeBucket</code></td><td>enum</td><td><code>first_day</code> | <code>2-7d</code> | <code>8-30d</code> | <code>31-90d</code> | <code>&gt;90d</code> | <code>unavailable</code></td><td>Derived locally from <code>firstRunAt</code>; raw date is not sent.</td></tr>
   </tbody>
 </table></div>
@@ -521,6 +523,14 @@ footer{
 # or: AIRECEIPTS_TELEMETRY=0 / AIRECEIPTS_TELEMETRY=false (case-insensitive)
 
 DO_NOT_TRACK=1 aireceipts ...</code></pre>
+
+<h3 id="ci-default-off">CI default-off</h3>
+
+<p>Telemetry also defaults to disabled whenever <code>CI</code> or <code>GITHUB_ACTIONS</code> is set (the same detection used for the <code>isCI</code> field above) — a fleet of automated runs should not silently dwarf human usage in the data, and CI shouldn't need a separate manual opt-out. This is a default, not a third kill switch: an explicit override re-enables it —</p>
+
+<pre class="doc-code"><code class="language-bash">AIRECEIPTS_TELEMETRY=on aireceipts ...   # re-enables telemetry even when CI/GITHUB_ACTIONS is set</code></pre>
+
+<p>Precedence is: <code>AIRECEIPTS_TELEMETRY=off</code>/<code>DO_NOT_TRACK=1</code> (always win) → CI default-off (unless explicitly overridden with <code>on</code>) → the connection-string checks below. Outside CI, behavior is unchanged.</p>
 
 <h2 id="inspecting-what-would-be-sent">Inspecting what would be sent</h2>
 

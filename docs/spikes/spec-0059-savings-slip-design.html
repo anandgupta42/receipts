@@ -1,0 +1,366 @@
+<title>The savings slip — final handoff section design</title>
+<style>
+  :root {
+    --desk: #eae6dd;
+    --ink: #23201a;
+    --muted: #6e6857;
+    --card: #f4f1e9;
+    --line: #d8d2c4;
+    --accent: #b4551d;
+    --good: #4a6b3a;
+    --shadow: 0 1px 2px rgba(35, 32, 26, 0.10), 0 6px 18px rgba(35, 32, 26, 0.08);
+    --gh-canvas: #ffffff;
+    --gh-border: #d0d7de;
+    --gh-ink: #1f2328;
+    --gh-muted: #59636e;
+    --gh-fence: #f6f8fa;
+    --gh-link: #0969da;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --desk: #191712;
+      --ink: #e8e3d6;
+      --muted: #9a937f;
+      --card: #211e18;
+      --line: #37332a;
+      --accent: #d98545;
+      --good: #8fb377;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.45);
+      --gh-canvas: #0d1117;
+      --gh-border: #30363d;
+      --gh-ink: #e6edf3;
+      --gh-muted: #8d96a0;
+      --gh-fence: #161b22;
+      --gh-link: #4493f8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --desk: #191712;
+    --ink: #e8e3d6;
+    --muted: #9a937f;
+    --card: #211e18;
+    --line: #37332a;
+    --accent: #d98545;
+    --good: #8fb377;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.45);
+    --gh-canvas: #0d1117;
+    --gh-border: #30363d;
+    --gh-ink: #e6edf3;
+    --gh-muted: #8d96a0;
+    --gh-fence: #161b22;
+    --gh-link: #4493f8;
+  }
+  :root[data-theme="light"] {
+    --desk: #eae6dd;
+    --ink: #23201a;
+    --muted: #6e6857;
+    --card: #f4f1e9;
+    --line: #d8d2c4;
+    --accent: #b4551d;
+    --good: #4a6b3a;
+    --shadow: 0 1px 2px rgba(35, 32, 26, 0.10), 0 6px 18px rgba(35, 32, 26, 0.08);
+    --gh-canvas: #ffffff;
+    --gh-border: #d0d7de;
+    --gh-ink: #1f2328;
+    --gh-muted: #59636e;
+    --gh-fence: #f6f8fa;
+    --gh-link: #4493f8;
+  }
+  :root[data-theme="light"] { --gh-link: #0969da; }
+
+  body {
+    background: var(--desk);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    line-height: 1.55;
+    margin: 0;
+    padding: 48px 24px 72px;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  header.masthead { max-width: 64ch; margin-bottom: 36px; }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: clamp(21px, 3.2vw, 28px);
+    font-weight: 700;
+    line-height: 1.28;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .lede { color: var(--muted); margin: 0; }
+
+  h2 {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 16px;
+    margin: 0 0 14px;
+  }
+
+  /* hero: comment + anatomy */
+  .hero { display: grid; grid-template-columns: minmax(0, max-content) minmax(240px, 1fr); gap: 28px; align-items: start; margin-bottom: 56px; }
+  @media (max-width: 820px) { .hero { grid-template-columns: 1fr; } }
+
+  .gh-frame {
+    background: var(--gh-canvas);
+    border: 1px solid var(--gh-border);
+    border-radius: 8px;
+    color: var(--gh-ink);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+    font-size: 14px;
+  }
+  .gh-crop { color: var(--gh-muted); font-size: 13px; margin: 0 0 8px; }
+  details.gh-details { margin-top: 4px; }
+  details.gh-details > summary {
+    cursor: pointer;
+    font-weight: 600;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    width: max-content;
+    max-width: 100%;
+    padding: 2px 4px 2px 2px;
+  }
+  details.gh-details > summary::-webkit-details-marker { display: none; }
+  details.gh-details > summary::before { content: "▸"; font-size: 12px; color: var(--gh-muted); }
+  details.gh-details[open] > summary::before { content: "▾"; }
+  details.gh-details > summary:hover { color: var(--gh-link); }
+  .gh-details-inner { padding: 10px 0 4px; }
+
+  .gh-fence {
+    background: var(--gh-fence);
+    border-radius: 6px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    position: relative;
+  }
+  .gh-fence pre {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.6;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+    /* .ln spans are display:block; collapse the source newlines between them
+       so each line renders exactly once (pre would add a second line box). */
+    white-space: normal;
+  }
+  .gh-fence .copy {
+    position: absolute; top: 8px; right: 8px;
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    background: var(--gh-canvas);
+    color: var(--gh-muted);
+    font-size: 12px;
+    padding: 3px 7px;
+    line-height: 1;
+  }
+  .ln { display: block; white-space: pre; }
+  .ln.dim { color: var(--gh-muted); }
+  .ln.big { font-weight: 700; }
+  .ln.rule { color: var(--accent); }
+  .ln .mk {
+    display: inline-block;
+    margin-left: 12px;
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    user-select: none;
+  }
+  .hero .gh-fence { padding-right: 52px; }
+
+  .anatomy { display: flex; flex-direction: column; gap: 12px; font-size: 13.5px; padding-top: 6px; }
+  .anatomy .a { display: flex; gap: 10px; align-items: baseline; }
+  .anatomy .n {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 12px;
+    flex: none;
+    width: 2ch;
+  }
+  .anatomy b { font-weight: 650; }
+  .anatomy .src {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+  .src.ext { background: var(--card); border: 1px solid var(--line); color: var(--good); }
+  .src.tpl { background: var(--card); border: 1px solid var(--line); color: var(--accent); }
+
+  /* states + parity */
+  .states { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 24px; margin-bottom: 56px; }
+  .states .gh-fence pre { font-size: 11px; }
+  .state h3 {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.09em;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 0 0 10px;
+  }
+  .state .gh-frame { padding: 12px 14px; }
+  .state .note { color: var(--muted); font-size: 13px; margin: 10px 0 0; }
+
+  section.parity { margin-bottom: 56px; }
+  .parity-grid { display: grid; grid-template-columns: minmax(0, max-content) minmax(240px, 1fr); gap: 28px; align-items: start; }
+  @media (max-width: 820px) { .parity-grid { grid-template-columns: 1fr; } }
+  .parity p { margin: 0 0 12px; font-size: 14px; }
+
+  section.notes { max-width: 64ch; }
+  .notes p { margin: 0 0 12px; }
+  .notes .small { color: var(--muted); font-size: 13.5px; }
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.92em;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0 4px;
+  }
+  footer {
+    margin-top: 56px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--line);
+    color: var(--muted);
+    font-size: 12.5px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (max-width: 480px) { body { padding: 32px 12px 56px; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">aireceipts · the design · round 4</p>
+    <h1>The savings slip</h1>
+    <p class="lede">One 9-line block, set entirely in the receipt's own idiom: the savings headline
+      is typeset like the receipt's <code>TOTAL</code> line, and every waste line carries its fix
+      directly underneath as a one-line <code>→</code> rule. No second fence, no prose paragraphs.
+      All lines are exactly 50 columns, verified.</p>
+  </header>
+
+  <div class="hero">
+    <div>
+      <div class="gh-frame">
+        <p class="gh-crop">…mini receipt + ▸ full receipts (2 sessions), both unchanged…</p>
+        <details class="gh-details" open>
+          <summary>handoff — could have saved ≤ $0.46 (16%)</summary>
+          <div class="gh-details-inner">
+            <div class="gh-fence"><span class="copy">⧉</span><pre><span class="ln big">COULD HAVE SAVED...........................≤ $0.46<span class="mk">①</span></span>
+<span class="ln dim">  ≈ 16% of $2.84 · arithmetic, not a prediction<span class="mk">②</span></span>
+<span class="ln"> </span>
+<span class="ln">⚠ Bash loop ×4 · 2m 10s......................$0.41<span class="mk">③</span></span>
+<span class="ln rule">  → change or stop after two identical failures<span class="mk">④</span></span>
+<span class="ln">≈ trivial turns ×8 on gpt-5.5................$0.05</span>
+<span class="ln rule">  → route short replies to a cheaper model</span>
+<span class="ln"> </span>
+<span class="ln dim">covers 2 sessions · 18 turns · 2 waste lines<span class="mk">⑤</span></span></pre></div>
+          </div>
+        </details>
+      </div>
+    </div>
+    <div class="anatomy">
+      <h2>Anatomy</h2>
+      <div class="a"><span class="n">①</span><span><b>Headline</b> — caps + dotted leaders + right-aligned amount, the receipt's <code>TOTAL</code> voice. The <code>≤</code> makes it a ceiling. Same string becomes the collapsed summary row, so the answer shows before any click.<span class="src ext">extracted</span></span></div>
+      <div class="a"><span class="n">②</span><span><b>Hedge</b> — the receipt's existing "arithmetic, not a prediction" idiom, plus the share of total. One muted line, I3-honest.<span class="src ext">extracted</span></span></div>
+      <div class="a"><span class="n">③</span><span><b>Evidence line</b> — waste class, run length, wall clock, dollars, cost-descending — prefixed with the main receipt's own waste glyph (<code>⚠</code> loops, <code>≈</code> repriced spans) so slip and receipt visibly rhyme.<span class="src ext">extracted</span></span></div>
+      <div class="a"><span class="n">④</span><span><b>Rule line</b> — the fix, one line, arrow-prefixed, keyed to the waste class. Fixed strings compressed from SPEC-0013's templates; banned-phrase tested; never model-generated.<span class="src tpl">static template</span></span></div>
+      <div class="a"><span class="n">⑤</span><span><b>Covers footer</b> — what the slip accounts for (SPEC-0042's honesty line, compacted to one line).<span class="src ext">extracted</span></span></div>
+    </div>
+  </div>
+
+  <h2>States</h2>
+  <div class="states">
+    <div class="state">
+      <h3>Collapsed (default)</h3>
+      <div class="gh-frame">
+        <details class="gh-details">
+          <summary>handoff — could have saved ≤ $0.46 (16%)</summary>
+          <div class="gh-details-inner"><p class="gh-crop">…slip…</p></div>
+        </details>
+      </div>
+      <p class="note">The dollars do the talking in the summary row — most readers never need to expand.</p>
+    </div>
+    <div class="state">
+      <h3>One waste line</h3>
+      <div class="gh-frame">
+        <div class="gh-fence"><span class="copy">⧉</span><pre><span class="ln big">COULD HAVE SAVED...........................≤ $0.41</span>
+<span class="ln dim">  14% of $2.84 · arithmetic, not a prediction</span>
+<span class="ln"> </span>
+<span class="ln">⚠ Bash loop ×4 · 2m 10s......................$0.41</span>
+<span class="ln rule">  → change or stop after two identical failures</span>
+<span class="ln"> </span>
+<span class="ln dim">covers 2 sessions · 18 turns · 1 waste line</span></pre></div>
+      </div>
+      <p class="note">Scales down to 7 lines; never pads.</p>
+    </div>
+    <div class="state">
+      <h3>Clean PR</h3>
+      <div class="gh-frame">
+        <p class="gh-crop" style="margin:0">…mini receipt + ▸ full receipts (2 sessions)…</p>
+      </div>
+      <p class="note">No waste → no row. The comment is byte-identical to today's. An absent slip is the good outcome, not a missing feature.</p>
+    </div>
+  </div>
+
+  <section class="parity">
+    <h2>Same slip, local terminal</h2>
+    <div class="parity-grid">
+      <div class="gh-fence"><pre><span class="ln dim">$ aireceipts --handoff</span>
+<span class="ln">handoff: Add day-1 setup integrations</span>
+<span class="ln">Codex · Jul 4 2026 18:12:09 UTC · 5m 02s</span>
+<span class="ln">gpt-5.5 100%</span>
+<span class="ln">--------------------------------------------------</span>
+<span class="ln big">COULD HAVE SAVED...........................≤ $0.46</span>
+<span class="ln dim">  ≈ 16% of $2.84 · arithmetic, not a prediction</span>
+<span class="ln"> </span>
+<span class="ln">⚠ Bash loop ×4 · 2m 10s......................$0.41</span>
+<span class="ln rule">  → change or stop after two identical failures</span>
+<span class="ln">≈ trivial turns ×8 on gpt-5.5................$0.05</span>
+<span class="ln rule">  → route short replies to a cheaper model</span>
+<span class="ln"> </span>
+<span class="ln dim">covers: 18 turns · 26 tool calls · 1 compaction ·</span>
+<span class="ln dim">2 waste lines</span></pre></div>
+      <div>
+        <p>The slip is a renderer, not a PR feature: <code>--handoff</code> gains it between its
+          header and <code>covers:</code> line, and the PR section embeds the identical output.
+          One code path — the two surfaces cannot drift (the same discipline
+          <code>handoff.ts</code> already applies to waste-line wording).</p>
+        <p>Where the slip follows other content — here, the handoff header — it opens with the
+          receipt's 50-dash rule, the same seam the receipt draws before <code>TOTAL</code>.
+          Standalone in the PR fence, the headline opens directly.</p>
+        <p>Pasted into an agent's next prompt, the slip reads as instructions with receipts
+          attached: each <code>→</code> rule sits directly under the dollars that justify it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="notes">
+    <h2>Rule-line strings (the full static set)</h2>
+    <p>One per waste class, fixed in-spec, ≤ 48 characters so they never wrap:</p>
+    <p><code>stuck-loop</code> → change or stop after two identical failures<br>
+       <code>trivial-spans</code> → route short replies to a cheaper model<br>
+       <code>context-thrash</code> → clear or split context at task boundaries</p>
+    <p class="small">The context-thrash string is SPEC-0017's existing suggestion verbatim; the other
+      two are one-line compressions of SPEC-0013's templates (the long forms stay in the standing-rule
+      section, which remains behind the 3-session recurrence gate). Spec checklist: shared renderer in
+      <code>src/receipt/handoff.ts</code>; banned-phrase test coverage for the new strings; section
+      omitted when no waste fired and under <code>--no-details</code>; SPEC-0027 HTML-artifact parity;
+      SPEC-0043 telemetry event; spec id claimed against main + open PRs.</p>
+  </section>
+
+  <footer>all block lines verified at 50 columns · dollars illustrative (PR #119's sessions) · every string extracted or static — no model calls (I1)</footer>
+</div>

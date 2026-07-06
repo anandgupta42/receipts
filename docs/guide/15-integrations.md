@@ -40,6 +40,9 @@ path, scope, and whether network is involved. Assistant recipes are intentionall
 thin: they tell the assistant to run the CLI. They do not duplicate parsing,
 pricing, attribution, or PR policy.
 
+Per-agent pages — what a receipt can prove for each agent, where its
+transcripts live, and its quick start: [docs/agents/](../agents/README.md).
+
 ## Day-1 value before hooks
 
 You do not need hooks or PR comments to get value on day 1. Run a session in any

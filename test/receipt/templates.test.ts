@@ -19,7 +19,6 @@ import {
   PRICE_DELTA_NOTE,
 } from "../../src/receipt/blocks.js";
 import type { Block, TemplateName } from "../../src/receipt/blocks.js";
-import { METHODOLOGY_BRIEF } from "../../src/pricing/attribution.js";
 import { buildReceiptView } from "../../src/receipt/present.js";
 import { renderReceipt, renderReceiptLines, RECEIPT_WIDTH } from "../../src/receipt/render.js";
 import { renderReceiptSvg } from "../../src/receipt/svg.js";
@@ -74,8 +73,9 @@ describe("SPEC-0020 R3 — exact-wording honesty battery holds in every template
     const model = await modelFor(PRICED.source, PRICED.path);
     const { blocks } = buildReceiptView(model, template);
     expect(validateReceiptBlocks(blocks, model)).toEqual([]);
-    // the methodology brief is byte-equal (block level), and the price-delta note renders verbatim (one line) in both mediums.
-    expect(blocks.some((b) => b.kind === "footnote" && b.text === METHODOLOGY_BRIEF)).toBe(true);
+    // SPEC-0055: the card carries no methodology footnote — the full methodology
+    // is one flag away (`aireceipts --methodology`) and ships in `--json`.
+    expect(blocks.some((b) => b.kind === "footnote")).toBe(false);
     expect(renderReceipt(model, { color: false, template })).toContain(PRICE_DELTA_NOTE);
     expect(renderReceiptSvg(model, { template })).toContain(PRICE_DELTA_NOTE);
   });
@@ -88,13 +88,8 @@ describe("SPEC-0020 R3 — exact-wording honesty battery holds in every template
     expect(renderReceiptSvg(model, { template }).includes("$")).toBe(false);
   });
 
-  it("validateReceiptBlocks has teeth: a paraphrased methodology and an injected `$` are caught", async () => {
+  it("validateReceiptBlocks has teeth: an injected `$` is caught, priced or unpriced", async () => {
     const priced = await modelFor(PRICED.source, PRICED.path);
-    const tampered = buildReceiptView(priced, "classic").blocks.map((b) =>
-      b.kind === "footnote" ? { ...b, text: "roughly how we did it" } : b,
-    );
-    expect(validateReceiptBlocks(tampered, priced).map((v) => v.code)).toContain("missing-methodology");
-
     const unpriced = await modelFor(UNPRICED.source, UNPRICED.path);
     const leaked = [...buildReceiptView(unpriced, "classic").blocks, { kind: "note", text: "sneaky $9.99" } as Block];
     expect(validateReceiptBlocks(leaked, unpriced).map((v) => v.code)).toContain("dollar-in-unpriced");

@@ -309,6 +309,7 @@ footer{
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
+        <li><a href="15-integrations.html">Choose an integration</a></li>
       </ul>
       <p class="toc-section">Reference</p>
       <ul>
@@ -388,6 +389,8 @@ git receipt                  # after pushing your branch</code></pre>
 <p>&gt; Before opening a PR, run <code>npx aireceipts-cli pr --post</code> to attach your build receipt.</p>
 
 <p>That's it. By default, the workflow emits a neutral <code>::notice</code> when a PR has no receipt comment and never fails the build. To enforce receipts for same-repo PRs, set the repo variable <code>AIRECEIPTS_REQUIRE_PR_RECEIPT=true</code>; fork PRs stay notice-only because source transcripts remain on the contributor's machine. CI still never generates a receipt itself: the source transcripts stay local. Rolling out across a whole org: <a href="org-rollout.html">docs/adopt/org-rollout.md</a>.</p>
+
+<p>There is no aireceipts GitHub App or bot: receipts are generated and posted locally by design, and a hosted App could never see the transcripts they're built from — the decision record is <a href="SPEC-0052-github-app-deferral.html">SPEC-0052</a>.</p>
 
 <h2 id="what-the-comment-contains">What the comment contains</h2>
 

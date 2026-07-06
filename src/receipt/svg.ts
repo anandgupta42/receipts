@@ -18,7 +18,6 @@ import type { ReceiptView, TemplateName } from "./blocks.js";
 import { wrapText } from "./format.js";
 import type { ReceiptModel } from "./model.js";
 import { buildReceiptView } from "./present.js";
-import { SAMOSA_STROKE_DARK, SAMOSA_STROKE_LIGHT, samosaGlyphGroup } from "./samosa-glyph.js";
 
 export type ThemeName = "light" | "dark";
 
@@ -51,11 +50,9 @@ interface Paints {
   rule: string;
   accent: string;
   flag: string;
-  /** SPEC-0034 R2 — fixed by theme NAME (design-supplied), not derived from the theme's own ink/muted tokens. */
-  samosaStroke: string;
 }
 
-function paintsFor(theme: Theme, themeName: ThemeName): Paints {
+function paintsFor(theme: Theme): Paints {
   return {
     card: theme.card,
     ink: theme.ink,
@@ -63,7 +60,6 @@ function paintsFor(theme: Theme, themeName: ThemeName): Paints {
     rule: theme.rule,
     accent: theme.accent,
     flag: theme.flag,
-    samosaStroke: themeName === "dark" ? SAMOSA_STROKE_DARK : SAMOSA_STROKE_LIGHT,
   };
 }
 
@@ -105,11 +101,6 @@ const STAMP_ROTATE = -4;
 // note's SVG offset (LEFT+14 for a 2-space indent) tracking the terminal's.
 const NOTE_INDENT_PX = 7;
 
-// Emoji deliberately absent from the footer TEXT run: a glyph outside the
-// monospace face poisons the whole text run in resvg-class renderers (tofu).
-// The terminal footer is text-only too (maintainer: 🔺 rejected — "not a
-// samosa"); this renderer draws the real samosa shape when the footer block
-// carries `samosaMark` (SPEC-0034 R2 — see samosaGlyphGroup in the footer case).
 const STAMP_TEXT = "LOCAL · DETERMINISTIC";
 
 // --- Primitives --------------------------------------------------------------
@@ -341,18 +332,6 @@ function layoutBlock(block: Block, cur: Cursor, p: Paints, els: string[]): void 
       els.push(stampElement(cur.y, p.accent));
       const footerBaseline = cur.y + 22 + 18 + SZ_FOOTER;
       els.push(textEl(WIDTH / 2, footerBaseline, block.text, { size: SZ_FOOTER, anchor: "middle", fill: p.muted }));
-      // SPEC-0034 R2 — the drawn samosa glyph sits just right of the centered
-      // footer text (never in the text run itself — see the tofu note above).
-      // `samosaMark` gates it per template (grocery carries none — R1's
-      // "grocery untouched").
-      if (block.samosaMark) {
-        const textWidth = [...block.text].length * charW(SZ_FOOTER);
-        const glyphSize = 14;
-        const glyphGap = 6;
-        const glyphX = WIDTH / 2 + textWidth / 2 + glyphGap;
-        const glyphY = footerBaseline - glyphSize + 3;
-        els.push(samosaGlyphGroup(glyphX, glyphY, glyphSize, p.samosaStroke));
-      }
       // Advance past the footer text (not just record a height) so a later block
       // — grocery's barcode is the last line — lays out BELOW it, never over the
       // stamp. Height is then cur.y + PAD_BOTTOM for every template.
@@ -424,9 +403,8 @@ function svgDocument(width: number, height: number, body: string, label: string)
 
 /** Render one receipt as a self-contained SVG string (R1). Deterministic bytes; on-screen font is the viewer's monospace (layout is font-safe). */
 export function renderReceiptSvg(model: ReceiptModel, opts: SvgOptions = {}): string {
-  const themeName = opts.theme ?? "light";
-  const theme = THEMES[themeName];
-  const p = paintsFor(theme, themeName);
+  const theme = THEMES[opts.theme ?? "light"];
+  const p = paintsFor(theme);
   const { els, height } = layoutContent(buildReceiptView(model, opts.template ?? "classic"), p);
   const body = cardGroup(els, height, 0, "0", p.card);
   return svgDocument(WIDTH, height, body, "aireceipts cost receipt");
@@ -437,9 +415,8 @@ const COMPARE_WIDTH = WIDTH * 2 + COMPARE_GUTTER; // 1304
 
 /** Render two receipts side-by-side in one SVG with the factual ratio-only delta line (R3, I6 — no better/worse styling; nothing coloured green/red across cards). */
 export function renderCompareSvg(a: ReceiptModel, b: ReceiptModel, opts: SvgOptions = {}): string {
-  const themeName = opts.theme ?? "light";
-  const theme = THEMES[themeName];
-  const p = paintsFor(theme, themeName);
+  const theme = THEMES[opts.theme ?? "light"];
+  const p = paintsFor(theme);
   const laidA = layoutContent(buildReceiptView(a), p);
   const laidB = layoutContent(buildReceiptView(b), p);
   const cardHeight = Math.max(laidA.height, laidB.height);

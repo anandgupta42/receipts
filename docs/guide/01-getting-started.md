@@ -38,13 +38,8 @@ Read...............................$0.02  (1 call)
 TOTAL........................................$0.18
 same tokens on claude-haiku-4-5..............$0.04
   (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
@@ -118,7 +113,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
   Tokens Δ......................+93,700 tok (more)
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 ```
 
 Every session on your machine, across every supported agent, totalled for the
