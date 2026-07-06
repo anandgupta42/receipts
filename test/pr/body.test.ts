@@ -438,6 +438,11 @@ describe("SPEC-0054 R3 · subagentDetailsTable", () => {
     expect(table).toContain("| a\\|b c | $0.50 |");
   });
 
+  it("escapes backslashes before pipes — a name's own backslash can't neutralize the pipe escape", () => {
+    const table = subagentDetailsTable([row("a\\|b", 0.5, { model: undefined })]);
+    expect(table).toContain("| a\\\\\\|b | $0.50 |");
+  });
+
   it("reconciles the priced column so cells sum to the rounded total", () => {
     // 3 × $0.335 = $1.005 → rounds to $1.01; naive per-cell rounding would
     // print 3 × $0.34 = $1.02. Largest-remainder must keep the column at $1.01.

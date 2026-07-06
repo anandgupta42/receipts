@@ -418,9 +418,9 @@ export function renderPrReceiptText(input: PrBodyInput): string {
 /** SPEC-0054 R3 — details-table cap: 19 children plus one remainder row that carries the leftover sum. */
 export const SUBAGENT_TABLE_CAP = 20;
 
-/** Markdown-table cell: single line, pipes escaped, capped so a prompt-derived title can't wreck the layout. */
+/** Markdown-table cell: single line, backslashes then pipes escaped (order matters — escaping pipes first would double-escape their own backslashes), capped so a prompt-derived title can't wreck the layout. */
 function tableCell(s: string): string {
-  return capText(s.replace(/\s+/g, " ").replace(/\|/g, "\\|").trim(), 80);
+  return capText(s.replace(/\s+/g, " ").replace(/\\/g, "\\\\").replace(/\|/g, "\\|").trim(), 80);
 }
 
 /**
