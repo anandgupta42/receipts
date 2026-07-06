@@ -488,6 +488,7 @@ describe("built CLI e2e", () => {
       "durationMs",
       "totals",
       "wasteLines",
+      "couldHaveSaved",
       "suggestions",
       "threshold",
       "coverage",
@@ -499,6 +500,9 @@ describe("built CLI e2e", () => {
     expect(textRun.code, textRun.stderr).toBe(0);
     expect(textRun.stdout).toContain("handoff: ");
     expect(textRun.stdout).toContain("total $");
+    // SPEC-0059 R1/R3 — the slip headline and the class's rule line ride the packet.
+    expect(textRun.stdout).toContain("COULD HAVE SAVED");
+    expect(textRun.stdout).toContain("→ change or stop after two identical failures");
     expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
   });
 

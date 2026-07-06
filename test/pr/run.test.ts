@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { loadById } from "../../src/parse/load.js";
 import type { CommandResult, CommandRunner } from "../../src/pr/git.js";
 import { DOGFOOD_MARKER } from "../../src/pr/body.js";
-import { runPr, type PrDeps } from "../../src/pr/index.js";
+import { runPr, runPrDetailed, type PrDeps } from "../../src/pr/index.js";
 import type { SessionSummary } from "../../src/parse/types.js";
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
@@ -661,5 +661,75 @@ describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e thro
     expect(out[0]).not.toContain("cache-write cost that is a lower bound");
     expect(out[0]).not.toContain("cost-model.md");
     expect(out[0]).not.toMatch(/TOTAL priced\.+≥/);
+  });
+});
+
+// SPEC-0059 R5/R8 — the handoff section through the real PR flow: present on a
+// wasteful PR (and reported via handoffSectionIncluded), absent on a clean PR
+// and under --no-details. Section-content details (arithmetic, hedge, budget)
+// are unit-covered in test/receipt/savings-slip.test.ts.
+describe("SPEC-0059 handoff section (e2e through runPr)", () => {
+  const LOOP_ANCHORS = path.join(FIX, "claude-anchors-loop.jsonl");
+
+  async function loopDeps(): Promise<{ deps: PrDeps; out: string[] }> {
+    const session = (await loadById("claude-code", LOOP_ANCHORS))!;
+    const out: string[] = [];
+    const deps: PrDeps = {
+      listSessions: async () => [session],
+      loadSession: async (summary) => loadById(summary.source, summary.id),
+      runGit: gitOk,
+      runGh: () => ok("[]"),
+      rollup: async () => [],
+      cwd: "/home/dev/repo",
+      out: (s) => out.push(s),
+      err: () => {},
+    };
+    return { deps, out };
+  }
+
+  it("a wasteful PR renders the collapsed section after full receipts and reports it (R8)", async () => {
+    const { deps, out } = await loopDeps();
+    const result = await runPrDetailed({ post: false }, deps);
+    expect(result.code).toBe(0);
+    expect(result.handoffSectionIncluded).toBe(true);
+    const body = out[0];
+    expect(body).toContain("<details><summary>handoff — could have saved ≤ $");
+    expect(body).toContain("COULD HAVE SAVED");
+    expect(body).toContain("→ change or stop after two identical failures");
+    expect(body).toContain("covers: 1 session ·");
+    expect(body.indexOf("full receipts (")).toBeLessThan(body.indexOf("<details><summary>handoff — "));
+  });
+
+  it("--no-details drops the section and the flag with it", async () => {
+    const { deps, out } = await loopDeps();
+    const result = await runPrDetailed({ post: false, details: false }, deps);
+    expect(result.code).toBe(0);
+    expect(result.handoffSectionIncluded).toBe(false);
+    expect(out[0]).not.toContain("handoff — could have saved");
+  });
+
+  it("a clean PR has no section and the body is byte-identical to pre-SPEC-0059 output", async () => {
+    const { deps, out } = await makeDeps();
+    const result = await runPrDetailed({ post: false }, deps);
+    expect(result.code).toBe(0);
+    expect(result.handoffSectionIncluded).toBe(false);
+    expect(out[0]).not.toContain("handoff —");
+  });
+
+  it("dry-run and --post render the identical body, and the post result reports the section (R8)", async () => {
+    const first = await loopDeps();
+    await runPrDetailed({ post: false }, first.deps);
+    const second = await loopDeps();
+    const ghPost: CommandRunner = (_cmd, args) => {
+      if (args[0] === "pr") return ok('{"number": 7, "url": "https://github.com/o/r/pull/7"}');
+      return ok("[]");
+    };
+    second.deps.runGh = ghPost;
+    const posted = await runPrDetailed({ post: true }, second.deps);
+    expect(second.out[0]).toBe(first.out[0]);
+    // Codex review finding: the successful-post path must carry the boolean
+    // too — a posted wasteful PR is the kill criterion's main denominator.
+    expect(posted.commentResult).toBe("success");
+    expect(posted.handoffSectionIncluded).toBe(true);
   });
 });

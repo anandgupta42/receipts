@@ -223,6 +223,8 @@ export const prFlowCompletedPropertiesSchema = z
     commentResult: z.enum(STEP_RESULT_VALUES),
     artifactResult: z.enum(STEP_RESULT_VALUES),
     shareResult: z.enum(STEP_RESULT_VALUES),
+    /** SPEC-0059 R8 — the body carried the handoff section (rendering rate, never engagement). */
+    handoffSectionIncluded: z.boolean(),
     result: z.enum(RESULT_VALUES),
   })
   .strict();

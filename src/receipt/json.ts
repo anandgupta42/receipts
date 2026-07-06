@@ -11,7 +11,7 @@ import { compareDeltaLine } from "./compare.js";
 import { SCHEMA_VERSION } from "./exportSchema.js";
 import type { ModelMixEntry, PriceRowUsed, ReceiptModel, ToolRow, WasteLine } from "./model.js";
 import type { WasteClassAggregate } from "../aggregate/waste.js";
-import type { HandoffCounts } from "./handoff.js";
+import { SLIP_RULE_LINES, couldHaveSavedOf, type HandoffCounts } from "./handoff.js";
 
 function tokenUsageJson(t: TokenUsage) {
   return {
@@ -160,7 +160,9 @@ export function summaryToJson(summary: SessionSummary) {
  * schema (I5); validated against `handoffJsonSchema`. Always emits the full
  * structure (empty arrays included) — machine consumers need shape, not
  * sentinels (R6). `aggregates` is exactly what `aggregateWaste` returned for
- * the recurrence window, below-threshold classes included.
+ * the recurrence window, below-threshold classes included. SPEC-0059 R7
+ * extends the SPEC-0042-pinned field list with `couldHaveSaved` and a
+ * per-waste-line `rule` (additive — no version bump).
  */
 export function toHandoffJson(
   model: ReceiptModel,
@@ -181,7 +183,8 @@ export function toHandoffJson(
       turnCount: counts.turns,
       toolCallCount: counts.toolCalls,
     },
-    wasteLines: model.wasteLines.map(wasteLineJson),
+    wasteLines: model.wasteLines.map((w) => ({ ...wasteLineJson(w), rule: SLIP_RULE_LINES[w.kind] ?? null })),
+    couldHaveSaved: couldHaveSavedOf(model.wasteLines, model.totalUsd),
     suggestions,
     threshold,
     coverage: {

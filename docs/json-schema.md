@@ -166,7 +166,10 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 | `totals` | object | `tokens` (TokenUsage object) + `turnCount` + `toolCallCount`. |
 | `turnCount` | number | (totals) Assistant turns in the session. |
 | `toolCallCount` | number | (totals) Tool calls in the session. |
-| `wasteLines` | array | Same WasteLine union as the receipt. |
+| `wasteLines` | array | Same WasteLine union as the receipt, plus a per-line `rule` (SPEC-0059). |
+| `rule` | string \| null | (wasteLines) The class's fixed one-line next-time rule; `null` for a class without one. |
+| `couldHaveSaved` | object | SPEC-0059: the extracted savings ceiling — `usd` (sum of priced waste lines, `null` when none priced), `tokens` (sum over all fired lines), `pctOfTotal`. Arithmetic, never a prediction. |
+| `pctOfTotal` | number \| null | (couldHaveSaved) `round(100 · usd / totalUsd)`; `null` without both dollar sides. |
 | `suggestions` | array | Standing-rule suggestion strings (SPEC-0013), possibly empty. |
 | `threshold` | number | The distinct-session recurrence threshold in effect. |
 | `coverage` | object | What the packet covers, checkably: `turns`, `toolCalls`, `compactions`, `wasteLines` (all numbers). |

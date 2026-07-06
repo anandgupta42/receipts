@@ -196,8 +196,13 @@ function priceDeltaParts(model: ReceiptModel): { label: string; value: string } 
   return { label: `same tokens on ${model.priceDelta.cheaperModel}`, value: `$${formatUsd(model.priceDelta.usd)}` };
 }
 
-/** A classic waste block: stuck-loop carries the ⚠ badge, trivial-spans carries the `≈` label and a detail sub-line. */
-function classicWasteBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" }> {
+/**
+ * A classic waste block: stuck-loop carries the ⚠ badge, trivial-spans carries
+ * the `≈` label and a detail sub-line. Exported for SPEC-0059 R3 — the savings
+ * slip renders its evidence lines from these exact blocks, so glyphs, labels,
+ * and values are never duplicated as strings across the two surfaces.
+ */
+export function wasteRowBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" }> {
   if (waste.kind === "stuck-loop") {
     const valuePart = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
     const clockPart = waste.wallClockMs !== null ? ` (${formatDuration(waste.wallClockMs)})` : "";
@@ -263,7 +268,7 @@ function buildClassic(model: ReceiptModel): Block[] {
     blocks.push({ kind: "row", label: row.tool, value: classicRowValue(row, model, reconciled), spaceBefore: i === 0 });
   });
   model.wasteLines.forEach((waste, i) => {
-    const block = classicWasteBlock(waste);
+    const block = wasteRowBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
   blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT }));
@@ -290,7 +295,7 @@ function buildGrocery(model: ReceiptModel): Block[] {
     blocks.push({ kind: "note", text: "--- RETURN/REFUND ---", align: "center", spaceBefore: true });
     model.wasteLines.forEach((waste) => {
       // grocery frames waste as a refund line (no ⚠ badge); the ≈ label + numbers carry through unchanged.
-      blocks.push({ ...classicWasteBlock(waste), badge: false });
+      blocks.push({ ...wasteRowBlock(waste), badge: false });
     });
   }
   blocks.push(...caveatBlocks(model));
@@ -346,7 +351,7 @@ function buildDatavis(model: ReceiptModel): Block[] {
     }
   }
   model.wasteLines.forEach((waste, i) => {
-    const block = classicWasteBlock(waste);
+    const block = wasteRowBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
   blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT }));

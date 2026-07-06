@@ -87,6 +87,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `commentResult` | enum | `success` \| `failed` \| `skipped` | |
 | `artifactResult` | enum | `success` \| `failed` \| `skipped` | |
 | `shareResult` | enum | `success` \| `failed` \| `skipped` | |
+| `handoffSectionIncluded` | boolean | | SPEC-0059: the rendered body carried the handoff section (rendering rate only — never engagement, never contents). |
 | `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
 
 ### `hook_configured` — one per hook install/uninstall command
