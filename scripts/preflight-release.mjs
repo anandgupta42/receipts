@@ -14,10 +14,11 @@
 // case, which throttles badly on dev macOS under the full suite. CI (including
 // release-publish's own preflight, CI=true) runs everything, and CI-green-on-SHA
 // is a hard release precondition — so the release gate keeps full coverage.
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const r = (p) => join(ROOT, p);
@@ -98,80 +99,115 @@ export function checkTarball(manifest, requiredPaths) {
   return v;
 }
 
-const sh = (cmd, args, opts = {}) => execFileSync(cmd, args, { cwd: ROOT, stdio: "pipe", encoding: "utf8", ...opts });
+const execFileAsync = promisify(execFile);
+const MAX_EXEC_BUFFER = 64 * 1024 * 1024;
 
-function main() {
+async function sh(cmd, args, opts = {}) {
+  const { stdout } = await execFileAsync(cmd, args, { cwd: ROOT, encoding: "utf8", maxBuffer: MAX_EXEC_BUFFER, ...opts });
+  return stdout;
+}
+
+function failureMessage(error) {
+  const stdout = typeof error?.stdout === "string" ? error.stdout : "";
+  const stderr = typeof error?.stderr === "string" ? error.stderr : "";
+  const message = error instanceof Error ? error.message : String(error);
+  const out = (stdout + stderr).trim() || message;
+  return String(out).split("\n").slice(-20).join("\n");
+}
+
+async function record(results, name, fn) {
+  try {
+    await fn();
+    const result = { name, ok: true };
+    results.set(name, result);
+    console.log(`✓ ${name}`);
+    return result;
+  } catch (error) {
+    const result = { name, ok: false, msg: failureMessage(error) };
+    results.set(name, result);
+    console.log(`✗ ${name}`);
+    return result;
+  }
+}
+
+function recordSkipped(results, name, msg) {
+  const result = { name, ok: false, msg };
+  results.set(name, result);
+  console.log(`✗ ${name}`);
+  return result;
+}
+
+async function main() {
   const quick = process.argv.includes("--quick");
-  const results = [];
-  const record = (name, fn) => {
-    try {
-      fn();
-      results.push({ name, ok: true });
-      console.log(`✓ ${name}`);
-    } catch (e) {
-      const out = ((e.stdout || "") + (e.stderr || "")).trim() || e.message;
-      results.push({ name, ok: false, msg: String(out).split("\n").slice(-20).join("\n") });
-      console.log(`✗ ${name}`);
-    }
-  };
+  const results = new Map();
+  const gateOrder = [
+    "manifest: publish-shape contract",
+    "build → dist/cli.js + shebang",
+    "tarball: lean + complete",
+    "tsc --noEmit",
+    "eslint --max-warnings 0",
+    "cite-check (all price tables, liveness enforced)",
+    "verify-goldens",
+    "spec-lint",
+    "hygiene",
+    "vitest run (full suite, incl. install+run e2e)",
+    "determinism-check ×10",
+  ];
 
-  // 1. manifest shape (pure, fast)
-  record("manifest: publish-shape contract", () => {
+  await record(results, "manifest: publish-shape contract", () => {
     const pkg = JSON.parse(readFileSync(r("package.json"), "utf8"));
     const lock = existsSync(r("package-lock.json")) ? JSON.parse(readFileSync(r("package-lock.json"), "utf8")) : null;
     const viol = checkManifest(pkg, lock);
     if (viol.length) throw new Error(viol.join("\n"));
   });
 
-  // 2. types + lint
-  record("tsc --noEmit", () => sh("npx", ["tsc", "--noEmit"]));
-  record("eslint --max-warnings 0", () => sh("npx", ["eslint", ".", "--max-warnings", "0"]));
-
-  // 3. clean build → dist/cli.js with a node shebang (the bin must be executable)
-  record("build → dist/cli.js + shebang", () => {
-    sh("npm", ["run", "build"]);
+  // Build and pack are the only dist/ writer/readers besides the vitest e2e
+  // beforeAll rebuild, so they complete before anything else starts; after this
+  // point only vitest touches dist/.
+  await record(results, "build → dist/cli.js + shebang", async () => {
+    await sh("npm", ["run", "build"]);
     if (!existsSync(r("dist/cli.js"))) throw new Error("dist/cli.js missing after build");
     const first = readFileSync(r("dist/cli.js"), "utf8").split("\n", 1)[0];
     if (first !== "#!/usr/bin/env node") throw new Error(`dist/cli.js first line is not a node shebang: ${first}`);
   });
 
-  // 4. tarball shape (what npm would actually publish; build just ran so the
-  //    fresh dist is what --ignore-scripts packs — same output prepublishOnly
-  //    produces, enforced by the manifest prepublishOnly==build check)
-  record("tarball: lean + complete", () => {
-    const out = sh("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"]);
+  await record(results, "tarball: lean + complete", async () => {
+    const out = await sh("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"]);
     const viol = checkTarball(JSON.parse(out)[0], ["dist/cli.js", "README.md", "LICENSE", "NOTICE", ...priceTablePaths(), ...demoAssetPaths()]);
     if (viol.length) throw new Error(viol.join("\n"));
   });
 
-  // 5. price citations valid + LIVE (I3) — on every committed table, not a diff.
-  //    CI=1 makes cite-check enforce URL liveness (locally it only warns).
-  record("cite-check (all price tables, liveness enforced)", () =>
-    sh("node", ["--experimental-strip-types", "scripts/cite-check.ts", ...priceTablePaths()], { env: { ...process.env, CI: "1" } }),
-  );
-
-  // 6. byte-stability guarantees (I5)
-  record("verify-goldens", () => sh("node", ["scripts/verify-goldens.mjs"]));
-  record("spec-lint", () => sh("node", ["scripts/spec-lint.mjs"]));
-  record("hygiene", () => sh("node", ["scripts/hygiene.mjs"]));
-
-  // 7. the heavy, release-only gates: the FULL suite (incl. the packed-tarball
-  //    install-and-run e2e that proves a priced receipt) + determinism ×10.
-  //    --quick skips these, and therefore cannot declare RELEASE-READY.
-  //    On a LOCAL run only (not CI), skip the one spawn-heavy stress case — the
-  //    100-session built-CLI e2e — which throttles badly on dev macOS under the
-  //    full suite. CI (including release-publish's own preflight, which runs with
-  //    CI=true) leaves the env unset and runs the full suite, so the release gate
-  //    keeps full coverage; CI-green-on-SHA is a hard release precondition. The
-  //    tarball install-and-run proof is a separate test and always runs.
   const stressEnv = process.env.CI ? {} : { AIRECEIPTS_SKIP_STRESS: "1" };
+  const concurrent = [
+    record(results, "tsc --noEmit", () => sh("npx", ["tsc", "--noEmit"])),
+    record(results, "eslint --max-warnings 0", () => sh("npx", ["eslint", ".", "--max-warnings", "0"])),
+    record(results, "cite-check (all price tables, liveness enforced)", () =>
+      sh("node", ["--experimental-strip-types", "scripts/cite-check.ts", ...priceTablePaths()], { env: { ...process.env, CI: "1" } }),
+    ),
+    record(results, "spec-lint", () => sh("node", ["scripts/spec-lint.mjs"])),
+    record(results, "hygiene", () => sh("node", ["scripts/hygiene.mjs"])),
+  ];
+  const verify = record(results, "verify-goldens", () => sh("node", ["scripts/verify-goldens.mjs"]));
+  concurrent.push(verify);
+
   if (!quick) {
-    record("vitest run (full suite, incl. install+run e2e)", () =>
-      sh("npx", ["vitest", "run"], { stdio: "pipe", env: { ...process.env, ...stressEnv } }));
-    record("determinism-check ×10", () => sh("node", ["scripts/determinism-check.mjs", "--runs=10", "--", "node", "scripts/verify-goldens.mjs"]));
+    concurrent.push(
+      record(results, "vitest run (full suite, incl. install+run e2e)", () =>
+        sh("npx", ["vitest", "run"], { env: { ...process.env, ...stressEnv } })),
+    );
+    concurrent.push(
+      verify.then((result) => {
+        if (!result.ok) return recordSkipped(results, "determinism-check ×10", "skipped: verify-goldens failed");
+        return record(results, "determinism-check ×10", () =>
+          sh("node", ["scripts/determinism-check.mjs", "--runs=10", "--", "node", "scripts/verify-goldens.mjs"]));
+      }),
+    );
   }
 
-  const failed = results.filter((x) => !x.ok);
+  await Promise.all(concurrent);
+
+  const orderedResults = gateOrder.map((name) => results.get(name)).filter(Boolean);
+  const failed = orderedResults.filter((x) => !x.ok);
   console.log();
   if (failed.length) {
     console.error(`preflight: NOT RELEASABLE — ${failed.length} check(s) failed:`);
@@ -179,12 +215,12 @@ function main() {
     process.exit(1);
   }
   if (quick) {
-    console.log(`preflight: ${results.length} quick checks passed — NOT release-valid (skipped full suite + determinism; run without --quick before releasing).`);
+    console.log(`preflight: ${orderedResults.length} quick checks passed — NOT release-valid (skipped full suite + determinism; run without --quick before releasing).`);
     return;
   }
-  console.log(`preflight: RELEASE-READY — ${results.length} checks passed.`);
+  console.log(`preflight: RELEASE-READY — ${orderedResults.length} checks passed.`);
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main();
+  await main();
 }
