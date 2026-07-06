@@ -12,11 +12,6 @@ run_shell_command..................$0.00  (1 call)
 TOTAL........................................$0.01
 same tokens on gemini-2.5-flash-lite.........$0.00
   (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 - - - - - - - - - - - - - - - - - - - - - - - - -
