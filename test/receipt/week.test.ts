@@ -43,6 +43,25 @@ describe("renderWeek (R7 text)", () => {
     expect(out).toContain("Tokens (all sessions)");
     expect(out).toMatch(/Tokens \(all sessions\)\.+1,500,000 tok/); // both sessions' tokens
     expect(out).toContain("By agent");
+    // Deltas carry a plain-language direction so the sign isn't the only cue:
+    // current (1.5M tok / higher $) exceeds prior (0.8M tok) → both read "(more)".
+    expect(out).toMatch(/Priced \$ Δ.+\(more\)/);
+    expect(out).toMatch(/Tokens Δ\.+\+700,000 tok \(more\)/);
+  });
+
+  it("labels a drop vs prior as (fewer)/(less), not a bare minus sign", async () => {
+    const bounds = windowBounds(NOW);
+    // This week burned fewer tokens (and $) than the prior week — the reported
+    // confusion: a negative delta must read as a reduction, not an increase.
+    const digest = await assembleWeekDigest(
+      bounds,
+      [sess("c", "claude-code", "claude-sonnet-5", 500_000)],
+      [sess("pp", "claude-code", "claude-sonnet-5", 800_000)],
+      { sinceOverride: false, byProject: false, dataDir },
+    );
+    const out = renderWeek(digest, { color: false });
+    expect(out).toMatch(/Tokens Δ\.+-300,000 tok \(fewer\)/);
+    expect(out).toMatch(/Priced \$ Δ.+\(less\)/);
   });
 
   it("renders 'no prior data' for an empty prior window", async () => {
