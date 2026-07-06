@@ -41,9 +41,10 @@ describe("R7 — text receipt line + methodology sentence", () => {
 });
 
 describe("R7 — --handoff static suggestion", () => {
-  it("adds the clear/split-context suggestion to the context-thrash bullet", async () => {
+  it("pairs the context-thrash evidence line with the clear/split-context rule (SPEC-0059 R3 form)", async () => {
     const handoff = renderHandoff(await tpModel());
-    expect(handoff).toContain("context thrash ×3 compactions (4 turns)");
-    expect(handoff).toContain("clear or split context at task boundaries");
+    // Evidence via the receipt's own wasteRowBlock label (shared, not re-derived).
+    expect(handoff).toContain("≈ context thrash: 3 compactions in 4 turns");
+    expect(handoff).toContain("→ clear or split context at task boundaries");
   });
 });

@@ -191,6 +191,8 @@ export interface RecordPrFlowCompletedInput {
   commentResult: StepResultValue;
   artifactResult: StepResultValue;
   shareResult: StepResultValue;
+  /** SPEC-0059 R8. */
+  handoffSectionIncluded: boolean;
   result: ResultValue;
 }
 
@@ -205,6 +207,7 @@ export function recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void {
       commentResult: input.commentResult,
       artifactResult: input.artifactResult,
       shareResult: input.shareResult,
+      handoffSectionIncluded: input.handoffSectionIncluded,
       result: input.result,
     },
   });

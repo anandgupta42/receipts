@@ -8,7 +8,7 @@
 import type { ReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
 import { samosaGlyphMarkup } from "../receipt/samosa-glyph.js";
-import { renderPrReceiptText, type PrBodyInput } from "./body.js";
+import { renderPrReceiptText, type HandoffSlipView, type PrBodyInput } from "./body.js";
 import { SAMOSA_URL } from "./publish.js";
 
 export interface ArtifactSession {
@@ -27,6 +27,8 @@ export interface ArtifactInput {
   notAttributable?: string[];
   /** SPEC-0031 R3c — the table data as JSON for an inert <template> island. */
   perCommitJson?: string;
+  /** SPEC-0059 R6 — the savings slip, same strings the comment section fences (`buildHandoffSlip`). */
+  handoff?: HandoffSlipView;
 }
 
 /** The artifact's file name for a PR — shared by the publisher and the comment link (R3). */
@@ -69,6 +71,12 @@ export function renderPrArtifactHtml(input: ArtifactInput): string {
       )}</pre></div></section>`;
     })
     .join("\n");
+  // SPEC-0059 R6 — the savings slip, after the per-session receipts (the same
+  // position the comment gives it); heading is the comment's summary line.
+  const handoff =
+    input.handoff !== undefined
+      ? `<section><h2>${escapeHtml(input.handoff.summary)}</h2><div><pre>${escapeHtml(input.handoff.text)}</pre></div></section>`
+      : "";
   const bucket =
     input.notAttributable !== undefined && input.notAttributable.length > 0
       ? `<section><h2>not commit-attributable</h2><div><pre>${escapeHtml(input.notAttributable.join("\n"))}</pre></div></section>`
@@ -95,6 +103,7 @@ export function renderPrArtifactHtml(input: ArtifactInput): string {
     `<p class="sub">receipt artifact · PR #${input.prNumber}</p>`,
     `<section><div><pre>${rollup}</pre></div></section>`,
     sections,
+    handoff,
     bucket,
     island,
     // SPEC-0034 R3 — the artifact footer's one clickable surface: the drawn

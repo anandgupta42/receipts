@@ -13,5 +13,5 @@ TOTAL...................................$12,500.00
 same tokens on claude-haik…...$2,500.00 (80% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-                aireceipts · local                
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -

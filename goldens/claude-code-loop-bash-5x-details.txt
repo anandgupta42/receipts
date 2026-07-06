@@ -23,5 +23,5 @@ peak turn.........................16k tok (turn 6)
 same reads at uncached input rate............$0.28
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-                aireceipts · local                
+     aireceipts · local · npx aireceipts-cli      
 - - - - - - - - - - - - - - - - - - - - - - - - -

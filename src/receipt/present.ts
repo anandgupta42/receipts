@@ -32,7 +32,7 @@ export const CURSOR_DEGRADED_NOTE = "Cursor transcripts carry no per-turn model/
 export const NO_PRICE_MATCH_NOTE = "no price table matched";
 
 const WORDMARK = "AIRECEIPTS";
-const FOOTER_TEXT = "aireceipts · local";
+const FOOTER_TEXT = "aireceipts · local · npx aireceipts-cli";
 const THINKING_REPLY = "(thinking/reply)";
 
 const TITLE_MAX = 46;
@@ -232,8 +232,13 @@ function stuckLoopDetail(turnIndices: number[]): string | undefined {
   return min === max ? `at turn ${min}` : `at turns ${min}-${max}`;
 }
 
-/** A classic waste block: stuck-loop carries the ⚠ badge, trivial-spans carries the `≈` label and a detail sub-line. */
-function classicWasteBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" }> {
+/**
+ * A classic waste block: stuck-loop carries the ⚠ badge, trivial-spans carries
+ * the `≈` label and a detail sub-line. Exported for SPEC-0059 R3 — the savings
+ * slip renders its evidence lines from these exact blocks, so glyphs, labels,
+ * and values are never duplicated as strings across the two surfaces.
+ */
+export function wasteRowBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" }> {
   if (waste.kind === "stuck-loop") {
     const valuePart = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
     const clockPart = waste.wallClockMs !== null ? ` (${formatDuration(waste.wallClockMs)})` : "";
@@ -386,7 +391,7 @@ function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[
     blocks.push({ kind: "row", label: row.tool, value: classicRowValue(row, model, reconciled), spaceBefore: i === 0 });
   });
   model.wasteLines.forEach((waste, i) => {
-    const block = classicWasteBlock(waste);
+    const block = wasteRowBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
   const extra = view?.details ? detailsBlocks(model) : undefined;
@@ -414,7 +419,7 @@ function buildGrocery(model: ReceiptModel): Block[] {
     blocks.push({ kind: "note", text: "--- RETURN/REFUND ---", align: "center", spaceBefore: true });
     model.wasteLines.forEach((waste) => {
       // grocery frames waste as a refund line (no ⚠ badge); the ≈ label + numbers carry through unchanged.
-      blocks.push({ ...classicWasteBlock(waste), badge: false });
+      blocks.push({ ...wasteRowBlock(waste), badge: false });
     });
   }
   blocks.push(...caveatBlocks(model));
@@ -470,7 +475,7 @@ function buildDatavis(model: ReceiptModel): Block[] {
     }
   }
   model.wasteLines.forEach((waste, i) => {
-    const block = classicWasteBlock(waste);
+    const block = wasteRowBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
   blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT }));
