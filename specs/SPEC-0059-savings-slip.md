@@ -1,12 +1,12 @@
 ---
-id: SPEC-0055
+id: SPEC-0059
 title: Savings slip — could-have-saved handoff body + PR comment section
 status: approved
 milestone: M5
 depends: [SPEC-0013, SPEC-0017, SPEC-0026, SPEC-0042, SPEC-0043]
 ---
 
-# SPEC-0055: Savings slip — could-have-saved handoff body + PR comment section
+# SPEC-0059: Savings slip — could-have-saved handoff body + PR comment section
 
 Invariants: I1 (every line is extracted numbers or a fixed template — zero model
 calls), I2 (headline renders `$` only from waste lines that already carry priced
@@ -17,7 +17,7 @@ section), I6 (rules address the *next run's* behavior; never judge the agent or
 rank models).
 
 Design source: maintainer-approved rendered design, committed at
-`docs/spikes/spec-0055-savings-slip-design.html` (from Claude session 2026-07-05;
+`docs/spikes/spec-0059-savings-slip-design.html` (from Claude session 2026-07-05;
 also at `claude.ai/code/artifact/e6525807-f76e-4849-8774-2b204582fcd3`), growing
 `docs/spikes/handoff-v3-research.md` item E4 from a footer line into a section.
 
@@ -141,7 +141,7 @@ session is an immediate fix or removal.
 - **Given** the same session, **when** `aireceipts pr` (dry-run) assembles the
   comment, **then** a `<details>` section follows full receipts with summary
   `handoff — could have saved ≤ $0.46 (16%)` and the fenced slip, and the mini
-  receipt above is byte-identical to pre-SPEC-0055 output.
+  receipt above is byte-identical to pre-SPEC-0059 output.
 - **Given** a session on an unpriced model where waste lines carry only tokens,
   **when** the slip renders, **then** the headline value is `≤ <N> tok` and the
   hedge is exactly `arithmetic, not a prediction` (no `$`, no percent — I2).
@@ -151,7 +151,7 @@ session is an immediate fix or removal.
 - **Given** zero fired waste lines, **when** `--handoff` runs, **then** output is
   byte-identical to today (`nothing to hand off`, or suggestions-only), and
   **when** `aireceipts pr` runs, **then** no handoff section exists and the
-  comment is byte-identical to pre-SPEC-0055 output.
+  comment is byte-identical to pre-SPEC-0059 output.
 - **Given** a comment whose full-receipts section already consumes the budget to
   within less than the slip's size, **when** the body assembles, **then** the
   handoff section is entirely absent (never truncated).
@@ -201,7 +201,7 @@ session is an immediate fix or removal.
 
 - [ ] Local `--handoff` renders the slip per R1–R4; goldens updated deliberately.
 - [ ] PR comment + HTML artifact render the section per R5–R6; clean PRs
-      byte-identical to pre-SPEC-0055 output.
+      byte-identical to pre-SPEC-0059 output.
 - [ ] R7 JSON and R8 telemetry fields land with schema/allowlist coverage.
 - [ ] R9 docs shipped in the same PR.
 - [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
@@ -228,7 +228,7 @@ new ordering semantics (R3 pinned: subtotal-desc groups, token-only last);
 waste data absent from `PrBodyInput` (R5 rides `PrBodyExtras`); JSON version
 bump contradicted `exportSchema.ts:13` convention (R7 additive, no bump);
 design source not locally verifiable (mock committed at
-`docs/spikes/spec-0055-savings-slip-design.html`); kill criterion unmeasurable
+`docs/spikes/spec-0059-savings-slip-design.html`); kill criterion unmeasurable
 as phrased (rewritten to observable evidence + R8 firing rate); test gaps
 (5 matrix rows added). Rejected — "cut R8": the boolean is the kill criterion's
 denominator and the maintainer's standing telemetry-on-every-feature directive;
@@ -256,9 +256,12 @@ evidence it survives — maintainer initiated the feature and approved the
 rendered design (4 iterations, 2026-07-05); cheapest experiment is dogfood on
 this repo's own PR receipts, which is automatic. **Verdict: build now.**
 
-**S4:** `node scripts/spec-lint.mjs` — 51 specs OK (id uniqueness verified
-against origin/main and open PRs #143/#144; 0054 and 0057 claimed there, 0055
-free).
+**S4:** `node scripts/spec-lint.mjs` — 51 specs OK. Originally drafted as
+SPEC-0055 (verified free at draft time against origin/main and open PRs
+#143/#144); renumbered to 0059 on 2026-07-05 after a maintainer side session
+landed `SPEC-0055-receipt-card-cleanup` (#145) first — the known
+concurrent-session collision mode; 0056/0057 claimed by open PRs #147/#144,
+0058 on main.
 
 **Pre-push Codex re-review (commit gate):** one blocking finding — the R2
 estimate-tier `≈` hedge was specified but the scenario and the committed design
