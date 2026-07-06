@@ -9,40 +9,53 @@
 
 [![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/aireceipts-cli.svg)](https://www.npmjs.com/package/aireceipts-cli) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/anandgupta42/receipts/badge)](https://scorecard.dev/viewer/?uri=github.com/anandgupta42/receipts) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
-  <img alt="a rendered aireceipts receipt for a real Claude Code session" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
-</picture>
+<a href="https://github.com/anandgupta42/receipts/pull/131#issuecomment-4886722030">
+  <img alt="a real aireceipts receipt comment on a merged pull request of this repo: 6 sessions, two Claude models and five Codex helpers, $172.76 total" src="docs/assets/pr-receipt-comment.png" width="560">
+</a>
 
-<sub>real renderer output, byte-pinned to this repo's golden tests</sub>
+<sub>not a mockup — a receipt comment on a merged PR of this repo, posted by <code>aireceipts pr --post</code>. <a href="https://github.com/anandgupta42/receipts/pull/131#issuecomment-4886722030">Read it live.</a></sub>
 
 </div>
 
 **Why this exists.** AI coding agents spend real money invisibly — you see the diff,
 never the bill. aireceipts reads the transcripts your agent already writes to disk and
 turns them into receipts: what a session cost, tool by tool; what a PR cost, across
-every supported agent session it can attribute; where tokens were wasted. Local and
-deterministic — no accounts, no servers; your transcripts and code never leave your
-machine (anonymous, content-free diagnostics are on by default and opt-out — see
-[docs/telemetry.md](docs/telemetry.md)). This repo runs on it: every pull request here
-carries the receipt of the agent sessions that built it — open any merged PR and read
-the bill ([how](docs/pr-receipts.md)).
+every supported agent session it can attribute; where tokens were wasted. This repo
+runs on it: every pull request here carries the receipt of the agent sessions that
+built it — the comment above is one ([how](docs/pr-receipts.md)).
 
-## Install
+- **Local. No accounts, no servers.** Your transcripts and code never leave your
+  machine; rendering a receipt makes zero network calls.
+- **Never a fabricated dollar.** A `$` renders only from a cited, dated price row;
+  unknown models show tokens, never guesses.
+- **Deterministic.** Same transcript in, byte-identical receipt out — golden-tested
+  on every commit ([what a receipt proves](docs/trust.md)).
+- **Telemetry disclosed and killable.** Anonymous, content-free diagnostics, on by
+  default and opt-out ([docs/telemetry.md](docs/telemetry.md)).
 
-```sh
-npx aireceipts-cli          # receipt for your newest session
-npx aireceipts-cli setup    # first-run report + integration next steps
-```
+## Install — four steps, first receipt in under a minute
 
-Or install it: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
+1. **See a receipt.** `npx aireceipts-cli` — your newest session, no install, no
+   account (`npx aireceipts-cli --demo` shows a bundled example if you have no
+   sessions yet).
+2. **Get your bearings.** `npx aireceipts-cli setup` — found sessions, latest cost,
+   week total, and the integrations that fit your machine
+   ([guide](docs/guide/01-getting-started.md)).
+3. **Make it always-on.** `aireceipts install-hook` ends every Claude Code session
+   with a mini-receipt; `aireceipts statusline` puts the live cost in the status bar.
+4. **Put receipts on your PRs.** `aireceipts pr --post` posts the receipt — the
+   same comment shown above. Generation stays local; a drop-in
+   [CI check](docs/adopt/pr-receipt-check-caller.yml) can then verify every PR
+   carries one ([guide](docs/pr-receipts.md)).
+
+Prefer a global install: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
 
 <img alt="aireceipts --demo rendering a sample receipt in a terminal" src="site/assets/demo.gif" width="620">
 
 <sub>`aireceipts --demo` — the bundled sample session; recorded by
 [`site/assets/demo.tape`](site/assets/demo.tape)</sub>
 
-What you get back — the hero image above, as the bytes your terminal prints:
+What you get back, as the bytes your terminal prints:
 
 ```
 - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -65,6 +78,17 @@ same tokens on claude-haiku-4-5..............$0.04
                 aireceipts · local                
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
+  <img alt="the same receipt rendered as a shareable SVG, light and dark themes" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
+</picture>
+
+<sub>the same receipt as <code>--svg</code> renders it — byte-pinned to this repo's golden tests</sub>
+
+</div>
 
 ## Usage
 
@@ -119,11 +143,16 @@ Full methodology: `aireceipts --methodology`.
 
 | Agent | Depth |
 |---|---|
-| Claude Code | Full: per-turn models, tools, cache tiers |
-| Codex CLI | Full per-turn parsing |
-| Gemini CLI | Full: per-turn models, tools, cache tokens |
-| Cursor | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
-| opencode | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
+| [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
+| [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
+| [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
+| [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
+| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; multi-provider pricing resolves per turn from the model id, and unknown models stay tokens-only |
+
+Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
+independent dataset and opens an issue when they disagree; every table change lands
+as a cited price-table PR — watch or star the repo to catch price updates and new
+releases.
 
 ## Telemetry, disclosed
 
