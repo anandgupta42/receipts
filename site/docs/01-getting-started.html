@@ -322,12 +322,26 @@ footer{
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
+      <p class="toc-section">Agents</p>
+      <ul>
+        <li><a href="README.html">Supported agents</a></li>
+        <li><a href="claude-code.html">Receipts for Claude Code</a></li>
+        <li><a href="codex.html">Receipts for Codex CLI</a></li>
+        <li><a href="cursor.html">Receipts for Cursor</a></li>
+        <li><a href="gemini.html">Receipts for Gemini CLI</a></li>
+        <li><a href="opencode.html">Receipts for opencode</a></li>
+      </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
+        <li><a href="ROADMAP.html">Roadmap</a></li>
+      </ul>
+      <p class="toc-section">Advanced</p>
+      <ul>
+        <li><a href="16-improve-your-next-session.html">Improve your next session</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -419,6 +433,18 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
      aireceipts · local · npx aireceipts-cli      </code></pre>
 
 <p>Every session on your machine, across every supported agent, totalled for the last seven days — still local, still no upload.</p>
+
+<h2 id="already-have-sessions-aireceipts-works-retroactively">Already have sessions? aireceipts works retroactively</h2>
+
+<p>Installed today after weeks of agent use? Your history is already on disk, and aireceipts reads it as-is — no re-running anything. Sweep every existing session in one command:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli backfill</code></pre>
+
+<p>That prints a summary of what it found (and writes nothing). To generate the receipts, add <code>--out</code>:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli backfill --out ./receipts</code></pre>
+
+<p>You get one receipt file per session — byte-identical to running <code>aireceipts &lt;selector&gt;</code> on each — plus an <code>index.txt</code> manifest. <code>--since &lt;date&gt;</code> and <code>--limit N</code> narrow the sweep; <code>--json</code> emits the summary machine-readably. Re-running against the same directory is safe (it refuses to write into a directory it didn't create).</p>
 
 <h2 id="4-make-it-automatic">4. Make it automatic</h2>
 

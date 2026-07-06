@@ -45,8 +45,29 @@ const NAV_SECTIONS = Object.freeze([
     ],
   },
   {
+    section: "Agents",
+    items: [
+      "agents/README.md",
+      "agents/claude-code.md",
+      "agents/codex.md",
+      "agents/cursor.md",
+      "agents/gemini.md",
+      "agents/opencode.md",
+    ],
+  },
+  {
     section: "Why",
-    items: ["guide/13-pricing.md", "guide/14-session-attribution.md", "trust.md", "cost-model.md"],
+    items: [
+      "guide/13-pricing.md",
+      "guide/14-session-attribution.md",
+      "trust.md",
+      "cost-model.md",
+      "ROADMAP.md",
+    ],
+  },
+  {
+    section: "Advanced",
+    items: ["guide/16-improve-your-next-session.md"],
   },
 ]);
 

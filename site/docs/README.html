@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Use a template — aireceipts docs</title>
+<title>Supported agents — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,8 +286,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Use a template</h1>
-      <p class="sub">Rendered from <code>docs/guide/10-templates.md</code>.</p>
+      <h1>Supported agents</h1>
+      <p class="sub">Rendered from <code>docs/agents/README.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -345,100 +345,22 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="use-a-template">Use a template</h1>
+<h1 id="supported-agents">Supported agents</h1>
 
-<p>Goal: render the same receipt in a different visual style — for a screenshot, a share, or just taste.</p>
+<p>One page per agent: what a receipt can prove there, where the transcripts live, and how to wire it in. Depth is stated honestly per adapter — full per-turn parsing where the agent records it, labeled degraded mode where it doesn't (I3/I6).</p>
 
-<p>A template changes only how the receipt is <em>drawn</em>. The numbers, the honesty rules, and the totals are identical across all of them.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Agent</th><th>Depth</th><th>Page</th></tr></thead>
+  <tbody>
+    <tr><td>Claude Code</td><td>Full: per-turn models, tools, cache tiers, subagents</td><td><a href="claude-code.html">claude-code.md</a></td></tr>
+    <tr><td>Codex CLI</td><td>Full per-turn parsing + compaction waste</td><td><a href="codex.html">codex.md</a></td></tr>
+    <tr><td>Cursor</td><td>Honest degraded mode: session totals only</td><td><a href="cursor.html">cursor.md</a></td></tr>
+    <tr><td>Gemini CLI</td><td>Full: per-turn models, tools, cache tokens</td><td><a href="gemini.html">gemini.md</a></td></tr>
+    <tr><td>opencode</td><td>Full: per-message models, tools, cache read/write</td><td><a href="opencode.html">opencode.md</a></td></tr>
+  </tbody>
+</table></div>
 
-<h2 id="see-the-styles">See the styles</h2>
-
-<pre class="doc-code"><code class="language-sh">aireceipts templates</code></pre>
-
-<p>prints a short live preview of each built-in template:</p>
-
-<pre class="doc-code"><code>── classic  (default) ──
-Bash..............................$0.05  (3 calls)
-Edit..............................$0.05  (2 calls)
-(thinking/reply)..................$0.03  (2 turns)
-Write.............................$0.03  (2 calls)
-Read...............................$0.02  (1 call)
---------------------------------------------------
-
-── grocery ──
-TXN #A2998369
-ITEM                              QTY          AMT
-Bash                                3        $0.05
-Edit                                2        $0.05
-(thinking/reply)                    2        $0.03
-Write                               2        $0.03
-
-── datavis ──
-[##########] = priciest line; others in proportion
-
---- MODEL OUTPUT ---
-(thinking/reply)................$0.03 [######----]
-
---- TOOL CALLS ---</code></pre>
-
-<h2 id="apply-one">Apply one</h2>
-
-<p>Pass <code>--template &lt;name&gt;</code> (<code>classic</code>, <code>grocery</code>, or <code>datavis</code>) with any selector:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts --template grocery &quot;email format&quot;</code></pre>
-
-<pre class="doc-code"><code>- - - - - - - - - - - - - - - - - - - - - - - - -
-                    AIRECEIPTS                    
- “Add email format validation to the signup for…” 
- Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s 
-    claude-opus-4-8 87% · claude-sonnet-5 13%     
-         cache served 85% of input tokens         
-
-TXN #A3E98D5C
-ITEM                              QTY          AMT
-Bash                                3        $0.05
-Edit                                2        $0.05
-(thinking/reply)                    2        $0.03
-Write                               2        $0.03
-Read                                1        $0.02
---------------------------------------------------
-TOTAL                                        $0.18
-same tokens on claude-haiku-4-5..............$0.04
-  (arithmetic, not a prediction)
-
-CARDHOLDER: claude-opus-4-8
-- - - - - - - - - - - - - - - - - - - - - - - - -
-      THANK YOU FOR VIBING WITH Claude Code       
-            || |||| || || | | || ||||             
-- - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
-
-<p>The <code>TXN #</code> and barcode are a deterministic hash of the session — the same session always renders the same code. <code>datavis</code> instead draws each line as a proportional bar:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts --template datavis &quot;email format&quot;</code></pre>
-
-<pre class="doc-code"><code>[##########] = priciest line; others in proportion
-
---- MODEL OUTPUT ---
-(thinking/reply)................$0.03 [######----]
-
---- TOOL CALLS ---
-Bash............................$0.05 [##########]
-Edit............................$0.05 [#########-]
-Write...........................$0.03 [######----]
-Read............................$0.02 [####------]</code></pre>
-
-<p><code>--template</code> works with the image exports too — see <a href="11-share-and-export.html">Share and export</a>.</p>
-
-<h2 id="adding-a-template">Adding a template</h2>
-
-<p>Templates are built in, not user config files. A new style ships as a small contribution to the renderer — see <code>CONTRIBUTING.md</code> and the existing templates under <code>src/receipt/</code>. Open a PR with a template and its golden output, and it becomes available to everyone.</p>
-
-<h2 id="next">Next</h2>
-
-<ul>
-  <li><strong><a href="11-share-and-export.html">Share and export</a></strong> — save any template as an SVG or PNG.</li>
-  <li><strong><a href="04-read-a-receipt.html">Read a receipt</a></strong> — the default <code>classic</code> layout in detail.</li>
-</ul>
+<p>Adding an agent? The adapter contract and registry are described in <a href="https://github.com/anandgupta42/receipts/blob/main/docs/internal/harness.md">docs/internal/harness.md</a> and the <code>add-vendor-adapter</code> skill; a new adapter ships with its page here (guarded by <code>test/agent-pages.test.ts</code>).</p>
     </article>
   </main>
   <footer>

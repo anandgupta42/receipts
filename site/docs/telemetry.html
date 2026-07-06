@@ -322,12 +322,26 @@ footer{
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
+      <p class="toc-section">Agents</p>
+      <ul>
+        <li><a href="README.html">Supported agents</a></li>
+        <li><a href="claude-code.html">Receipts for Claude Code</a></li>
+        <li><a href="codex.html">Receipts for Codex CLI</a></li>
+        <li><a href="cursor.html">Receipts for Cursor</a></li>
+        <li><a href="gemini.html">Receipts for Gemini CLI</a></li>
+        <li><a href="opencode.html">Receipts for opencode</a></li>
+      </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
+        <li><a href="ROADMAP.html">Roadmap</a></li>
+      </ul>
+      <p class="toc-section">Advanced</p>
+      <ul>
+        <li><a href="16-improve-your-next-session.html">Improve your next session</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -359,7 +373,7 @@ footer{
     <tr><td><code>cliVersion</code></td><td>string</td><td>semver</td><td>From this package's <code>package.json</code>.</td></tr>
     <tr><td><code>os</code></td><td>enum</td><td><code>darwin</code> | <code>linux</code> | <code>win32</code> | <code>other</code></td><td>Collapsed from <code>process.platform</code>.</td></tr>
     <tr><td><code>nodeMajor</code></td><td>integer</td><td>e.g. <code>22</code></td><td>Major Node version only.</td></tr>
-    <tr><td><code>commandClass</code></td><td>enum</td><td><code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>demo</code> | <code>handoff</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>version</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
+    <tr><td><code>commandClass</code></td><td>enum</td><td><code>backfill</code> | <code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>demo</code> | <code>handoff</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>version</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
     <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td>Which agent format was parsed, if known.</td></tr>
     <tr><td><code>durationBucket</code></td><td>enum</td><td><code>&lt;100ms</code> | <code>100-500ms</code> | <code>500ms-2s</code> | <code>2-10s</code> | <code>&gt;10s</code></td><td>Coarse bucket; never raw milliseconds.</td></tr>
     <tr><td><code>ok</code></td><td>boolean</td><td></td><td>Whether the command returned exit code 0.</td></tr>
@@ -376,7 +390,7 @@ footer{
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>errorClass</code></td><td>enum</td><td><code>parse_error</code> | <code>io_error</code> | <code>network_error</code> | <code>validation_error</code> | <code>unknown_error</code></td><td>Derived from bounded error metadata; never <code>error.message</code>.</td></tr>
-    <tr><td><code>command</code></td><td>enum</td><td>same 19-command enum as <code>cli_run.commandClass</code></td><td>Never raw argv.</td></tr>
+    <tr><td><code>command</code></td><td>enum</td><td>same command enum as <code>cli_run.commandClass</code></td><td>Never raw argv.</td></tr>
     <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td></td></tr>
     <tr><td><code>inPackage</code></td><td>boolean</td><td></td><td>Whether the top stack frame is inside aireceipts; the stack text never leaves the process.</td></tr>
   </tbody>
@@ -420,8 +434,8 @@ footer{
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>surface</code></td><td>enum</td><td><code>receipt</code> | <code>compare</code> | <code>week</code> | <code>list</code> | <code>pr</code></td><td></td></tr>
-    <tr><td><code>format</code></td><td>enum</td><td><code>json</code> | <code>csv_session</code> | <code>csv_tool</code> | <code>svg</code> | <code>png</code> | <code>markdown</code> | <code>html</code></td><td></td></tr>
+    <tr><td><code>surface</code></td><td>enum</td><td><code>receipt</code> | <code>compare</code> | <code>week</code> | <code>list</code> | <code>pr</code> | <code>backfill</code></td><td></td></tr>
+    <tr><td><code>format</code></td><td>enum</td><td><code>json</code> | <code>csv_session</code> | <code>csv_tool</code> | <code>svg</code> | <code>png</code> | <code>markdown</code> | <code>html</code> | <code>text</code></td><td></td></tr>
     <tr><td><code>wroteFile</code></td><td>boolean</td><td></td><td>False for stdout exports.</td></tr>
     <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
   </tbody>
@@ -439,6 +453,7 @@ footer{
     <tr><td><code>commentResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
     <tr><td><code>artifactResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
     <tr><td><code>shareResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
+    <tr><td><code>handoffSectionIncluded</code></td><td>boolean</td><td></td><td>SPEC-0059: the rendered body carried the handoff section (rendering rate only — never engagement, never contents).</td></tr>
     <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
   </tbody>
 </table></div>
@@ -472,7 +487,7 @@ footer{
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>milestone</code></td><td>enum</td><td><code>first_run</code> | <code>first_receipt</code> | <code>third_receipt</code> | <code>tenth_receipt</code> | <code>first_export</code> | <code>first_compare</code> | <code>first_week</code> | <code>first_hook_install</code> | <code>first_pr</code> | <code>first_pr_post</code> | <code>first_artifact</code></td><td></td></tr>
-    <tr><td><code>command</code></td><td>enum</td><td>same 19-command enum as <code>cli_run.commandClass</code></td><td>Command that caused the milestone.</td></tr>
+    <tr><td><code>command</code></td><td>enum</td><td>same command enum as <code>cli_run.commandClass</code></td><td>Command that caused the milestone.</td></tr>
     <tr><td><code>installAgeBucket</code></td><td>enum</td><td><code>first_day</code> | <code>2-7d</code> | <code>8-30d</code> | <code>31-90d</code> | <code>&gt;90d</code> | <code>unavailable</code></td><td>Derived locally from <code>firstRunAt</code>; raw date is not sent.</td></tr>
   </tbody>
 </table></div>

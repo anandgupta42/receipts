@@ -19,22 +19,25 @@ Recommendation: **1**. The repo is the demo; the title should point at it.
 
 > aireceipts is a local CLI that reads the transcripts your coding agent
 > already writes (Claude Code, Codex, Cursor, opencode) and prints a cost
-> receipt: per-tool spend, cache economics, waste lines, and a PR-level
-> receipt of every agent session behind a pull request.
+> receipt: per-tool spend, waste lines, and a PR-level receipt of every
+> agent session behind a pull request — and it works retroactively, on
+> sessions already on disk.
 >
-> The honesty rules are the product: no fabricated dollars (unpriced models
-> render tokens-only), every price cited to a dated vendor page checked in
-> CI, byte-deterministic output golden-tested 10× per commit, and a doc on
-> what a receipt can and can't prove (docs/trust.md).
+> Every receipt ends with a handoff: the session's measured waste becomes
+> a paste-ready instruction for the next run. A suggestion graduates to a
+> standing rule only after recurring across 3+ sessions — a one-off
+> fluke never becomes a rule — and an empty handoff prints "nothing to
+> hand off," never invented advice.
 >
-> The repo is agent-built under a spec harness and dogfoods itself: every
-> PR carries the receipt of the sessions that built it — including the day
-> the attribution engine caught itself crediting a $965 session to the
-> wrong PR, and the spec + fix that followed.
+> No fabricated dollars: every price is cited to a dated vendor page
+> checked in CI; byte-deterministic, golden-tested 10x per commit
+> (docs/trust.md).
 >
-> `npx aireceipts-cli` — no accounts, no servers; your transcripts and code
-> never leave your machine (only anonymous, content-free diagnostics, off with
-> one env var — see the first comment).
+> `npx aireceipts-cli` — no accounts, no servers; transcripts never leave
+> your machine (anonymous, content-free diagnostics, off with one env
+> var — see the first comment).
+
+Word count (post body only): 148.
 
 ## Prepared first comment (post immediately under your submission)
 
@@ -52,6 +55,21 @@ The telemetry disclosure is deliberate and goes first, not buried: a
 "nothing leaves your machine" tool that phones home at all will be asked
 about it on HN, and volunteering it reads as honesty while being asked
 reads as a dodge.
+
+## Prepared handoff answer (paste if asked "how do you avoid false positives?")
+
+> The handoff prints exactly what fired on that session — each waste line
+> with what it cost — extracted from the transcript, never summarized, so
+> nothing can be paraphrased away. If nothing fired, it says so: `nothing
+> to hand off`, instead of inventing advice to fill the space.
+>
+> Standing-rule suggestions (a `CLAUDE.md` line to add) are gated
+> separately and more strictly: a waste class has to recur across 3 or
+> more distinct recent sessions — not just repeat inside one session —
+> before it's ever suggested as a rule. `--handoff-threshold` controls
+> that number; the default is 3. That recurrence gate is the actual
+> false-positive control: a one-off fluke never becomes a standing rule.
+> Worked example: docs/guide/09-handoff.md.
 
 ## The claude-receipts reply
 

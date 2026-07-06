@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Use a template — aireceipts docs</title>
+<title>Roadmap — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -286,8 +286,8 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Use a template</h1>
-      <p class="sub">Rendered from <code>docs/guide/10-templates.md</code>.</p>
+      <h1>Roadmap</h1>
+      <p class="sub">Rendered from <code>docs/ROADMAP.md</code>.</p>
     </div>
   </header>
   <main class="doc-grid">
@@ -345,100 +345,31 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="use-a-template">Use a template</h1>
+<h1 id="roadmap">Roadmap</h1>
 
-<p>Goal: render the same receipt in a different visual style — for a screenshot, a share, or just taste.</p>
+<p>Honest and short, on purpose: order and reasons, never dates. For what's actually shipped in the current release, see the current-state inventory in <a href="https://github.com/anandgupta42/receipts/blob/main/AGENTS.md">AGENTS.md</a>.</p>
 
-<p>A template changes only how the receipt is <em>drawn</em>. The numbers, the honesty rules, and the totals are identical across all of them.</p>
+<h2 id="now">Now</h2>
 
-<h2 id="see-the-styles">See the styles</h2>
-
-<pre class="doc-code"><code class="language-sh">aireceipts templates</code></pre>
-
-<p>prints a short live preview of each built-in template:</p>
-
-<pre class="doc-code"><code>── classic  (default) ──
-Bash..............................$0.05  (3 calls)
-Edit..............................$0.05  (2 calls)
-(thinking/reply)..................$0.03  (2 turns)
-Write.............................$0.03  (2 calls)
-Read...............................$0.02  (1 call)
---------------------------------------------------
-
-── grocery ──
-TXN #A2998369
-ITEM                              QTY          AMT
-Bash                                3        $0.05
-Edit                                2        $0.05
-(thinking/reply)                    2        $0.03
-Write                               2        $0.03
-
-── datavis ──
-[##########] = priciest line; others in proportion
-
---- MODEL OUTPUT ---
-(thinking/reply)................$0.03 [######----]
-
---- TOOL CALLS ---</code></pre>
-
-<h2 id="apply-one">Apply one</h2>
-
-<p>Pass <code>--template &lt;name&gt;</code> (<code>classic</code>, <code>grocery</code>, or <code>datavis</code>) with any selector:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts --template grocery &quot;email format&quot;</code></pre>
-
-<pre class="doc-code"><code>- - - - - - - - - - - - - - - - - - - - - - - - -
-                    AIRECEIPTS                    
- “Add email format validation to the signup for…” 
- Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s 
-    claude-opus-4-8 87% · claude-sonnet-5 13%     
-         cache served 85% of input tokens         
-
-TXN #A3E98D5C
-ITEM                              QTY          AMT
-Bash                                3        $0.05
-Edit                                2        $0.05
-(thinking/reply)                    2        $0.03
-Write                               2        $0.03
-Read                                1        $0.02
---------------------------------------------------
-TOTAL                                        $0.18
-same tokens on claude-haiku-4-5..............$0.04
-  (arithmetic, not a prediction)
-
-CARDHOLDER: claude-opus-4-8
-- - - - - - - - - - - - - - - - - - - - - - - - -
-      THANK YOU FOR VIBING WITH Claude Code       
-            || |||| || || | | || ||||             
-- - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
-
-<p>The <code>TXN #</code> and barcode are a deterministic hash of the session — the same session always renders the same code. <code>datavis</code> instead draws each line as a proportional bar:</p>
-
-<pre class="doc-code"><code class="language-sh">aireceipts --template datavis &quot;email format&quot;</code></pre>
-
-<pre class="doc-code"><code>[##########] = priciest line; others in proportion
-
---- MODEL OUTPUT ---
-(thinking/reply)................$0.03 [######----]
-
---- TOOL CALLS ---
-Bash............................$0.05 [##########]
-Edit............................$0.05 [#########-]
-Write...........................$0.03 [######----]
-Read............................$0.02 [####------]</code></pre>
-
-<p><code>--template</code> works with the image exports too — see <a href="11-share-and-export.html">Share and export</a>.</p>
-
-<h2 id="adding-a-template">Adding a template</h2>
-
-<p>Templates are built in, not user config files. A new style ships as a small contribution to the renderer — see <code>CONTRIBUTING.md</code> and the existing templates under <code>src/receipt/</code>. Open a PR with a template and its golden output, and it becomes available to everyone.</p>
+<p>Cost-attribution confidence (SPEC-0044): the shipped slices — the <code>ConfidenceEvent</code> contract, the no-silent-drop guarantee, the per-model cost matrix, the cache-write caveat, and the subagent double-count fix — are already in the current release. The spec itself stays open until its <code>--self-check</code> kill-criterion and cost-model docs land.</p>
 
 <h2 id="next">Next</h2>
 
 <ul>
-  <li><strong><a href="11-share-and-export.html">Share and export</a></strong> — save any template as an SVG or PNG.</li>
-  <li><strong><a href="04-read-a-receipt.html">Read a receipt</a></strong> — the default <code>classic</code> layout in detail.</li>
+  <li><strong>Integration with coding agents.</strong> The handoff and standing rules are built to be read by a machine, not just pasted by a human. Claude Code hooks ship today (<code>aireceipts install-hook</code>); the deeper direction is agent-native integrations that consume <code>--handoff --json</code> directly — a hook or harness that reads the packet and acts on it without a human pasting anything.</li>
+  <li><strong>Broader adapter coverage.</strong> More coding agents parsed to the same per-turn depth Claude Code, Codex, Gemini CLI, and opencode already get.</li>
+  <li><strong>The opt-in cost-per-turn benchmark (SPEC-0015).</strong> The client contract — payload build, the allowlisted schema, <code>--dry-run</code>, the <code>[y/N]</code> consent flow — is shipped; sends stay disabled until a separate server spec owns cohort definitions, abuse policy, and the explicit network exception that would allow one (I1/I4).</li>
 </ul>
+
+<h2 id="later">Later</h2>
+
+<ul>
+  <li><strong>A hosted GitHub App stays parked, not planned</strong> (SPEC-0052). An App can't generate a receipt — the transcripts it would need live on the developer's machine, not on GitHub — and none of its three recorded revisit triggers (an org rejecting the per-repo workflow as the enforcement mechanism, a committed hosted org-aggregation product, or fork-PR contributors measurably losing receipts) has fired. It reopens only if one does.</li>
+</ul>
+
+<h2 id="principles">Principles</h2>
+
+<p>Local-first: your transcripts and code never leave your machine. Deterministic: the same transcript in always renders the same receipt out, byte for byte. No fabricated dollars, ever — every price traces to a dated, cited source. Facts, not rankings: a receipt reports what a session cost; it never grades or ranks one model or agent against another.</p>
     </article>
   </main>
   <footer>

@@ -322,12 +322,26 @@ footer{
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
       </ul>
+      <p class="toc-section">Agents</p>
+      <ul>
+        <li><a href="README.html">Supported agents</a></li>
+        <li><a href="claude-code.html">Receipts for Claude Code</a></li>
+        <li><a href="codex.html">Receipts for Codex CLI</a></li>
+        <li><a href="cursor.html">Receipts for Cursor</a></li>
+        <li><a href="gemini.html">Receipts for Gemini CLI</a></li>
+        <li><a href="opencode.html">Receipts for opencode</a></li>
+      </ul>
       <p class="toc-section">Why</p>
       <ul>
         <li><a href="13-pricing.html">How pricing is estimated</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
+        <li><a href="ROADMAP.html">Roadmap</a></li>
+      </ul>
+      <p class="toc-section">Advanced</p>
+      <ul>
+        <li><a href="16-improve-your-next-session.html">Improve your next session</a></li>
       </ul>
     </aside>
     <article class="doc-content">
@@ -442,6 +456,39 @@ footer{
     <p>All notable changes to aireceipts-cli. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
   </li>
 </ul>
+<h2>Agents</h2>
+<ul class="doc-index-list">
+  <li>
+    <a href="README.html">Supported agents</a>
+    <span class="path">docs/agents/README.md</span>
+    <p>One page per agent: what a receipt can prove there, where the transcripts live, and how to wire it in.</p>
+  </li>
+  <li>
+    <a href="claude-code.html">Receipts for Claude Code</a>
+    <span class="path">docs/agents/claude-code.md</span>
+    <p>Full-depth support: per-turn models, per-tool attribution, cache tiers, subagent rollups.</p>
+  </li>
+  <li>
+    <a href="codex.html">Receipts for Codex CLI</a>
+    <span class="path">docs/agents/codex.md</span>
+    <p>Full per-turn parsing: models, token usage, tool calls, and Codex's context compactions surfaced as a waste signal. (SPEC-0058; depth facts match src/parse/codex.ts.)</p>
+  </li>
+  <li>
+    <a href="cursor.html">Receipts for Cursor</a>
+    <span class="path">docs/agents/cursor.md</span>
+    <p>Honest degraded mode: session totals only, tokens only. Cursor's local history carries no per-turn model ids, no cache/usage breakdown, and no real per-message timestamps — so a…</p>
+  </li>
+  <li>
+    <a href="gemini.html">Receipts for Gemini CLI</a>
+    <span class="path">docs/agents/gemini.md</span>
+    <p>Full-depth support: per-turn models, tools, and cache tokens, including nested subagent chats. (SPEC-0058; depth facts match src/parse/gemini.ts.)</p>
+  </li>
+  <li>
+    <a href="opencode.html">Receipts for opencode</a>
+    <span class="path">docs/agents/opencode.md</span>
+    <p>Full-depth support: per-message models, tools, and cache read/write, with multi-provider pricing resolved per turn from the model id.</p>
+  </li>
+</ul>
 <h2>Why</h2>
 <ul class="doc-index-list">
   <li>
@@ -463,6 +510,19 @@ footer{
     <a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a>
     <span class="path">docs/cost-model.md</span>
     <p>This is the living account of how aireceipts turns a transcript into priced numbers, per scenario and per agent, and — the part that matters most — exactly when the receipt tells…</p>
+  </li>
+  <li>
+    <a href="ROADMAP.html">Roadmap</a>
+    <span class="path">docs/ROADMAP.md</span>
+    <p>Honest and short, on purpose: order and reasons, never dates. For what's actually shipped in the current release, see the current-state inventory in AGENTS.md.</p>
+  </li>
+</ul>
+<h2>Advanced</h2>
+<ul class="doc-index-list">
+  <li>
+    <a href="16-improve-your-next-session.html">Improve your next session</a>
+    <span class="path">docs/guide/16-improve-your-next-session.md</span>
+    <p>Goal: turn today's receipt into a cheaper session tomorrow — a six-step loop, in order, using commands you already have.</p>
   </li>
 </ul>
     </article>
