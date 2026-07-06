@@ -45,16 +45,16 @@ function opencodeRoot(home: string): string {
 
 describe("SPEC-0043 command-path telemetry", () => {
   const home = homedir(); // the mocked, factory-created temp home
-  let origOut: typeof process.stdout.write;
-  let origErr: typeof process.stderr.write;
+  // Captured ONCE at module scope: a beforeEach save would capture the previous
+  // test's mock on the second run, and afterAll would then restore the mock.
+  const origOut = process.stdout.write.bind(process.stdout);
+  const origErr = process.stderr.write.bind(process.stderr);
 
   beforeEach(() => {
     mkdirSync(join(home, ".aireceipts"), { recursive: true });
     writeFileSync(join(home, ".aireceipts", "telemetry.json"), JSON.stringify({ shown: true }));
     mkdirSync(opencodeRoot(home), { recursive: true });
     copyFileSync(join(fixturesDir, "opencode", "clean-multi-vendor.db"), join(opencodeRoot(home), "opencode.db"));
-    origOut = process.stdout.write.bind(process.stdout);
-    origErr = process.stderr.write.bind(process.stderr);
     process.stdout.write = (() => true) as typeof process.stdout.write;
     process.stderr.write = (() => true) as typeof process.stderr.write;
     __resetQueueForTests();

@@ -47,6 +47,14 @@ export interface AttributionResult {
   /** SPEC-0054 R4 — priced cost per model (`turn.model ?? session.model`), summed over PRICED turns only; an unpriced turn contributes nothing (I2). */
   byModelUsd: { model: string; usd: number }[];
   /**
+   * SPEC-0054 R3 — turn-level coverage: of the turns that carried token usage,
+   * how many priced. Turn-level (not per-tool-row) because a tool row mixing a
+   * priced and an unpriced turn still shows a `$` — only the turn count can
+   * disclose that TOTAL excludes some tokens (I2).
+   */
+  usageTurnCount: number;
+  unpricedUsageTurnCount: number;
+  /**
    * SPEC-0054 R4 — the counterfactual "what these cache-read tokens would have
    * cost at the plain input rate", summed per priced turn as
    * `cacheRead * (row.input - row.input_cached) / 1_000_000` over that turn's
@@ -79,6 +87,8 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
   let costLowerBoundCacheTier = false;
   const modelUsdAcc = new Map<string, number>();
   let cacheReadAtInputRateUsd = 0;
+  let usageTurnCount = 0;
+  let unpricedUsageTurnCount = 0;
   // SPEC-0054 R4 — starts true; any cacheRead-carrying turn that can't cite
   // both rates flips it false, making the counterfactual all-or-null (I2).
   let cacheReadCounterfactualComplete = true;
@@ -92,6 +102,12 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
     const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
 
+    if (turn.usage && turn.usage.total > 0) {
+      usageTurnCount++;
+      if (priced === null) {
+        unpricedUsageTurnCount++;
+      }
+    }
     if (priced !== null && priced.cacheWriteLowerBound) {
       costLowerBoundCacheTier = true;
     }
@@ -139,6 +155,8 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
     methodology: METHODOLOGY,
     costLowerBoundCacheTier,
     byModelUsd,
+    usageTurnCount,
+    unpricedUsageTurnCount,
     cacheReadAtInputRateUsd: totalUsd !== null && totalTokens.cacheRead > 0 && cacheReadCounterfactualComplete ? cacheReadAtInputRateUsd : null,
   };
 }

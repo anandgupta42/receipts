@@ -92,7 +92,7 @@ describe("buildReceiptModel — peakTurn (SPEC-0054 R4)", () => {
 });
 
 describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", () => {
-  it("fires exactly one caveat naming the unpriced/total tool-row counts when the session priced but some rows didn't", async () => {
+  it("fires exactly one caveat naming the unpriced/total usage-turn counts when the session priced but some turns didn't", async () => {
     const turns = [
       turn(0, { model: "claude-haiku-4-5", usage: usage({ input: 1000, output: 0 }), toolCalls: [call("Bash")] }),
       turn(1, { model: "claude-unknown-model-xyz", usage: usage({ input: 500, output: 0 }), toolCalls: [call("Grep")] }),
@@ -102,8 +102,25 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     expect(model.totalUsd).not.toBeNull();
     const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
     expect(coverage).toHaveLength(1);
-    expect(coverage[0].text).toBe("caveat: 1 of 2 tool rows unpriced — TOTAL excludes their tokens");
+    expect(coverage[0].text).toBe("caveat: 1 of 2 turns unpriced — TOTAL excludes their tokens");
     expect(coverage[0].text).not.toContain("$");
+  });
+
+  it("fires even when one tool row spans a priced AND an unpriced turn (the row shows a $, so only the turn count discloses the gap — S2 round 3)", async () => {
+    const turns = [
+      turn(0, { model: "claude-haiku-4-5", usage: usage({ input: 1000, output: 0 }), toolCalls: [call("Bash")] }),
+      turn(1, { model: "claude-unknown-model-xyz", usage: usage({ input: 500, output: 0 }), toolCalls: [call("Bash")] }),
+    ];
+    const model = await buildReceiptModel(session({ turns }), dataDir);
+
+    // The single Bash row is priced (its priced turn contributed a $)...
+    expect(model.totalUsd).not.toBeNull();
+    expect(model.toolRows).toHaveLength(1);
+    expect(model.toolRows[0].usd).not.toBeNull();
+    // ...but the caveat still fires: row-level coverage would miss this.
+    const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
+    expect(coverage).toHaveLength(1);
+    expect(coverage[0].text).toBe("caveat: 1 of 2 turns unpriced — TOTAL excludes their tokens");
   });
 
   it("stays silent when every tool row priced", async () => {

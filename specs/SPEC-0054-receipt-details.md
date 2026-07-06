@@ -46,13 +46,16 @@ Default-output changes (deliberate, scoped golden regeneration):
   (`src/receipt/svg.ts:297-303`) — it must draw `detail` for badged rows too, the
   same way the unbadged branch does.
 - **R3 — priced-coverage caveat.** When a session priced (`totalUsd !== null`) but
-  some tool rows are unpriced, `buildReceiptModel` appends one caveat via the
-  existing mechanism (`src/receipt/model.ts:258-273`), computed directly over
-  `toolRows` (no import of the CLI-side telemetry helper — that enum stays where
-  it is): `caveat: N of M tool rows unpriced — TOTAL excludes their tokens`.
+  some usage-carrying turns didn't, `buildReceiptModel` appends one caveat via
+  the existing mechanism (`src/receipt/model.ts:258-273`), fed by turn-level
+  counts from `attributeByTool` (turn-level, not per-tool-row: a row mixing a
+  priced and an unpriced turn still shows a `$`, so only the turn count can
+  disclose the gap — S2 round 3):
+  `caveat: N of M turns unpriced — TOTAL excludes their tokens`.
   Integer counts, no `$` in the text. New `CaveatFinding.kind`
-  `"partial-priced-coverage"` (`src/receipt/caveats.ts:17`). Fully-priced and
-  fully-unpriced sessions render byte-identically to today.
+  `"partial-priced-coverage"` (`src/receipt/caveats.ts:17`), added to the
+  `--json` export schema's caveat enum (`src/receipt/exportSchema.ts:123`).
+  Fully-priced and fully-unpriced sessions render byte-identically to today.
 
 The `--details` section (opt-in; default output untouched):
 
@@ -133,8 +136,10 @@ The `--details` section (opt-in; default output untouched):
   byte-identical to today except the price-delta row's `(-N%)` suffix.
 - **Given** the stuck-loop fixture **When** `aireceipts` (text and `--svg`)
   **Then** the loop waste row carries `at turns A-B` (1-based) in both surfaces.
-- **Given** a session where only some tool rows priced **When** `aireceipts`
-  **Then** exactly one new caveat names the unpriced row count; TOTAL unchanged.
+- **Given** a session where only some usage-carrying turns priced **When**
+  `aireceipts` **Then** exactly one new caveat names the unpriced turn count
+  (even when a single tool row spans both a priced and an unpriced turn);
+  TOTAL unchanged.
 - **Given** an unpriced (tokens-only) session **When** `aireceipts --details`
   **Then** the DETAILS section renders zero `$` bytes and the dollar-in-unpriced
   battery check passes; no coverage caveat renders.
@@ -174,7 +179,9 @@ The `--details` section (opt-in; default output untouched):
 | R2 stuck-loop location | loop-bash-5x fixture | detail `at turns A-B` 1-based; other waste details unchanged |
 | R2 single-turn loop | crafted fixture, one-turn run | `at turn N` singular |
 | R2 SVG badged detail | loop fixture `--svg` | detail text present in SVG output |
-| R3 coverage caveat | mixed priced/unpriced fixture | one caveat, exact counts, no `$` in text |
+| R3 coverage caveat | mixed priced/unpriced fixture | one caveat, exact turn counts, no `$` in text |
+| R3 same-tool mix | one tool across a priced + an unpriced turn | caveat still fires (turn-level, not row-level) |
+| R3 json schema | mixed fixture `--json` | `receiptJsonSchema` accepts the new caveat kind |
 | R3 caveat absent | all-priced and all-unpriced fixtures | byte-identical output |
 | R4 composition | demo fixture `--details` | in/out + cache r/w rows, `formatTokensK` values |
 | R4 TTL split | fixture with 5m/1h fields | `writes:` sub-line; absent fields → no line; a lone tier renders without a fabricated 0 for the other |
@@ -253,6 +260,14 @@ product) is honored by keeping the section strictly opt-in with zero default chu
 `(-N%)`, build renders `(N% less)`; spec amended to the build's unsigned wording
 (a bare minus reads as a negative dollar). SHOULD-FIX adopted: PNG follows SVG
 (R7 wording), mixed-coverage BY MODEL test added.
+
+**2026-07-05 · S2 round 3 (Codex, review-pr gate): 3 BLOCKING → applied.**
+(1) `--json` export schema lacked the new caveat kind → enum + docs + test.
+(2) row-level R3 missed a same-tool priced/unpriced mix (row shows `$`, tokens
+silently excluded) → caveat recomputed at turn level in `attributeByTool`
+(`usageTurnCount`/`unpricedUsageTurnCount`), text now `N of M turns unpriced`.
+(3) the added command-path telemetry test leaked a mocked stdout via
+beforeEach re-capture → originals captured once at module scope.
 
 **2026-07-05 · approved (button 1):** maintainer, in-session standing directive
 ("come up with ideas and implement them as well … take decision on your own",

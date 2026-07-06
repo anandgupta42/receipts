@@ -51,7 +51,7 @@ Three lines appear only when they have something to say:
 
 - a **stuck-loop waste line** names where to look — `at turns 1-5` — so you
   can jump straight to the loop in your own transcript;
-- a **coverage caveat** — `caveat: 2 of 3 tool rows unpriced — TOTAL excludes
+- a **coverage caveat** — `caveat: 2 of 3 turns unpriced — TOTAL excludes
   their tokens` — whenever a session mixed a priced model with one that has no
   cited price row, so a partial TOTAL never poses as a complete one;
 - time-integrity caveats (inconsistent timestamps, skipped records) as before.

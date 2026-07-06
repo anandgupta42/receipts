@@ -304,18 +304,18 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
       text: `caveat: ${n} unreadable transcript record${n === 1 ? "" : "s"} skipped — total may be incomplete`,
     });
   }
-  // SPEC-0054 R3 — a session that priced but left some tool rows unpriced (a
-  // mixed-model or partial-coverage transcript) gets one caveat naming the
-  // gap; fully-priced and fully-unpriced (`totalUsd === null`) sessions push
-  // nothing, so their output stays byte-identical (I5).
-  if (attribution.totalUsd !== null) {
-    const unpricedRows = toolRows.filter((r) => r.usd === null).length;
-    if (unpricedRows > 0) {
-      caveats.push({
-        kind: "partial-priced-coverage",
-        text: `caveat: ${unpricedRows} of ${toolRows.length} tool rows unpriced — TOTAL excludes their tokens`,
-      });
-    }
+  // SPEC-0054 R3 — a session that priced but left some usage-carrying turns
+  // unpriced (a mixed-model or partial-coverage transcript) gets one caveat
+  // naming the gap. Turn-level, not per-tool-row: a row mixing a priced and an
+  // unpriced turn still shows a `$`, so only the turn count can disclose that
+  // TOTAL excludes some tokens (I2). Fully-priced and fully-unpriced
+  // (`totalUsd === null`) sessions push nothing — byte-identical output (I5).
+  if (attribution.totalUsd !== null && attribution.unpricedUsageTurnCount > 0) {
+    const n = attribution.unpricedUsageTurnCount;
+    caveats.push({
+      kind: "partial-priced-coverage",
+      text: `caveat: ${n} of ${attribution.usageTurnCount} turns unpriced — TOTAL excludes their tokens`,
+    });
   }
 
   const durationMs =
