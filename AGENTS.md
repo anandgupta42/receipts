@@ -52,9 +52,10 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 - **I2 — Never fabricate a dollar.** `$` renders only when a dated price-table row
   matches the session's model and date; otherwise render tokens. No silent fallback
   prices.
-- **I3 — Every number traceable.** Price rows carry cited `sources:`; the receipt prints
-  its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
-  and no line ever claims another model would have completed the task.
+- **I3 — Every number traceable.** Price rows carry cited `sources:`; the attribution
+  methodology is one flag away (`--methodology`) and ships in `--json`; cheaper-model
+  lines are labeled (arithmetic vs ≈ estimate), and no line ever claims another model
+  would have completed the task.
 - **I4 — Local-first; diagnostics + adoption telemetry, disclosed and escapable.** The
   product works fully offline. The only network call is content-free telemetry (Azure
   App Insights): command, coarse buckets, versions, agent type, error class, parse-failure
