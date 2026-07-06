@@ -25,11 +25,6 @@ same reads at uncached input rate............$0.52
 BY MODEL
 claude-opus-4-8........................87% · $0.17
 claude-sonnet-5........................13% · $0.01
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 - - - - - - - - - - - - - - - - - - - - - - - - -

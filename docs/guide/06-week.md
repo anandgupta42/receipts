@@ -24,11 +24,11 @@ Top waste
   trivial-spans.................$0.00 · 2 sessions
 
 vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
-  Priced $ Δ................................+$0.12
-  Tokens Δ.............................+93,700 tok
+  Priced $ Δ.........................+$0.12 (more)
+  Tokens Δ......................+93,700 tok (more)
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 ```
 
 `Priced total (5 of 5)` reads "5 of 5 sessions had a price"; if some ran on
@@ -36,7 +36,10 @@ unpriced models, the dollar total covers only the priced ones while the token
 total covers all of them — a coverage gap can never masquerade as a spend change.
 The deltas at the bottom are reported **per category, never blended**: the dollar
 delta only appears when both weeks are fully priced, the token delta always
-appears, and `Excluded` counts unpriced sessions in each window separately.
+appears, and `Excluded` counts unpriced sessions in each window separately. Each
+delta carries a plain-language direction — `(more)`, `(less)`/`(fewer)`, or
+`(flat)` — read against the `vs. prior 7 days` header, so a negative figure like
+`-93,700 tok (fewer)` reads unambiguously as *fewer tokens this week*, not more.
 
 ## The window
 

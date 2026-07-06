@@ -9,7 +9,6 @@
 // refactor's no-regression proof); `grocery` and `datavis` reuse the same block
 // kinds with template-specific data. No template re-derives a number: every
 // dollar/token figure comes from the already-priced {@link ReceiptModel}.
-import { METHODOLOGY_BRIEF } from "../pricing/attribution.js";
 import {
   CONTEXT_THRASH_NOTE,
   PRICE_DELTA_NOTE,
@@ -33,7 +32,7 @@ export const CURSOR_DEGRADED_NOTE = "Cursor transcripts carry no per-turn model/
 export const NO_PRICE_MATCH_NOTE = "no price table matched";
 
 const WORDMARK = "AIRECEIPTS";
-const FOOTER_TEXT = "aireceipts · local · buy me a samosa";
+const FOOTER_TEXT = "aireceipts · local";
 const THINKING_REPLY = "(thinking/reply)";
 
 const TITLE_MAX = 46;
@@ -339,7 +338,7 @@ export function detailsBlocks(model: ReceiptModel): Block[] {
   return blocks;
 }
 
-// --- Shared tail: rule → total → price-delta → methodology footnote ----------
+// --- Shared tail: rule → total → price-delta → footer -----------------------
 
 /** SPEC-0028 R3 — muted time-integrity caveat notes; empty for consistent sessions so existing renders stay byte-identical (I5). */
 function caveatBlocks(model: ReceiptModel): Block[] {
@@ -347,10 +346,12 @@ function caveatBlocks(model: ReceiptModel): Block[] {
 }
 
 /**
- * The rule/total/price-delta/footnote sequence every template ends its body
- * with (honesty invariants live here — I3). `extra` (R4's DETAILS blocks,
- * classic-only) inserts between the price-delta block and the methodology
- * footnote.
+ * The rule/total/price-delta/footer sequence every template ends its body with
+ * (honesty invariants live here — I3; SPEC-0055: the card carries no
+ * methodology footnote — the full methodology is one flag away,
+ * `aireceipts --methodology`, and ships in `--json`). `extra` (SPEC-0054 R4's
+ * DETAILS blocks, classic-only) inserts between the price-delta block and the
+ * footer.
  */
 function tailBlocks(model: ReceiptModel, footer: Block, extra?: Block[]): Block[] {
   const blocks: Block[] = [];
@@ -369,7 +370,6 @@ function tailBlocks(model: ReceiptModel, footer: Block, extra?: Block[]): Block[
   if (extra) {
     blocks.push(...extra);
   }
-  blocks.push({ kind: "footnote", text: METHODOLOGY_BRIEF, spaceBefore: true });
   blocks.push(footer);
   return blocks;
 }
@@ -390,7 +390,7 @@ function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
   const extra = view?.details ? detailsBlocks(model) : undefined;
-  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, samosaMark: true }, extra));
+  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT }, extra));
   return blocks;
 }
 
@@ -430,7 +430,6 @@ function buildGrocery(model: ReceiptModel): Block[] {
     blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
   }
   blocks.push({ kind: "note", text: `CARDHOLDER: ${dominantModel}`, spaceBefore: true });
-  blocks.push({ kind: "footnote", text: METHODOLOGY_BRIEF, spaceBefore: true });
   blocks.push({ kind: "footer", text: `THANK YOU FOR VIBING WITH ${model.agentLabel}` });
   blocks.push({ kind: "barcode", pattern: barcodePattern(token) });
   return blocks;
@@ -474,7 +473,7 @@ function buildDatavis(model: ReceiptModel): Block[] {
     const block = classicWasteBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
-  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT, samosaMark: true }));
+  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT }));
   return blocks;
 }
 

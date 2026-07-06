@@ -24,6 +24,22 @@ function signedInt(n: number): string {
   return `${n >= 0 ? "+" : "-"}${formatInt(Math.abs(n))}`;
 }
 
+/**
+ * Plain-language direction for a delta so a signed figure reads without knowing
+ * the current−prior convention: against the "vs. prior 7 days" header, does this
+ * week land higher or lower? A bare `-3,315,784,772` can't say whether tokens
+ * went up or down; `(fewer)` does. Zero → "flat".
+ */
+function trend(n: number, more: string, less: string): string {
+  if (n > 0) {
+    return more;
+  }
+  if (n < 0) {
+    return less;
+  }
+  return "flat";
+}
+
 /** A priced bucket renders `$`; an unpriced bucket falls back to tokens (mirrors the receipt's tokens-only mode). */
 function splitValue(usd: number | null, tokens: TokenUsage, sessionCount: number): string {
   const magnitude = usd !== null ? `$${formatUsd(usd)}` : `${formatInt(tokens.total)} tok`;
@@ -77,9 +93,12 @@ function deltaBody(digest: WeekDigest): string[] {
     lines.push("  no prior data");
     return lines;
   }
-  const usdValue = delta.pricedUsdDelta !== null ? signedUsd(delta.pricedUsdDelta) : "n/a (priced coverage differs)";
+  const usdValue =
+    delta.pricedUsdDelta !== null
+      ? `${signedUsd(delta.pricedUsdDelta)} (${trend(delta.pricedUsdDelta, "more", "less")})`
+      : "n/a (priced coverage differs)";
   lines.push(indented("Priced $ Δ", usdValue));
-  lines.push(indented("Tokens Δ", `${signedInt(delta.tokenDelta)} tok`));
+  lines.push(indented("Tokens Δ", `${signedInt(delta.tokenDelta)} tok (${trend(delta.tokenDelta, "more", "fewer")})`));
   lines.push(indented("Excluded", `${delta.currentExcluded} now / ${delta.priorExcluded} prior`));
   return lines;
 }
@@ -109,7 +128,7 @@ export function renderWeek(digest: WeekDigest, opts: RenderWeekOptions = {}): st
   lines.push(...deltaBody(digest));
 
   lines.push(dim("-".repeat(WIDTH)));
-  lines.push(center("aireceipts · local · buy me a samosa", WIDTH));
+  lines.push(center("aireceipts · local", WIDTH));
 
   return lines.join("\n");
 }

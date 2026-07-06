@@ -29,13 +29,8 @@ Read...............................$0.02  (1 call)
 TOTAL........................................$0.18
 same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
@@ -77,7 +72,7 @@ claude-opus-4-8........................87% · $0.17
 claude-sonnet-5........................13% · $0.01
 ```
 
-The section slots between the price-delta line and the methodology footnote.
+The section slots between the price-delta line and the footer.
 Line by line: **tokens in / out** is the raw prompt/completion split; **cache
 read / write** shows whether caching is actually working (when the transcript
 reports the cache-write TTL tiers, a `writes: 5m … · 1h …` sub-line appears —

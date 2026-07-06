@@ -2,7 +2,6 @@
 # .github/workflows/pr-receipt-check.yml. It is notice-only by default; set
 # AIRECEIPTS_REQUIRE_PR_RECEIPT=true to enforce same-repo PRs. Generation is
 # local; see https://github.com/anandgupta42/receipts/blob/main/docs/pr-receipts.md.
-# NOTE: reference valid only after the receipts repo rename+flip is complete.
 name: pr-receipt-check
 on: [pull_request]
 jobs:

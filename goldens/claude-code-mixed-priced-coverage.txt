@@ -13,11 +13,6 @@ caveat: 2 of 3 turns unpriced — TOTAL excludes their tokens
 TOTAL........................................$0.01
 same tokens on claude-haiku-4-5...$0.01 (12% less)
   (arithmetic, not a prediction)
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 - - - - - - - - - - - - - - - - - - - - - - - - -

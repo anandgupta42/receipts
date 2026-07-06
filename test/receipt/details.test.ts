@@ -96,13 +96,13 @@ describe("SPEC-0054 R4 — the DETAILS section", () => {
     }
   });
 
-  it("places DETAILS after the price-delta note and before the methodology footnote", async () => {
+  it("places DETAILS after the price-delta note and before the footer (SPEC-0055: the card carries no methodology footnote)", async () => {
     const lines = await pricedDetailsLines();
     const details = lines.findIndex((l) => l.trim() === "DETAILS");
     const deltaNote = lines.findIndex((l) => l.includes("(arithmetic, not a prediction)"));
-    const methodology = lines.findIndex((l) => l.includes("Per-turn cost split"));
+    const footer = lines.findIndex((l) => l.includes("aireceipts · local"));
     expect(details).toBeGreaterThan(deltaNote);
-    expect(details).toBeLessThan(methodology);
+    expect(details).toBeLessThan(footer);
   });
 
   it("BY MODEL rows are cent-reconciled and sum to TOTAL", async () => {

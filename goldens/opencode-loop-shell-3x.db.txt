@@ -10,11 +10,6 @@ bash..............................$0.01  (3 calls)
   at turns 1-3
 --------------------------------------------------
 TOTAL........................................$0.01
-
-Per-turn cost split evenly across that turn's tool
-calls; unpriced models show tokens only, never
-guessed dollars. Full method: aireceipts
---methodology
 - - - - - - - - - - - - - - - - - - - - - - - - -
-       aireceipts · local · buy me a samosa       
+                aireceipts · local                
 - - - - - - - - - - - - - - - - - - - - - - - - -

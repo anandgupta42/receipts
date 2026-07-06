@@ -241,7 +241,10 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("AIRECEIPTS");
     expect(result.stdout).toContain("Claude Code");
     expect(result.stdout).toContain("TOTAL");
-    expect(result.stdout).toContain("Per-turn cost split");
+    // SPEC-0055: the card carries no methodology footnote and no samosa footer.
+    expect(result.stdout).toContain("aireceipts · local");
+    expect(result.stdout).not.toContain("Per-turn cost split");
+    expect(result.stdout).not.toContain("buy me a samosa");
   });
 
   // SPEC-0054 R9 e2e: `--details` through real argv parsing renders the
