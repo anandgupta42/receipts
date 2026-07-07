@@ -38,5 +38,6 @@ conservative branch rules as every agent — [how](../pr-receipts.md).
 
 ## Privacy
 
-Read-only, local. Transcripts never leave your machine; rendering a receipt
-makes zero network calls ([what a receipt proves](../trust.md)).
+Read-only, local. Transcripts never leave your machine; pricing a receipt needs no
+network — it uses bundled, cited price tables ([what a receipt proves](../trust.md)).
+Anonymous, opt-out usage telemetry is the one exception (`AIRECEIPTS_TELEMETRY=off`).

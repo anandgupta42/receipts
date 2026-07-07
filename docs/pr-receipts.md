@@ -65,6 +65,12 @@ replacement for the one command above. Enable it once per clone:
 npm run setup:hooks
 ```
 
+> **Scope:** `npm run setup:hooks` and the committed `.githooks/` live in **this repo's
+> own source tree** — they are not part of the published npm package, so this exact wiring
+> is for aireceipts' own contributors. The underlying flags (`aireceipts pr --store ref
+> --push-ref`) work in any repo; a repo that has adopted aireceipts can point
+> `core.hooksPath` at its own hook that calls them.
+
 That points `core.hooksPath` at the committed `.githooks/` and builds the CLI (the hook
 runs the built `dist/`, or a global `aireceipts` if you have one). From then on, every
 `git push` of a branch runs `aireceipts pr --store ref --push-ref` for you: it writes the
@@ -134,11 +140,14 @@ by deleting the file.
 - **Enforce** — set the repo variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true` to make same-repo
   PRs require a receipt. Fork PRs always stay notice-only (source transcripts live on the
   contributor's machine, so CI can't generate one).
-- **Fully seamless (in progress)** — the `store=ref` receipt producer is shipped; a pre-push
-  hook that auto-attaches the receipt on every push, and a CI step that posts it for you (so
-  contributors need no local `gh`), are landing next — each opt-in, each notice-only until
-  turned on. Until then, a contributor attaches a receipt with the one shipped command:
-  `npx aireceipts-cli pr --post`.
+- **Fully seamless (v0.4.0)** — two opt-in layers now exist. **CI posts for you:** when a
+  branch carries a `refs/receipts/<slug>` ref, the check renders and posts the receipt
+  comment itself via `GITHUB_TOKEN`, so a contributor needs no local `gh`. **Auto-attach on
+  push:** a committed pre-push hook writes and pushes that ref on `git push` — shipped for
+  *this* repo's own contributors (`npm run setup:hooks`); an adopter repo wires an equivalent
+  hook calling `npx aireceipts-cli pr --store ref --push-ref` (the flags ship in the npm
+  package; the hook file does not). Either way a contributor can still just run
+  `npx aireceipts-cli pr --post`. Each layer is opt-in and notice-only until turned on.
 
 CI still never generates a receipt itself: the source transcripts stay local (I1/I4).
 Rolling out across a whole org: [docs/adopt/org-rollout.md](adopt/org-rollout.md).

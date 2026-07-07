@@ -1,7 +1,7 @@
 ---
 id: SPEC-0063
 title: "Fast feedback — cut test, CI, and release wall-clock without weakening any gate"
-status: building # PR open; shipped flips on merge
+status: shipped
 milestone: M5
 depends: []
 ---
@@ -101,11 +101,11 @@ I1/I5: determinism is proven more often per minute, not less).
 
 ## Success criteria
 
-- [ ] Local `npx vitest run` wall-clock materially reduced (target ≥ 2× vs the 58s
+- [x] Local `npx vitest run` wall-clock materially reduced (target ≥ 2× vs the 58s
       baseline on the same machine).
-- [ ] CI `verify` job time materially reduced (determinism step ~36s → seconds).
-- [ ] Full preflight wall-clock ≈ its longest single gate, not the sum.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] CI `verify` job time materially reduced (determinism step ~36s → seconds).
+- [x] Full preflight wall-clock ≈ its longest single gate, not the sum.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs` all pass unmasked (`echo $?`).
-- [ ] `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
+- [x] `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked.

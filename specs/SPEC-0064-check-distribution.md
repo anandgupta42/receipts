@@ -1,7 +1,7 @@
 ---
 id: SPEC-0064
 title: PR-receipt check — release-pinned distribution and an npm-native pr-check
-status: draft
+status: building
 milestone: M5
 depends: [SPEC-0019, SPEC-0030, SPEC-0057]
 ---
@@ -89,10 +89,14 @@ is the single source of truth behind the reusable workflow, the composite action
 
 ## Success criteria
 
-- [ ] R1 landed: every live caller template pins `@latest`; `release-publish.yml` advances
+- [x] R1 landed: every live caller template pins `@latest`; `release-publish.yml` advances
       the tag; a bootstrap `latest` tag exists at the current release.
 - [ ] R2–R4: `aireceipts pr-check` ships in `dist/`, verdict parity with
       `check-pr-receipt.mjs` is asserted by a test, and the render path stays lazy.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked
       (`echo $?`).
+
+**Shipped in v0.4.0:** R1 only (`@latest` pin + tag-move, #164). R2–R4 (the npm-native
+`aireceipts pr-check` command) are not built; the spec stays `status: building` until they
+land.

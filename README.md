@@ -25,20 +25,22 @@ turns them into receipts: what a session cost, tool by tool; what a PR cost, acr
 every supported agent session it can attribute; where tokens were wasted. This repo
 runs on it — every pull request here carries the receipt of the agent sessions that
 built it ([how](docs/pr-receipts.md)). Local, with no accounts and no servers: your
-transcripts and code never leave your machine, and rendering a receipt makes zero
-network calls.
+transcripts and code never leave your machine, and pricing a receipt needs no network —
+it uses cited, bundled price tables. (aireceipts does send anonymous, opt-out usage
+[telemetry](#telemetry-disclosed) — turn it off with `AIRECEIPTS_TELEMETRY=off` or
+`DO_NOT_TRACK=1`; it is auto-off in CI.)
 
 ## Install — four steps, first receipt in under a minute
 
-1. **See a receipt.** `npx aireceipts-cli` — your newest session, no install, no
-   account (`npx aireceipts-cli --demo` shows a bundled example if you have no
-   sessions yet).
+1. **See a receipt.** `npx aireceipts-cli` — renders your newest agent session found
+   anywhere on your machine (not scoped to the current folder), no install, no account
+   (`npx aireceipts-cli --demo` shows a bundled example if you have no sessions yet).
 2. **Get your bearings.** `npx aireceipts-cli setup` — found sessions, latest cost,
    week total, and the integrations that fit your machine
    ([guide](docs/guide/01-getting-started.md)).
-3. **Make it always-on.** `aireceipts install-hook` ends every Claude Code session
-   with a mini-receipt; `aireceipts statusline` puts the live cost in the status bar.
-4. **Put receipts on your PRs.** `aireceipts pr --post` posts the comment shown above.
+3. **Make it always-on.** `npx aireceipts-cli install-hook` ends every Claude Code session
+   with a mini-receipt; `npx aireceipts-cli statusline` puts the live cost in the status bar.
+4. **Put receipts on your PRs.** `npx aireceipts-cli pr --post` posts the comment shown above.
    Generation stays local; a drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml)
    can then verify every PR carries one ([guide](docs/pr-receipts.md)).
 
