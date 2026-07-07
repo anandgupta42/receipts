@@ -32,6 +32,7 @@ import {
   type ContributorView,
   type HandoffSectionData,
   type HandoffSlipView,
+  type PrBodyExtras,
   type PrBodyInput,
 } from "./body.js";
 import { summarizeConfidence, type ConfidenceEvent } from "./confidence.js";
@@ -41,6 +42,9 @@ import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js"
 import { buildShareLines } from "./share.js";
 import type { ReceiptModel } from "../receipt/model.js";
 import type { ResultValue, StepResultValue } from "../telemetry/schemas.js";
+import { buildPrReceiptPayload, canonicalEndedAtMs, serializePrReceipt } from "./payload.js";
+import { receiptRefSlug } from "./payloadTypes.js";
+import { writeReceiptRef } from "./store.js";
 
 export interface PrOptions {
   post: boolean;
@@ -51,6 +55,8 @@ export interface PrOptions {
   details?: boolean;
   /** SPEC-0035 R5: print ready-to-paste share intent URLs to stderr (requires --artifact). */
   share?: boolean;
+  /** SPEC-0065 R1: where the receipt is persisted. Precedence: flag > `AIRECEIPTS_STORE` env > default `"comment"`. */
+  store?: "comment" | "ref";
 }
 
 export interface PrDeps {
@@ -572,11 +578,41 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   // SPEC-0059 R5 — the comment's handoff section is a sibling of the details
   // section and shares its --no-details gate; R8's boolean is the assembler's
   // own decision, not a scan of the body.
-  const { body, handoffSectionIncluded } = renderPrBodyDetailed(bodyInput, {
-    artifactLink: link ?? undefined,
+  const extras: PrBodyExtras = {
+    // Project to the declared `{ fileName, url }` — `link` also carries a runtime
+    // `ownerRepo` (used for the share-hint check below, not by the renderer). Storing it
+    // in the payload would smuggle an unknown field past `PrBodyExtras.artifactLink` that
+    // SPEC-0066's strict CI validator rejects (Codex review).
+    artifactLink: link ? { fileName: link.fileName, url: link.url } : undefined,
     details,
     handoff: opts.details === false ? undefined : handoffData,
-  });
+  };
+  const { body, handoffSectionIncluded } = renderPrBodyDetailed(bodyInput, extras);
+
+  // SPEC-0065 R1 — `store=ref`: in addition to (never instead of) the comment
+  // path below, which stays the unconditional default, write the exact
+  // renderer input as a schema-versioned payload to `refs/receipts/<slug>`
+  // via pure git plumbing. Precedence: flag > `AIRECEIPTS_STORE` env >
+  // default `"comment"`; R3's committed-settings layer is out of scope here.
+  const store = opts.store ?? (process.env.AIRECEIPTS_STORE === "ref" ? "ref" : undefined) ?? "comment";
+  if (store === "ref") {
+    const branchResult = deps.runGit("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: deps.cwd });
+    const branch = branchResult.code === 0 ? branchResult.stdout.trim() : "";
+    if (!branch || branch === "HEAD") {
+      deps.err("store=ref skipped: could not resolve current branch");
+    } else {
+      const payload = buildPrReceiptPayload(bodyInput, extras);
+      const json = serializePrReceipt(payload);
+      const endedAtMs = canonicalEndedAtMs(receipt.models);
+      const slug = receiptRefSlug(branch);
+      const outcome = writeReceiptRef(slug, branch, json, endedAtMs, deps.cwd);
+      if (outcome.ok) {
+        deps.err(`wrote receipt ref ${outcome.ref} (${outcome.commit})`);
+      } else {
+        deps.err(`store=ref failed: ${outcome.reason}`);
+      }
+    }
+  }
 
   // R3 (SPEC-0019): render before the comment upsert, unconditionally.
   deps.out(body);
