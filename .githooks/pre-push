@@ -1,0 +1,35 @@
+#!/bin/sh
+# SPEC-0065 R2 — pre-push hook: attach a receipt ref to every branch push, with
+# no extra step from the developer. Activated per clone via `core.hooksPath`
+# (run `npm run setup:hooks`; SPEC-0065 R3).
+#
+# RECURSION GUARD: this hook runs `aireceipts pr --store ref --push-ref`, which
+# does a nested `git push` of `refs/receipts/<slug>` (see `pushReceiptRef` in
+# src/pr/store.ts). That nested push re-invokes this same hook. We act only when
+# the ORIGINAL push targets a branch — a stdin line whose LOCAL or REMOTE ref is
+# `refs/heads/*` (a refspec like `HEAD^:refs/heads/main` names the branch only on
+# the remote side). A ref-only push (the nested receipts push, a tag push) names
+# no `refs/heads/*` on either side, so the guard below exits 0 and recursion stops.
+#
+# BEST-EFFORT: every failure path is silent (output redirected, exit ignored)
+# and this script always exits 0. It must never block `git push`.
+
+has_branch_push=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_ref" in refs/heads/*) has_branch_push=1 ;; esac
+  case "$remote_ref" in refs/heads/*) has_branch_push=1 ;; esac
+done
+
+if [ "$has_branch_push" -ne 1 ]; then
+  exit 0
+fi
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+if [ -f "$repo_root/dist/cli.js" ]; then
+  node "$repo_root/dist/cli.js" pr --store ref --push-ref >/dev/null 2>&1 || true
+elif command -v aireceipts >/dev/null 2>&1; then
+  aireceipts pr --store ref --push-ref >/dev/null 2>&1 || true
+fi
+
+exit 0

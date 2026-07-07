@@ -38,6 +38,7 @@
     "build": "tsup",
     "preflight": "node scripts/preflight-release.mjs",
     "prepublishOnly": "tsup",
+    "setup:hooks": "git config core.hooksPath .githooks && npm run build",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

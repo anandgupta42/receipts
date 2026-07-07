@@ -56,6 +56,24 @@ git config alias.receipt '!npx aireceipts-cli pr --post'
 git receipt                  # after pushing your branch
 ```
 
+### Always-on: pre-push hook
+
+This is optional and not required for adoption — it's a convenience layer, not a
+replacement for the one command above. Enable it once per clone:
+
+```sh
+npm run setup:hooks
+```
+
+That points `core.hooksPath` at the committed `.githooks/` and builds the CLI (the hook
+runs the built `dist/`, or a global `aireceipts` if you have one). From then on, every
+`git push` of a branch runs `aireceipts pr --store ref --push-ref` for you: it writes the
+receipt to `refs/receipts/<slug>` and pushes that ref alongside your branch, with no extra
+step. It's best-effort and **never blocks the push** — a missing session, a repo without
+`gh`, an unbuilt CLI, or a push failure is swallowed silently and the push proceeds. (Git
+never runs a fetched hook automatically, so this one command is unavoidable; the CI check
+is the install-free layer that catches a missed receipt regardless.)
+
 ### Optional: publish a durable receipt page
 
 ```sh

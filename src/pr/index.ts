@@ -44,7 +44,7 @@ import type { ReceiptModel } from "../receipt/model.js";
 import type { ResultValue, StepResultValue } from "../telemetry/schemas.js";
 import { buildPrReceiptPayload, canonicalEndedAtMs, serializePrReceipt } from "./payload.js";
 import { receiptRefSlug } from "./payloadTypes.js";
-import { writeReceiptRef } from "./store.js";
+import { pushReceiptRef, writeReceiptRef } from "./store.js";
 
 export interface PrOptions {
   post: boolean;
@@ -57,6 +57,8 @@ export interface PrOptions {
   share?: boolean;
   /** SPEC-0065 R1: where the receipt is persisted. Precedence: flag > `AIRECEIPTS_STORE` env > default `"comment"`. */
   store?: "comment" | "ref";
+  /** SPEC-0065 R2: after a successful `store=ref` write, also push the ref to `origin`. Best-effort — never fails the command. */
+  pushRef?: boolean;
 }
 
 export interface PrDeps {
@@ -608,6 +610,16 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       const outcome = writeReceiptRef(slug, branch, json, endedAtMs, deps.cwd);
       if (outcome.ok) {
         deps.err(`wrote receipt ref ${outcome.ref} (${outcome.commit})`);
+        // SPEC-0065 R2 — best-effort push of the ref itself, for the pre-push
+        // hook's `--push-ref` call. Never throws and never affects `code`: a
+        // push failure (no remote, no push rights, offline) prints one line
+        // and the branch push the hook is running inside of proceeds.
+        if (opts.pushRef) {
+          const pushed = pushReceiptRef(slug, "origin", deps.cwd);
+          if (!pushed) {
+            deps.err(`store=ref: push of ${outcome.ref} to origin failed (best-effort, continuing)`);
+          }
+        }
       } else {
         deps.err(`store=ref failed: ${outcome.reason}`);
       }
