@@ -1,4 +1,5 @@
-import type { Compaction, Session, TokenUsage, Turn } from "../parse/types.js";
+import { posix as posixPath } from "node:path";
+import type { Compaction, Session, TokenUsage, ToolCallStatus, Turn } from "../parse/types.js";
 import { addUsage, emptyUsage, scaleUsage, withTotal } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
 import { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForSource, vendorForTurn } from "./resolve.js";
@@ -42,6 +43,12 @@ export interface StuckLoopFinding {
 interface FlatCall {
   tool: string;
   normalizedInput: string;
+  /** SPEC-0068 — raw call input (for read `file_path` / shell `command` extraction). */
+  input?: unknown;
+  /** SPEC-0068 — a real shell execution (may mutate files). */
+  shell?: boolean;
+  /** SPEC-0068 — a failed read is a retry, not a re-read. */
+  status?: ToolCallStatus;
   usd: number | null;
   tokens: TokenUsage;
   turnIndex: number;
@@ -65,6 +72,9 @@ async function flattenCalls(session: Session, dataDir: string): Promise<FlatCall
       out.push({
         tool: call.name,
         normalizedInput: normalizedInput(call.input),
+        input: call.input,
+        shell: call.shell,
+        status: call.status,
         usd: priced !== null ? priced.usd * share : null,
         tokens: tokenShare,
         turnIndex: turn.index,
@@ -114,6 +124,120 @@ export async function detectStuckLoops(session: Session, dataDir: string = defau
   }
 
   return findings;
+}
+
+// --- SPEC-0068 same-file re-reads (a LOW-confidence neutral diagnostic) ---------
+
+const READ_TOOL_NAMES = new Set(["Read"]);
+const REREAD_EDIT_TOOL_NAMES = new Set(["Edit", "Write", "NotebookEdit"]);
+/**
+ * Whole-tree shell mutators that can change files WITHOUT naming a basename the
+ * substring check would catch. Deliberately narrow: a path-specific `git checkout
+ * README.md` is NOT whole-tree (the substring check suppresses only that file);
+ * only `.`-targeted / `--hard` / stash / apply / whole-tree formatters qualify.
+ */
+const WHOLE_TREE_MUTATOR = /\bgit\s+reset\s+--hard\b|\bgit\s+stash\b|\bgit\s+apply\b|\bgit\s+(?:checkout|restore)\s+(?:--\s+)?\.(?:\s|$)|\bprettier\b[^|]*--write|\beslint\b[^|]*--fix|\bfind\b[^|]*-exec/u;
+
+/** Normalize a read/edit path (`file_path`, or `NotebookEdit`'s `notebook_path`): resolve `.`/`..`, collapse separators, strip a trailing slash. Absolute vs relative and different dirs stay distinct — `src/a.ts` !== `test/a.ts` (SPEC-0068 R1). */
+function normReadPath(input: unknown): string | undefined {
+  if (input && typeof input === "object") {
+    const o = input as { file_path?: unknown; notebook_path?: unknown };
+    const raw = typeof o.file_path === "string" ? o.file_path : typeof o.notebook_path === "string" ? o.notebook_path : undefined;
+    if (raw && raw.length > 0) {
+      return posixPath.normalize(raw).replace(/(?!^)\/+$/u, "");
+    }
+  }
+  return undefined;
+}
+
+function shellCommandOf(input: unknown): string {
+  if (input && typeof input === "object" && "command" in input) {
+    const c = (input as { command?: unknown }).command;
+    return typeof c === "string" ? c : "";
+  }
+  return "";
+}
+
+export interface SameFileReReadsFinding {
+  /** No-recorded-cause re-reads (2nd..Nth reads of a path with no edit/compaction/shell-touch between). */
+  count: number;
+  /** `null` when any counted re-read is unpriced (I2). */
+  usd: number | null;
+  tokens: TokenUsage;
+  turnIndices: number[];
+  /** Always low — the transcript cannot prove the re-read was unnecessary (SPEC-0068 R4). */
+  confidence: "low";
+}
+
+/**
+ * SPEC-0068 R1-R3 — same-FILE re-reads (same normalized path, any range) with no
+ * RECORDED edit to that path, compaction, or shell command touching it between the
+ * reads. A neutral diagnostic FACT, never a waste verdict (R4) and never a savings
+ * claim. `usd` is `null` if any counted re-read is unpriced (I2). Fires only where a
+ * `Read` tool with a `file_path` exists (Claude Code) — silent elsewhere (I6).
+ */
+export async function detectSameFileReReads(session: Session, dataDir: string = defaultDataDir()): Promise<SameFileReReadsFinding | null> {
+  const flat = await flattenCalls(session, dataDir);
+  const compactionTurns = (session.compactions ?? []).map((c) => c.turnIndex);
+
+  const lastRead = new Map<string, { ord: number; turn: number }>();
+  const lastEditOrd = new Map<string, number>();
+  // Shell calls in order — a re-read is "shell-touched" if a later-than-prior-read
+  // shell command is whole-tree OR mentions the file's basename (substring, so it
+  // catches multi-dot/no-extension/dotfile names the regex would miss — Codex #1).
+  const shellCalls: { ord: number; cmd: string; wholeTree: boolean }[] = [];
+
+  let count = 0;
+  let tokens = emptyUsage();
+  let usd: number | null = 0;
+  const turnIndices = new Set<number>();
+
+  flat.forEach((f, ord) => {
+    if (REREAD_EDIT_TOOL_NAMES.has(f.tool)) {
+      const p = normReadPath(f.input);
+      if (p) {
+        lastEditOrd.set(p, ord);
+      }
+      return;
+    }
+    if (f.shell === true || f.tool === "Bash") {
+      const cmd = shellCommandOf(f.input);
+      shellCalls.push({ ord, cmd, wholeTree: WHOLE_TREE_MUTATOR.test(cmd) });
+      return;
+    }
+    if (!READ_TOOL_NAMES.has(f.tool) || f.status === "error") {
+      return; // non-read, or a failed read (a retry, not a re-read)
+    }
+    const p = normReadPath(f.input);
+    if (!p) {
+      return;
+    }
+    const prev = lastRead.get(p);
+    if (prev === undefined) {
+      lastRead.set(p, { ord, turn: f.turnIndex });
+      return;
+    }
+    const editBetween = (lastEditOrd.get(p) ?? -1) > prev.ord;
+    const base = posixPath.basename(p);
+    const bashBetween = shellCalls.some((s) => s.ord > prev.ord && (s.wholeTree || s.cmd.includes(base)));
+    const compactionBetween = compactionTurns.some((t) => t > prev.turn && t <= f.turnIndex);
+    if (!editBetween && !bashBetween && !compactionBetween) {
+      count += 1;
+      tokens = addUsage(tokens, f.tokens);
+      if (f.usd === null) {
+        usd = null;
+      } else if (usd !== null) {
+        usd += f.usd;
+      }
+      turnIndices.add(f.turnIndex);
+    }
+    lastRead.set(p, { ord, turn: f.turnIndex });
+  });
+
+  if (count === 0) {
+    return null;
+  }
+  return { count, usd, tokens, turnIndices: [...turnIndices].sort((a, b) => a - b), confidence: "low" };
 }
 
 const TRIVIAL_SPAN_MAX_OUTPUT_TOKENS = 120;
