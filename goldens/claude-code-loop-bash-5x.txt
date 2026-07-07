@@ -5,6 +5,9 @@
                claude-opus-4-8 100%               
          cache served 88% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 Bash..............................$0.07  (5 calls)
 (thinking/reply)...................$0.02  (1 turn)
 

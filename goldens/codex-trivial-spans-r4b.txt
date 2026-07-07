@@ -5,6 +5,9 @@
                 gpt-5.3-codex 100%                
          cache served 54% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 (thinking/reply)..................$0.00  (3 turns)
 
 ≈ re-priced eligible trivial spans...........$0.00

@@ -23,6 +23,7 @@ import type {
   WasteLine,
 } from "../../src/receipt/model.js";
 import type { TokenUsage } from "../../src/parse/types.js";
+import { emptyCostShape } from "../../src/pricing/costShape.js";
 
 function usage(total: number): TokenUsage {
   return { input: total, output: 0, cacheRead: 0, cacheCreation: 0, total };
@@ -69,6 +70,7 @@ function model(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     methodology: "m",
     priceRowsUsed: [],
     unpriceable: false,
+    costShape: emptyCostShape(),
     ...overrides,
   } as ReceiptModel;
 }

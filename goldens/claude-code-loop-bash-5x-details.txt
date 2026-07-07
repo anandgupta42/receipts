@@ -5,6 +5,9 @@
                claude-opus-4-8 100%               
          cache served 88% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 Bash..............................$0.07  (5 calls)
 (thinking/reply)...................$0.02  (1 turn)
 
@@ -20,6 +23,9 @@ tokens in / out.........................8.1k / 688
 cache read / write.......................63k / 900
 turns / tool calls...........................6 / 5
 peak turn.........................16k tok (turn 6)
+top 3 turns......................53% (turns 4,5,6)
+late-turn...............1.1× late/early (low conf)
+  (ratio only — mixes output/cache/model)
 same reads at uncached input rate............$0.28
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -

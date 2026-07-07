@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReceiptModel, WasteLine } from "../receipt/model.js";
+import { emptyCostShape } from "../pricing/costShape.js";
 import { bucketCostPerTurn, buildBenchmarkPayload, toBenchmarkAgentType, toModelFamily } from "./payload.js";
 import { benchmarkRunPropertiesSchema } from "./schemas.js";
 
@@ -25,6 +26,7 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     turnCount: 0,
     toolCallCount: 0,
     cacheReadAtInputRateUsd: null,
+    costShape: emptyCostShape(),
     ...overrides,
   };
 }

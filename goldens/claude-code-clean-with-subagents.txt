@@ -5,6 +5,9 @@
                claude-opus-4-8 100%               
          cache served 29% of input tokens         
 
+pre-edit: 61% of cost (1/2 turns)
+  (share before the first named edit tool)
+
 Task...............................$0.01  (1 call)
 Edit...............................$0.01  (1 call)
 SUBAGENTS (2)................................$0.02

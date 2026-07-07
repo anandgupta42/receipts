@@ -56,6 +56,7 @@ JSON export.
 | `priceDelta` | PriceDelta \| null | Cheapest-current-model arithmetic, or null in tokens-only mode. |
 | `methodology` | string | The attribution methodology string (I3). |
 | `priceRowsUsed` | array | Every dated price row consulted; see PriceRowUsed. |
+| `costShape` | CostShape | SPEC-0067 — cost-shape facts (standalone, never in savings math): `preEdit` (pre-edit cost/token share), `topTurns` (expensive-turn concentration, or null), `lateTurn` (neutral late-half/early-half cost ratio, low confidence, or null). |
 | `subagents` | Subagents (optional) | SPEC-0061 — the session's subagent (child-transcript) rollup; present only when children were discovered. Aggregate only — never child ids, titles, or paths. |
 
 ### Subagents object
@@ -67,6 +68,25 @@ JSON export.
 | `tokensTotal` | number | Total tokens across readable children; unreadable children contribute nothing (counted, never guessed). |
 | `unpricedCount` | number | Readable children with no matching price row. |
 | `unreadableCount` | number | Children whose transcripts failed to parse — the rendered TOTAL is a floor. |
+
+### CostShape object
+
+SPEC-0067 cost-shape facts — standalone, never in savings math. `preEdit` always present; `topTurns` and `lateTurn` are null unless every usage-bearing turn is priced.
+
+| Field | Type | Notes |
+|---|---|---|
+| `preEdit` | object | The pre-edit cost/token split (below). |
+| `preEditUsd` | number \| null | Priced cost before the first named edit turn; null unless all pre-edit turns priced (I2). |
+| `postEditUsd` | number \| null | Priced cost from the first named edit turn onward; null unless all priced. |
+| `preEditPct` | number \| null | `preEditUsd / totalUsd` percent; null unless every usage-bearing turn is priced (never a ratio over a partial denominator). |
+| `preEditTokenPct` | number | The same split in tokens (always present). |
+| `firstEditTurn` | number \| null | 1-based turn of the first named edit tool, or null when none observed. |
+| `confidence` | string | `high` for `preEdit`/`topTurns`, `low` for `lateTurn`. |
+| `topTurns` | object \| null | Expensive-turn concentration: `sharePct` and 1-based `indices` of the top-3 priced turns. |
+| `sharePct` | number | Share of priced cost in the top-3 turns. |
+| `indices` | array | 1-based turn numbers of the top-3 turns, ascending. |
+| `lateTurn` | object \| null | `lateRatio`: a neutral late-half/early-half average-cost ratio (low confidence; never a "context growth" cause). |
+| `lateRatio` | number | Second-half average turn cost / first-half average. |
 
 ### TokenUsage object
 

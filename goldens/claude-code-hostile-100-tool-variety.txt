@@ -5,6 +5,9 @@
                claude-sonnet-5 100%               
          cache served 34% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 mcp__postgres__query_098...........$0.01  (1 call)
 mcp__redis__scan_099...............$0.01  (1 call)
 mcp__sentry__resolve_event_097.....$0.01  (1 call)

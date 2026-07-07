@@ -145,6 +145,8 @@ export interface RecordReceiptGeneratedInput {
   hasPriceDelta: boolean;
   /** SPEC-0061 R6 — subagent transcripts were folded into the rendered totals. */
   hasSubagents: boolean;
+  /** SPEC-0067 R7 — the receipt rendered a pre-edit cost-share line. */
+  hasPreEditShare: boolean;
   /** SPEC-0054 R8 — the render carried the opt-in `--details` section. */
   detailsView: boolean;
   turnCount: number;
@@ -167,6 +169,7 @@ export function recordReceiptGenerated(input: RecordReceiptGeneratedInput): void
       hasContextThrashWaste: input.hasContextThrashWaste,
       hasPriceDelta: input.hasPriceDelta,
       hasSubagents: input.hasSubagents,
+      hasPreEditShare: input.hasPreEditShare,
       detailsView: input.detailsView,
       turnCountBucket: bucketCount(input.turnCount),
       toolCallCountBucket: bucketCount(input.toolCallCount),

@@ -5,6 +5,9 @@
      claude-haiku-4-5 54% · gpt-5.3-codex 46%     
          cache served 6% of input tokens          
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 bash...............................$0.01  (1 call)
 read...............................$0.00  (1 call)
 

@@ -47,6 +47,12 @@ export function receiptTelemetryFromModels(input: {
     hasPriceDelta: input.models.some((model) => model.priceDelta !== null),
     // SPEC-0061 R6 — boolean only, never a count (I4).
     hasSubagents: input.models.some((model) => model.subagents !== undefined),
+    // SPEC-0067 R7 — true iff a pre-edit line actually rendered: it is classic-only
+    // (default `none` or explicit `classic`), and only when a session has usage turns
+    // to split. grocery/datavis omit the line, so they report false (Codex #6).
+    hasPreEditShare:
+      (input.template === "none" || input.template === "classic") &&
+      input.models.some((model) => model.costShape.preEdit.totalTurnCount > 0),
     detailsView: input.detailsView,
     turnCount: input.turnCount,
     toolCallCount: input.toolCallCount,

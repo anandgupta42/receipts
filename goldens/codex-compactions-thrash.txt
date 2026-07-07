@@ -5,6 +5,9 @@
                 gpt-5.3-codex 100%                
          cache served 75% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 exec_command......................$0.23  (3 calls)
 
 ≈ context thrash: 2 compactions in 1 turns...$0.06

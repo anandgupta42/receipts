@@ -6,6 +6,7 @@ import type { AgentSource, Session, TokenUsage } from "../parse/types.js";
 import { SOURCE_LABELS } from "../parse/types.js";
 import { addUsage, emptyUsage, sanitizeText } from "../parse/util.js";
 import { attributeByTool, METHODOLOGY } from "../pricing/attribution.js";
+import { computeCostShape, type CostShape } from "../pricing/costShape.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
 import { isoDateOf, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
 import type { ResolvedPrice } from "../pricing/types.js";
@@ -115,6 +116,8 @@ export interface ReceiptModel {
   peakTurn?: { tokens: number; turnNumber: number };
   /** SPEC-0054 R4 — `attribution.cacheReadAtInputRateUsd`; see that field for the all-or-null completeness rule. */
   cacheReadAtInputRateUsd: number | null;
+  /** SPEC-0067 — cost-shape facts (pre-edit share + JSON/details expensive-turn & late-turn). Standalone facts, not WasteLines; never enter savings math. */
+  costShape: CostShape;
   /** SPEC-0061 — subagent rollup, composed after build by session surfaces; absent ⇒ no children discovered (or the surface didn't compose it) and output stays byte-identical (I5). */
   subagents?: SubagentAggregate;
 }
@@ -261,6 +264,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
 
   const modelMix = await buildModelMix(session, attribution.byModelUsd);
   const toolRows = sortToolRows(attribution.byTool);
+  const costShape = await computeCostShape(session, dataDir);
 
   const wasteLines: WasteLine[] = [
     ...stuckLoops.map(
@@ -367,5 +371,6 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     toolCallCount: session.totals.toolCallCount,
     peakTurn: findPeakTurn(session),
     cacheReadAtInputRateUsd: attribution.cacheReadAtInputRateUsd,
+    costShape,
   };
 }

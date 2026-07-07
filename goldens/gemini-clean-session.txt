@@ -5,6 +5,9 @@
               gemini-2.5-flash 100%               
          cache served 62% of input tokens         
 
+pre-edit: 67% of cost (1/2 turns)
+  (share before the first named edit tool)
+
 replace............................$0.01  (1 call)
 read_file..........................$0.00  (1 call)
 run_shell_command..................$0.00  (1 call)

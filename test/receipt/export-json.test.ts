@@ -10,6 +10,7 @@ import type { ReceiptModel } from "../../src/receipt/model.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
 import { toCompareJsonModel, toJsonModel } from "../../src/receipt/json.js";
 import { compareJsonSchema, receiptJsonSchema, SCHEMA_VERSION } from "../../src/receipt/exportSchema.js";
+import { emptyCostShape } from "../../src/pricing/costShape.js";
 
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures");
 
@@ -49,6 +50,7 @@ function unpricedModel(): ReceiptModel {
     methodology: "tokens-only",
     priceRowsUsed: [],
     unpriceable: true,
+    costShape: emptyCostShape(),
   };
 }
 

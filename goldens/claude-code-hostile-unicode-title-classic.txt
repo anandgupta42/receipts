@@ -5,6 +5,9 @@
                claude-sonnet-5 100%               
          cache served 60% of input tokens         
 
+pre-edit: 0% of cost (0/1 turns)
+  (share before the first named edit tool)
+
 Edit...............................$0.01  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.01

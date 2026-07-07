@@ -132,6 +132,23 @@ const receiptBodyShape = {
   priceDelta: priceDeltaSchema.nullable(),
   methodology: z.string(),
   priceRowsUsed: z.array(priceRowUsedSchema),
+  /** SPEC-0067 — cost-shape facts. Standalone facts (not waste), never in savings math. */
+  costShape: z
+    .object({
+      preEdit: z
+        .object({
+          preEditUsd: z.number().nullable(),
+          postEditUsd: z.number().nullable(),
+          preEditPct: z.number().nullable(),
+          preEditTokenPct: z.number(),
+          firstEditTurn: z.number().nullable(),
+          confidence: z.literal("high"),
+        })
+        .strict(),
+      topTurns: z.object({ sharePct: z.number(), indices: z.array(z.number().int()), confidence: z.literal("high") }).strict().nullable(),
+      lateTurn: z.object({ lateRatio: z.number(), confidence: z.literal("low") }).strict().nullable(),
+    })
+    .strict(),
   /** SPEC-0061 R5 — subagent rollup aggregate; present only when the session has children. Counts and sums only — never child ids, titles, or paths. */
   subagents: z
     .object({
