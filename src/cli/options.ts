@@ -43,6 +43,8 @@ export interface CliOptions {
   readonly share: boolean;
   /** SPEC-0065 R1: `aireceipts pr --store <comment|ref>` — where the receipt is persisted; default `comment`. */
   readonly store?: "comment" | "ref";
+  /** SPEC-0065 R2: `aireceipts pr --store ref --push-ref` also pushes the written ref to `origin`. */
+  readonly pushRef: boolean;
   /** SPEC-0056: `aireceipts backfill --limit N` caps the swept set to the N most recent matches. */
   readonly limit?: number;
   /** SPEC-0056: `aireceipts backfill --out <dir>` — distinct from `output` (SVG/PNG's `-o`/`--output`). */
@@ -94,6 +96,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let noDetails = false;
   let share = false;
   let store: "comment" | "ref" | undefined;
+  let pushRef = false;
   let limit: number | undefined;
   let outDir: string | undefined;
   let format: string | undefined;
@@ -157,6 +160,8 @@ export function parseOptions(argv: string[]): CliOptions {
         throw new Error(`--store must be "comment" or "ref" (got ${JSON.stringify(value)})`);
       }
       store = value;
+    } else if (arg === "--push-ref") {
+      pushRef = true;
     } else if (arg === "--session") {
       prSession = argv[++i];
     } else if (arg.startsWith("--session=")) {
@@ -215,6 +220,7 @@ export function parseOptions(argv: string[]): CliOptions {
     noDetails,
     share,
     store,
+    pushRef,
     limit,
     outDir,
     help,
