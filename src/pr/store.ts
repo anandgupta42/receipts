@@ -126,6 +126,21 @@ export function pushReceiptRef(slug: string, remote = "origin", cwd?: string): b
   return result.ok;
 }
 
+/**
+ * SPEC-0066 R1 — fetch one receipt ref from `remoteUrl` into the local ref namespace,
+ * for the CI side. `remoteUrl` is the PR head repo's clone URL (a fork's own URL), never
+ * a named remote. Returns whether the ref now exists locally. `--no-tags` keeps the fetch
+ * to exactly the one receipt ref.
+ */
+export function fetchReceiptRef(slug: string, remoteUrl: string, cwd?: string): boolean {
+  const ref = receiptRef(slug);
+  const fetched = git(["fetch", "--no-tags", remoteUrl, `+${ref}:${ref}`], { cwd });
+  if (!fetched.ok) {
+    return false;
+  }
+  return git(["cat-file", "-e", `${ref}:receipt.json`], { cwd }).ok;
+}
+
 export interface ReceiptRefEntry {
   ref: string;
   slug: string;
