@@ -12,6 +12,8 @@ async function run(ctx: CommandContext): Promise<number> {
     artifact: ctx.options.artifact,
     details: !ctx.options.noDetails,
     share: ctx.options.share,
+    store: ctx.options.store,
+    pushRef: ctx.options.pushRef,
   });
   if (result.bodyRendered && result.receipt) {
     await ctx.telemetry.noteReceiptGenerated(
@@ -59,13 +61,18 @@ export const command: CommandDef = {
     order: 100,
     lines: [
       "  aireceipts pr [--post] [--session <id>] [--artifact] [--no-details] [--share]",
+      "                [--store <comment|ref>] [--push-ref]",
       "                                        attach the building session's receipt to",
       "                                         the current PR (dry-run prints the body;",
       "                                         --post upserts it via gh; --artifact also",
       "                                         publishes pr-<n>.html to the",
       "                                         aireceipts/artifacts branch and links it;",
       "                                         --share prints ready-to-paste X/LinkedIn",
-      "                                         intent URLs to stderr, requires --artifact)",
+      "                                         intent URLs to stderr, requires --artifact;",
+      "                                         --store ref also writes the receipt to",
+      "                                         refs/receipts/<slug> (SPEC-0065); default",
+      "                                         comment; --push-ref also pushes that ref to",
+      "                                         origin, only meaningful with --store ref)",
     ],
   },
 };

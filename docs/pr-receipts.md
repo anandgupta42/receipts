@@ -56,6 +56,24 @@ git config alias.receipt '!npx aireceipts-cli pr --post'
 git receipt                  # after pushing your branch
 ```
 
+### Always-on: pre-push hook
+
+This is optional and not required for adoption — it's a convenience layer, not a
+replacement for the one command above. Enable it once per clone:
+
+```sh
+npm run setup:hooks
+```
+
+That points `core.hooksPath` at the committed `.githooks/` and builds the CLI (the hook
+runs the built `dist/`, or a global `aireceipts` if you have one). From then on, every
+`git push` of a branch runs `aireceipts pr --store ref --push-ref` for you: it writes the
+receipt to `refs/receipts/<slug>` and pushes that ref alongside your branch, with no extra
+step. It's best-effort and **never blocks the push** — a missing session, a repo without
+`gh`, an unbuilt CLI, or a push failure is swallowed silently and the push proceeds. (Git
+never runs a fetched hook automatically, so this one command is unavoidable; the CI check
+is the install-free layer that catches a missed receipt regardless.)
+
 ### Optional: publish a durable receipt page
 
 ```sh
@@ -102,12 +120,28 @@ who viewed which receipt.
 
    > Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.
 
-That's it. By default, the workflow emits a neutral `::notice` when a PR has no receipt
-comment and never fails the build. To enforce receipts for same-repo PRs, set the repo
-variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`; fork PRs stay notice-only because source
-transcripts remain on the contributor's machine. CI still never generates a receipt
-itself: the source transcripts stay local. Rolling out across a whole org:
-[docs/adopt/org-rollout.md](adopt/org-rollout.md).
+That's it — and by design it stays out of your way.
+
+**Footprint (what this actually adds to your repo).** One workflow file (plus, optionally, a
+one-line note in `CONTRIBUTING.md`). The check **never fails a build** — a neutral `::notice`
+when a receipt is missing, and nothing otherwise. aireceipts **never commits receipt files**
+to your tree: a receipt is a PR comment or a git ref (`refs/receipts/…`), both invisible in
+your source and your PR diffs. Nothing runs on any contributor's machine. Remove it anytime
+by deleting the file.
+
+**Turn it up when you want — opt-in and escapable:**
+
+- **Enforce** — set the repo variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true` to make same-repo
+  PRs require a receipt. Fork PRs always stay notice-only (source transcripts live on the
+  contributor's machine, so CI can't generate one).
+- **Fully seamless (in progress)** — the `store=ref` receipt producer is shipped; a pre-push
+  hook that auto-attaches the receipt on every push, and a CI step that posts it for you (so
+  contributors need no local `gh`), are landing next — each opt-in, each notice-only until
+  turned on. Until then, a contributor attaches a receipt with the one shipped command:
+  `npx aireceipts-cli pr --post`.
+
+CI still never generates a receipt itself: the source transcripts stay local (I1/I4).
+Rolling out across a whole org: [docs/adopt/org-rollout.md](adopt/org-rollout.md).
 
 There is no aireceipts GitHub App or bot: receipts are generated and posted locally by
 design, and a hosted App could never see the transcripts they're built from — the

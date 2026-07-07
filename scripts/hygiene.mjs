@@ -20,6 +20,7 @@ export const LINE_BUDGETS = Object.freeze([
 
 export const ROOT_ALLOWLIST = Object.freeze([
   ".claude",
+  ".githooks",
   ".github",
   ".gitleaksignore",
   ".gitignore",

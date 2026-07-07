@@ -24,13 +24,18 @@ Usage:
   aireceipts week [--by-project] [--since <date>] [--json]
                                         trailing-7-day digest across sessions
   aireceipts pr [--post] [--session <id>] [--artifact] [--no-details] [--share]
+                [--store <comment|ref>] [--push-ref]
                                         attach the building session's receipt to
                                          the current PR (dry-run prints the body;
                                          --post upserts it via gh; --artifact also
                                          publishes pr-<n>.html to the
                                          aireceipts/artifacts branch and links it;
                                          --share prints ready-to-paste X/LinkedIn
-                                         intent URLs to stderr, requires --artifact)
+                                         intent URLs to stderr, requires --artifact;
+                                         --store ref also writes the receipt to
+                                         refs/receipts/<slug> (SPEC-0065); default
+                                         comment; --push-ref also pushes that ref to
+                                         origin, only meaningful with --store ref)
   aireceipts --check-budget             exit 1 if ~/.aireceipts/budget.json's cap is
                                          exceeded (advisory; see docs)
   aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
