@@ -132,6 +132,16 @@ function receiptBody(model: ReceiptModel) {
       topTurns: model.costShape.topTurns,
       lateTurn: model.costShape.lateTurn,
     },
+    // SPEC-0068 — same-file re-reads diagnostic (standalone; NEVER a waste[] row or savings claim).
+    sameFileReReads: model.sameFileReReads
+      ? {
+          count: model.sameFileReReads.count,
+          turnIndices: model.sameFileReReads.turnIndices,
+          tokens: tokenUsageJson(model.sameFileReReads.tokens),
+          usd: model.sameFileReReads.usd,
+          confidence: model.sameFileReReads.confidence,
+        }
+      : null,
     // SPEC-0061 R5 — aggregate only (counts + sums); child ids/titles/paths never export.
     ...(model.subagents ? { subagents: { ...model.subagents } } : {}),
   };

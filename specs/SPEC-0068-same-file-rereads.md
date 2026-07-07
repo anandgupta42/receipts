@@ -68,6 +68,13 @@ tokens-only or stays draft.
   low confidence) — no recorded edit, compaction, or matching shell command between; may include
   legitimate re-grounding.` Never "wasted"/"avoidable". A test asserts no savings `$` AND no `%` is
   attributed on **both** the handoff and the PR body.
+  **Implementation note (2026-07-07):** realized as a **standalone diagnostic block** (R5's
+  `sameFileReReads` field on `ReceiptModel`, mirroring `costShape`), NOT a `WasteLine`. It is
+  therefore structurally never in `handoff.ts`'s `WasteLine.usd` sum or `pr/body.ts`'s savings line,
+  achieving the Net above **by construction** — the (i)/(ii) WasteLine-confidence-exclusion mechanism
+  is unnecessary. The `confidence: "low"` field lives on the standalone block, and a test asserts the
+  signal is never a `same-file-rereads` waste-row kind. Rendered in `--details` + `--json` only (a
+  low-confidence, corpus-gated line stays off the default receipt until R6 is met).
 - **R5 — Surfaces (minimal).** Text receipt: the R4 diagnostic line (marked low confidence). `--json`:
   `sameFileReReads: { count, turnIndices, tokens, usd: number | null, confidence: "low" }`. No
   `--handoff` action suggestion in this spec (deferred until the corpus gate proves the signal — S2).

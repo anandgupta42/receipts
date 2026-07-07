@@ -57,6 +57,7 @@ JSON export.
 | `methodology` | string | The attribution methodology string (I3). |
 | `priceRowsUsed` | array | Every dated price row consulted; see PriceRowUsed. |
 | `costShape` | CostShape | SPEC-0067 — cost-shape facts (standalone, never in savings math): `preEdit` (pre-edit cost/token share), `topTurns` (expensive-turn concentration, or null), `lateTurn` (neutral late-half/early-half cost ratio, low confidence, or null). |
+| `sameFileReReads` | SameFileReReads \| null | SPEC-0068 — same-file re-reads diagnostic (standalone, low confidence, NEVER a waste row or savings claim); null when none. |
 | `subagents` | Subagents (optional) | SPEC-0061 — the session's subagent (child-transcript) rollup; present only when children were discovered. Aggregate only — never child ids, titles, or paths. |
 
 ### Subagents object
@@ -87,6 +88,18 @@ SPEC-0067 cost-shape facts — standalone, never in savings math. `preEdit` alwa
 | `indices` | array | 1-based turn numbers of the top-3 turns, ascending. |
 | `lateTurn` | object \| null | `lateRatio`: a neutral late-half/early-half average-cost ratio (low confidence; never a "context growth" cause). |
 | `lateRatio` | number | Second-half average turn cost / first-half average. |
+
+### SameFileReReads object
+
+SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to a "could have saved" figure.
+
+| Field | Type | Notes |
+|---|---|---|
+| `count` | number | No-recorded-cause re-reads (2nd..Nth reads of a path). |
+| `turnIndices` | array | 1-/0-based transcript turn indices of the counted re-reads, ascending. |
+| `tokens` | TokenUsage | Per-call token share of the counted re-reads. |
+| `usd` | number \| null | Priced share; null if any counted re-read is unpriced (I2). |
+| `confidence` | string | Always `low` — the transcript cannot prove a re-read was unnecessary. |
 
 ### TokenUsage object
 

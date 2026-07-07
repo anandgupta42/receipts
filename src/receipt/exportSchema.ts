@@ -149,6 +149,17 @@ const receiptBodyShape = {
       lateTurn: z.object({ lateRatio: z.number(), confidence: z.literal("low") }).strict().nullable(),
     })
     .strict(),
+  /** SPEC-0068 — same-file re-reads diagnostic (standalone, never in savings math); null when none. */
+  sameFileReReads: z
+    .object({
+      count: z.number().int().nonnegative(),
+      turnIndices: z.array(z.number().int()),
+      tokens: tokenUsageSchema,
+      usd: z.number().nullable(),
+      confidence: z.literal("low"),
+    })
+    .strict()
+    .nullable(),
   /** SPEC-0061 R5 — subagent rollup aggregate; present only when the session has children. Counts and sums only — never child ids, titles, or paths. */
   subagents: z
     .object({

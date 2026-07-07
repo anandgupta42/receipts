@@ -400,6 +400,14 @@ export function detailsBlocks(model: ReceiptModel): Block[] {
     // cache-write, and model switches, so it is not a context-growth measure (Codex #4).
     blocks.push({ kind: "note", text: "(ratio only — mixes output/cache/model)", indent: 2, muted: true });
   }
+  // SPEC-0068 — same-file re-reads: a LOW-confidence neutral diagnostic (never a
+  // "wasted"/savings claim; it is not a WasteLine and never enters savings math).
+  if (model.sameFileReReads) {
+    const r = model.sameFileReReads;
+    blocks.push({ kind: "row", label: "same-file re-reads", value: `${formatInt(r.count)} · ${formatShortTokens(r.tokens.total)} tok` });
+    blocks.push({ kind: "note", text: "(no recorded edit/shell/compaction between)", indent: 2, muted: true });
+    blocks.push({ kind: "note", text: "(low conf — may be legitimate re-grounding)", indent: 2, muted: true });
+  }
   if (model.cacheReadAtInputRateUsd !== null) {
     blocks.push({ kind: "row", label: "same reads at uncached input rate", value: `$${formatUsd(model.cacheReadAtInputRateUsd)}` });
     blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
