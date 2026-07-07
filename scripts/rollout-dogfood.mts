@@ -19,7 +19,7 @@ export const CALLER_YAML = `name: pr-receipt-check
 on: [pull_request]
 jobs:
   check:
-    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
+    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest
 `;
 export const CONTRIBUTING_LINE =
   "Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.";

@@ -139,7 +139,7 @@ export const INTEGRATION_RECIPES: readonly IntegrationRecipe[] = [
       "on: [pull_request]",
       "jobs:",
       "  check:",
-      "    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main",
+      "    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest",
       "```",
     ].join("\n"),
     notes: [

@@ -161,6 +161,18 @@ jobs:
             git push origin "refs/tags/${TAG}"
           fi
 
+      - name: advance the `latest` moving tag to this release
+        # SPEC-0064 R1 — external adopters pin the reusable workflow at
+        # `@latest`; this tag tracks the newest published release so `@latest`
+        # always resolves to a release-gated commit. Unlike the immutable `v*`
+        # tags above, `latest` is intentionally FORCE-MOVED on every publish.
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f latest "${GITHUB_SHA}"
+          git push -f origin refs/tags/latest
+
       - name: create GitHub Release v${{ env.VERSION }}
         env:
           GH_TOKEN: ${{ github.token }}

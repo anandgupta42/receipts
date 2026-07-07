@@ -113,7 +113,7 @@ who viewed which receipt.
    on: [pull_request]
    jobs:
      check:
-       uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
+       uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest
    ```
 
 2. Add one line to `CONTRIBUTING.md`:
