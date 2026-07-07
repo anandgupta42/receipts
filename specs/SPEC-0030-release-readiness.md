@@ -121,6 +121,11 @@ jobs:
     uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
 ```
 
+> **Superseded (SPEC-0064 R1):** callers now pin `@latest` — a moving tag that
+> tracks the newest published release, advanced by `release-publish.yml` on every
+> publish — instead of `@main`. The template above records what R3 originally
+> shipped; the live template is `docs/adopt/pr-receipt-check-caller.yml`.
+
 R1 sequencing checklist (maintainer + agent interleaved, executed as one
 continuous window):
 1. URL-cutover PR opened, CI green, held unmerged.

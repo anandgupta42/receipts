@@ -2,8 +2,10 @@
 # .github/workflows/pr-receipt-check.yml. It is notice-only by default; set
 # AIRECEIPTS_REQUIRE_PR_RECEIPT=true to enforce same-repo PRs. Generation is
 # local; see https://github.com/anandgupta42/receipts/blob/main/docs/pr-receipts.md.
+# `@latest` is a moving tag that tracks the newest published release and is
+# advanced on every publish (SPEC-0064 R1); pin a `v*` tag instead for a frozen ref.
 name: pr-receipt-check
 on: [pull_request]
 jobs:
   check:
-    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@main
+    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest

@@ -7,10 +7,12 @@ name: pr-receipt-check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-  # SPEC-0030 R3 — reusable: other repos adopt with a 3-line caller
-  # (docs/adopt/pr-receipt-check-caller.yml). Callers must reference
-  # anandgupta42/receipts — GitHub does NOT redirect reusable-workflow
-  # references after a rename, so callers are created only post-rename.
+  # SPEC-0030 R3 / SPEC-0064 R1 — reusable: other repos adopt with a 3-line
+  # caller (docs/adopt/pr-receipt-check-caller.yml) that pins `@latest`, a moving
+  # tag tracking the newest published release (advanced by release-publish.yml).
+  # Callers must reference anandgupta42/receipts — GitHub does NOT redirect
+  # reusable-workflow references after a rename, so callers are created only
+  # post-rename.
   workflow_call: {}
 
 permissions:
@@ -26,6 +28,12 @@ jobs:
       # CALLER's repo, which does not carry scripts/check-pr-receipt.mjs.
       # Same-repo runs get main's copy of the script — a PR cannot tamper
       # with the verdict logic it is being checked by.
+      #
+      # The internal ref stays `main` even though callers pin the workflow at
+      # `@latest` (SPEC-0064 R1): this repo's own dogfood CI checks against the
+      # freshest verdict script, and the presence-grep is backward-compatible by
+      # design. Version-coherent packaging — the script frozen to the pinned ref
+      # — is the composite action's job (SPEC-0057), not the reusable workflow's.
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           repository: anandgupta42/receipts
