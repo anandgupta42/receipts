@@ -28,22 +28,33 @@ async function makeInput(): Promise<ArtifactInput> {
 }
 
 describe("SPEC-0027 R1 artifact page", () => {
-  it("is self-contained except the one intentional samosa link (SPEC-0034 R3): no scripts, no fonts, no fetches", async () => {
+  it("is fully self-contained by default — ZERO external references, no tip link (SPEC-0070 R3): no scripts, fonts, fetches", async () => {
     const html = renderPrArtifactHtml(await makeInput());
     // The inline SVG glyph's `xmlns="http://www.w3.org/2000/svg"` is an inert
     // namespace declaration (every SVG has one; browsers never fetch it) —
     // excluded before counting so this assertion targets requests, not markup.
     const withoutXmlns = html.replace(/xmlns="https?:\/\/[^"]*"/g, "");
-    // Exactly one external reference is allowed: the samosa page link, as a
-    // plain <a href> (a click, never a fetch). A second https:// occurrence
-    // would mean a real external request crept in.
-    expect(withoutXmlns.match(/https?:\/\//g) ?? []).toHaveLength(1);
-    expect(html).toContain(`<a href="${SAMOSA_URL}">buy me a samosa</a>`);
+    // Samosa off by default → the footer is link-free → the page references
+    // nothing external. Any https:// occurrence would mean a real reference crept in.
+    expect(withoutXmlns.match(/https?:\/\//g) ?? []).toHaveLength(0);
+    expect(html).not.toContain("buy me a samosa");
     expect(html).not.toContain("<script");
     expect(html).not.toContain("<link");
     expect(html).not.toContain("<img");
     expect(html).not.toContain("@font-face");
     expect(html).not.toContain("url(");
+  });
+
+  it("with --samosa, adds exactly ONE external reference: the intentional tip link (SPEC-0034 R3 / SPEC-0070 R3)", async () => {
+    const html = renderPrArtifactHtml({ ...(await makeInput()), samosa: true });
+    const withoutXmlns = html.replace(/xmlns="https?:\/\/[^"]*"/g, "");
+    // Exactly one external reference is allowed: the samosa page link, as a
+    // plain <a href> (a click, never a fetch).
+    expect(withoutXmlns.match(/https?:\/\//g) ?? []).toHaveLength(1);
+    expect(html).toContain(`<a href="${SAMOSA_URL}">buy me a samosa</a>`);
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("<link");
+    expect(html).not.toContain("<img");
   });
 
   it("defines both palettes inline behind exactly one prefers-color-scheme query", async () => {

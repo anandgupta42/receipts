@@ -214,6 +214,9 @@ const prBodyExtrasSchema = z
     artifactLink: artifactLinkSchema.optional(),
     details: boundedArray(detailReceiptSchema).optional(),
     handoff: handoffSectionDataSchema.optional(),
+    // SPEC-0070 R4 — the opt-in tip-link flag round-trips through the ref payload;
+    // omitted on older refs → deserializes as off (the new default).
+    samosa: z.boolean().optional(),
   })
   .strict();
 

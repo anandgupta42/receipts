@@ -515,6 +515,8 @@ export interface PrBodyExtras {
   details?: DetailReceipt[];
   /** SPEC-0059 R5 — handoff slip facts; omitted under `--no-details` (index.ts gates it). */
   handoff?: HandoffSectionData;
+  /** SPEC-0070 R2 — opt the `buy me a samosa` tip link back onto the comment; off by default. */
+  samosa?: boolean;
 }
 
 const FENCE = "```";
@@ -526,11 +528,12 @@ const SAMOSA_LINK = `[buy me a samosa](${SAMOSA_URL})`;
  * The `<details>` section, size-capped: the largest prefix of receipts that
  * fits is kept, trailing ones degrade to one-line omission notes; `null` when
  * even all-omitted cannot fit (the caller drops the section). Computed with
- * prefix sums — one pass, no quadratic reassembly. The section always ends
- * with the samosa link (SPEC-0034 R3); its fixed length is folded into the
- * frame so the budget accounting still holds.
+ * prefix sums — one pass, no quadratic reassembly. The section ends with the
+ * samosa link only when `samosa` is on (SPEC-0034 R3 / SPEC-0070 R2); its fixed
+ * length is folded into the frame — and dropped from it when off — so the budget
+ * accounting still holds either way.
  */
-function detailsSection(details: DetailReceipt[], budget: number): string | null {
+function detailsSection(details: DetailReceipt[], budget: number, samosa: boolean): string | null {
   // SPEC-0060 R4: the subagent table is part of its session's kept-block, so the
   // size cap either keeps receipt+table or degrades to the omission note whole.
   const kept = details.map((d) => `${d.label}\n\n${FENCE}\n${d.text}\n${FENCE}${d.subagents !== undefined ? `\n\n${d.subagents}` : ""}`);
@@ -543,9 +546,14 @@ function detailsSection(details: DetailReceipt[], budget: number): string | null
     ...details.map((d) => `| ${d.row.join(" | ")} |`),
   ].join("\n");
   const header = `<details><summary>full receipts (${plural(details.length, "session")})</summary>\n\n${table}`;
-  // header + blank lines + joins + the closing samosa link and its own blank-line pair
-  const frame =
-    [...header].length + [...`\n\n${"\n"}\n${SAMOSA_LINK}\n\n</details>`].length + details.length;
+  // SPEC-0070 R2 — the closing tail carries the samosa link (and its blank-line
+  // pair) only when opted in, else the plain `</details>` close. The frame stays a
+  // conservative upper bound (as before — it never under-reserves): dropping the
+  // link's bytes when off only frees budget, so a receipt can only ever fit more
+  // easily, never overflow the comment cap.
+  const closingTail = samosa ? `\n\n${SAMOSA_LINK}\n\n</details>` : `\n\n</details>`;
+  // header + the joined blank line before the first part + the closing tail
+  const frame = [...header].length + [...`\n\n${closingTail}`].length + details.length;
   const size = (s: string): number => [...s].length + 1; // +1 for its join newline
 
   const allOmitted = frame + omitted.reduce((sum, s) => sum + size(s), 0);
@@ -560,7 +568,8 @@ function detailsSection(details: DetailReceipt[], budget: number): string | null
     keep++;
   }
   const parts = details.map((_, i) => (i < keep ? kept[i] : omitted[i]));
-  return [header, "", ...parts, "", SAMOSA_LINK, "", "</details>"].join("\n");
+  const tail = samosa ? [SAMOSA_LINK, "", "</details>"] : ["</details>"];
+  return [header, "", ...parts, "", ...tail].join("\n");
 }
 
 /** SPEC-0059 R5 — the slip strings shared by the comment section and the artifact page (R6): one builder, no drift. */
@@ -630,7 +639,7 @@ export function renderPrBodyDetailed(
       [...[DOGFOOD_MARKER, FENCE, budgetFence, FENCE].join("\n")].length +
       (linkLine === undefined ? 0 : [...linkLine].length + 1) +
       3;
-    section = detailsSection(extras.details, COMMENT_SIZE_CAP - used);
+    section = detailsSection(extras.details, COMMENT_SIZE_CAP - used, extras.samosa === true);
     // SPEC-0059 R5 — a sibling of the full-receipts section, decided against
     // what that section actually consumed (+2: its trailing blank-line join).
     if (section !== null && extras.handoff !== undefined) {

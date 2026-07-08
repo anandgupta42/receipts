@@ -59,6 +59,8 @@ export interface PrOptions {
   store?: "comment" | "ref";
   /** SPEC-0065 R2: after a successful `store=ref` write, also push the ref to `origin`. Best-effort — never fails the command. */
   pushRef?: boolean;
+  /** SPEC-0070 R1: opt the `buy me a samosa` tip link back onto the comment + artifact (off by default). */
+  samosa?: boolean;
 }
 
 export interface PrDeps {
@@ -303,7 +305,7 @@ function publishAndLink(
   bodyInput: PrBodyInput,
   sessions: ArtifactSession[],
   deps: PrDeps,
-  extras?: { notAttributable?: string[]; perCommitJson?: string; handoff?: HandoffSlipView },
+  extras?: { notAttributable?: string[]; perCommitJson?: string; handoff?: HandoffSlipView; samosa?: boolean },
 ): { fileName: string; url: string; ownerRepo: string } | null {
   const pr = resolvePr(deps.runGh);
   if (!pr.ok) {
@@ -561,6 +563,8 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       // SPEC-0059 R6 — same slip, same builder; the artifact always carries its
       // full receipts, so its handoff section ignores --no-details too.
       handoff: buildHandoffSlip(handoffData, bodyInput) ?? undefined,
+      // SPEC-0070 R3 — opt-in footer tip link, off by default.
+      samosa: opts.samosa === true,
     });
     artifactFailed = link === null;
     artifactResult = link === null ? "failed" : "success";
@@ -588,6 +592,12 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     artifactLink: link ? { fileName: link.fileName, url: link.url } : undefined,
     details,
     handoff: opts.details === false ? undefined : handoffData,
+    // SPEC-0070 R2/R4 — opt-in comment tip link. OMITTED (undefined, like
+    // artifactLink/handoff above) when off, never `false`: a default store=ref
+    // payload then carries no new key, stays byte-identical to a pre-feature ref,
+    // and is accepted by an older strict consumer (Codex work review). Only a
+    // `--samosa` ref grows the field, and it re-renders the link CI-side.
+    samosa: opts.samosa === true ? true : undefined,
   };
   const { body, handoffSectionIncluded } = renderPrBodyDetailed(bodyInput, extras);
 

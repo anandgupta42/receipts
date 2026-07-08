@@ -4,7 +4,11 @@ import type { PrBodyExtras, PrBodyInput } from "./body.js";
  * SPEC-0065 / SPEC-0066 — the versioned, JSON-plain PR-receipt payload stored at
  * `refs/receipts/<slug>` by the local producer and re-rendered by CI. It is exactly the
  * renderer's input (`renderPrBody(bodyInput, extras)`), so a round-trip reproduces the
- * comment byte-for-byte. Bump `PR_RECEIPT_SCHEMA_VERSION` on any shape change.
+ * comment byte-for-byte. Bump `PR_RECEIPT_SCHEMA_VERSION` on any INCOMPATIBLE shape change
+ * (renamed/removed field, changed type/meaning). A purely additive OPTIONAL field whose
+ * absent value reproduces prior behavior is backward-compatible — an older ref still
+ * validates and re-renders identically — and does NOT require a bump (SPEC-0070's
+ * `extras.samosa`, which defaults to off, is such a field).
  *
  * This file is the SEAM the producer (SPEC-0065) and the CI consumer (SPEC-0066) both
  * build against — it holds only the shared type, version, and slug so the two sides never

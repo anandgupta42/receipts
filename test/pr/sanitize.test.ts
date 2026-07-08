@@ -12,6 +12,7 @@ import {
   SANITIZED_FIELD_CAP,
 } from "../../src/pr/sanitize.js";
 import { PR_RECEIPT_SCHEMA_VERSION, type PrReceiptPayload } from "../../src/pr/payloadTypes.js";
+import { buildPrReceiptPayload, serializePrReceipt } from "../../src/pr/payload.js";
 import { renderPrBody } from "../../src/pr/body.js";
 import type { StuckLoopWasteLine, TrivialSpansWasteLine } from "../../src/receipt/model.js";
 
@@ -73,6 +74,37 @@ describe("deserializePrReceipt", () => {
     if (result.ok) {
       expect(result.payload).toEqual(payload);
     }
+  });
+
+  it("SPEC-0070 R4 — extras.samosa round-trips through the strict schema; an omitting v1 ref still validates (no bump → off)", () => {
+    // The opt-in flag survives serialize → deserialize, so a `--samosa` ref
+    // re-renders the tip link CI-side rather than silently dropping it.
+    const withFlag = deserializePrReceipt(JSON.stringify(basePayload({ extras: { samosa: true } })));
+    expect(withFlag.ok).toBe(true);
+    if (withFlag.ok) {
+      expect(withFlag.payload.extras.samosa).toBe(true);
+    }
+    // A payload written before the field existed (extras: {}) is NOT rejected —
+    // the additive optional field needs no schemaVersion bump — and reads as off.
+    const without = deserializePrReceipt(JSON.stringify(basePayload()));
+    expect(without.ok).toBe(true);
+    if (without.ok) {
+      expect(without.payload.extras.samosa).toBeUndefined();
+    }
+  });
+
+  it("SPEC-0070 R4 — the serialized payload OMITS samosa when off (no new key vs a pre-feature ref) and carries `true` when on", () => {
+    const body = { contributors: [], excludedCount: 0 };
+    // Off — the producer path sets samosa: undefined, which serialization drops.
+    const offJson = serializePrReceipt(buildPrReceiptPayload(body, { samosa: undefined }));
+    expect(offJson).not.toContain("samosa");
+    // A pre-feature ref (extras: {}) serializes identically — no forward-compat break.
+    expect(offJson).toBe(serializePrReceipt(buildPrReceiptPayload(body, {})));
+    // On — the field is present and re-round-trips.
+    const onJson = serializePrReceipt(buildPrReceiptPayload(body, { samosa: true }));
+    expect(onJson).toContain("\"samosa\":true");
+    const back = deserializePrReceipt(onJson);
+    expect(back.ok && back.payload.extras.samosa).toBe(true);
   });
 
   it("rejects invalid JSON without throwing", () => {
