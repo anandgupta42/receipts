@@ -104,15 +104,21 @@ minimized (commandClass enum {receipt, compare, other}, no raw commands) to be u
 as usage analytics. **S3 (value):** parse_failure is the format-drift sensor the
 maintenance loop needs; cli_error is table-stakes for an npx tool. **S4:** spec-lint green.
 
-**2026-07-05 · Amendment (maintainer decision):** R4 is extended — telemetry also
-defaults to disabled when running in CI (`CI`/`GITHUB_ACTIONS` env detected, same
-signal as SPEC-0043's `isCI` field), unless explicitly re-enabled with
-`AIRECEIPTS_TELEMETRY=on`. This is a default, not a third kill switch: `off`/`0`/`false`
-and `DO_NOT_TRACK=1` still disable unconditionally and win over `on` even in CI. Rationale:
-a fleet of automated runs shouldn't silently dwarf human usage in the data, and CI
-shouldn't need a separate manual opt-out. Implemented in `src/telemetry/config.ts`
-(`ciDefaultOffActive`); `docs/telemetry.md` kill-switches section updated;
-`config.test.ts` covers the full precedence table (CI+unset→off, CI+on→on, CI+off→off,
-CI+DO_NOT_TRACK→off even combined with `on`, non-CI unchanged). No change to the `isCI`
-event field itself, which still reports raw CI-env presence independent of whether
-telemetry is enabled (see `src/telemetry/index.ts#noteRunStart`).
+**2026-07-05 · Amendment — ⚠️ SUPERSEDED by the 2026-07-08 amendment below (CI now
+defaults ON). Kept for history; this paragraph no longer describes current behavior.**
+~~R4 is extended — telemetry also defaults to disabled when running in CI
+(`CI`/`GITHUB_ACTIONS` env detected), unless explicitly re-enabled with
+`AIRECEIPTS_TELEMETRY=on`. Rationale: a fleet of automated runs shouldn't silently dwarf
+human usage in the data.~~ (Reversed 2026-07-08 — see below.)
+
+**2026-07-08 · Amendment (maintainer decision — SUPERSEDES the 2026-07-05 CI default):**
+the CI default-off is **reversed**. Telemetry now defaults to **enabled in CI**, the same
+as any other environment, so automated CI runs are counted by default (the maintainer wants
+that adoption signal). CI is no longer a special case in `resolveTelemetryConfig` — the
+`ciDefaultOffActive` gate is removed. The two kill switches (`AIRECEIPTS_TELEMETRY=off|0|false`,
+`DO_NOT_TRACK=1`) still win everywhere, in CI or not, and an empty/malformed connection string
+still disables. The `isCI` event field is unchanged and still records CI-env presence, so CI vs.
+human usage remains distinguishable in the data. `config.test.ts` updated: CI+unset→**on**,
+CI+off→off, CI+DO_NOT_TRACK→off, non-CI unchanged. Note: this broadens what CI environments send
+(every adopter's CI, unless they set a kill switch); the first-run notice + kill switches remain
+the consent mechanism.
