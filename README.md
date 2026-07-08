@@ -22,31 +22,12 @@ $172.76. <a href="https://github.com/anandgupta42/receipts/pull/131#issuecomment
 **Why this exists.** AI coding agents spend real money invisibly — you see the diff,
 never the bill. aireceipts reads the transcripts your agent already writes to disk and
 turns them into receipts: what a session cost, tool by tool; what a PR cost, across
-every supported agent session it can attribute; where tokens were wasted. This repo
-runs on it — every pull request here carries the receipt of the agent sessions that
-built it ([how](docs/pr-receipts.md)). Local, with no accounts and no servers: your
-transcripts and code never leave your machine, and pricing a receipt needs no network —
-it uses cited, bundled price tables. (aireceipts does send anonymous, opt-out usage
-[telemetry](#telemetry-disclosed) — turn it off with `AIRECEIPTS_TELEMETRY=off` or
-`DO_NOT_TRACK=1`, in CI or anywhere.)
+every session it can attribute; where tokens were wasted. It's local — your transcripts
+and code never leave your machine, and pricing needs no network. The only thing that
+ever leaves is a receipt you choose to share, and it carries cost and token numbers
+only, never your code or prompts ([how](docs/pr-receipts.md)).
 
-## Install — four steps, first receipt in under a minute
-
-1. **See a receipt.** `npx aireceipts-cli` — renders your newest agent session found
-   anywhere on your machine (not scoped to the current folder), no install, no account
-   (`npx aireceipts-cli --demo` shows a bundled example if you have no sessions yet).
-2. **Get your bearings.** `npx aireceipts-cli setup` — found sessions, latest cost,
-   week total, and the integrations that fit your machine
-   ([guide](docs/guide/01-getting-started.md)).
-3. **Make it always-on.** `npx aireceipts-cli install-hook` ends every Claude Code session
-   with a mini-receipt; `npx aireceipts-cli statusline` puts the live cost in the status bar.
-4. **Put receipts on your PRs.** `npx aireceipts-cli pr --post` posts the comment shown above.
-   Generation stays local; a drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml)
-   can then verify every PR carries one ([guide](docs/pr-receipts.md)).
-
-Prefer a global install: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
-
-What you get back, as the bytes your terminal prints:
+Here's what one looks like — the exact bytes your terminal prints:
 
 ```
 - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -76,11 +57,29 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 <sub>the same receipt renders as a shareable SVG (`--svg`, light and dark themes),
 versioned JSON (`--json`), or CSV (`--csv`).</sub>
 
-## Usage
+## Start here — three commands
+
+**See what a session cost** — `npx aireceipts-cli`
+Tool by tool, locally, including where tokens went to waste. No install, no account
+(`--demo` shows a bundled example if you have no sessions yet).
+
+**Live cost in your status bar** — `npx aireceipts-cli statusline`
+Claude Code's status line shows running cost as you work, not just a total at the end.
+
+**A receipt on every PR** — `npx aireceipts-cli pr --post`
+Attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
+drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to carry one.
+
+Prefer a global install: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
+Full walkthrough: [getting started](docs/guide/01-getting-started.md) · a real one, live:
+[PR #131](https://github.com/anandgupta42/receipts/pull/131#issuecomment-4886722030).
+
+## Everything else it does
 
 | Command | What it does |
 |---|---|
 | `aireceipts` | Receipt for the newest session (`--list` to pick another) |
+| `aireceipts setup` | Found sessions, latest cost, week total, and the integrations that fit your machine — [guide](docs/guide/01-getting-started.md) |
 | `aireceipts pr --post [--artifact]` | Attach the receipt of the sessions behind a PR as a comment; `--artifact` also publishes a durable receipt page — [guide](docs/pr-receipts.md) |
 | `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
 | `aireceipts week` | Trailing-7-day digest: totals, per-agent split, top waste — [guide](docs/guide/06-week.md) |
@@ -91,33 +90,13 @@ versioned JSON (`--json`), or CSV (`--csv`).</sub>
 | `aireceipts --quota` / `--check-budget` | Official rate-limit window state (subscribers); exit 1 when your local budget cap is exceeded |
 | `aireceipts --json` / `--csv` / `--svg` | Versioned schema, RFC 4180 rows, shareable image — [schema](docs/json-schema.md) |
 
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
-  <img alt="the same receipt rendered as a shareable SVG, light and dark themes" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
-</picture>
-
-<sub><code>--svg</code> — the receipt shown above, as the shareable image it exports; byte-pinned to this repo's golden tests</sub>
-
-</div>
-
 ## The honesty rules
 
-The receipt is only useful if you can trust every character on it. What a receipt
-proves — and what it can't: [docs/trust.md](docs/trust.md).
-
-- **No fabricated dollars, ever.** A model without a cited, dated price row renders
-  tokens-only — never a guess.
-- **Every price is cited.** Each row in `data/prices/` carries the vendor page URL, the
-  date observed, and a quoted excerpt. CI checks the citations and their liveness.
-- **Comparisons are arithmetic, not predictions.** "Same tokens on X" re-prices the
-  identical token counts — it never claims another model would have done the job.
-- **Deterministic.** Same transcript in, byte-identical receipt out — golden-tested on
-  every commit, 10× under a frozen environment. The receipts on this page are pinned
-  to those goldens by CI: this README cannot show output the renderer didn't produce.
-
-Full methodology: `aireceipts --methodology`.
+Every price is cited (vendor URL, date observed, a quoted excerpt — checked by CI). Every
+receipt is deterministic: same transcript in, byte-identical receipt out, golden-tested on
+every commit. No model without a cited price row ever shows a dollar figure — tokens-only
+instead of a guess. Comparisons re-price the identical tokens; they never predict. What a
+receipt proves, and what it can't: [docs/trust.md](docs/trust.md) · `aireceipts --methodology`.
 
 ## Supported agents
 
@@ -133,7 +112,7 @@ Model prices move. A daily advisory tripwire cross-checks `data/prices/` against
 independent dataset and opens an issue when they disagree; every table change lands
 as a cited price-table PR.
 
-## Telemetry, disclosed
+## Telemetry
 
 Anonymous diagnostics and usage signals — error classes, duration buckets,
 parse-failure signatures, feature enums, and coarse buckets. Never code, prompts,
@@ -166,4 +145,4 @@ welcome and run the same gates: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0. · [buy me a samosa](https://anandgupta42.github.io/receipts/samosa.html)
+Apache-2.0.
