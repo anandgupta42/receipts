@@ -1,24 +1,37 @@
 name: Mutation
 
-# Runs Stryker mutation testing on the money paths — src/pricing/** AND
-# src/pr/** (the PR-attribution path, added SPEC-0044 M3) — the anti-gaming
-# moat (AGENTS.md): agent-written tests routinely hit ~100% coverage but a
-# lower mutation score, so coverage alone doesn't prove the tests assert
-# anything real. The break threshold in stryker.config.json fails CI if the
-# combined score drops below it.
+# Stryker mutation testing on the money paths — src/pricing/** AND src/pr/**
+# (the PR-attribution path, SPEC-0044 M3) — the anti-gaming moat (AGENTS.md):
+# agent-written tests routinely hit ~100% coverage but a lower mutation score,
+# so coverage alone doesn't prove the tests assert anything real. The break
+# threshold in stryker.config.json fails the job if the combined score drops
+# below it.
+#
+# SPEC-0069 — the exhaustive full sweep runs NIGHTLY (and rebuilds the shared
+# incremental baseline); PRs run INCREMENTALLY against that baseline, so a PR
+# touching a few files finishes in minutes instead of ~40. Both enforce the
+# same break:60 floor. Mutation stays advisory (not a required check).
 
 on:
   pull_request:
     paths:
       - "src/pricing/**"
       - "src/pr/**"
+  schedule:
+    # Nightly full sweep at 07:17 UTC (off the :00 rush). Refreshes the baseline
+    # PRs restore, bounding incremental staleness to <= 1 day.
+    - cron: "17 7 * * *"
+  workflow_dispatch: {}
 
-# SPEC-0033 R2 — least-privilege baseline; this job only reads and runs tests.
+# SPEC-0033 R2 — least-privilege baseline; these jobs only read and run tests.
 permissions:
   contents: read
 
 jobs:
-  mutation:
+  # PR path: fast, incremental, advisory. Restores the nightly baseline (read
+  # only) and re-runs mutation only on changed code.
+  mutation-pr:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -30,7 +43,18 @@ jobs:
 
       - run: npm ci
 
-      - name: mutation score
+      # Read-only restore: the exact key never hits (per-SHA), so restore-keys
+      # falls back to the most recent nightly baseline (created on the default
+      # branch, readable from PR branches). A miss just means a cold full run.
+      - name: restore mutation baseline
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-inc-pr-${{ github.sha }}
+          restore-keys: |
+            stryker-inc-
+
+      - name: mutation score (incremental)
         run: |
           if [ ! -d src/pricing ] || [ -z "$(ls -A src/pricing 2>/dev/null)" ]; then
             echo "src/pricing/ is empty — nothing to mutate yet (Tier 0 harness). Skipping."
@@ -42,10 +66,46 @@ jobs:
             echo "Stryker config in the same PR that introduces src/pricing/." >&2
             exit 1
           fi
-          npx stryker run
-        # break=60 (stryker.config.json) is the enforced FLOOR — the same
-        # standard as src/pricing/, now extended (SPEC-0044 M3) to src/pr/**,
-        # which previously had ZERO mutation enforcement. It prevents the money
-        # paths' combined score from regressing below 60%. A tighter
-        # score-not-decreased ratchet against a stored main baseline is a
-        # follow-up (needs baseline persistence in CI).
+          npx stryker run --incremental
+
+  # Nightly / on-demand path: the exhaustive full sweep. --force re-tests every
+  # mutant AND rewrites a clean baseline, which is then cached for PRs to warm-
+  # start against. Enforces the same break:60 floor on the full surface.
+  mutation-nightly:
+    # Default branch only: the baseline PRs restore must come from main, and a
+    # cache saved from a side ref could poison it. workflow_dispatch is honored
+    # only on main for the same reason.
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: mutation score (full sweep, rebuild baseline)
+        run: |
+          if [ ! -d src/pricing ] || [ -z "$(ls -A src/pricing 2>/dev/null)" ]; then
+            echo "src/pricing/ is empty — nothing to mutate yet (Tier 0 harness). Skipping."
+            exit 0
+          fi
+          if [ ! -f stryker.config.json ] && [ ! -f stryker.conf.json ]; then
+            echo "FAIL: src/pricing/ exists but no Stryker config does." >&2
+            echo "Pricing code requires mutation testing (AGENTS.md gates) — add a" >&2
+            echo "Stryker config in the same PR that introduces src/pricing/." >&2
+            exit 1
+          fi
+          npx stryker run --incremental --force
+
+      # Save the fresh baseline under a per-SHA key; PR jobs restore it via the
+      # stryker-inc- prefix. Runs on the default branch, so PRs can read it.
+      - name: save mutation baseline
+        if: always() && hashFiles('reports/stryker-incremental.json') != ''
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: reports/stryker-incremental.json
+          key: stryker-inc-${{ github.sha }}
