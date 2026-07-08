@@ -3,6 +3,39 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.5.0 — 2026-07-08
+
+Minor: PR receipts gain a **self-contained CI path** (no external reusable workflow), the
+default **statusline** gets richer, and the **samosa tip link** leaves the default PR-posted
+surfaces (now opt-in). Two deliberate output changes — statusline default and the PR-posted
+footer — both called out below.
+
+### Added
+
+- **Self-contained `pr-check`** (SPEC-0064 R2–R7): an adopter's own workflow can run
+  `npx -y aireceipts-cli@latest pr-check` in a single job — **no reusable-workflow `uses:`**,
+  no org Actions-policy gate — to fetch the branch's receipt ref, render + sanitize it, and
+  upsert the marked PR comment via `GITHUB_TOKEN` (no local `gh`). Hidden command; for trusted
+  same-repo/internal PRs (the two-job reusable workflow stays the hardened path for untrusted
+  fork PRs). Also fixes the reusable-caller template, which was missing `pull-requests: write`.
+
+### Changed (deliberate output changes)
+
+- **Richer default statusline** (SPEC-0071): the default line now carries a burn rate (`$/hr`),
+  context-window %, abbreviated `M`/`B` token counts, and an inline 5h reset countdown — e.g.
+  `[aireceipts] $423 · $80/hr · 501M · ctx 42% · 5h 26% ↺2h13m`. Every segment renders from a
+  real payload field or a priced ledger value; nothing is estimated.
+- **Samosa tip link off by default** (SPEC-0070): the `buy me a samosa` link no longer appears
+  on the surfaces aireceipts posts onto a PR (the comment's `<details>` and the artifact
+  footer). Opt back in with `--samosa`; the standalone tip page and the docs-site footer are
+  unchanged.
+
+### Internal / CI
+
+- **Incremental mutation testing** (SPEC-0069): Stryker runs incrementally on PRs that touch
+  the money paths (`src/pricing/**`, `src/pr/**`), with a nightly full sweep — the same
+  anti-gaming moat at a fraction of the wall-clock. No product code change.
+
 ## v0.4.0 — 2026-07-07
 
 Minor: PR receipts can now **attach and post themselves**. A receipt travels with the

@@ -1,7 +1,7 @@
 ---
 id: SPEC-0070
 title: "Samosa tip link behind an opt-in flag, off by default on PR-posted surfaces"
-status: draft
+status: shipped
 milestone: M5
 depends: [SPEC-0034, SPEC-0066]
 ---
@@ -102,12 +102,12 @@ occurrences, so the criterion is satisfied and locally verifiable.
 
 ## Success criteria
 
-- [ ] `--samosa` is off by default; the comment and artifact carry no tip link unless it is set.
-- [ ] With `--samosa`, both surfaces render the exact SPEC-0034 link/glyph as before.
-- [ ] The default artifact page has zero external references; its golden is regenerated.
-- [ ] The `samosa` flag round-trips through `store=ref` / `postRef` (strict schema accepts it;
+- [x] `--samosa` is off by default; the comment and artifact carry no tip link unless it is set.
+- [x] With `--samosa`, both surfaces render the exact SPEC-0034 link/glyph as before.
+- [x] The default artifact page has zero external references; its golden is regenerated.
+- [x] The `samosa` flag round-trips through `store=ref` / `postRef` (strict schema accepts it;
       omitting it deserializes as off).
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/spec-lint.mjs` all pass unmasked (`echo $?`).
 
 ## Validation
