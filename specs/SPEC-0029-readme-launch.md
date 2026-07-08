@@ -81,6 +81,11 @@ number.
   `CONTRIBUTING.md`) → License. Existing content is reshaped, not rewritten
   from scratch; the honesty-rules and telemetry sections keep their current
   substance.
+
+  > **Amended 2026-07-08:** the `Install` section is renamed `## Start here` and is a
+  > three-command quick start (see SPEC-0053 R3's amendment for the shape and
+  > rationale); it appears within the first **80** lines (receipt-first layout). CLI
+  > table coverage is unchanged.
 - **R4 — The README guard (new test, `test/readme-guard.test.ts`).**
   Asserts mechanically: (a) tagline line equals `package.json` description
   byte-for-byte; (b) every fenced receipt in README is byte-identical to a
@@ -184,7 +189,7 @@ link line reads: "What a receipt proves — and what it can't:
 | R2 hero sources | `<picture>` srcset/src paths | both exist under goldens/svg/ |
 | R2 receipt parity | every fenced receipt in README | byte-equal to a committed goldens/*.txt |
 | R3 order | section headings | Standard-Readme order as specified |
-| R3 install early | Install heading | within first 60 lines |
+| R3 quick-start early (amended 2026-07-08) | `## Start here` heading | within first 80 lines |
 | R4 emoji budget | README bytes | ≤2 emoji |
 | R4 length cap | README bytes | ≤260 lines |
 | R1 tagline shape | first bold paragraph | bold, <120 chars |
