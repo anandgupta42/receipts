@@ -7,6 +7,8 @@
   "reporters": ["progress", "clear-text", "html"],
   "thresholds": { "high": 80, "low": 60, "break": 60 },
   "concurrency": 4,
+  "incremental": true,
+  "incrementalFile": "reports/stryker-incremental.json",
   "tempDirName": ".stryker-tmp",
   "cleanTempDir": true
 }
