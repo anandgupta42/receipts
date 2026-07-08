@@ -28,7 +28,7 @@ built it ([how](docs/pr-receipts.md)). Local, with no accounts and no servers: y
 transcripts and code never leave your machine, and pricing a receipt needs no network —
 it uses cited, bundled price tables. (aireceipts does send anonymous, opt-out usage
 [telemetry](#telemetry-disclosed) — turn it off with `AIRECEIPTS_TELEMETRY=off` or
-`DO_NOT_TRACK=1`; it is auto-off in CI.)
+`DO_NOT_TRACK=1`, in CI or anywhere.)
 
 ## Install — four steps, first receipt in under a minute
 
