@@ -1,12 +1,12 @@
 ---
-id: SPEC-0069
+id: SPEC-0071
 title: "Statusline rich default — burn rate, context %, quota reset countdown, M/B tokens"
 status: draft
 milestone: M5
 depends: [SPEC-0062]
 ---
 
-# SPEC-0069: Statusline rich default
+# SPEC-0071: Statusline rich default
 
 Invariants: I2 (never a fabricated dollar — a `$` segment renders only when priced), I3
 (every number traceable; the reset countdown derives from Claude Code's real `resets_at`,

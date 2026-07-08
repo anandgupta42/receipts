@@ -83,6 +83,17 @@ describe("R3 render-first ordering", () => {
     expect(out[0]).toContain("session slice: turns 2–4 of 6");
   });
 
+  it("SPEC-0070 R1 end-to-end — opts.samosa threads through pr → PrOptions → the rendered comment; off by default", async () => {
+    // Off by default: the dry-run body carries no tip link.
+    const base = await makeDeps();
+    expect(await runPr({ post: false }, base.deps)).toBe(0);
+    expect(base.out.join("")).not.toContain("buy me a samosa");
+    // With the flag, the same command threads it through to the details link.
+    const withFlag = await makeDeps();
+    expect(await runPr({ post: false, samosa: true }, withFlag.deps)).toBe(0);
+    expect(withFlag.out.join("")).toContain("buy me a samosa");
+  });
+
   it("SPEC-0045 R2 anti-wallpaper — a degraded no-cwd session that only overlaps the window does NOT flag unreadable-session", async () => {
     // A transcript that failed to parse (degraded) with NO cwd, whose timestamps
     // merely overlap the branch window. Without repo-cwd proof it isn't ours, so

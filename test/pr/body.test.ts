@@ -479,10 +479,21 @@ describe("SPEC-0026 R5 · details size cap", () => {
     expect(body).toContain(rollup);
   });
 
-  it("SPEC-0034 R3 — the samosa link closes the details section, after the last receipt and before </details>; the fenced receipt itself carries no link", () => {
+  it("SPEC-0070 R2 — the samosa link is OFF by default: no tip link anywhere in the comment", () => {
     const body = renderPrBody(
       { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
       { details: [detail("builder · abc123", "AAA"), detail("builder · def456", "BBB")] },
+    );
+    expect(body).not.toContain("buy me a samosa");
+    expect(body).not.toContain(SAMOSA_URL);
+    // The section still closes cleanly straight after the last receipt.
+    expect(body.indexOf("BBB")).toBeLessThan(body.indexOf("</details>"));
+  });
+
+  it("SPEC-0034 R3 / SPEC-0070 R2 — with samosa opted in, the link closes the details section, after the last receipt and before </details>; the fenced receipt itself carries no link", () => {
+    const body = renderPrBody(
+      { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
+      { details: [detail("builder · abc123", "AAA"), detail("builder · def456", "BBB")], samosa: true },
     );
     const samosaLink = `[buy me a samosa](${SAMOSA_URL})`;
     expect(body).toContain(samosaLink);

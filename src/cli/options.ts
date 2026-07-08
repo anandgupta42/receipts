@@ -74,6 +74,8 @@ export interface CliOptions {
   readonly details: boolean;
   /** SPEC-0062 R3: `aireceipts statusline --format "<segments>"` — comma-separated segment names. */
   readonly format?: string;
+  /** SPEC-0070 R1: `aireceipts pr --samosa` opts the tip link back onto the PR comment + artifact (off by default). */
+  readonly samosa: boolean;
 }
 
 /** Value-consuming flags: `--theme dark`, `-o out.svg`. Anything else is a boolean flag or positional. */
@@ -115,6 +117,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let limit: number | undefined;
   let outDir: string | undefined;
   let format: string | undefined;
+  let samosa = false;
   const positional: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
@@ -229,6 +232,8 @@ export function parseOptions(argv: string[]): CliOptions {
       demo = true;
     } else if (arg === "--details") {
       details = true;
+    } else if (arg === "--samosa") {
+      samosa = true;
     } else {
       positional.push(arg);
     }
@@ -273,5 +278,6 @@ export function parseOptions(argv: string[]): CliOptions {
     demo,
     details,
     format,
+    samosa,
   };
 }
