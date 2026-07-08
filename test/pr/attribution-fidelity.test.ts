@@ -26,6 +26,7 @@ const OTHER_SHA = "9876fed" + "c".repeat(33);
 const usage = { input: 100, output: 10, cacheRead: 0, cacheWrite: 0 };
 const turn = (index: number, toolCalls: ToolCall[]): Turn => ({ index, timestamp: 1000 + index, model: "claude-opus-4-8", usage, toolCalls });
 const PUSH = "git pu" + "sh";
+const noGit = () => ({ stdout: "", stderr: "", code: 1, missing: false });
 
 describe("R1a — only adapter-flagged shells mint git verbs", () => {
   it("an unflagged tool carrying a command field and SHAs in output yields no verb, no anchor", () => {
@@ -106,6 +107,7 @@ describe("R2 — fallback bounding", () => {
     const sel = await selectContributors(candidates, [BRANCH_SHA], {
       loadSession: async () => s.session as never,
       currentWorktreeRoot: "/home/dev/repo",
+      runGit: noGit,
     });
     expect(sel.contributors).toHaveLength(0);
     expect(sel.excludedCount).toBe(0); // distinct from `excluded` (repo+window, no commit) — SPEC-0024 fence copy stays true
@@ -119,6 +121,7 @@ describe("R2 — fallback bounding", () => {
     const sel = await selectContributors([{ summary: s.summary as never, pool: "anchor" }], [BRANCH_SHA], {
       loadSession: async () => s.session as never,
       currentWorktreeRoot: "/home/dev/repo",
+      runGit: noGit,
     });
     expect(sel.contributors).toHaveLength(1);
     expect(sel.contributors[0].slice.kind).toBe("slice");
@@ -130,6 +133,7 @@ describe("R2 — fallback bounding", () => {
     const sel = await selectContributors([{ summary: s.summary as never, pool: "repo" }], [BRANCH_SHA], {
       loadSession: async () => s.session as never,
       currentWorktreeRoot: "/home/dev/repo",
+      runGit: noGit,
     });
     expect(sel.contributors).toHaveLength(1);
     expect(sel.contributors[0].slice.kind).toBe("full");

@@ -22,6 +22,7 @@ const SUBJ_A = "feat: quiet-committed spec subject A";
 const SUBJ_B = "fix: the other branch commit subject B";
 const usage = withTotal({ ...emptyUsage(), input: 1000, output: 100 });
 const CURRENT_ROOT = "/home/dev/repo";
+const noGit = () => ({ stdout: "", stderr: "", code: 1, missing: false });
 
 function bashTurn(index: number, command: string, output: string): Turn {
   return {
@@ -58,6 +59,7 @@ function loaderFor(sessions: Session[], branchSubjects: readonly string[] = [SUB
     loadSession: async (summary: SessionSummary) => byId.get(summary.id) ?? null,
     currentWorktreeRoot: CURRENT_ROOT,
     branchSubjects,
+    runGit: noGit,
   };
 }
 
@@ -238,6 +240,7 @@ describe("SPEC-0032 R4/R5 · credit through selectContributors", () => {
     const sel = await selectContributors([repo(q)], [SHA_A, SHA_B], {
       loadSession: async () => q,
       currentWorktreeRoot: CURRENT_ROOT,
+      runGit: noGit,
     });
     expect(sel.contributors).toHaveLength(0);
     expect(sel.excludedCount).toBe(1);

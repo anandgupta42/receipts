@@ -323,6 +323,18 @@ function totalBlocks(input: PrBodyInput): Block[] {
     });
     blocks.push({ kind: "note", text: "(in repo + branch window, no branch commit)", muted: true });
   }
+  // SPEC-0072 R3 — sharper signal for excluded candidates that made a real git
+  // write but still could not be tied to the branch after patch-id recovery.
+  const unanchored = input.confidence?.unanchoredGitWrite ?? 0;
+  if (unanchored > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(unanchored, "session")} made git writes that could not be anchored`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(see docs/trust.md)", muted: true });
+  }
   // SPEC-0044 A1 — anchor-pool sessions that touched the branch but couldn't be
   // sliced precisely: counted-absence, DISTINCT from the excluded note above
   // (the coverage-map C.2 hole — never a silent drop).

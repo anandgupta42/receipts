@@ -33,6 +33,9 @@ export type ConfidenceEvent =
   // A repo+window candidate that isn't proven ours (no branch SHA) — the
   // long-standing honest "excluded" count (SPEC-0023 R4 / SPEC-0032).
   | { kind: "silenced-git-write"; sessionId: string }
+  // SPEC-0072 R3: a repo+window candidate made a real git write, but no direct,
+  // message, or patch-id recovered anchor could tie it to this branch.
+  | { kind: "unanchored-git-write"; sessionId: string }
   // A subagent transcript that couldn't be parsed — listed, never dropped.
   | { kind: "unreadable-subagent"; sessionId: string }
   // A3: cache-write tokens priced at the base input rate because the vendor's
@@ -55,6 +58,8 @@ export interface ConfidenceSummary {
   unattributableAnchorPool: number;
   /** repo+window candidates not proven ours (the classic excluded count). */
   silencedGitWrite: number;
+  /** repo+window candidates with git writes that could not be anchored after recovery. */
+  unanchoredGitWrite: number;
   /** subagents that couldn't be parsed. */
   unreadableSubagent: number;
   /** sessions whose cache-write cost is a lower bound (no published cache-write rate). */
@@ -79,6 +84,7 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
     switch (e.kind) {
       case "unattributable-anchor-pool":
       case "silenced-git-write":
+      case "unanchored-git-write":
       case "unreadable-subagent":
       case "cost-lower-bound-cache-tier":
       case "unreadable-session":
@@ -93,6 +99,7 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
   return {
     unattributableAnchorPool: distinctSessions(events, "unattributable-anchor-pool"),
     silencedGitWrite: distinctSessions(events, "silenced-git-write"),
+    unanchoredGitWrite: distinctSessions(events, "unanchored-git-write"),
     unreadableSubagent: distinctSessions(events, "unreadable-subagent"),
     costLowerBoundCacheTier: distinctSessions(events, "cost-lower-bound-cache-tier"),
     unreadableSession: distinctSessions(events, "unreadable-session"),
@@ -105,6 +112,7 @@ export function isFloored(summary: ConfidenceSummary): boolean {
   return (
     summary.unattributableAnchorPool > 0 ||
     summary.silencedGitWrite > 0 ||
+    summary.unanchoredGitWrite > 0 ||
     summary.unreadableSubagent > 0 ||
     summary.costLowerBoundCacheTier > 0 ||
     summary.unreadableSession > 0 ||

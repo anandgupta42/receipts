@@ -27,11 +27,13 @@ describe("SPEC-0044 · summarizeConfidence", () => {
       { kind: "unattributable-anchor-pool", sessionId: "a" }, // dup session — counts once
       { kind: "unattributable-anchor-pool", sessionId: "b" },
       { kind: "silenced-git-write", sessionId: "c" },
+      { kind: "unanchored-git-write", sessionId: "e" },
       { kind: "cost-lower-bound-cache-tier", sessionId: "d" },
     ];
     const s = summarizeConfidence(events);
     expect(s.unattributableAnchorPool).toBe(2);
     expect(s.silencedGitWrite).toBe(1);
+    expect(s.unanchoredGitWrite).toBe(1);
     expect(s.costLowerBoundCacheTier).toBe(1);
     expect(s.unreadableSubagent).toBe(0);
   });
@@ -42,9 +44,22 @@ describe("SPEC-0044 · summarizeConfidence", () => {
     expect(isFloored(summarizeConfidence([{ kind: "unattributable-anchor-pool", sessionId: "y" }]))).toBe(true);
     // each disjunct isolated (so a deleted one is caught, not masked by a sibling):
     expect(isFloored(summarizeConfidence([{ kind: "silenced-git-write", sessionId: "s" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "unanchored-git-write", sessionId: "g" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "unreadable-subagent", sessionId: "sub" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "unreadable-session", sessionId: "u" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "dropped-transcript-records", sessionId: "d" }]))).toBe(true);
+  });
+});
+
+describe("SPEC-0072 R3 · unanchored git-write renders (not silent)", () => {
+  it("floors the total AND renders a distinct git-write note", () => {
+    const body = renderPrReceiptText({
+      contributors: [builder()],
+      excludedCount: 1,
+      confidence: summarizeConfidence([{ kind: "unanchored-git-write", sessionId: "writer.jsonl" }]),
+    });
+    expect(body).toMatch(/TOTAL priced\.+≥/);
+    expect(body).toContain("1 session made git writes that could not be anchored");
   });
 });
 
