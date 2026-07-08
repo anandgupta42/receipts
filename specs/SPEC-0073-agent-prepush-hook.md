@@ -1,7 +1,7 @@
 ---
 id: SPEC-0073
 title: "Agent auto-attach — a hook pre-push subcommand + zero-install adopter kit"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0064, SPEC-0065]
 ---
@@ -133,12 +133,12 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
 
 ## Success criteria
 
-- [ ] `aireceipts hook pre-push` ships (hidden), parses the PreToolUse payload with the tokenized
+- [x] `aireceipts hook pre-push` ships (hidden), parses the PreToolUse payload with the tokenized
       `gitWrite` parser, attaches the ref only on an `origin`/current-branch push, writes zero
       stdout, and exits 0 on every path (push never blocked; bounded delay only).
-- [ ] Per-event settings helpers land; the `.claude/settings.json` PreToolUse entry
+- [x] Per-event settings helpers land; the `.claude/settings.json` PreToolUse entry
       install/idempotency/coexistence with SessionEnd (and pre-existing PreToolUse entries) is
       tested; the two-file adopter kit + `integrations` recipe document it, incl. the
       no-op-without-hook and the sibling-collision warnings.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.

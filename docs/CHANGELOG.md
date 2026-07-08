@@ -3,7 +3,34 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
-## v0.5.0 — 2026-07-08
+## v0.6.0 — 2026-07-08
+
+Minor: receipts can now be produced **automatically** on push, and PR attribution is more
+robust. No change to rendered receipt output (goldens byte-identical); both additions are
+opt-in / internal.
+
+### Added
+
+- **Agent auto-attach** (SPEC-0073): a hidden `aireceipts hook pre-push` subcommand, wired as a
+  Claude Code `PreToolUse` hook via a committed `.claude/settings.json`, writes and pushes the
+  receipt ref (`refs/receipts/<slug>`) when the coding agent runs a branch push — so a receipt
+  is produced with no manual command. It **never blocks the push** (exits 0 on every path, no
+  stdout, bounded by the hook timeout) and only acts on a real `origin`/current-branch push
+  (tokenized detection; skips dry-run/delete/tags/non-origin/repo-retargeting/`refs/receipts`).
+  The adopter kit is now **two files** — the `pr-check` workflow (produces nothing on its own)
+  plus the `.claude/settings.json` hook (`docs/adopt/`, `aireceipts integrations`).
+
+### Fixed
+
+- **Robust PR-receipt attribution** (SPEC-0072): a session whose commit SHA was orphaned by
+  `git commit --amend` (or rebase) is now correctly credited by matching its stable
+  `git patch-id` to the branch commit, instead of showing "no branch commit" while an unrelated
+  helper takes the credit. Strictly under-crediting — duplicated diffs, empty/merge commits, and
+  a diff already directly claimed by another session never produce a match (no fabricated or
+  stolen credit, I2). Adds an `unanchored-git-write` confidence signal that floors the total when
+  a real git-write can't be tied to the branch.
+
+
 
 Minor: PR receipts gain a **self-contained CI path** (no external reusable workflow), the
 default **statusline** gets richer, and the **samosa tip link** leaves the default PR-posted
