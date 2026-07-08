@@ -135,7 +135,7 @@ who viewed which receipt.
              {
                "type": "command",
                "command": "npx -y aireceipts-cli@latest hook pre-push",
-               "timeout": 10
+               "timeout": 60
              }
            ]
          }

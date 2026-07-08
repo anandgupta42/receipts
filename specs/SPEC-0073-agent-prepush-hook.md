@@ -68,7 +68,11 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   them to operate **per event** (add/detect/remove keyed on `(event, command)`), preserving
   unrelated keys, existing SessionEnd entries, and any pre-existing PreToolUse entries. The kit
   adds a `PreToolUse` entry with `matcher: "Bash"` running `npx -y aireceipts-cli@<pin> hook
-  pre-push` with a per-hook `timeout` (bounds R2's delay). It is **separate** from the SessionEnd
+  pre-push` with a per-hook `timeout` (bounds R2's delay). The pre-push timeout is **larger than
+  the SessionEnd `--mini` hook's** (60s vs 10s): its first invocation on a cold npm cache must
+  download the package (incl. the `@resvg/resvg-js` native dep) before it can write the ref, and
+  10s can expire mid-download — silently missing the first push's receipt. 60s is still bounded
+  (the push is never gated on the receipt). It is **separate** from the SessionEnd
   `--mini` entry (SPEC-0006) — both coexist; installing/removing one never touches the other.
   Idempotent: re-adding is a no-op; `(PreToolUse, command)` is the identity key.
 - **R4 — the two-file adopter kit.** `docs/adopt/` documents the automatic setup as **two**

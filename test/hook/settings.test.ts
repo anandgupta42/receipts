@@ -105,7 +105,7 @@ describe("SPEC-0073 PreToolUse hook settings", () => {
     expect(entry.hooks[0].type).toBe("command");
     expect(entry.hooks[0].command).toBe(PRE_PUSH_HOOK_COMMAND);
     expect(entry.hooks[0].command).toContain("@latest hook pre-push");
-    expect(entry.hooks[0].timeout).toBe(10);
+    expect(entry.hooks[0].timeout).toBe(60);
   });
 
   it("adds alongside existing SessionEnd and PreToolUse entries without touching them", () => {

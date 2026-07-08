@@ -17,6 +17,17 @@ export const PRE_PUSH_HOOK_COMMAND = "npx -y aireceipts-cli@latest hook pre-push
  */
 export const HOOK_TIMEOUT_SECONDS = 10;
 
+/**
+ * The pre-push hook needs more headroom than the SessionEnd `--mini` render: it
+ * runs `npx -y aireceipts-cli@latest`, whose FIRST invocation on a cold npm
+ * cache downloads the package (incl. the `@resvg/resvg-js` native dep) before it
+ * can write+push the ref. 10s (SessionEnd's value) can expire mid-download, so
+ * the first push in a fresh clone would silently miss its receipt. 60s is still
+ * a bound (the push is never gated on the receipt; SPEC-0073 R2), just enough for
+ * a cold first run. The internal sibling sets no timeout at all (600s default).
+ */
+export const PRE_PUSH_HOOK_TIMEOUT_SECONDS = 60;
+
 export const SESSION_END_EVENT = "SessionEnd";
 export const PRE_TOOL_USE_EVENT = "PreToolUse";
 
@@ -38,7 +49,7 @@ export const PRE_PUSH_SPEC: HookCommandSpec = {
   event: PRE_TOOL_USE_EVENT,
   matcher: "Bash",
   command: PRE_PUSH_HOOK_COMMAND,
-  timeout: HOOK_TIMEOUT_SECONDS,
+  timeout: PRE_PUSH_HOOK_TIMEOUT_SECONDS,
 };
 
 export function hookCommandEntry(spec: HookCommandSpec): Record<string, unknown> {

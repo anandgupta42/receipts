@@ -154,7 +154,7 @@ export const INTEGRATION_RECIPES: readonly IntegrationRecipe[] = [
       "          {",
       '            "type": "command",',
       '            "command": "npx -y aireceipts-cli@latest hook pre-push",',
-      '            "timeout": 10',
+      '            "timeout": 60',
       "          }",
       "        ]",
       "      }",
