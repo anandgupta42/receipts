@@ -80,6 +80,7 @@ describe("SPEC-0054 --details CLI surface", () => {
           hasContextThrashWaste: false,
           hasPriceDelta: false,
           hasSubagents: false,
+          hasPreEditShare: false,
           detailsView,
           turnCountBucket: "2-3",
           toolCallCountBucket: "4-10",

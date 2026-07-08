@@ -5,6 +5,9 @@
                 gpt-5.3-codex 100%                
          cache served 59% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 exec_command......................$0.01  (3 calls)
 
 ⚠ exec_command loop ×3.................$0.01 (30s)

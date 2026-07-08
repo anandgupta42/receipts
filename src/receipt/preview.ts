@@ -4,6 +4,7 @@
 // never reads a test fixture at runtime. Its sessionId is chosen to give the
 // grocery barcode varied group widths.
 import type { ReceiptModel } from "./model.js";
+import { emptyCostShape } from "../pricing/costShape.js";
 import type { TokenUsage } from "../parse/types.js";
 
 function usage(total: number): TokenUsage {
@@ -44,5 +45,6 @@ export function previewModel(): ReceiptModel {
     toolCallCount: 10,
     peakTurn: { tokens: 3200, turnNumber: 4 },
     cacheReadAtInputRateUsd: 0.12,
+    costShape: emptyCostShape(),
   };
 }

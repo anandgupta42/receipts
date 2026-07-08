@@ -5,6 +5,9 @@
           claude-unknown-model-zzz 100%           
          cache served 44% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 (thinking/reply)..........1,354,000 tok  (8 turns)
 
 ≈ context thrash: 3 compactions in…....700,000 tok

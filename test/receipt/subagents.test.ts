@@ -8,6 +8,7 @@ import { loadById } from "../../src/index.js";
 import type { TokenUsage } from "../../src/parse/types.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
 import type { ReceiptModel, SubagentAggregate, ToolRow } from "../../src/receipt/model.js";
+import { emptyCostShape } from "../../src/pricing/costShape.js";
 import { attachSubagentRollup, foldSubagentRows, subagentCaveats } from "../../src/receipt/subagents.js";
 import { renderReceipt } from "../../src/receipt/render.js";
 import { renderReceiptSvg } from "../../src/receipt/svg.js";
@@ -65,6 +66,7 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     turnCount: 4,
     toolCallCount: 4,
     cacheReadAtInputRateUsd: null,
+    costShape: emptyCostShape(),
     ...overrides,
   };
 }

@@ -54,6 +54,9 @@ What you get back, as the bytes your terminal prints:
     claude-opus-4-8 87% · claude-sonnet-5 13%     
          cache served 85% of input tokens         
 
+pre-edit: 11% of cost (1/10 turns)
+  (share before the first named edit tool)
+
 Bash..............................$0.05  (3 calls)
 Edit..............................$0.05  (2 calls)
 (thinking/reply)..................$0.03  (2 turns)

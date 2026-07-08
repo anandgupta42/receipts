@@ -4,6 +4,9 @@
  Claude Code · Jun 20 2026 10:00:00 UTC · 1m 50s  
   claude-opus-4-legacy 78% · claude-opus-4-8 22%  
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 Read...............................$0.01  (1 call)
 (thinking/reply)...............2,335 tok  (1 turn)
 Bash...........................2,160 tok  (1 call)

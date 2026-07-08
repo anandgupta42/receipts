@@ -5,6 +5,9 @@
                claude-opus-4-8 100%               
          cache served 37% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 (thinking/reply)..................$0.01  (3 turns)
 
 ≈ re-priced eligible trivial spans...........$0.00

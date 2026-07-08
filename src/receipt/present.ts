@@ -148,6 +148,27 @@ function metaLines(model: ReceiptModel): string[] {
   return lines;
 }
 
+/**
+ * SPEC-0067 — the default-receipt pre-edit line (HIGH confidence). Uses the `$`
+ * split when every usage turn priced; otherwise the always-present token split
+ * (I2 — never a `$` ratio over a partial denominator). Omitted when the session
+ * has no usage turns to split. Neutral wording only (I6): "pre-edit", never a
+ * "tax"/"overhead"/"wasted" or any cross-session ranking.
+ */
+function preEditLine(model: ReceiptModel): string | undefined {
+  const pe = model.costShape.preEdit;
+  if (pe.totalTurnCount === 0) {
+    return undefined;
+  }
+  if (pe.firstEditTurn === null) {
+    return "pre-edit: no named edit tool observed";
+  }
+  const range = `${formatInt(pe.preEditTurnCount)}/${formatInt(pe.totalTurnCount)} turns`;
+  return pe.preEditPct !== null
+    ? `pre-edit: ${pe.preEditPct}% of cost (${range})`
+    : `pre-edit: ${pe.preEditTokenPct}% of tokens (${range})`;
+}
+
 /** The count suffix a classic row shows (`(3 calls)` / `(2 turns)` / `(1 call)`). */
 function countLabel(row: ToolRow): string {
   const unit = row.tool === THINKING_REPLY ? "turn" : "call";
@@ -367,6 +388,26 @@ export function detailsBlocks(model: ReceiptModel): Block[] {
   if (model.peakTurn) {
     blocks.push({ kind: "row", label: "peak turn", value: `${formatShortTokens(model.peakTurn.tokens)} tok (turn ${model.peakTurn.turnNumber})` });
   }
+  // SPEC-0067 — expensive-turn concentration (HIGH) and late-turn cost ratio
+  // (LOW confidence; a neutral ratio, never a "context growth" cause). Details-only.
+  if (model.costShape.topTurns) {
+    const ts = model.costShape.topTurns;
+    blocks.push({ kind: "row", label: "top 3 turns", value: `${ts.sharePct}% (turns ${ts.indices.join(",")})` });
+  }
+  if (model.costShape.lateTurn) {
+    blocks.push({ kind: "row", label: "late-turn", value: `${model.costShape.lateTurn.lateRatio}× late/early (low conf)` });
+    // R-conf/R4b — disclose WHY confidence is low: the ratio mixes output,
+    // cache-write, and model switches, so it is not a context-growth measure (Codex #4).
+    blocks.push({ kind: "note", text: "(ratio only — mixes output/cache/model)", indent: 2, muted: true });
+  }
+  // SPEC-0068 — same-file re-reads: a LOW-confidence neutral diagnostic (never a
+  // "wasted"/savings claim; it is not a WasteLine and never enters savings math).
+  if (model.sameFileReReads) {
+    const r = model.sameFileReReads;
+    blocks.push({ kind: "row", label: "same-file re-reads", value: `${formatInt(r.count)} · ${formatShortTokens(r.tokens.total)} tok` });
+    blocks.push({ kind: "note", text: "(no recorded edit/shell/compaction between)", indent: 2, muted: true });
+    blocks.push({ kind: "note", text: "(low conf — may be legitimate re-grounding)", indent: 2, muted: true });
+  }
   if (model.cacheReadAtInputRateUsd !== null) {
     blocks.push({ kind: "row", label: "same reads at uncached input rate", value: `$${formatUsd(model.cacheReadAtInputRateUsd)}` });
     blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
@@ -422,6 +463,13 @@ function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[
     { kind: "masthead", text: WORDMARK },
     { kind: "meta", lines: metaLines(model) },
   ];
+  const preEdit = preEditLine(model);
+  if (preEdit !== undefined) {
+    blocks.push({ kind: "note", text: preEdit, spaceBefore: true });
+    // R1/R5 (I3) — disclose the split is around the first NAMED edit tool, so
+    // shell/vendor mutations are not implied to be captured (Codex #3).
+    blocks.push({ kind: "note", text: "(share before the first named edit tool)", indent: 2, muted: true });
+  }
   model.toolRows.forEach((row, i) => {
     blocks.push({ kind: "row", label: row.tool, value: classicRowValue(row, model, reconciled), spaceBefore: i === 0 });
   });

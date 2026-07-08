@@ -4,6 +4,9 @@
  Claude Code · Jun 15 2026 14:00:30 UTC · 4m 00s  
               claude-haiku-4-5 100%               
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 (thinking/reply)..................$0.56  (6 turns)
 --------------------------------------------------
 TOTAL........................................$0.56

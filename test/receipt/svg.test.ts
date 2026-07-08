@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { loadById } from "../../src/index.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
 import type { ReceiptModel, ToolRow } from "../../src/receipt/model.js";
+import { emptyCostShape } from "../../src/pricing/costShape.js";
 import type { TokenUsage } from "../../src/parse/types.js";
 import { renderReceiptLines } from "../../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg, rowGeometry, THEMES } from "../../src/receipt/svg.js";
@@ -56,6 +57,7 @@ function fakeModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
     methodology: "method",
     priceRowsUsed: [],
     unpriceable: false,
+    costShape: emptyCostShape(),
     ...overrides,
   };
 }

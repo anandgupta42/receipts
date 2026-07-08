@@ -5,6 +5,9 @@
               claude-haiku-4-5 100%               
          cache served 44% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 (thinking/reply)..................$0.90  (8 turns)
 
 ≈ context thrash: 3 compactions in 4 turns...$0.39

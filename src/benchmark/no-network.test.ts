@@ -1,6 +1,7 @@
 import { Readable, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReceiptModel } from "../receipt/model.js";
+import { emptyCostShape } from "../pricing/costShape.js";
 import { BENCHMARK_UNAVAILABLE_MESSAGE, buildBenchmarkPayload, confirmPrompt, isBenchmarkServiceAvailable } from "./index.js";
 
 const EMPTY_USAGE = { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 };
@@ -24,6 +25,7 @@ const SAMPLE_MODEL: ReceiptModel = {
   turnCount: 0,
   toolCallCount: 0,
   cacheReadAtInputRateUsd: null,
+  costShape: emptyCostShape(),
 };
 
 function inputStream(line: string): Readable {

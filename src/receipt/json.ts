@@ -117,6 +117,31 @@ function receiptBody(model: ReceiptModel) {
       : null,
     methodology: model.methodology,
     priceRowsUsed: model.priceRowsUsed.map(priceRowUsedJson),
+    // SPEC-0067 — cost-shape facts (standalone; never in savings math). The R5
+    // JSON contract lists exactly these preEdit fields; preEditTurnCount /
+    // totalTurnCount stay internal to the model (they drive the text range only).
+    costShape: {
+      preEdit: {
+        preEditUsd: model.costShape.preEdit.preEditUsd,
+        postEditUsd: model.costShape.preEdit.postEditUsd,
+        preEditPct: model.costShape.preEdit.preEditPct,
+        preEditTokenPct: model.costShape.preEdit.preEditTokenPct,
+        firstEditTurn: model.costShape.preEdit.firstEditTurn,
+        confidence: model.costShape.preEdit.confidence,
+      },
+      topTurns: model.costShape.topTurns,
+      lateTurn: model.costShape.lateTurn,
+    },
+    // SPEC-0068 — same-file re-reads diagnostic (standalone; NEVER a waste[] row or savings claim).
+    sameFileReReads: model.sameFileReReads
+      ? {
+          count: model.sameFileReReads.count,
+          turnIndices: model.sameFileReReads.turnIndices,
+          tokens: tokenUsageJson(model.sameFileReReads.tokens),
+          usd: model.sameFileReReads.usd,
+          confidence: model.sameFileReReads.confidence,
+        }
+      : null,
     // SPEC-0061 R5 — aggregate only (counts + sums); child ids/titles/paths never export.
     ...(model.subagents ? { subagents: { ...model.subagents } } : {}),
   };

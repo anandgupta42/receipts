@@ -5,6 +5,9 @@
                claude-sonnet-5 100%               
          cache served 71% of input tokens         
 
+pre-edit: no named edit tool observed
+  (share before the first named edit tool)
+
 mcp__claude-in-chrome__browser_…...$0.01  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.01

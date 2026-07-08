@@ -200,6 +200,8 @@ export const receiptGeneratedPropertiesSchema = z
     hasPriceDelta: z.boolean(),
     /** SPEC-0061 R6 — the session had discovered subagent (child) transcripts folded into its totals (boolean, never a count — I4). */
     hasSubagents: z.boolean(),
+    /** SPEC-0067 R7 — the receipt rendered a pre-edit cost-share line (boolean only — never the percentage/counts/$, I4). */
+    hasPreEditShare: z.boolean(),
     /** SPEC-0054 R8 — the receipt rendered with the opt-in `--details` section (boolean, never content). */
     detailsView: z.boolean(),
     turnCountBucket: z.enum(COUNT_BUCKET_VALUES),

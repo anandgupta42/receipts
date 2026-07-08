@@ -64,6 +64,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `hasContextThrashWaste` | boolean | | |
 | `hasPriceDelta` | boolean | | Whether the receipt had an arithmetic cheaper-model delta line. |
 | `hasSubagents` | boolean | | Whether subagent (child) transcripts were folded into the receipt's totals (SPEC-0061). A boolean, never a count. |
+| `hasPreEditShare` | boolean | | Whether the receipt rendered a pre-edit cost-share line (SPEC-0067). A boolean, never the percentage, counts, or `$`. |
 | `detailsView` | boolean | | Whether the receipt rendered the opt-in `--details` section. |
 | `turnCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw turn count. |
 | `toolCallCountBucket` | enum | `0` \| `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` | Never raw tool-call count. |
