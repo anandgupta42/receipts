@@ -3,6 +3,16 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.7.0 — 2026-07-08
+
+Minor: **telemetry now defaults to enabled in CI**, reversing the v0.6.x CI-default-off behavior.
+Automated CI runs (e.g. the `pr-check` action) are now counted by default, so CI adoption shows up
+in the data. CI is no longer special-cased — the `isCI` field still distinguishes CI from human
+runs. **Both kill switches still win everywhere**: set `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`)
+or `DO_NOT_TRACK=1` to disable telemetry in CI or anywhere; an empty/malformed connection string
+also disables. Telemetry payloads remain content-free (no transcript, prompts, file paths, repo
+names, or dollar amounts — invariant I4). See SPEC-0002's 2026-07-08 amendment and `docs/telemetry.md`.
+
 ## v0.6.1 — 2026-07-08
 
 Patch: the agent auto-attach hook (SPEC-0073) shipped with a 10s `timeout` — too tight for its
