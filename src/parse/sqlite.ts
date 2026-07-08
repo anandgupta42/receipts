@@ -110,6 +110,16 @@ function trySqlite3Cli(dbPath: string): SqliteReader | null {
   };
 }
 
+// Test-only: pin which backend openReadOnly uses. CI runs a single Node version
+// (node:sqlite present), so the sqlite3-CLI fallback is otherwise never reached;
+// pinning "cli" lets a test drive the full parse→render pipeline through it and
+// prove the receipt is byte-identical to the node:sqlite path. null = normal
+// auto-select; product code never sets this.
+let forcedReaderForTests: "cli" | "node" | null = null;
+export function __setForcedReaderForTests(reader: "cli" | "node" | null): void {
+  forcedReaderForTests = reader;
+}
+
 /**
  * Open a SQLite database read-only. Prefers node:sqlite for in-process reads and
  * falls back to the sqlite3 CLI on runtimes where node:sqlite is unavailable.
@@ -117,5 +127,15 @@ function trySqlite3Cli(dbPath: string): SqliteReader | null {
  * Cursor adapter reports not-detected).
  */
 export async function openReadOnly(dbPath: string): Promise<SqliteReader | null> {
+  if (forcedReaderForTests === "cli") return trySqlite3Cli(dbPath);
+  if (forcedReaderForTests === "node") return await tryNodeSqlite(dbPath);
   return (await tryNodeSqlite(dbPath)) ?? trySqlite3Cli(dbPath);
 }
+
+/**
+ * Test-only seam: each reader backend, exposed so the sqlite3-CLI fallback keeps
+ * direct unit coverage (real-data reads + the `[]`-on-error contract) alongside
+ * the end-to-end render parity that `__setForcedReaderForTests` enables. Not for
+ * product use.
+ */
+export const __sqliteReadersForTests = { tryNodeSqlite, trySqlite3Cli };
