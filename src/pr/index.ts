@@ -237,6 +237,7 @@ async function resolveContributors(
     branchSubjects: subjects,
     loadSession,
     currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
+    runGit: deps.runGit,
   });
   return { ...selection, sidechains };
 }

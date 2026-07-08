@@ -32,6 +32,7 @@ function namedToolTurn(index: number, name: string, input: unknown): Turn {
 }
 
 const CURRENT_ROOT = "/home/dev/repo";
+const noGit = () => ({ stdout: "", stderr: "", code: 1, missing: false });
 
 function makeSession(
   id: string,
@@ -71,6 +72,7 @@ function loaderFor(sessions: Session[]) {
   return {
     loadSession: async (summary: SessionSummary) => byId.get(summary.id) ?? null,
     currentWorktreeRoot: CURRENT_ROOT,
+    runGit: noGit,
   };
 }
 

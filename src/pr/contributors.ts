@@ -9,8 +9,9 @@
 // rankings (I6): codex / orchestrator (spawned subagents or launched agents) /
 // builder.
 import type { Session, SessionSummary } from "../parse/types.js";
+import { orphanCommitOutputShas, recoverBranchAnchors, type OrphanCommitCandidate } from "./anchorRecovery.js";
 import { classifyBranchAnchors, computeSlice, type BranchAnchorSummary, type SliceResult } from "./slice.js";
-import { cwdInsideRoots } from "./git.js";
+import { cwdInsideRoots, type CommandRunner } from "./git.js";
 import { isCodexExec, toolCallInvocations } from "./gitWrite.js";
 import { claimedBranchShas, eligibleSubjects, hasForeignShaWrites, sessionCommitSubjects } from "./messageAnchor.js";
 import type { ConfidenceEvent } from "./confidence.js";
@@ -60,6 +61,8 @@ export interface ContributorDeps {
   currentWorktreeRoot: string | null;
   /** Branch commit subjects aligned with `branchShas` (SPEC-0032). Absent/empty → message fallback off. */
   branchSubjects?: readonly string[];
+  /** Injected local git runner for SPEC-0072 patch-id anchor recovery. */
+  runGit: CommandRunner;
 }
 
 /** True if the session's cwd is inside the current process's worktree (not a sibling worktree). */
@@ -83,12 +86,16 @@ export async function selectContributors(
 ): Promise<ContributorSelection> {
   const contributors: RawContributor[] = [];
   const events: ConfidenceEvent[] = [];
-  // excludedCount derives from the silenced-git-write events (kept as a field
-  // for the well-tested body wiring); the events are the R1 source of truth.
+  // excludedCount derives from the repo+current-worktree uncredited events
+  // (kept as a field for the well-tested body wiring); the events are the R1
+  // source of truth.
   // filePath is the file-unique identity; summary.id collides across nested
   // candidates (nestedCandidates synthesizes id: agentId) — S2 finding 3.
-  const excludeHere = (summary: SessionSummary): void => {
-    events.push({ kind: "silenced-git-write", sessionId: summary.filePath });
+  const excludeHere = (summary: SessionSummary, anchors?: BranchAnchorSummary | null): void => {
+    events.push({
+      kind: anchors !== null && anchors !== undefined && anchors.writeCount > 0 ? "unanchored-git-write" : "silenced-git-write",
+      sessionId: summary.filePath,
+    });
   };
 
   // Pass 1 — load and classify EVERYTHING first, so SHA claims are computed
@@ -112,6 +119,54 @@ export async function selectContributors(
     loaded.push({ summary, here, pool, session, anchors: session ? classifyBranchAnchors(session.turns, branchShas) : null });
   }
 
+  const orphanCandidates: OrphanCommitCandidate[] = [];
+  const orphanOwners = new Map<string, Set<Loaded>>();
+  for (const l of loaded) {
+    if (!l.session) {
+      continue;
+    }
+    for (const sha of orphanCommitOutputShas(l.session, branchShas)) {
+      orphanCandidates.push({ sessionId: l.summary.filePath, sha });
+      const owners = orphanOwners.get(sha) ?? new Set<Loaded>();
+      owners.add(l);
+      orphanOwners.set(sha, owners);
+    }
+  }
+  // SPEC-0072 R1 authorship guard — patch-id proves diff-EQUALITY, not authorship.
+  // A branch SHA that a session's own git-write OUTPUT already directly claims has
+  // a proven author; never re-credit it to a different session whose orphan merely
+  // *reproduces* the diff (a cherry-pick, or an independent rebuild of the same
+  // change). Computed from direct claims only, so it is available before recovery.
+  // The amend case is unaffected: an amended branch SHA is never directly claimed
+  // (the transcript holds only the orphaned pre-amend SHA).
+  const directlyClaimed = new Set<string>();
+  for (const l of loaded) {
+    if (l.session) {
+      for (const sha of claimedBranchShas(l.session, branchShas)) {
+        directlyClaimed.add(sha);
+      }
+    }
+  }
+  const recoveredByLoaded = new Map<Loaded, Set<string>>();
+  const recovered = recoverBranchAnchors({
+    branchShas,
+    candidates: orphanCandidates,
+    runGit: deps.runGit,
+    cwd: deps.currentWorktreeRoot ?? undefined,
+  });
+  for (const [orphanSha, branchSha] of recovered) {
+    // Never promote onto a branch SHA a different session already directly proved.
+    if (directlyClaimed.has(branchSha)) {
+      continue;
+    }
+    for (const owner of orphanOwners.get(orphanSha) ?? []) {
+      const shas = recoveredByLoaded.get(owner) ?? new Set<string>();
+      shas.add(branchSha);
+      recoveredByLoaded.set(owner, shas);
+    }
+  }
+  const hasRecoveredOwn = (l: Loaded): boolean => (recoveredByLoaded.get(l)?.size ?? 0) > 0;
+
   // SPEC-0032 R3 — the eligible-subject set: branch subjects on commits no
   // candidate SHA-claims, unique on the branch. Empty when subjects weren't
   // supplied (fallback off).
@@ -121,6 +176,9 @@ export async function selectContributors(
       // Any write verb claims (push output too — a push-anchored commit's
       // subject must not stay eligible; S5 finding 1).
       for (const sha of claimedBranchShas(l.session, branchShas)) {
+        claimedShas.add(sha);
+      }
+      for (const sha of recoveredByLoaded.get(l) ?? []) {
         claimedShas.add(sha);
       }
     }
@@ -139,7 +197,7 @@ export async function selectContributors(
       continue;
     }
     const isCodex = l.summary.source === "codex";
-    const shaIncluded = l.anchors.hasOwn || (isCodex && l.anchors.writeCount === 0);
+    const shaIncluded = l.anchors.hasOwn || hasRecoveredOwn(l) || (isCodex && l.anchors.writeCount === 0);
     if (shaIncluded) {
       continue;
     }
@@ -177,7 +235,7 @@ export async function selectContributors(
       // it used to vanish silently — SPEC-0044 B4: "couldn't read" ≠ "not ours",
       // so its absence is now counted via a typed event (floors the total).
       if (here) {
-        excludeHere(summary);
+        excludeHere(summary, anchors);
       } else {
         events.push({ kind: "unreadable-session", sessionId: summary.filePath });
       }
@@ -190,7 +248,8 @@ export async function selectContributors(
     // no branch SHA, or a SHA-less Codex session from a sibling worktree or
     // the anchor pool, is not proven ours (R1) — unless the SPEC-0032 message
     // fallback structurally credits it (weaker basis, labeled on the row).
-    const include = anchors.hasOwn || (isCodex && anchors.writeCount === 0 && here);
+    const recoveredOwn = hasRecoveredOwn(l);
+    const include = anchors.hasOwn || recoveredOwn || (isCodex && anchors.writeCount === 0 && here);
     if (include) {
       const slice = computeSlice(session.turns, branchShas);
       // SPEC-0038 R2a — an anchor-pool session contributes ONLY with a
@@ -211,7 +270,7 @@ export async function selectContributors(
         summary,
         session,
         slice,
-        basis: anchors.hasOwn ? "anchor" : "helper",
+        basis: anchors.hasOwn || recoveredOwn ? "anchor" : "helper",
       });
     } else if (messageCredited.has(l)) {
       contributors.push({
@@ -224,7 +283,7 @@ export async function selectContributors(
       });
     } else if (here) {
       // Plausibly ours (this worktree) but unproven — surface it in the honest note.
-      excludeHere(summary);
+      excludeHere(summary, anchors);
     }
     // else: a sibling-worktree or anchor-pool candidate with no branch-SHA proof — not ours, ignored.
   }
@@ -233,7 +292,7 @@ export async function selectContributors(
     (a, b) => (a.session.startedAt ?? 0) - (b.session.startedAt ?? 0) || a.summary.id.localeCompare(b.summary.id),
   );
   const excludedCount = new Set(
-    events.filter((e) => e.kind === "silenced-git-write").map((e) => e.sessionId),
+    events.filter((e) => e.kind === "silenced-git-write" || e.kind === "unanchored-git-write").map((e) => e.sessionId),
   ).size;
   return { contributors, excludedCount, events };
 }
