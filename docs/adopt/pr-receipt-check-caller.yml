@@ -6,6 +6,9 @@
 # advanced on every publish (SPEC-0064 R1); pin a `v*` tag instead for a frozen ref.
 name: pr-receipt-check
 on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: write
 jobs:
   check:
     uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest
