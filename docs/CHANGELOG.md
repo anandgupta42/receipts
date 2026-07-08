@@ -3,6 +3,15 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.6.1 — 2026-07-08
+
+Patch: the agent auto-attach hook (SPEC-0073) shipped with a 10s `timeout` — too tight for its
+**first** `npx -y aireceipts-cli@latest` run on a cold npm cache (which downloads the package,
+including the `@resvg/resvg-js` native dep, before it can write the ref). On a fresh clone the
+first push could hit the timeout and silently skip its receipt. Bumped the pre-push hook timeout
+to **60s** (still bounded — the push is never gated on the receipt). The SessionEnd `--mini` hook
+timeout is unchanged (10s). No other behavior change; rendered output is byte-identical.
+
 ## v0.6.0 — 2026-07-08
 
 Minor: receipts can now be produced **automatically** on push, and PR attribution is more
