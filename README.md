@@ -26,7 +26,7 @@ every session it can attribute; where tokens were wasted. It's local — your co
 contents, and raw transcripts never leave your machine, and pricing needs no network. A
 receipt is the one thing you'd share, and only when you choose to (a PR comment, a
 `refs/receipts/*` git ref, or an artifact page): it carries cost, token, model, and tool
-figures — plus a title taken from your session's first prompt — never your code, file
+figures — plus a short session title (often prompt-derived) — never your code, file
 contents, or the transcript itself ([how](docs/pr-receipts.md)).
 
 Here's what one looks like — the exact bytes your terminal prints:

@@ -150,7 +150,7 @@ describe("SPEC-0029 · README guard", () => {
       expect(readme).toContain(cmd);
     }
     // Design-mandated linked rows: each command's table row must carry a doc link.
-    for (const cmd of ["aireceipts pr", "compare", "week", "--handoff", "install-hook", "statusline", "--json"]) {
+    for (const cmd of ["aireceipts pr", "aireceipts setup", "compare", "week", "--handoff", "install-hook", "statusline", "--json"]) {
       const row = lines.find((l) => l.startsWith("|") && l.includes(cmd));
       expect(row, `CLI table row missing for ${cmd}`).toBeDefined();
       expect(row!.includes("]("), `CLI table row for ${cmd} must link its doc`).toBe(true);
