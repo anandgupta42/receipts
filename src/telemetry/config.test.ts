@@ -20,24 +20,24 @@ describe("R4: kill switches disable telemetry", () => {
   });
 });
 
-describe("CI default-off (2026-07-05 amendment): explicit on beats CI, kill switches beat everything", () => {
+describe("CI default-on (2026-07-08 amendment): CI is enabled by default like any env; kill switches beat everything", () => {
   it.each([
     ["CI unset, AIRECEIPTS_TELEMETRY unset", {}, true],
-    ["CI=true, AIRECEIPTS_TELEMETRY unset", { CI: "true" }, false],
+    ["CI=true, AIRECEIPTS_TELEMETRY unset (now on by default)", { CI: "true" }, true],
     ["CI=true, AIRECEIPTS_TELEMETRY=on", { CI: "true", AIRECEIPTS_TELEMETRY: "on" }, true],
-    ["CI=true, AIRECEIPTS_TELEMETRY=off", { CI: "true", AIRECEIPTS_TELEMETRY: "off" }, false],
-    ["CI=true, DO_NOT_TRACK=1, AIRECEIPTS_TELEMETRY=on", { CI: "true", DO_NOT_TRACK: "1", AIRECEIPTS_TELEMETRY: "on" }, false],
-    ["GITHUB_ACTIONS=1, AIRECEIPTS_TELEMETRY unset", { GITHUB_ACTIONS: "1" }, false],
+    ["CI=true, AIRECEIPTS_TELEMETRY=off (kill switch wins)", { CI: "true", AIRECEIPTS_TELEMETRY: "off" }, false],
+    ["CI=true, DO_NOT_TRACK=1 (kill switch wins)", { CI: "true", DO_NOT_TRACK: "1" }, false],
+    ["GITHUB_ACTIONS=1, AIRECEIPTS_TELEMETRY unset (now on by default)", { GITHUB_ACTIONS: "1" }, true],
     ["CI=false, AIRECEIPTS_TELEMETRY unset (not CI)", { CI: "false" }, true],
   ] as const)("%s -> enabled=%s", (_label, env, expectedEnabled) => {
     const config = resolveTelemetryConfig({ ...env, AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN });
     expect(config.enabled).toBe(expectedEnabled);
   });
 
-  it("non-CI runs are unaffected by the amendment — off/on/unset behave exactly as before", () => {
-    expect(resolveTelemetryConfig({ AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }).enabled).toBe(true);
-    expect(resolveTelemetryConfig({ AIRECEIPTS_TELEMETRY: "off", AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }).enabled).toBe(false);
-    expect(resolveTelemetryConfig({ AIRECEIPTS_TELEMETRY: "on", AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }).enabled).toBe(true);
+  it("kill switches still disable telemetry in CI", () => {
+    expect(resolveTelemetryConfig({ CI: "true", AIRECEIPTS_TELEMETRY: "off", AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }).enabled).toBe(false);
+    expect(resolveTelemetryConfig({ CI: "true", DO_NOT_TRACK: "1", AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }).enabled).toBe(false);
+    expect(resolveTelemetryConfig({ GITHUB_ACTIONS: "1", AIRECEIPTS_TELEMETRY: "0", AIRECEIPTS_TELEMETRY_CONNECTION: VALID_CONN }).enabled).toBe(false);
   });
 });
 

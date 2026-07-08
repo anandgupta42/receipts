@@ -8,7 +8,7 @@
 - **Never sent**: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.
 - **Pseudonymous install identity**: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete `~/.aireceipts/state.json` to reset it.
 - **Disable anytime**: `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`) or `DO_NOT_TRACK=1`. Either one results in **zero network calls** and prevents install-id creation on a fresh install.
-- **Off by default in CI**: when `CI` or `GITHUB_ACTIONS` is set, telemetry defaults to disabled — no separate opt-out needed. Set `AIRECEIPTS_TELEMETRY=on` to opt a CI environment back in; the kill switches above still win over that.
+- **On by default in CI too**: `CI`/`GITHUB_ACTIONS` environments are treated the same as any other — telemetry is enabled by default there. Use a kill switch (`AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1`) to disable it in CI. (Before v0.7.0 it defaulted off in CI; reversed — see SPEC-0002.)
 - **Inspect before you decide**: `aireceipts --telemetry-show` prints exactly what the current run would send, and sends nothing.
 - **Bounded and fail-safe**: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code.
 
@@ -27,7 +27,7 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket; never raw milliseconds. |
 | `ok` | boolean | | Whether the command returned exit code 0. |
-| `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. Note: telemetry is disabled by default in CI (see Kill switches below), so this field is `true` only on the runs where `AIRECEIPTS_TELEMETRY=on` explicitly re-enabled it. |
+| `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. Telemetry is enabled by default in CI, so this field distinguishes CI runs from human runs in the data. |
 | `installHash` | string | 64-hex sha256 or `unavailable` | Salted hash of the random local install id; raw id never leaves disk. |
 | `runOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime run ordinal bucket; never the raw count. |
 | `handoffFormat` | enum (optional) | `text` \| `json` | SPEC-0042: emission mode, present only on handoff-command runs — never content. |
@@ -167,15 +167,20 @@ AIRECEIPTS_TELEMETRY=off aireceipts ...
 DO_NOT_TRACK=1 aireceipts ...
 ```
 
-### CI default-off
+### CI behavior (on by default)
 
-Telemetry also defaults to disabled whenever `CI` or `GITHUB_ACTIONS` is set (the same detection used for the `isCI` field above) — a fleet of automated runs should not silently dwarf human usage in the data, and CI shouldn't need a separate manual opt-out. This is a default, not a third kill switch: an explicit override re-enables it —
+Telemetry is **enabled by default in CI**, the same as any other environment — `CI` and
+`GITHUB_ACTIONS` are not special-cased. Automated CI runs are counted; the `isCI` field (above)
+records whether a run was in CI so CI vs. human usage stays distinguishable in the data. To turn
+telemetry **off** in a CI environment, use a kill switch:
 
 ```bash
-AIRECEIPTS_TELEMETRY=on aireceipts ...   # re-enables telemetry even when CI/GITHUB_ACTIONS is set
+AIRECEIPTS_TELEMETRY=off aireceipts ...   # or DO_NOT_TRACK=1 — disables telemetry in CI or anywhere
 ```
 
-Precedence is: `AIRECEIPTS_TELEMETRY=off`/`DO_NOT_TRACK=1` (always win) → CI default-off (unless explicitly overridden with `on`) → the connection-string checks below. Outside CI, behavior is unchanged.
+Precedence is: `AIRECEIPTS_TELEMETRY=off`/`DO_NOT_TRACK=1` (always win) → the connection-string
+checks below. (Before v0.7.0, telemetry defaulted **off** in CI; that default was reversed — see
+SPEC-0002's 2026-07-08 amendment.)
 
 ## Inspecting what would be sent
 
