@@ -195,9 +195,15 @@ describe("SPEC-0072 R1 - patch-id anchor recovery", () => {
     const cwd = await tempRepo();
     const main = currentBranch(cwd);
     const branchSha = await commitFile(cwd, "shared.txt", "shared change\n", "feat: shared change");
+    // Cherry-pick onto a DIFFERENT parent (an unrelated commit) so the orphan gets a
+    // distinct SHA while keeping the identical diff (equal patch-id). Cherry-picking the
+    // tip straight onto its own parent would reproduce the byte-identical commit SHA and
+    // never exercise the guard.
     git(cwd, ["checkout", "--quiet", "-b", "cherry", `${branchSha}~1`]);
+    await commitFile(cwd, "unrelated.txt", "noise\n", "chore: unrelated work");
     git(cwd, ["cherry-pick", "--no-edit", branchSha]);
     const orphanSha = head(cwd);
+    expect(orphanSha).not.toBe(branchSha);
     git(cwd, ["checkout", "--quiet", main]);
 
     const author = makeSession("author", cwd, [bashTurn(0, "git commit -m shared", commitOutput(branchSha, "feat: shared change"))], "claude-code", 1000);
