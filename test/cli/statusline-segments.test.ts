@@ -115,7 +115,7 @@ describe("SPEC-0062 R3 — renderSegments", () => {
   });
 });
 
-describe("SPEC-0069 — rich statusline (burn, context, quota countdown, M/B tokens)", () => {
+describe("SPEC-0071 — rich statusline (burn, context, quota countdown, M/B tokens)", () => {
   it("R1: tokens use abbreviated M formatting", () => {
     expect(renderSegments(segs("tokens"), ctx({ summary: buildMiniSummary(model({ totalTokens: usage(501_368_000) })) }))).toBe("501M");
   });
