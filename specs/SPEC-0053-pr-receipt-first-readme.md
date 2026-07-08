@@ -41,6 +41,19 @@ visual in the first 30 lines in 86% of the winning corpus). Maintainer-directed
   branch, SPEC-0051), (2) `aireceipts setup` (SPEC-0050), (3) wire the always-on
   surfaces (hook / statusline), (4) put receipts on PRs (`pr --post` / CI caller).
   The `## Install` heading stays within the first 60 lines (SPEC-0029 R3).
+
+  > **Amended 2026-07-08 (maintainer-directed launch redesign).** The four-step
+  > `## Install` path above is superseded by a three-command `## Start here` quick
+  > start: (1) `npx aireceipts-cli` (`--demo` for an empty machine), (2)
+  > `npx aireceipts-cli statusline`, (3) `npx aireceipts-cli pr --post` — with the
+  > full command reference (including `setup` and the always-on surfaces) moved to an
+  > `## Everything else it does` table. Rationale: the launch page leads with the
+  > three headline capabilities (local receipts, statusline, PR receipts) and keeps
+  > depth below the fold. The quick-start line budget moves 60→80 because the
+  > receipt-first layout shows the sample receipt above it. `readme-guard` R3
+  > assertions were updated to enforce the new shape; every other guard (receipt/
+  > golden parity, tagline sync, proof image, zero-emoji, length, table doc-links)
+  > is unchanged.
 - **R4 — Trust block, scannable.** The trust guarantees currently embedded in the
   "why this exists" prose render as a short bold-led bullet block above the fold:
   local-only, no accounts/servers; dollars only from cited dated price rows;
@@ -88,8 +101,8 @@ visual in the first 30 lines in 86% of the winning corpus). Maintainer-directed
 | R1 proof permalink | README link wrapping the image | matches `github.com/anandgupta42/receipts/pull/\d+#issuecomment-\d+` |
 | R1/R6 fenced receipts unchanged | README fenced blocks containing the wordmark | each byte-matches a committed golden |
 | R2 hero SVGs still present | `<picture>` srcs | ≥2 `goldens/svg/` paths, light + dark, on disk |
-| R3 install position | `## Install` heading | within first 60 lines |
-| R3 four steps | Install section body | exactly four numbered steps, `--demo` named in step 1 |
+| R3 quick-start position (amended 2026-07-08) | `## Start here` heading | within first 80 lines |
+| R3 three commands (amended 2026-07-08) | `## Start here` body | names `npx aireceipts-cli`, `statusline`, `pr --post`, and `--demo` |
 | R4 trust block | README above-the-fold text | bold-led bullets; `docs/trust.md` + `docs/telemetry.md` links preserved |
 | R5 watch hook | README text | one star/watch line, tied to the price-scan fact, no superlatives |
 | R6 length budget | README line count | ≤ 260 |

@@ -3,6 +3,10 @@
 // goldens (I5 extended to the marketing surface); the tagline is synced to
 // package.json; structural budgets are caps, not floors (budget constants
 // cite docs/internal/readme-evidence.md — the committed corpus note).
+// 2026-07-08 — SPEC-0053 R3's four-step `## Install` path is superseded by a
+// three-command `## Start here` quick start (maintainer-directed launch
+// redesign); the R3 assertions below enforce the new shape at the same rigor.
+// See the SPEC-0053 R3 amendment note.
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
@@ -120,28 +124,28 @@ describe("SPEC-0029 · README guard", () => {
     expect(imgLine).toBeLessThan(proseIdx);
   });
 
-  it("SPEC-0053 R3: the install section is exactly four numbered steps and step 1 names --demo", () => {
-    const installAt = lines.findIndex((l) => l.trim().toLowerCase().startsWith("## install"));
-    const nextH2 = lines.findIndex((l, i) => i > installAt && l.startsWith("## "));
-    const section = lines.slice(installAt, nextH2);
-    const stepIdx = section.reduce<number[]>((acc, l, i) => (/^\d+\. /.test(l.trim()) ? [...acc, i] : acc), []);
-    expect(stepIdx.map((i) => section[i].trim().slice(0, 2))).toEqual(["1.", "2.", "3.", "4."]);
-    const stepOne = section.slice(stepIdx[0], stepIdx[1]).join(" ");
-    expect(stepOne).toContain("--demo");
-    const stepTwo = section.slice(stepIdx[1], stepIdx[2]).join(" ");
-    expect(stepTwo).toContain("setup");
-    const stepThree = section.slice(stepIdx[2], stepIdx[3]).join(" ");
-    expect(stepThree).toContain("install-hook");
-    expect(stepThree).toContain("statusline");
-    const stepFour = section.slice(stepIdx[3]).join(" ");
-    expect(stepFour).toContain("pr --post");
-    expect(stepFour, "the CI workflow verifies receipts; posting is local").toContain("local");
+  it("SPEC-0053 R3 (amended 2026-07-08): the 'Start here' quick-start names the three headline commands", () => {
+    // Superseded shape: the original four-step `## Install` path. The launch
+    // redesign replaced it with a three-command quick start; the guard enforces
+    // THAT — same rigor, new contract.
+    const startAt = lines.findIndex((l) => /^##\s+start here\b/i.test(l.trim()));
+    expect(startAt, "README must have a '## Start here' quick-start section").toBeGreaterThan(-1);
+    const nextH2 = lines.findIndex((l, i) => i > startAt && l.startsWith("## "));
+    const section = lines.slice(startAt, nextH2 === -1 ? undefined : nextH2).join("\n");
+    // The three headline commands, each as a runnable invocation.
+    expect(section, "quick-start must name the session-receipt command").toContain("npx aireceipts-cli`");
+    expect(section, "quick-start must name statusline").toContain("statusline");
+    expect(section, "quick-start must name pr --post").toContain("pr --post");
+    // The empty-machine branch stays discoverable (SPEC-0051).
+    expect(section, "quick-start must name --demo for the empty-machine case").toContain("--demo");
   });
 
-  it("R3: install appears within the first 60 lines; CLI table names every command with doc links", () => {
-    const installAt = lines.findIndex((l) => l.trim().toLowerCase().startsWith("## install"));
-    expect(installAt).toBeGreaterThan(-1);
-    expect(installAt).toBeLessThanOrEqual(60);
+  it("R3: quick-start appears early; CLI table names every command with doc links", () => {
+    const startAt = lines.findIndex((l) => /^##\s+start here\b/i.test(l.trim()));
+    expect(startAt).toBeGreaterThan(-1);
+    // Budget moves 60→80: the receipt-first layout shows the sample receipt
+    // (fenced + SVG) above the quick start, still above the fold on GitHub.
+    expect(startAt).toBeLessThanOrEqual(80);
     for (const cmd of ["--svg", "--quota", "--check-budget"]) {
       expect(readme).toContain(cmd);
     }

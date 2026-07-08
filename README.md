@@ -22,10 +22,12 @@ $172.76. <a href="https://github.com/anandgupta42/receipts/pull/131#issuecomment
 **Why this exists.** AI coding agents spend real money invisibly — you see the diff,
 never the bill. aireceipts reads the transcripts your agent already writes to disk and
 turns them into receipts: what a session cost, tool by tool; what a PR cost, across
-every session it can attribute; where tokens were wasted. It's local — your transcripts
-and code never leave your machine, and pricing needs no network. The only thing that
-ever leaves is a receipt you choose to share, and it carries cost and token numbers
-only, never your code or prompts ([how](docs/pr-receipts.md)).
+every session it can attribute; where tokens were wasted. It's local — your code, file
+contents, and raw transcripts never leave your machine, and pricing needs no network. A
+receipt is the one thing you'd share, and only when you choose to (a PR comment, a
+`refs/receipts/*` git ref, or an artifact page): it carries cost, token, model, and tool
+figures — plus a title taken from your session's first prompt — never your code, file
+contents, or the transcript itself ([how](docs/pr-receipts.md)).
 
 Here's what one looks like — the exact bytes your terminal prints:
 
@@ -57,6 +59,15 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 <sub>the same receipt renders as a shareable SVG (`--svg`, light and dark themes),
 versioned JSON (`--json`), or CSV (`--csv`).</sub>
 
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
+  <img alt="the same receipt rendered as a shareable SVG, light and dark themes" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
+</picture>
+
+</div>
+
 ## Start here — three commands
 
 **See what a session cost** — `npx aireceipts-cli`
@@ -87,15 +98,15 @@ Full walkthrough: [getting started](docs/guide/01-getting-started.md) · a real 
 | `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time — [guide](docs/guide/09-handoff.md) |
 | `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt — [guide](docs/guide/03-install-hook.md) |
 | `aireceipts statusline` | Live cost line in Claude Code's status bar — [setup](docs/statusline.md) |
-| `aireceipts --quota` / `--check-budget` | Official rate-limit window state (subscribers); exit 1 when your local budget cap is exceeded |
+| `aireceipts --quota` / `--check-budget` | Claude Code rate-limit window, read from the statusline stdin payload (silent otherwise); `--check-budget` exits 1 when your local budget cap is exceeded |
 | `aireceipts --json` / `--csv` / `--svg` | Versioned schema, RFC 4180 rows, shareable image — [schema](docs/json-schema.md) |
 
 ## The honesty rules
 
 Every price is cited (vendor URL, date observed, a quoted excerpt — checked by CI). Every
 receipt is deterministic: same transcript in, byte-identical receipt out, golden-tested on
-every commit. No model without a cited price row ever shows a dollar figure — tokens-only
-instead of a guess. Comparisons re-price the identical tokens; they never predict. What a
+every commit — including the receipts shown on this page. No model without a cited price
+row ever shows a dollar figure — tokens-only instead of a guess. Comparisons re-price the identical tokens; they never predict. What a
 receipt proves, and what it can't: [docs/trust.md](docs/trust.md) · `aireceipts --methodology`.
 
 ## Supported agents
