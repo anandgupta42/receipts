@@ -2,7 +2,7 @@
 // authorship. The load-bearing case: an orchestrator running
 // `codex exec "…git push…"` must NEVER be read as a real push.
 import { describe, expect, it } from "vitest";
-import { gitWriteVerb, hexRuns, matchesBranchSha, toolCallGitVerb } from "../../src/pr/gitWrite.js";
+import { classifyPush, gitWriteVerb, hexRuns, matchesBranchSha, toolCallGitVerb, toolCallInvocations } from "../../src/pr/gitWrite.js";
 import type { ToolCall } from "../../src/parse/types.js";
 
 describe("gitWriteVerb (tokenized argv)", () => {
@@ -52,6 +52,54 @@ describe("toolCallGitVerb (across input shapes)", () => {
 
   it("an operator inside quotes never splits a command", () => {
     expect(toolCallGitVerb(call({ command: 'git commit -m "done && shipped; really"' }))).toBe("commit");
+  });
+});
+
+describe("SPEC-0073 classifyPush", () => {
+  it.each([
+    [["git", "push"]],
+    [["git", "push", "origin"]],
+    [["git", "push", "origin", "feat"]],
+    [["git", "push", "origin", "HEAD:refs/heads/main"]],
+    [["GIT_SSH_COMMAND=ssh -i key", "git", "push", "origin", "feat"]],
+    [["git", "push", "--force-with-lease"]],
+    [["git", "push", "-u", "origin", "feat"]],
+  ])("attaches on branch push argv %j", (argv) => {
+    expect(classifyPush(argv).attach).toBe(true);
+  });
+
+  it.each([
+    [["npm", "test"]],
+    [["git", "status"]],
+    [["git", "push", "--dry-run"]],
+    [["git", "push", "--delete", "origin", "feat"]],
+    [["git", "push", "-d", "origin", "feat"]],
+    [["git", "push", "--tags"]],
+    [["git", "push", "--prune", "origin"]],
+    [["git", "push", "--mirror"]],
+    [["git", "push", "--all"]],
+    [["git", "push", "upstream", "feat"]],
+    [["git", "push", "origin", "refs/receipts/x"]],
+    [["git", "push", "origin", "+refs/receipts/x:refs/receipts/x"]],
+    [["git", "push", "origin", "HEAD"]],
+    [["git", "push", "origin", "abc1234:refs/heads/tmp"]],
+    [["git", "-C", "sub", "push", "origin", "feat"]],
+    [["git", "--git-dir=/other/.git", "--work-tree=/other", "push", "origin", "feat"]],
+    [["git", "--namespace=ns", "push", "origin", "feat"]],
+  ])("does not attach on non-branch, retargeted, or ambiguous argv %j", (argv) => {
+    expect(classifyPush(argv).attach).toBe(false);
+  });
+
+  it("uses the tokenized invocation view so quoted, heredoc, and compound pushes do not attach", () => {
+    const attaches = (command: string) => {
+      const call: ToolCall = { name: "Bash", shell: true, input: { command } };
+      const invocations = toolCallInvocations(call);
+      return invocations.length === 1 && classifyPush(invocations[0]).attach;
+    };
+
+    expect(attaches('echo "git push"')).toBe(false);
+    expect(attaches("cat <<'EOF'\ngit push\nEOF")).toBe(false);
+    expect(attaches("npm test && git push")).toBe(false);
   });
 });
 
