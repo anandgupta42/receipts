@@ -551,7 +551,7 @@ describe("built CLI e2e", () => {
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("[aireceipts]");
     expect(result.stdout).toContain("$0.18");
-    expect(result.stdout).toContain("147k tok");
+    expect(result.stdout).toContain("147k");
     expect(result.stdout.endsWith("\n")).toBe(true);
   });
 

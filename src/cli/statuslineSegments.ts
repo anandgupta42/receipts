@@ -7,7 +7,7 @@
 // render a partial line.
 import type { MiniSummary } from "../receipt/mini.js";
 import { statuslineWasteFlag } from "../receipt/mini.js";
-import { formatTokensK, formatUsd } from "../receipt/format.js";
+import { formatShortTokens, formatUsd } from "../receipt/format.js";
 import {
   projectCapCrossingMs,
   quotaWindowPath,
@@ -16,9 +16,9 @@ import {
   type QuotaReading,
 } from "./quotaWindow.js";
 
-export const DEFAULT_FORMAT = "brand,cost,tokens,waste,quota5h";
+export const DEFAULT_FORMAT = "brand,cost,burn,tokens,context,waste,quota5h";
 
-export const SEGMENT_NAMES = ["brand", "cost", "tokens", "waste", "quota5h", "quota7d", "quotaEta"] as const;
+export const SEGMENT_NAMES = ["brand", "cost", "burn", "tokens", "context", "waste", "quota5h", "quota7d", "quotaEta"] as const;
 export type SegmentName = (typeof SEGMENT_NAMES)[number];
 
 export interface SegmentContext {
@@ -75,6 +75,42 @@ function utcHhMm(ms: number): string {
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
 }
 
+/** R2 — Claude Code's pre-calculated `context_window.used_percentage` (0–100). Guarded like the rate-limit windows: absent/non-numeric/out-of-range → `null` (also rejects the CC epoch-timestamp bug). */
+function contextPct(payload: unknown): number | null {
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
+  const cw = (payload as Record<string, unknown>).context_window;
+  if (typeof cw !== "object" || cw === null) {
+    return null;
+  }
+  const pct = (cw as Record<string, unknown>).used_percentage;
+  return typeof pct === "number" && Number.isFinite(pct) && pct >= 0 && pct <= 100 ? pct : null;
+}
+
+/** A 5h/7d window never resets more than ~8 days out — a remaining time beyond this means a garbage `resets_at` (e.g. a ms value sent as seconds, or the CC epoch bug), so omit rather than render an absurd countdown (Codex #2). */
+const MAX_RESET_COUNTDOWN_MS = 8 * 24 * 60 * 60 * 1000;
+
+/** R4 — time until a rate-limit window resets, as `2h13m` / `45m`; `null` when `resets_at` is absent, already past, or absurdly far out (never a negative/fabricated time). `resetsAtSec` is epoch SECONDS. */
+function resetCountdown(resetsAtSec: number | null, nowMs: number): string | null {
+  if (resetsAtSec === null) {
+    return null;
+  }
+  const remMs = resetsAtSec * 1000 - nowMs;
+  if (!Number.isFinite(remMs) || remMs <= 0 || remMs > MAX_RESET_COUNTDOWN_MS) {
+    return null;
+  }
+  const totalMin = Math.floor(remMs / 60_000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h > 0 ? `${h}h${m}m` : `${m}m`;
+}
+
+/** R3 — a burn RATE `$/hr`: whole dollars once it's ≥ $1/hr (glanceable), else the cents. */
+function formatRate(perHr: number): string {
+  return perHr >= 1 ? String(Math.round(perHr)) : formatUsd(perHr);
+}
+
 /**
  * R4 — the `≈` ETA segment: reads the prior reading, persists the current one
  * (atomic, last-writer-wins), and projects only when every guard holds.
@@ -105,15 +141,37 @@ const SEGMENTS: Record<SegmentName, (ctx: SegmentContext) => string | null> = {
   brand: (ctx) => (ctx.inputMode === "stdin_payload" ? "[aireceipts]" : `[aireceipts · ${ctx.summary.agentLabel}]`),
   cost: (ctx) =>
     !ctx.summary.unpriceable && ctx.summary.totalUsd !== null ? `$${formatUsd(ctx.summary.totalUsd)}` : null,
-  tokens: (ctx) => formatTokensK(ctx.summary.totalTokens),
+  tokens: (ctx) => formatShortTokens(ctx.summary.totalTokens),
+  // R2 — Claude Code's pre-calculated context-window fullness; omitted when absent (I2/I3).
+  context: (ctx) => {
+    const p = contextPct(ctx.payload);
+    return p === null ? null : `ctx ${Math.round(p)}%`;
+  },
+  // R3 — session-average burn rate from aireceipts' OWN priced ledger (I2 — no fabricated $/hr).
+  burn: (ctx) => {
+    const { totalUsd, durationMs, unpriceable } = ctx.summary;
+    if (unpriceable || totalUsd === null || !Number.isFinite(totalUsd) || totalUsd < 0 || durationMs === undefined || !Number.isFinite(durationMs) || durationMs <= 0) {
+      return null;
+    }
+    const perHr = totalUsd / (durationMs / 3_600_000);
+    return Number.isFinite(perHr) ? `$${formatRate(perHr)}/hr` : null;
+  },
   waste: (ctx) => (ctx.summary.topWaste ? statuslineWasteFlag(ctx.summary.topWaste) : null),
   quota5h: (ctx) => {
     const w = quotaWindow(ctx.payload, "five_hour");
-    return w ? `5h ${Math.round(w.usedPercentage)}%` : null;
+    if (!w) {
+      return null;
+    }
+    const cd = resetCountdown(w.resetsAt, ctx.nowMs);
+    return cd ? `5h ${Math.round(w.usedPercentage)}% ↺${cd}` : `5h ${Math.round(w.usedPercentage)}%`;
   },
   quota7d: (ctx) => {
     const w = quotaWindow(ctx.payload, "seven_day");
-    return w ? `7d ${Math.round(w.usedPercentage)}%` : null;
+    if (!w) {
+      return null;
+    }
+    const cd = resetCountdown(w.resetsAt, ctx.nowMs);
+    return cd ? `7d ${Math.round(w.usedPercentage)}% ↺${cd}` : `7d ${Math.round(w.usedPercentage)}%`;
   },
   quotaEta: quotaEtaSegment,
 };
