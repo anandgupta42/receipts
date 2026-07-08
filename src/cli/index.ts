@@ -22,12 +22,16 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   // send nothing and record nothing, or the privacy-preview surface becomes a
   // privacy leak (v0.1.0 docs-board BLOCKER). It's exempt from the first-run
   // notice, the run-counter start, the `cli_run` record, AND the flush below.
+  // SPEC-0073's PreToolUse hook gets the same treatment so it stays zero-output
+  // and local-only when invoked inside an agent tool gate.
   const isTelemetryShow = command.name === "telemetry-show";
-  if (!isTelemetryShow) {
+  const isSilentHook = command.name === "hook-pre-push";
+  const skipTelemetry = isTelemetryShow || isSilentHook;
+  if (!skipTelemetry) {
     await ensureFirstRunNotice((text) => process.stderr.write(text + "\n"), undefined);
   }
   const ctx = createContext(options, commands);
-  const runTelemetry = isTelemetryShow ? undefined : await noteRunStart(command.name, process.env);
+  const runTelemetry = skipTelemetry ? undefined : await noteRunStart(command.name, process.env);
   const started = Date.now();
   try {
     const code = await command.run(ctx);
@@ -44,13 +48,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
     return code;
   } catch (err) {
-    if (!isTelemetryShow) {
+    if (!skipTelemetry) {
       recordCliError({ command: command.name, agentType: undefined, err });
     }
-    process.stderr.write(String(err instanceof Error ? err.message : err) + "\n");
-    return 1;
+    if (!isSilentHook) {
+      process.stderr.write(String(err instanceof Error ? err.message : err) + "\n");
+    }
+    return isSilentHook ? 0 : 1;
   } finally {
-    if (!isTelemetryShow) {
+    if (!skipTelemetry) {
       await flushTelemetry();
     }
   }

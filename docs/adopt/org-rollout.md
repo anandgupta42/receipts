@@ -1,8 +1,9 @@
 # Rolling out receipt checks across a fleet of repos
 
-For one repo, adoption is the 3-line caller — see
-[pr-receipt-check-caller.yml](pr-receipt-check-caller.yml) and
-[docs/pr-receipts.md](../pr-receipts.md).
+For one repo, notice-only adoption starts with the workflow caller; automatic receipt
+posting needs the two-file kit (workflow + Claude Code hook). See
+[pr-receipt-check-caller.yml](pr-receipt-check-caller.yml),
+[claude-settings.json](claude-settings.json), and [docs/pr-receipts.md](../pr-receipts.md).
 
 For many repos (an org dogfood, a platform team), generate the adoption
 packet:
@@ -18,15 +19,16 @@ PR. **It performs no repo or GitHub mutations** — each repo's owners review an
 PR, and the script refuses to run until `aireceipts` is actually on npm
 (a packet telling developers to run an unpublished command helps nobody).
 
-**The default footprint is deliberately minimal — one non-blocking file per repo** (plus,
-optionally, a one-line CONTRIBUTING note). The packet adds only the notice-only caller: it
-never fails a build, and aireceipts never commits receipt files (a receipt is a PR comment
-or a git ref, invisible in the tree and PR diffs). So a fleet rollout doesn't dirty anyone's
-repo or gate anyone's CI. Enforcement (`AIRECEIPTS_REQUIRE_PR_RECEIPT`) is opt-in and coarse — it makes same-repo PRs
-require a receipt (fork PRs always stay notice-only). The seamless CI-post layer (CI renders
-+ posts the receipt from a branch ref, no contributor `gh`) shipped in v0.4.0, opt-in and
-off by default; auto-attach on push ships as a committed hook for this repo's contributors,
-which an adopter repo wires itself. See the tiers in [docs/pr-receipts.md](../pr-receipts.md).
+**The default footprint is deliberately minimal.** The notice-only packet adds one
+non-blocking workflow file (plus, optionally, a one-line CONTRIBUTING note): it never
+fails a build, and aireceipts never commits receipt files (a receipt is a PR comment or a
+git ref, invisible in the tree and PR diffs). Automatic receipts add the committed
+`.claude/settings.json` PreToolUse hook that produces the ref when Claude Code runs
+`git push`; the workflow alone is a no-op until that hook, or a manual
+`pr --store ref --push-ref`, produces a ref. Enforcement
+(`AIRECEIPTS_REQUIRE_PR_RECEIPT`) is opt-in and coarse — it makes same-repo PRs require a
+receipt (fork PRs always stay notice-only). See the tiers in
+[docs/pr-receipts.md](../pr-receipts.md).
 
 Two constraints inherited from GitHub:
 

@@ -109,9 +109,9 @@ never touched. The viewer page itself carries no analytics or beacons (I4's
 spirit): nobody, including the aireceipts project, learns
 who viewed which receipt.
 
-## For maintainers (repo integration, 2 minutes)
+## For maintainers (automatic repo integration, 2 files)
 
-1. Paste the 3-line caller as `.github/workflows/pr-receipt-check.yml`
+1. Commit the PR receipt check workflow as `.github/workflows/pr-receipt-check.yml`
    ([template](adopt/pr-receipt-check-caller.yml)):
 
    ```yaml
@@ -122,31 +122,68 @@ who viewed which receipt.
        uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest
    ```
 
-2. Add one line to `CONTRIBUTING.md`:
+2. Commit the Claude Code auto-attach hook as `.claude/settings.json`
+   ([template](adopt/claude-settings.json)):
+
+   ```json
+   {
+     "hooks": {
+       "PreToolUse": [
+         {
+           "matcher": "Bash",
+           "hooks": [
+             {
+               "type": "command",
+               "command": "npx -y aireceipts-cli@latest hook pre-push",
+               "timeout": 10
+             }
+           ]
+         }
+       ]
+     }
+   }
+   ```
+
+3. Add one line to `CONTRIBUTING.md`:
 
    > Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.
 
-That's it — and by design it stays out of your way.
+The workflow is the reader/poster; the hook is the producer. The workflow alone is a
+no-op until a branch carries `refs/receipts/<slug>`, produced by the Claude hook above
+or manually with:
 
-**Footprint (what this actually adds to your repo).** One workflow file (plus, optionally, a
-one-line note in `CONTRIBUTING.md`). The check **never fails a build** — a neutral `::notice`
-when a receipt is missing, and nothing otherwise. aireceipts **never commits receipt files**
-to your tree: a receipt is a PR comment or a git ref (`refs/receipts/…`), both invisible in
-your source and your PR diffs. Nothing runs on any contributor's machine. Remove it anytime
-by deleting the file.
+```sh
+npx aireceipts-cli pr --store ref --push-ref
+```
+
+Codex is manual for now: Codex `exec` does not currently invoke lifecycle hooks. The
+hidden `hook pre-push` subcommand accepts a Codex-shaped payload for forward
+compatibility, but do not count on Codex auto-attach until Codex hooks exist.
+
+Do **not** enable this hook in a repo already running another `refs/receipts/*`
+producer. `--push-ref` force-updates the receipt ref for a branch, so two producers
+would fight over the same namespace. `pr-check` fails safe on a foreign-schema ref and
+posts nothing, but avoiding the collision is still the adopter's responsibility.
+
+**Footprint (what this actually adds to your repo).** Two committed files for the
+automatic path (plus, optionally, a one-line note in `CONTRIBUTING.md`). The check
+**never fails a build** — a neutral `::notice` when a receipt is missing, and nothing
+otherwise. aireceipts **never commits receipt files** to your tree: a receipt is a PR
+comment or a git ref (`refs/receipts/…`), both invisible in your source and your PR
+diffs. Remove it anytime by deleting the workflow and the `.claude/settings.json` hook
+entry.
 
 **Turn it up when you want — opt-in and escapable:**
 
 - **Enforce** — set the repo variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true` to make same-repo
   PRs require a receipt. Fork PRs always stay notice-only (source transcripts live on the
   contributor's machine, so CI can't generate one).
-- **Fully seamless (v0.4.0)** — two opt-in layers now exist. **CI posts for you:** when a
+- **Fully seamless** — two opt-in layers now exist. **CI posts for you:** when a
   branch carries a `refs/receipts/<slug>` ref, the check renders and posts the receipt
   comment itself via `GITHUB_TOKEN`, so a contributor needs no local `gh`. **Auto-attach on
-  push:** a committed pre-push hook writes and pushes that ref on `git push` — shipped for
-  *this* repo's own contributors (`npm run setup:hooks`); an adopter repo wires an equivalent
-  hook calling `npx aireceipts-cli pr --store ref --push-ref` (the flags ship in the npm
-  package; the hook file does not). Either way a contributor can still just run
+  push:** the committed Claude Code hook above writes and pushes that ref before an agent-run
+  `git push`. For this repo's own contributors, the older `.githooks/pre-push` path still
+  exists behind `npm run setup:hooks`. Either way a contributor can still just run
   `npx aireceipts-cli pr --post`. Each layer is opt-in and notice-only until turned on.
 - **npm-native (no `uses:`)** — for trusted same-repo/internal repos, use the
   [self-contained caller](adopt/pr-check-caller.yml). It runs

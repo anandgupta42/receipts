@@ -9,6 +9,10 @@ import * as path from "node:path";
 import type { ToolCall } from "../parse/types.js";
 
 export type GitVerb = "commit" | "push";
+export interface PushClassification {
+  attach: boolean;
+  reason?: string;
+}
 
 /** Shells whose `-c`/`-lc` script argument we recurse into (a real `git commit`
  * wrapped as `bash -lc "git commit …"`). `codex`/other launchers are NOT shells
@@ -165,27 +169,308 @@ function resolveInvocations(argvs: string[][], depth = 0): string[][] {
  * the subcommand.
  */
 export function gitWriteVerb(argv: string[]): GitVerb | null {
-  if (argv.length === 0 || path.basename(argv[0]) !== "git") {
+  const gitIndex = gitCommandIndex(argv);
+  if (gitIndex === null) {
     return null;
   }
-  let i = 1;
-  while (i < argv.length) {
-    const tok = argv[i];
-    if (tok === "-C" || tok === "-c") {
-      i += 2; // option with a value
-      continue;
-    }
-    if (tok.startsWith("-")) {
-      i += 1; // valueless global option
-      continue;
-    }
-    break;
-  }
+  const i = gitSubcommandIndex(argv, gitIndex);
+  if (i === null) return null;
   const sub = argv[i];
   if (sub === "commit" || sub === "push") {
     return sub;
   }
   return null;
+}
+
+function gitCommandIndex(argv: string[]): number | null {
+  let i = 0;
+  while (i < argv.length && /^[A-Za-z_][A-Za-z0-9_]*=.*/.test(argv[i])) {
+    i++;
+  }
+  if (i >= argv.length || path.basename(argv[i]) !== "git") {
+    return null;
+  }
+  return i;
+}
+
+const GIT_GLOBAL_VALUE_OPTIONS = new Set(["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"]);
+
+function gitSubcommandIndex(argv: string[], gitIndex: number): number | null {
+  let i = gitIndex + 1;
+  while (i < argv.length) {
+    const tok = argv[i];
+    if (GIT_GLOBAL_VALUE_OPTIONS.has(tok)) {
+      i += 2;
+      continue;
+    }
+    if (tok.startsWith("--git-dir=") || tok.startsWith("--work-tree=") || tok.startsWith("--namespace=") || tok.startsWith("--exec-path=")) {
+      i += 1;
+      continue;
+    }
+    if (tok.startsWith("-")) {
+      i += 1;
+      continue;
+    }
+    break;
+  }
+  return i < argv.length ? i : null;
+}
+
+interface ParsedPush {
+  remote?: string;
+  refspecs: string[];
+  dryRun: boolean;
+  delete: boolean;
+  tags: boolean;
+  prune: boolean;
+  mirror: boolean;
+  all: boolean;
+  ambiguous: boolean;
+}
+
+const PUSH_VALUE_OPTIONS = new Set(["--receive-pack", "--exec", "--push-option", "--recurse-submodules", "-o"]);
+const PUSH_VALUE_PREFIXES = ["--receive-pack=", "--exec=", "--push-option=", "--recurse-submodules=", "--signed="];
+const PUSH_VALUE_OR_REMOTE_PREFIXES = ["--repo="];
+const PUSH_VALUELESS_OPTIONS = new Set([
+  "--atomic",
+  "--delete",
+  "--dry-run",
+  "--follow-tags",
+  "--force",
+  "--force-if-includes",
+  "--force-with-lease",
+  "--ipv4",
+  "--ipv6",
+  "--mirror",
+  "--no-atomic",
+  "--no-force-if-includes",
+  "--no-signed",
+  "--no-thin",
+  "--no-verify",
+  "--porcelain",
+  "--progress",
+  "--prune",
+  "--quiet",
+  "--set-upstream",
+  "--tags",
+  "--thin",
+  "--verbose",
+]);
+
+function parsePushArgs(args: string[]): ParsedPush {
+  const nonOptions: string[] = [];
+  let remoteFromRepoOption: string | undefined;
+  const parsed: ParsedPush = {
+    refspecs: [],
+    dryRun: false,
+    delete: false,
+    tags: false,
+    prune: false,
+    mirror: false,
+    all: false,
+    ambiguous: false,
+  };
+  let stopOptions = false;
+  for (let i = 0; i < args.length; i++) {
+    const tok = args[i];
+    if (stopOptions) {
+      nonOptions.push(tok);
+      continue;
+    }
+    if (tok === "--") {
+      stopOptions = true;
+      continue;
+    }
+    if (tok === "--repo") {
+      remoteFromRepoOption = args[++i];
+      if (!remoteFromRepoOption) parsed.ambiguous = true;
+      continue;
+    }
+    const repoPrefix = PUSH_VALUE_OR_REMOTE_PREFIXES.find((prefix) => tok.startsWith(prefix));
+    if (repoPrefix) {
+      remoteFromRepoOption = tok.slice(repoPrefix.length);
+      if (!remoteFromRepoOption) parsed.ambiguous = true;
+      continue;
+    }
+    if (PUSH_VALUE_OPTIONS.has(tok)) {
+      i++;
+      if (i >= args.length) parsed.ambiguous = true;
+      continue;
+    }
+    if (PUSH_VALUE_PREFIXES.some((prefix) => tok.startsWith(prefix))) {
+      continue;
+    }
+    if (tok.startsWith("--force-with-lease=")) {
+      continue;
+    }
+    if (tok.startsWith("--")) {
+      if (tok === "--dry-run") parsed.dryRun = true;
+      else if (tok === "--delete") parsed.delete = true;
+      else if (tok === "--tags") parsed.tags = true;
+      else if (tok === "--prune") parsed.prune = true;
+      else if (tok === "--mirror") parsed.mirror = true;
+      else if (tok === "--all") parsed.all = true;
+
+      if (!PUSH_VALUELESS_OPTIONS.has(tok) && tok !== "--all") {
+        parsed.ambiguous = true;
+      }
+      continue;
+    }
+    if (tok.startsWith("-") && tok !== "-") {
+      if (!parseShortPushOptions(tok, parsed, args, () => ++i)) {
+        parsed.ambiguous = true;
+      }
+      continue;
+    }
+    nonOptions.push(tok);
+  }
+
+  if (remoteFromRepoOption !== undefined) {
+    parsed.remote = remoteFromRepoOption;
+    parsed.refspecs = nonOptions;
+  } else if (nonOptions.length > 0) {
+    parsed.remote = nonOptions[0];
+    parsed.refspecs = nonOptions.slice(1);
+  }
+  return parsed;
+}
+
+function parseShortPushOptions(tok: string, parsed: ParsedPush, args: readonly string[], consumeNext: () => number): boolean {
+  const flags = tok.slice(1);
+  for (let i = 0; i < flags.length; i++) {
+    const flag = flags[i];
+    if (flag === "n") {
+      parsed.dryRun = true;
+    } else if (flag === "d") {
+      parsed.delete = true;
+    } else if (flag === "u" || flag === "f" || flag === "q" || flag === "v" || flag === "4" || flag === "6") {
+      continue;
+    } else if (flag === "o") {
+      if (i < flags.length - 1) {
+        return true;
+      }
+      const next = consumeNext();
+      return next < args.length;
+    } else {
+      return false;
+    }
+  }
+  return true;
+}
+
+function falsePush(reason: string): PushClassification {
+  return { attach: false, reason };
+}
+
+function truePush(): PushClassification {
+  return { attach: true };
+}
+
+function normalizedRefspec(refspec: string): string {
+  return refspec.startsWith("+") ? refspec.slice(1) : refspec;
+}
+
+function refspecTarget(refspec: string): string {
+  const normalized = normalizedRefspec(refspec);
+  const colon = normalized.indexOf(":");
+  return colon >= 0 ? normalized.slice(colon + 1) : normalized;
+}
+
+function isReceiptRefspec(refspec: string): boolean {
+  return refspecTarget(refspec).startsWith("refs/receipts/");
+}
+
+function isBranchName(value: string): boolean {
+  if (!value || value.startsWith("-") || value.startsWith(":") || value.includes(":") || value.includes("*")) {
+    return false;
+  }
+  if (value === "HEAD" || value === "tag" || value.startsWith("refs/tags/") || value.startsWith("refs/receipts/")) {
+    return false;
+  }
+  if (/^[0-9a-f]{7,40}$/i.test(value)) {
+    return false;
+  }
+  return true;
+}
+
+function isBranchPushRefspec(refspec: string): boolean {
+  const normalized = normalizedRefspec(refspec);
+  if (normalized.startsWith(":")) {
+    return false;
+  }
+  const colon = normalized.indexOf(":");
+  if (colon >= 0) {
+    const src = normalized.slice(0, colon);
+    const dst = normalized.slice(colon + 1);
+    return src === "HEAD" && dst.startsWith("refs/heads/") && dst.length > "refs/heads/".length;
+  }
+  if (normalized.startsWith("refs/heads/")) {
+    return normalized.length > "refs/heads/".length;
+  }
+  return isBranchName(normalized);
+}
+
+/**
+ * Classify one already-tokenized argv as a branch push that should auto-attach
+ * a receipt ref. Conservative by design: only origin/current-branch push shapes
+ * from SPEC-0073 attach; ambiguous or multi-ref writes under-attach.
+ */
+export function classifyPush(argv: string[]): PushClassification {
+  const gitIndex = gitCommandIndex(argv);
+  if (gitIndex === null) {
+    return falsePush("not-git");
+  }
+  const subIndex = gitSubcommandIndex(argv, gitIndex);
+  if (subIndex === null || argv[subIndex] !== "push") {
+    return falsePush("not-push");
+  }
+  // SPEC-0073 — a repo-retargeting global option (`git -C <dir> push`,
+  // `--git-dir`/`--work-tree`/`--namespace`/`--exec-path`) points the push at a
+  // DIFFERENT repo/worktree than the hook's cwd, but the attach only ever runs
+  // against the hook's own cwd. Attaching would write the ref to the wrong repo,
+  // so treat any retargeted push as ambiguous → no attach (under-attach). `-c`
+  // (config key=value) does not retarget the repo and is left alone.
+  for (let i = gitIndex + 1; i < subIndex; i++) {
+    const tok = argv[i];
+    if (tok === "-C" || tok === "--git-dir" || tok === "--work-tree" || tok === "--namespace" || tok === "--exec-path") {
+      return falsePush("retargeted");
+    }
+    if (
+      tok.startsWith("--git-dir=") ||
+      tok.startsWith("--work-tree=") ||
+      tok.startsWith("--namespace=") ||
+      tok.startsWith("--exec-path=")
+    ) {
+      return falsePush("retargeted");
+    }
+  }
+  const parsed = parsePushArgs(argv.slice(subIndex + 1));
+  if (parsed.ambiguous) {
+    return falsePush("ambiguous");
+  }
+  if (parsed.dryRun) return falsePush("dry-run");
+  if (parsed.delete) return falsePush("delete");
+  if (parsed.mirror) return falsePush("mirror");
+  if (parsed.all) return falsePush("all");
+  if (parsed.remote !== undefined && parsed.remote !== "origin") {
+    return falsePush("non-origin");
+  }
+  if (parsed.refspecs.length === 0) {
+    if (parsed.tags) return falsePush("tags-only");
+    if (parsed.prune) return falsePush("prune-only");
+    return truePush();
+  }
+  if (parsed.refspecs.length !== 1) {
+    return falsePush("ambiguous-refspecs");
+  }
+  const refspec = parsed.refspecs[0];
+  if (isReceiptRefspec(refspec)) {
+    return falsePush("receipts-ref");
+  }
+  if (!isBranchPushRefspec(refspec)) {
+    return falsePush("not-branch-refspec");
+  }
+  return truePush();
 }
 
 /** The single git-write verb this tool call represents, if any (first match

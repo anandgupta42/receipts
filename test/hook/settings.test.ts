@@ -5,14 +5,23 @@
 import { describe, expect, it } from "vitest";
 import {
   HOOK_COMMAND,
+  PRE_PUSH_HOOK_COMMAND,
+  PRE_TOOL_USE_EVENT,
   diffLines,
   hasHookEntry,
+  hasHookCommand,
+  hasPrePushHookEntry,
   malformedHooksShape,
   parseSettings,
+  prePushHookEntry,
   serializeSettings,
   sessionEndEntry,
+  withHookCommand,
   withHookEntry,
+  withPrePushHookEntry,
+  withoutHookCommand,
   withoutHookEntry,
+  withoutPrePushHookEntry,
 } from "../../src/hook/settings.js";
 
 describe("parseSettings", () => {
@@ -80,6 +89,70 @@ describe("withHookEntry (R3 merge)", () => {
     expect(changed).toBe(false);
     expect(next).toBe(once);
     expect((next.hooks as { SessionEnd: unknown[] }).SessionEnd).toHaveLength(1);
+  });
+});
+
+describe("SPEC-0073 PreToolUse hook settings", () => {
+  it("adds the nested PreToolUse Bash entry to a fresh settings object", () => {
+    const { next, changed } = withPrePushHookEntry({});
+    expect(changed).toBe(true);
+    expect(next).toEqual({ hooks: { PreToolUse: [prePushHookEntry()] } });
+  });
+
+  it("writes the adopter auto-attach command shape", () => {
+    const entry = prePushHookEntry() as { matcher: string; hooks: { type: string; command: string; timeout: number }[] };
+    expect(entry.matcher).toBe("Bash");
+    expect(entry.hooks[0].type).toBe("command");
+    expect(entry.hooks[0].command).toBe(PRE_PUSH_HOOK_COMMAND);
+    expect(entry.hooks[0].command).toContain("@latest hook pre-push");
+    expect(entry.hooks[0].timeout).toBe(10);
+  });
+
+  it("adds alongside existing SessionEnd and PreToolUse entries without touching them", () => {
+    const original = {
+      hooks: {
+        SessionEnd: [sessionEndEntry()],
+        PreToolUse: [{ matcher: "Bash", hooks: [{ type: "command", command: "guard.sh" }] }],
+      },
+      permissions: { allow: ["Bash(npm test)"] },
+    };
+    const snapshot = structuredClone(original);
+    const { next } = withPrePushHookEntry(original);
+    expect(original).toEqual(snapshot);
+    const hooks = next.hooks as { SessionEnd: unknown[]; PreToolUse: unknown[] };
+    expect(hooks.SessionEnd).toEqual(original.hooks.SessionEnd);
+    expect(hooks.PreToolUse[0]).toEqual(original.hooks.PreToolUse[0]);
+    expect(hooks.PreToolUse[1]).toEqual(prePushHookEntry());
+    expect(next.permissions).toEqual(original.permissions);
+  });
+
+  it("is idempotent by (event, command)", () => {
+    const once = withPrePushHookEntry({}).next;
+    const { next, changed } = withPrePushHookEntry(once);
+    expect(changed).toBe(false);
+    expect(next).toBe(once);
+    expect((next.hooks as { PreToolUse: unknown[] }).PreToolUse).toHaveLength(1);
+  });
+
+  it("removes the PreToolUse entry without removing SessionEnd", () => {
+    const installed = withPrePushHookEntry(withHookEntry({}).next).next;
+    const { next, changed } = withoutPrePushHookEntry(installed);
+    expect(changed).toBe(true);
+    expect(next).toEqual({ hooks: { SessionEnd: [sessionEndEntry()] } });
+  });
+
+  it("exposes generic per-event helpers", () => {
+    const spec = { event: "PreToolUse", matcher: "Bash", command: "custom", timeout: 3 };
+    const installed = withHookCommand({}, spec).next;
+    expect(hasHookCommand(installed, "PreToolUse", "custom")).toBe(true);
+    expect(hasHookCommand(installed, "SessionEnd", "custom")).toBe(false);
+    expect(withoutHookCommand(installed, "PreToolUse", "custom").next).toEqual({});
+  });
+
+  it("detects PreToolUse shape problems independently from SessionEnd", () => {
+    expect(malformedHooksShape({ hooks: { SessionEnd: [], PreToolUse: [] } }, PRE_TOOL_USE_EVENT)).toBeNull();
+    expect(malformedHooksShape({ hooks: { SessionEnd: [], PreToolUse: {} } }, PRE_TOOL_USE_EVENT)).toContain("hooks.PreToolUse");
+    expect(hasPrePushHookEntry({ hooks: { PreToolUse: [prePushHookEntry()] } })).toBe(true);
   });
 });
 

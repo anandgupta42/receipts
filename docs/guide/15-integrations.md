@@ -23,6 +23,7 @@ or writes settings from this command.
 | A weekly habit | `npx aireceipts-cli week` | local | none |
 | PR receipt comments | `npx aireceipts-cli pr --post` | repo/PR | GitHub only when explicitly run |
 | Team PR receipt presence checks | reusable GitHub workflow | repo | GitHub Actions only |
+| Automatic PR receipt refs | workflow + `.claude/settings.json` hook | repo | GitHub Actions + git push |
 
 ## Recipes
 
@@ -65,7 +66,10 @@ for every user. Keep the rollout explicit:
 2. Add assistant snippets or local hooks if they help the workflow.
 3. For PR-producing tasks, run `npx aireceipts-cli pr --post`.
 4. Add the reusable GitHub check when the team wants visibility.
-5. Keep enforcement opt-in; notice-only is the default.
+5. Add the committed Claude Code hook when the team wants automatic ref production.
+6. Keep enforcement opt-in; notice-only is the default.
 
-CI checks for marked PR receipt comments. It does not generate receipts and does
-not read local transcripts.
+CI checks for marked PR receipt comments and can post from a `refs/receipts/*` ref. It
+does not generate receipts and does not read local transcripts. The workflow alone is a
+no-op until the Claude hook, or a manual `npx aireceipts-cli pr --store ref --push-ref`,
+produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.

@@ -1,12 +1,12 @@
-// Pure settings.json manipulation for the SessionEnd auto-receipt hook
-// (SPEC-0006 R1/R3/R5). No I/O lives here — `install.ts` owns reads, atomic
-// writes, backup, and the consent prompt. Claude Code's hooks are NESTED
-// (`hooks.SessionEnd[].hooks[]` command objects, the shape this repo's own
-// `.claude/settings.json` uses), so merge/remove operate structurally on that
-// tree and touch nothing else (R3: every other key deep-equal before/after).
+// Pure settings.json manipulation for Claude Code hooks. No I/O lives here —
+// `install.ts` owns reads, atomic writes, backup, and the consent prompt.
+// Claude Code's hooks are NESTED (`hooks.<event>[].hooks[]` command objects,
+// the shape this repo's own `.claude/settings.json` uses), so merge/remove
+// operate structurally on that tree and touch nothing else.
 
 /** The exact command string the installed hook runs. Also the identity key for idempotency + uninstall. */
 export const HOOK_COMMAND = "npx aireceipts-cli --mini";
+export const PRE_PUSH_HOOK_COMMAND = "npx -y aireceipts-cli@latest hook pre-push";
 
 /**
  * Bounded invocation (R6): Claude Code enforces this per-hook `timeout`
@@ -18,13 +18,44 @@ export const HOOK_COMMAND = "npx aireceipts-cli --mini";
 export const HOOK_TIMEOUT_SECONDS = 10;
 
 export const SESSION_END_EVENT = "SessionEnd";
+export const PRE_TOOL_USE_EVENT = "PreToolUse";
 
-/** The one nested entry `install-hook` writes under `hooks.SessionEnd` (R3). */
-export function sessionEndEntry(): Record<string, unknown> {
+export interface HookCommandSpec {
+  event: string;
+  matcher: string;
+  command: string;
+  timeout: number;
+}
+
+export const SESSION_END_SPEC: HookCommandSpec = {
+  event: SESSION_END_EVENT,
+  matcher: "*",
+  command: HOOK_COMMAND,
+  timeout: HOOK_TIMEOUT_SECONDS,
+};
+
+export const PRE_PUSH_SPEC: HookCommandSpec = {
+  event: PRE_TOOL_USE_EVENT,
+  matcher: "Bash",
+  command: PRE_PUSH_HOOK_COMMAND,
+  timeout: HOOK_TIMEOUT_SECONDS,
+};
+
+export function hookCommandEntry(spec: HookCommandSpec): Record<string, unknown> {
   return {
-    matcher: "*",
-    hooks: [{ type: "command", command: HOOK_COMMAND, timeout: HOOK_TIMEOUT_SECONDS }],
+    matcher: spec.matcher,
+    hooks: [{ type: "command", command: spec.command, timeout: spec.timeout }],
   };
+}
+
+/** The one nested entry `install-hook` writes under `hooks.SessionEnd` (SPEC-0006 R3). */
+export function sessionEndEntry(): Record<string, unknown> {
+  return hookCommandEntry(SESSION_END_SPEC);
+}
+
+/** The PreToolUse Bash entry adopters can commit for SPEC-0073 auto-attach. */
+export function prePushHookEntry(): Record<string, unknown> {
+  return hookCommandEntry(PRE_PUSH_SPEC);
 }
 
 type Json = Record<string, unknown>;
@@ -50,41 +81,51 @@ export function parseSettings(text: string): Json {
   return parsed;
 }
 
-function entryIsOurs(entry: unknown): boolean {
+function entryHasCommand(entry: unknown, command: string): boolean {
   if (!isObject(entry) || !Array.isArray(entry.hooks)) {
     return false;
   }
-  return entry.hooks.some((h) => isObject(h) && h.command === HOOK_COMMAND);
+  return entry.hooks.some((h) => isObject(h) && h.command === command);
 }
 
-function sessionEndArray(settings: Json): unknown[] {
+function eventArray(settings: Json, event: string): unknown[] {
   const hooks = settings.hooks;
   if (!isObject(hooks)) {
     return [];
   }
-  const arr = hooks[SESSION_END_EVENT];
+  const arr = hooks[event];
   return Array.isArray(arr) ? arr : [];
+}
+
+/** True when a command entry is already present under one hook event. */
+export function hasHookCommand(settings: Json, event: string, command: string): boolean {
+  return eventArray(settings, event).some((entry) => entryHasCommand(entry, command));
 }
 
 /** True when our SessionEnd entry is already present (R3 idempotency, R5 no-op detection). */
 export function hasHookEntry(settings: Json): boolean {
-  return sessionEndArray(settings).some(entryIsOurs);
+  return hasHookCommand(settings, SESSION_END_EVENT, HOOK_COMMAND);
+}
+
+/** True when the SPEC-0073 PreToolUse auto-attach entry is already present. */
+export function hasPrePushHookEntry(settings: Json): boolean {
+  return hasHookCommand(settings, PRE_TOOL_USE_EVENT, PRE_PUSH_HOOK_COMMAND);
 }
 
 /**
  * A reason string if `settings.hooks` is a shape we must NOT overwrite —
  * present but the wrong type (a non-object `hooks`, or a non-array
- * `hooks.SessionEnd`). The caller aborts with no write rather than silently
+ * `hooks.<event>`). The caller aborts with no write rather than silently
  * clobbering valid user JSON (R3: structural preservation). `null` means the
  * tree is safe to merge into.
  */
-export function malformedHooksShape(settings: Json): string | null {
+export function malformedHooksShape(settings: Json, event = SESSION_END_EVENT): string | null {
   if ("hooks" in settings && !isObject(settings.hooks)) {
     return "`hooks` is present but is not a JSON object";
   }
   const hooks = settings.hooks;
-  if (isObject(hooks) && SESSION_END_EVENT in hooks && !Array.isArray(hooks[SESSION_END_EVENT])) {
-    return "`hooks.SessionEnd` is present but is not an array";
+  if (isObject(hooks) && event in hooks && !Array.isArray(hooks[event])) {
+    return `\`hooks.${event}\` is present but is not an array`;
   }
   return null;
 }
@@ -94,57 +135,77 @@ function clone(settings: Json): Json {
 }
 
 /**
- * Return `settings` with our SessionEnd entry added under `hooks.SessionEnd`
- * (R3). Additive and structural: existing hooks/keys are preserved untouched.
- * `changed` is false when the entry was already present (idempotent no-op).
+ * Return `settings` with `spec` added under `hooks.<event>`. Additive and
+ * structural: existing hooks/keys are preserved untouched. `changed` is false
+ * when the command was already present for that event (idempotent no-op).
  */
-export function withHookEntry(settings: Json): { next: Json; changed: boolean } {
-  if (hasHookEntry(settings)) {
+export function withHookCommand(settings: Json, spec: HookCommandSpec): { next: Json; changed: boolean } {
+  if (hasHookCommand(settings, spec.event, spec.command)) {
     return { next: settings, changed: false };
   }
   const next = clone(settings);
   const hooks = isObject(next.hooks) ? next.hooks : {};
-  const arr = Array.isArray(hooks[SESSION_END_EVENT]) ? (hooks[SESSION_END_EVENT] as unknown[]) : [];
-  hooks[SESSION_END_EVENT] = [...arr, sessionEndEntry()];
+  const arr = Array.isArray(hooks[spec.event]) ? (hooks[spec.event] as unknown[]) : [];
+  hooks[spec.event] = [...arr, hookCommandEntry(spec)];
   next.hooks = hooks;
   return { next, changed: true };
 }
 
+/** Return `settings` with our SessionEnd entry added under `hooks.SessionEnd` (SPEC-0006 R3). */
+export function withHookEntry(settings: Json): { next: Json; changed: boolean } {
+  return withHookCommand(settings, SESSION_END_SPEC);
+}
+
+/** Return `settings` with the SPEC-0073 PreToolUse auto-attach entry added. */
+export function withPrePushHookEntry(settings: Json): { next: Json; changed: boolean } {
+  return withHookCommand(settings, PRE_PUSH_SPEC);
+}
+
 /**
- * Return `settings` with exactly our hook command removed (R5). Removal is
- * surgical: only the `{command: HOOK_COMMAND}` hook object is stripped from an
+ * Return `settings` with exactly `command` removed from `hooks.<event>`.
+ * Removal is surgical: only that `{command}` hook object is stripped from an
  * entry — any sibling hooks in the same entry are preserved (we never remove a
  * parent entry that also carries someone else's hook). An entry whose `hooks[]`
- * we thereby empty is dropped; an emptied `hooks.SessionEnd` array is dropped;
+ * we thereby empty is dropped; an emptied `hooks.<event>` array is dropped;
  * a `hooks` object we thereby empty is dropped — no empty scaffolding is left
  * behind. `changed` is false when our command was absent (no-op).
  */
-export function withoutHookEntry(settings: Json): { next: Json; changed: boolean } {
-  if (!hasHookEntry(settings)) {
+export function withoutHookCommand(settings: Json, event: string, command: string): { next: Json; changed: boolean } {
+  if (!hasHookCommand(settings, event, command)) {
     return { next: settings, changed: false };
   }
   const next = clone(settings);
   const hooks = next.hooks as Json;
   const rebuilt: unknown[] = [];
-  for (const entry of hooks[SESSION_END_EVENT] as unknown[]) {
-    if (!entryIsOurs(entry) || !isObject(entry)) {
+  for (const entry of hooks[event] as unknown[]) {
+    if (!entryHasCommand(entry, command) || !isObject(entry)) {
       rebuilt.push(entry);
       continue;
     }
-    const remainingHooks = (entry.hooks as unknown[]).filter((h) => !(isObject(h) && h.command === HOOK_COMMAND));
+    const remainingHooks = (entry.hooks as unknown[]).filter((h) => !(isObject(h) && h.command === command));
     if (remainingHooks.length > 0) {
       rebuilt.push({ ...entry, hooks: remainingHooks });
     }
   }
   if (rebuilt.length > 0) {
-    hooks[SESSION_END_EVENT] = rebuilt;
+    hooks[event] = rebuilt;
   } else {
-    delete hooks[SESSION_END_EVENT];
+    delete hooks[event];
   }
   if (Object.keys(hooks).length === 0) {
     delete next.hooks;
   }
   return { next, changed: true };
+}
+
+/** Return `settings` with exactly our SessionEnd hook command removed (SPEC-0006 R5). */
+export function withoutHookEntry(settings: Json): { next: Json; changed: boolean } {
+  return withoutHookCommand(settings, SESSION_END_EVENT, HOOK_COMMAND);
+}
+
+/** Return `settings` with exactly the SPEC-0073 PreToolUse command removed. */
+export function withoutPrePushHookEntry(settings: Json): { next: Json; changed: boolean } {
+  return withoutHookCommand(settings, PRE_TOOL_USE_EVENT, PRE_PUSH_HOOK_COMMAND);
 }
 
 /** Canonical serialization for the written file: 2-space JSON + trailing newline (matches Claude Code's own settings.json style). */

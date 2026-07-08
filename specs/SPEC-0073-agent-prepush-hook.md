@@ -1,0 +1,144 @@
+---
+id: SPEC-0073
+title: "Agent auto-attach — a hook pre-push subcommand + zero-install adopter kit"
+status: building
+milestone: M5
+depends: [SPEC-0064, SPEC-0065]
+---
+
+# SPEC-0073: Agent auto-attach — `hook pre-push` subcommand + zero-install adopter kit
+
+## Purpose
+
+Receipts only reach a PR when a branch carries a `refs/receipts/<slug>` ref (SPEC-0065/0066)
+and CI posts it (SPEC-0064 `pr-check`). Today aireceipts produces that ref only via the
+committed `.githooks/pre-push` (this repo's own contributors, `npm run setup:hooks`) or a
+manual `npx aireceipts-cli pr --store ref --push-ref`. An **adopter** repo therefore gets
+*nothing* automatically — the org dogfood rollout added the CI post side to 19 repos and
+observed **zero receipts**, because no ref is ever produced.
+
+The internal sibling makes it automatic with **one committed file**: a Claude Code
+`.claude/settings.json` `PreToolUse: Bash` hook that runs its `hook pre-push` subcommand, so
+when the coding agent runs `git push` the receipt ref is written and pushed with **no extra
+step**. This spec brings the same to aireceipts: **R1** a `hook pre-push` subcommand that reads
+the agent hook payload and attaches the ref only on a real branch push, never blocking; **R2**
+an adopter kit that commits the `.claude/settings.json` hook alongside the `pr-check` workflow.
+
+Boundary unchanged: generation is local (I1/I4); the hook only writes+pushes a deterministic
+ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricates a receipt
+(I2); the delay it adds is **bounded** by the hook timeout, not zero (see R2).
+
+## Requirements
+
+- **R1 — `aireceipts hook pre-push` (hidden) reads a PreToolUse payload and attaches on branch
+  push only, using the tokenized command parser (no substring matching).** It reads a JSON object
+  on stdin (the Claude Code hook payload: `{ tool_name, tool_input: { command } }`, and the
+  equivalent Codex shape where present). It acts **only** when `tool_name` is a shell tool
+  (`Bash`) **and** `tool_input.command`, parsed with the repo's existing tokenized git-command
+  parser (`src/pr/gitWrite.ts` — the same one that already rejects quoted/echoed/heredoc
+  `git push` and handles `git -C <dir>` / env-prefix forms; extend it, don't substring-match),
+  is a `git push` to **`origin`** (the only remote `--push-ref` targets) of the **current
+  branch** (a bare `git push`, `git push origin`, `git push origin <branch>`, or an explicit
+  `HEAD:refs/heads/<branch>` refspec). It must **NOT** act on: non-`git` commands; `git`
+  non-`push` verbs; `git push --delete`/`--tags`-only/`--prune`-only/`--dry-run`; a push whose
+  only refspec is `refs/receipts/*` (recursion guard); a push to a non-`origin` remote; a
+  **repo-retargeting push** (`git -C <dir> push`, `--git-dir`/`--work-tree`/`--namespace`/
+  `--exec-path`) whose target repo/worktree differs from the hook's cwd — the attach only runs
+  against the hook's cwd, so attaching would write the ref to the wrong repo; or any command the
+  parser cannot unambiguously resolve to the above (heredocs, aliases, `&&`-chains whose push
+  target is unclear → **no action**, under-attach). When it acts, it runs the existing
+  `pr --store ref --push-ref` path (SPEC-0065) — which writes the deterministic ref and pushes it
+  to `origin`. A spurious attach is harmless by construction (the ref is deterministic and the
+  session is real — it only writes a correct ref slightly early), but ambiguity still resolves to
+  no-action to honor I2 and avoid needless network writes.
+- **R2 — never blocks the push; bounded, best-effort delay; zero stdout; always exit 0.** The
+  subcommand returns exit 0 on **every** path (success, no-match, missing session, no `git`, ref
+  write/push failure, malformed/empty stdin, any thrown error — all swallowed) and writes
+  **nothing to stdout** (a PreToolUse hook's stdout can carry a permission-decision JSON; the
+  reused `runPrDetailed` is invoked with **no-op `out`/`err` writers** so its rendered body and
+  status lines never reach the hook's stdout/stderr). It emits **no** decision object. Because
+  Claude Code runs a `PreToolUse` command hook **synchronously** (it waits for the hook before the
+  matched push runs), the hook does add latency: this is **bounded** by the per-hook `timeout`
+  (R3) and the attach is best-effort within it — a slow/failed ref push is abandoned at timeout
+  and the developer's push proceeds regardless. The invariant is "the push always succeeds and is
+  never gated on the receipt," **not** "zero added latency." (A background/async variant was
+  rejected: it would let the ref race the branch push so the first CI run could miss it.)
+- **R3 — per-event `.claude/settings.json` helpers + a distinct PreToolUse entry.** The current
+  settings helpers (`src/hook/settings.ts`) are hardcoded to `hooks.SessionEnd`; R3 generalizes
+  them to operate **per event** (add/detect/remove keyed on `(event, command)`), preserving
+  unrelated keys, existing SessionEnd entries, and any pre-existing PreToolUse entries. The kit
+  adds a `PreToolUse` entry with `matcher: "Bash"` running `npx -y aireceipts-cli@<pin> hook
+  pre-push` with a per-hook `timeout` (bounds R2's delay). It is **separate** from the SessionEnd
+  `--mini` entry (SPEC-0006) — both coexist; installing/removing one never touches the other.
+  Idempotent: re-adding is a no-op; `(PreToolUse, command)` is the identity key.
+- **R4 — the two-file adopter kit.** `docs/adopt/` documents the automatic setup as **two**
+  committed files: `.github/workflows/aireceipts.yml` (the `pr-check` post side, SPEC-0064) **and**
+  `.claude/settings.json` (the `PreToolUse` auto-attach hook, R3). The kit states plainly that the
+  workflow alone is a no-op until the hook (or a manual `pr --store ref --push-ref`) produces a
+  ref. `aireceipts integrations` surfaces the same two-file recipe.
+- **R5 — collision safety with a sibling ref producer.** The `refs/receipts/<slug>` namespace is
+  shared with the internal sibling. The kit's docs state the hazard: do **not** enable the
+  aireceipts auto-attach hook on a repo already running another `refs/receipts/*` producer (they
+  would fight over the ref). `pr-check` already fails safe on a foreign-schema `receipt.json`
+  (rejects, posts nothing — no fabrication); this spec adds no new write that could clobber a
+  foreign ref beyond the existing `--push-ref` force semantics, which the docs call out.
+- **R6 — Codex scope is honest.** Codex `exec` does not currently invoke lifecycle hooks, so the
+  auto-attach is **Claude Code** for now; the subcommand still parses a Codex-shaped payload if
+  one is piped (forward-compatible), and the kit documents Codex as manual (`pr --store ref
+  --push-ref`) until Codex hooks land. No claim that Codex auto-attaches.
+
+## Scenarios
+
+- **Given** an adopter repo with the two-file kit, **when** the coding agent runs `git push` on a
+  feature branch, **then** `hook pre-push` writes+pushes `refs/receipts/<slug>` before/with the
+  push, the developer's push proceeds unblocked, and the next CI run posts the receipt.
+- **Given** the same hook, **when** the agent runs any non-push Bash command (or `git status`,
+  `git push --dry-run`, a tag-only push, or the nested `refs/receipts/*` push), **then** the hook
+  does nothing and exits 0 — no ref written, no recursion.
+- **Given** a session with no attributable receipt / no `git` / a failing ref push, **when** the
+  hook fires on a branch push, **then** it exits 0 silently and the developer's push is unaffected.
+- **Given** a repo already running the internal sibling's `refs/receipts` producer, **when** the
+  adopter reads the kit, **then** the docs tell them not to enable the aireceipts hook there.
+
+## Non-goals
+
+- **Generating receipts in CI or changing the ref format.** Reuses SPEC-0065 `store=ref` verbatim.
+- **A git `pre-push` hook for adopters.** The committed `.githooks/pre-push` stays this repo's own
+  (not in the npm package); adopters use the agent hook (R3) or the manual command.
+- **Codex auto-attach.** Documented manual until Codex invokes hooks (R6).
+- **Blocking or gating a push on receipt success.** Structurally forbidden (R2).
+- **Resolving the `refs/receipts` namespace collision with the sibling.** Documented as a hazard
+  (R5); a shared-namespace redesign is out of scope.
+
+## Test matrix
+
+| Req | Case | Input | Expected |
+|---|---|---|---|
+| R1 | branch push (bare) | `{tool_name:"Bash",tool_input:{command:"git push"}}` | runs attach (`pr --store ref --push-ref`) |
+| R1 | branch push origin | `git push origin feat` | runs attach |
+| R1 | explicit refspec | `git push origin HEAD:refs/heads/main` | runs attach |
+| R1 | non-git command | `npm test` | no action, exit 0 |
+| R1 | git non-push | `git status` | no action |
+| R1 | delete/tag-only/dry-run | `git push --delete`, `git push --tags`, `git push --dry-run` | no action |
+| R1 | non-origin remote | `git push upstream feat` | no action (only origin) |
+| R1 | nested receipts push (recursion) | `git push origin refs/receipts/x` | no action |
+| R1 | echoed / heredoc / alias | `echo "git push"`, push inside a heredoc, ambiguous `&&`-chain | no action (tokenized parser, under-attach) |
+| R1 | repo-retargeting push | `git -C sub push …`, `git --git-dir=… push …`, `--work-tree`/`--namespace`/`--exec-path` | **no action** — the attach only runs against the hook's cwd, so a push aimed at another repo/worktree must not attach (would write the ref to the wrong repo) |
+| R2 | never blocks | attach throws / no git / empty stdin / bad JSON / no session | exit 0, empty stdout, empty stderr, no decision object |
+| R2 | zero stdout on success | valid branch push, attach succeeds | ref written; hook stdout is empty (runPrDetailed given no-op writers) |
+| R3 | per-event entry | fresh + settings with an existing SessionEnd and/or PreToolUse entry | PreToolUse Bash entry added; SessionEnd `--mini` + unrelated keys untouched; idempotent |
+| R4 | adopter kit | `docs/adopt/*` + `integrations` | two files documented; no-op-without-hook stated |
+| R5 | collision note | kit docs | warns against enabling on a sibling-ref repo |
+| R6 | codex payload shape | a Codex-shaped push payload piped | parses + acts (forward-compat); docs say manual |
+
+## Success criteria
+
+- [ ] `aireceipts hook pre-push` ships (hidden), parses the PreToolUse payload with the tokenized
+      `gitWrite` parser, attaches the ref only on an `origin`/current-branch push, writes zero
+      stdout, and exits 0 on every path (push never blocked; bounded delay only).
+- [ ] Per-event settings helpers land; the `.claude/settings.json` PreToolUse entry
+      install/idempotency/coexistence with SessionEnd (and pre-existing PreToolUse entries) is
+      tested; the two-file adopter kit + `integrations` recipe document it, incl. the
+      no-op-without-hook and the sibling-collision warnings.
+- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+      `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.
