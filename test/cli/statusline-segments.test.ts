@@ -87,7 +87,7 @@ describe("SPEC-0062 R3 — parseFormat", () => {
 
 describe("SPEC-0062 R3 — renderSegments", () => {
   it("renders exactly the requested segments, ·-joined", () => {
-    expect(renderSegments(segs("cost,tokens"), ctx())).toBe("$0.50 · 1k tok");
+    expect(renderSegments(segs("cost,tokens"), ctx())).toBe("$0.50 · 1k");
   });
 
   it("duplicate segments render twice", () => {
@@ -106,12 +106,67 @@ describe("SPEC-0062 R3 — renderSegments", () => {
 
   it("I2: cost omits itself on an unpriced session — no zero-fill, no $ bytes", () => {
     const unpriced = ctx({ summary: buildMiniSummary(model({ totalUsd: null })) });
-    expect(renderSegments(segs("cost,tokens"), unpriced)).toBe("1k tok");
+    expect(renderSegments(segs("cost,tokens"), unpriced)).toBe("1k");
   });
 
   it("the default format constant matches the spec-pinned list", () => {
-    expect(DEFAULT_FORMAT).toBe("brand,cost,tokens,waste,quota5h");
+    expect(DEFAULT_FORMAT).toBe("brand,cost,burn,tokens,context,waste,quota5h");
     expect(SEGMENT_NAMES).toContain("quotaEta");
+  });
+});
+
+describe("SPEC-0069 — rich statusline (burn, context, quota countdown, M/B tokens)", () => {
+  it("R1: tokens use abbreviated M formatting", () => {
+    expect(renderSegments(segs("tokens"), ctx({ summary: buildMiniSummary(model({ totalTokens: usage(501_368_000) })) }))).toBe("501M");
+  });
+
+  it("R2: context segment from context_window.used_percentage; omitted when absent/out-of-range", () => {
+    expect(renderSegments(segs("context"), ctx({ payload: { context_window: { used_percentage: 42 } } }))).toBe("ctx 42%");
+    expect(renderSegments(segs("context"), ctx({ payload: { context_window: { used_percentage: 1_700_000_000 } } }))).toBe(""); // CC epoch-bug guard
+    expect(renderSegments(segs("context"), ctx({ payload: {} }))).toBe("");
+  });
+
+  it("R3: burn is a priced $/hr over the session wall-clock; omitted with no duration/price (no fabricated rate)", () => {
+    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ totalUsd: 40, durationMs: 1_800_000 })) }))).toBe("$80/hr"); // $40 / 0.5h
+    expect(renderSegments(segs("burn"), ctx())).toBe(""); // model() has no durationMs
+    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ durationMs: 1_800_000, totalUsd: null })) }))).toBe("");
+    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ durationMs: 1_800_000, unpriceable: true, totalUsd: null })) }))).toBe("");
+    // Codex #1 — non-finite / negative inputs never render a fabricated $NaN/$Infinity/negative rate
+    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ totalUsd: NaN, durationMs: 1_800_000 })) }))).toBe("");
+    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ totalUsd: 40, durationMs: NaN })) }))).toBe("");
+    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ totalUsd: -5, durationMs: 1_800_000 })) }))).toBe("");
+  });
+
+  it("R4: quota5h shows an inline reset countdown, with sub-hour / no-reset / past-reset handling", () => {
+    const at = (msBefore: number) => ctx({ payload: quotaPayload(26), nowMs: RESETS_AT_MS - msBefore });
+    expect(renderSegments(segs("quota5h"), at((2 * 3600 + 13 * 60) * 1000))).toBe("5h 26% ↺2h13m");
+    expect(renderSegments(segs("quota5h"), at(45 * 60 * 1000))).toBe("5h 26% ↺45m");
+    expect(renderSegments(segs("quota5h"), ctx({ payload: { rate_limits: { five_hour: { used_percentage: 26 } } }, nowMs: 0 }))).toBe("5h 26%"); // no resets_at
+    expect(renderSegments(segs("quota5h"), ctx({ payload: quotaPayload(26), nowMs: RESETS_AT_MS + 60_000 }))).toBe("5h 26%"); // reset already past
+    // Codex #2 — a ms-as-seconds / garbage resets_at is beyond ~8 days out → countdown omitted, not ↺…000h0m
+    expect(renderSegments(segs("quota5h"), ctx({ payload: { rate_limits: { five_hour: { used_percentage: 26, resets_at: 1_800_018_000_000 } } }, nowMs: 0 }))).toBe("5h 26%");
+  });
+
+  it("R4: quota7d gets the same reset countdown", () => {
+    const payload = { rate_limits: { seven_day: { used_percentage: 55, resets_at: WINDOW.resets_at } } };
+    expect(renderSegments(segs("quota7d"), ctx({ payload, nowMs: RESETS_AT_MS - 30 * 60 * 1000 }))).toBe("7d 55% ↺30m");
+  });
+
+  it("R5: the rich default renders every segment in order", () => {
+    const summary = buildMiniSummary(model({ totalUsd: 423.26, durationMs: 7_200_000, totalTokens: usage(501_368_000) })); // $423.26 / 2h = $212/hr
+    const payload = { context_window: { used_percentage: 42 }, rate_limits: { five_hour: { used_percentage: 26, resets_at: WINDOW.resets_at } } };
+    const nowMs = RESETS_AT_MS - (2 * 3600 + 13 * 60) * 1000;
+    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ summary, payload, nowMs }))).toBe("[aireceipts] $423.26 · $212/hr · 501M · ctx 42% · 5h 26% ↺2h13m");
+  });
+
+  it("R5: degrades to cost + tokens when no payload/duration data", () => {
+    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ payload: null }))).toBe("[aireceipts] $0.50 · 1k");
+  });
+
+  it("R6: rendered segments contain no ANSI escape codes", () => {
+    const summary = buildMiniSummary(model({ totalUsd: 40, durationMs: 1_800_000, totalTokens: usage(501_368_000) }));
+    const payload = { context_window: { used_percentage: 42 }, rate_limits: { five_hour: { used_percentage: 26, resets_at: WINDOW.resets_at } } };
+    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ summary, payload, nowMs: 0 }))).not.toContain(String.fromCharCode(27));
   });
 });
 

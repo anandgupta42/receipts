@@ -31,16 +31,22 @@ instead of `aireceipts` in the `command` field (for example, the output of
 ## Output
 
 ```
-[aireceipts] $1.23 · 12k tok · 5h 24%
-[aireceipts] $2.50 · 20k tok · ⚠ Bash loop ×5
-[aireceipts · Cursor] 8k tok
+[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+[aireceipts] $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
+[aireceipts · Cursor] 8k
 ```
 
-- `$X.XX · Nk tok` when the session's cost is priced; `Nk tok` only when it
-  isn't (never a fabricated `$` amount).
-- `5h N%` is your official 5-hour rate-limit window usage, straight from the
-  payload Claude Code pipes in (subscribers) — omitted when the payload doesn't
-  carry it, never guessed.
+- `$X.XX` is the session's priced cost (aireceipts' own cited-price figure, incl.
+  subagents); omitted when it can't be priced — never a fabricated `$` amount.
+- `$X/hr` is the session-average burn rate (that same priced cost over the session
+  wall-clock); omitted when the session isn't priced or has no duration yet.
+- `Nk` / `NM` is the session's token count, abbreviated (`12k`, `1.2M`, `501M`).
+- `ctx N%` is how full the current context window is — Claude Code's own
+  pre-calculated `context_window.used_percentage`, omitted when the payload lacks it.
+- `5h N% ↺Xh Ym` is your official 5-hour rate-limit usage (Claude Code's own
+  `rate_limits.five_hour.used_percentage`, subscribers only) plus the time until the
+  window resets, derived from the real `resets_at` — the countdown is dropped (leaving
+  `5h N%`) when `resets_at` is absent or already past, never a guessed time.
 - The waste flag (`⚠ ...`) appears only when a waste detector actually fired
   on the session — its absence is not itself a claim that nothing was found.
 - Outside a piped invocation (or when stdin carries no usable payload),
@@ -51,7 +57,7 @@ instead of `aireceipts` in the `command` field (for example, the output of
 
 ## Custom formats (`--format`)
 
-The default line is the format `brand,cost,tokens,waste,quota5h`. Pick your own
+The default line is the format `brand,cost,burn,tokens,context,waste,quota5h`. Pick your own
 segments with `--format` (comma-separated; a segment with nothing honest to say
 is omitted, and an unknown name exits 1 with the valid list on stderr):
 
@@ -68,9 +74,11 @@ is omitted, and an unknown name exits 1 with the valid list on stderr):
 |---|---|---|
 | `brand` | `[aireceipts]` (stdin) / `[aireceipts · <agent>]` (disk fallback) | — |
 | `cost` | `$X.XX` | priced session total incl. subagents; omitted when unpriced (I2) |
-| `tokens` | `Nk tok` | session + subagent tokens |
+| `burn` | `$X/hr` | session-average burn (priced cost ÷ wall-clock); omitted when unpriced or no duration |
+| `tokens` | `Nk` / `NM` | session + subagent tokens, abbreviated |
+| `context` | `ctx N%` | Claude Code's `context_window.used_percentage` (stdin only) |
 | `waste` | `⚠ ...` | first fired waste detector |
-| `quota5h` / `quota7d` | `5h N%` / `7d N%` | official `rate_limits` passthrough (stdin only) |
+| `quota5h` / `quota7d` | `5h N% ↺Xh Ym` / `7d N% ↺…` | official `rate_limits` passthrough + reset countdown (stdin only) |
 | `quotaEta` | `≈ 5h cap HH:MM UTC` | labeled arithmetic, see below |
 
 ### `quotaEta` honesty rules
