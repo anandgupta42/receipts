@@ -1,7 +1,7 @@
 ---
 id: SPEC-0066
 title: CI renders and posts PR receipts from the ref (the trust boundary)
-status: approved
+status: building
 milestone: M5
 depends: [SPEC-0019, SPEC-0064, SPEC-0065]
 ---
@@ -101,10 +101,19 @@ transports what the local hook produced.
 
 ## Success criteria
 
-- [ ] CI fetches, validates, sanitizes, renders, and posts from the ref via `GITHUB_TOKEN`;
+- [x] CI fetches, validates, sanitizes, renders, and posts from the ref via `GITHUB_TOKEN`;
       no local `gh` needed.
-- [ ] Injection corpus golden passes; hostile payloads never break the comment or fail the
+- [x] Injection corpus golden passes; hostile payloads never break the comment or fail the
       job unexpectedly.
 - [ ] Enforcement is opt-in and skips hand-written/fork PRs.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.
+
+**Shipped in v0.4.0:** R1–R4, R6 — CI fetches the ref, validates + sanitizes the untrusted
+payload (injection-corpus golden), renders via `renderPrBody`, and upserts via
+`GITHUB_TOKEN` from a separate `post` job; the comment-marker back-compat path is unchanged.
+**Deferred (spec stays `building`):** R5's agent-built vs hand-written discrimination is not
+implemented. `scripts/check-pr-receipt.mjs` distinguishes only same-repo vs fork, so opt-in
+enforcement currently fails **any** same-repo PR missing a receipt — it does not yet skip a
+hand-written PR. Enforcement is opt-in and default-off, so this is a refinement, not a
+regression; the spec flips to `shipped` when the agent-evidence gate lands.

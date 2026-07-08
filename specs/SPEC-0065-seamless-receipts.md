@@ -1,7 +1,7 @@
 ---
 id: SPEC-0065
 title: Seamless PR receipts — pre-push hook, store=ref, CI posts from the ref
-status: approved
+status: building
 milestone: M5
 depends: [SPEC-0019, SPEC-0037, SPEC-0064]
 ---
@@ -69,7 +69,8 @@ same transcript yields the same object SHA.
   through the hardened renderer, upsert via `GITHUB_TOKEN` (workflow gains
   `pull-requests: write`), and opt-in enforce — is specified and built in **SPEC-0066**,
   which carries its own injection/security review. SPEC-0065 ships the producer, hook, and
-  local tooling (R1–R3, R5–R6); the ref R1 writes is SPEC-0066's input, and the payload
+  local tooling (R1–R3, R6; R5 is deferred — see the shipped/deferred note under Success
+  criteria); the ref R1 writes is SPEC-0066's input, and the payload
   round-trip contract (`PrReceiptPayload`) is the seam both sides build to. The matrix rows
   below state that seam contract; their CI-side verification lives in SPEC-0066.
 - **R5 — local tooling reads refs.** `aireceipts --list` / `week` / `stats` include
@@ -130,10 +131,21 @@ same transcript yields the same object SHA.
 
 ## Success criteria
 
-- [ ] R1 ref store + `--store ref` shipped with round-trip + determinism tests; default
+- [x] R1 ref store + `--store ref` shipped with round-trip + determinism tests; default
       unchanged; `verify-goldens` and `determinism-check` green.
-- [ ] R2 pre-push hook + R3 activation land; recursion guard tested.
-- [ ] R4 CI renders + posts from the ref (no dev `gh`); enforcement opt-in; forks/hand-
-      written PRs never fail.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] R2 pre-push hook + R3 activation land; recursion guard tested.
+- [x] R4 CI renders + posts from the ref (no dev `gh`); enforcement opt-in; fork PRs stay
+      notice-only. (The agent-built vs hand-written enforcement refinement is deferred with
+      SPEC-0066 — see its note.)
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.
+- [ ] R5 local tooling reads ref receipts (`--list`/`week`/`stats`) + a prune for merged
+      branches — **not yet wired** (the spec stays `building` for this); the seamless
+      push→CI-post arc (R1–R4/R6) does not depend on it.
+
+**Shipped in v0.4.0:** the push→CI-post arc — R1 (`store=ref` producer), R2 (pre-push
+hook), R3 (activation), R6 (determinism), and R4 via SPEC-0066. **Deferred:** R5 (local
+`--list`/`week`/`stats` reading `refs/receipts` + a prune for merged branches) is not yet
+wired — `listReceiptRefs` has no CLI caller. Also deferred with SPEC-0066: enforcement's
+agent-built vs hand-written discrimination (opt-in enforcement is currently coarse —
+same-repo vs fork only). Both are follow-ups; neither gates the seamless push→CI-post arc.

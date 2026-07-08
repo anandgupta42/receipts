@@ -22,9 +22,11 @@ PR, and the script refuses to run until `aireceipts` is actually on npm
 optionally, a one-line CONTRIBUTING note). The packet adds only the notice-only caller: it
 never fails a build, and aireceipts never commits receipt files (a receipt is a PR comment
 or a git ref, invisible in the tree and PR diffs). So a fleet rollout doesn't dirty anyone's
-repo or gate anyone's CI. Enforcement (`AIRECEIPTS_REQUIRE_PR_RECEIPT`) is opt-in; the fully
-seamless auto-attach + CI-post layers are landing with the seamless-receipts work, each
-opt-in and off by default. See the tiers in [docs/pr-receipts.md](../pr-receipts.md).
+repo or gate anyone's CI. Enforcement (`AIRECEIPTS_REQUIRE_PR_RECEIPT`) is opt-in and coarse — it makes same-repo PRs
+require a receipt (fork PRs always stay notice-only). The seamless CI-post layer (CI renders
++ posts the receipt from a branch ref, no contributor `gh`) shipped in v0.4.0, opt-in and
+off by default; auto-attach on push ships as a committed hook for this repo's contributors,
+which an adopter repo wires itself. See the tiers in [docs/pr-receipts.md](../pr-receipts.md).
 
 Two constraints inherited from GitHub:
 

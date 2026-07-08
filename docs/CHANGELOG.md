@@ -3,6 +3,55 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.4.0 — 2026-07-07
+
+Minor: PR receipts can now **attach and post themselves**. A receipt travels with the
+branch as a sibling git ref and CI renders + posts the comment, so a receipt lands even
+when no one runs `pr --post`. Rendered receipt output is unchanged from v0.3.0 (goldens
+byte-identical); the new surface is opt-in.
+
+### Added
+
+- **Seamless PR receipts — `store=ref` + pre-push hook** (SPEC-0065): `aireceipts pr
+  --store ref` (or `AIRECEIPTS_STORE=ref`) writes the receipt as a **deterministic** git
+  object on `refs/receipts/<slug>` — invisible in the tree and PR diff, byte-identical
+  across machines (dated from the session's own `endedAt`, never wall-clock). A committed
+  `.githooks/pre-push` hook generates and pushes that ref on `git push` (best-effort;
+  never blocks a push, no second push). `npm run setup:hooks` activates the hook for a
+  clone of this repo; the default store stays `comment`.
+- **CI posts the receipt from the ref** (SPEC-0066): a two-job `pr-receipt-check.yml`
+  fetches the branch ref, validates and sanitizes the **untrusted, fork-author-controlled**
+  payload, renders it through the existing renderer, and upserts one marker comment via
+  `GITHUB_TOKEN` — no local `gh` required. Opt-in enforcement
+  (`AIRECEIPTS_REQUIRE_PR_RECEIPT=true`) makes **same-repo** PRs require a receipt; **fork**
+  PRs always stay notice-only (their transcripts live on the contributor's machine, so CI
+  can't generate one). Enforcement is currently coarse — it does not yet distinguish
+  agent-built from hand-written PRs.
+- **`@latest` distribution pin** (SPEC-0064 R1): the PR-receipt-check caller installs the
+  reusable workflow at `@latest`; the moving `latest` git tag is advanced by the release
+  workflow on each publish. (SPEC-0064 R2–R4, the npm-native `pr-check` command, remain in
+  progress.)
+
+### Performance
+
+- **Faster feedback** (SPEC-0063): in-process sqlite parsing, a goldens compile cache, and
+  parallel preflight reduce CLI and preflight wall-clock.
+
+### Security
+
+- The receipt payload that rides on the branch ref is treated as untrusted input — anyone
+  who can push a branch, including a fork author, controls its bytes. The CI post path is a
+  hardened trust boundary: a field-aware sanitizer (bracket-escape +
+  autolink defang for live-markdown fields, fence-guard for fenced `text`, an
+  https-allowlist that rejects markdown-breaking characters for artifact URLs), rendered in
+  a **token-less** `render` job whose data-only artifact is posted by a separate `post`
+  job — golden-gated against an injection corpus.
+
+### Docs
+
+- Adopter kit: a minimally-invasive default plus opt-in tiers for repos that want to turn
+  enforcement up (`docs/pr-receipts.md`, `docs/adopt/`).
+
 ## v0.3.0 — 2026-07-06
 
 Minor: background-agent (subagent) spend becomes visible on every surface, the
