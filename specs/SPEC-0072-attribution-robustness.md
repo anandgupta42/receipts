@@ -1,7 +1,7 @@
 ---
 id: SPEC-0072
 title: Robust branch-commit anchors — amend/orphan patch-id recovery and the helper/committer asymmetry
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0024, SPEC-0032, SPEC-0038, SPEC-0044]
 ---
@@ -186,16 +186,16 @@ inferred into credit.
 
 ## Success criteria
 
-- [ ] R1 recovers message-only/no-diff-change amends using `git patch-id --stable` and a fixed
+- [x] R1 recovers message-only/no-diff-change amends using `git patch-id --stable` and a fixed
       local diff producer, no network, via the injected `CommandRunner` (`src/pr/git.ts`).
-- [ ] R1 uniqueness is evaluated across all branch commits and orphan candidates; duplicated diffs
+- [x] R1 uniqueness is evaluated across all branch commits and orphan candidates; duplicated diffs
       (including one already direct-claimed) never produce a promotion.
-- [ ] Empty/merge/pruned commits under-credit (no promotion, no crash), never fabricate.
-- [ ] No message subject is ever recovered from `-F`/`-c`/`-C` argv; a changed `-F` file produces
+- [x] Empty/merge/pruned commits under-credit (no promotion, no crash), never fabricate.
+- [x] No message subject is ever recovered from `-F`/`-c`/`-C` argv; a changed `-F` file produces
       no credit (adversarial test passes).
-- [ ] A committing session with a real git-write call is never left indistinguishable from a
+- [x] A committing session with a real git-write call is never left indistinguishable from a
       session that made none (R3's new event, R4's locked scope).
-- [ ] The resolved-anchor pass runs before the message-fallback claim pass, preserving SPEC-0032
+- [x] The resolved-anchor pass runs before the message-fallback claim pass, preserving SPEC-0032
       R3a order-independence.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.
