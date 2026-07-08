@@ -45,6 +45,16 @@ export interface CliOptions {
   readonly store?: "comment" | "ref";
   /** SPEC-0065 R2: `aireceipts pr --store ref --push-ref` also pushes the written ref to `origin`. */
   readonly pushRef: boolean;
+  /** SPEC-0064 R2: hidden `pr-check --base-repo owner/repo` override. */
+  readonly prBaseRepo?: string;
+  /** SPEC-0064 R2: hidden `pr-check --head-repo owner/repo` override. */
+  readonly prHeadRepo?: string;
+  /** SPEC-0064 R2: hidden `pr-check --head-ref branch` override. */
+  readonly prHeadRef?: string;
+  /** SPEC-0064 R2: hidden `pr-check --pr <number>` override. */
+  readonly prNumber?: string;
+  /** SPEC-0064 R4: hidden `pr-check --require-same-repo` enforcement flag. */
+  readonly requireSameRepo: boolean;
   /** SPEC-0056: `aireceipts backfill --limit N` caps the swept set to the N most recent matches. */
   readonly limit?: number;
   /** SPEC-0056: `aireceipts backfill --out <dir>` — distinct from `output` (SVG/PNG's `-o`/`--output`). */
@@ -97,6 +107,11 @@ export function parseOptions(argv: string[]): CliOptions {
   let share = false;
   let store: "comment" | "ref" | undefined;
   let pushRef = false;
+  let prBaseRepo: string | undefined;
+  let prHeadRepo: string | undefined;
+  let prHeadRef: string | undefined;
+  let prNumber: string | undefined;
+  let requireSameRepo = false;
   let limit: number | undefined;
   let outDir: string | undefined;
   let format: string | undefined;
@@ -162,6 +177,24 @@ export function parseOptions(argv: string[]): CliOptions {
       store = value;
     } else if (arg === "--push-ref") {
       pushRef = true;
+    } else if (arg === "--base-repo") {
+      prBaseRepo = argv[++i];
+    } else if (arg.startsWith("--base-repo=")) {
+      prBaseRepo = arg.slice("--base-repo=".length);
+    } else if (arg === "--head-repo") {
+      prHeadRepo = argv[++i];
+    } else if (arg.startsWith("--head-repo=")) {
+      prHeadRepo = arg.slice("--head-repo=".length);
+    } else if (arg === "--head-ref") {
+      prHeadRef = argv[++i];
+    } else if (arg.startsWith("--head-ref=")) {
+      prHeadRef = arg.slice("--head-ref=".length);
+    } else if (arg === "--pr") {
+      prNumber = argv[++i];
+    } else if (arg.startsWith("--pr=")) {
+      prNumber = arg.slice("--pr=".length);
+    } else if (arg === "--require-same-repo") {
+      requireSameRepo = true;
     } else if (arg === "--session") {
       prSession = argv[++i];
     } else if (arg.startsWith("--session=")) {
@@ -221,6 +254,11 @@ export function parseOptions(argv: string[]): CliOptions {
     share,
     store,
     pushRef,
+    prBaseRepo,
+    prHeadRepo,
+    prHeadRef,
+    prNumber,
+    requireSameRepo,
     limit,
     outDir,
     help,

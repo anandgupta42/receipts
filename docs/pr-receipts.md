@@ -148,6 +148,10 @@ by deleting the file.
   hook calling `npx aireceipts-cli pr --store ref --push-ref` (the flags ship in the npm
   package; the hook file does not). Either way a contributor can still just run
   `npx aireceipts-cli pr --post`. Each layer is opt-in and notice-only until turned on.
+- **npm-native (no `uses:`)** — for trusted same-repo/internal repos, use the
+  [self-contained caller](adopt/pr-check-caller.yml). It runs
+  `npx -y aireceipts-cli@latest pr-check` in your own workflow, avoids the public
+  reusable-workflow org-policy gate, and keeps fork PRs notice-only.
 
 CI still never generates a receipt itself: the source transcripts stay local (I1/I4).
 Rolling out across a whole org: [docs/adopt/org-rollout.md](adopt/org-rollout.md).
