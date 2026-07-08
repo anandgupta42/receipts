@@ -81,7 +81,7 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 *Updated only by the `release` skill. Keep this section, and only this section, current
 after each release — don't hand-edit it elsewhere.*
 
-- **Shipped (npm `aireceipts-cli`, v0.4.0):** the receipt engine and its whole surface
+- **Shipped (npm `aireceipts-cli`, v0.5.0):** the receipt engine and its whole surface
   are live — parse adapters (Claude Code, Codex, Cursor, Gemini, opencode), cited price
   tables, per-tool attribution, waste lines (stuck-loop, trivial-spans, context-thrash
   incl. Codex compactions), price-delta + routable-spend (now with `% less`), `compare`,
@@ -97,18 +97,20 @@ after each release — don't hand-edit it elsewhere.*
   producer writing `refs/receipts/<slug>`, a pre-push auto-attach hook, and CI rendering +
   posting the receipt from the ref via `GITHUB_TOKEN` behind a hardened trust-boundary
   sanitizer with opt-in **same-repo** enforcement (SPEC-0065/0066 — the capability ships in
-  v0.4.0; both specs stay `building` for their final slices, listed below), the adopter pin
-  moved to `@latest` (SPEC-0064 R1); and a faster parse/preflight path — in-process
-  sqlite, goldens compile cache, parallel preflight (SPEC-0063). 36 specs at
-  `status: shipped`.
+  v0.4.0; both specs stay `building` for their final slices, listed below); a **self-contained
+  npm-native `pr-check`** an adopter runs in its own workflow with no reusable-workflow `uses:`
+  and no org Actions-policy gate (SPEC-0064, shipped v0.5.0, #176); a **richer default
+  statusline** — burn rate, context %, `M`/`B` tokens, inline 5h reset countdown (SPEC-0071);
+  the **samosa tip link off by default** on PR-posted surfaces, behind `--samosa` (SPEC-0070);
+  and a faster parse/preflight path — in-process sqlite, goldens compile cache, parallel
+  preflight (SPEC-0063) — plus **incremental mutation testing** on the money paths (SPEC-0069).
+  40 specs at `status: shipped`.
 - **In progress (`building`):** SPEC-0044 cost-attribution confidence — its
   implemented slices ship in v0.2.0 (ConfidenceEvent contract + no-silent-drop,
   cost matrix, rows-sum-to-total, cache-write caveat, parse-skip/load-failure
   drops, subagent double-count fix, mutation-gated PR path); the spec stays
   `building` until its `--self-check` kill-criterion and cost-model docs land.
-  SPEC-0064 (PR-check distribution) — R1 (`@latest` pin + release tag-move) shipped in
-  v0.4.0; R2–R4 (the npm-native `aireceipts pr-check` command) remain, so it stays
-  `building`. SPEC-0065 (seamless producer + hook) — R1–R3/R6 (`store=ref` producer,
+  SPEC-0065 (seamless producer + hook) — R1–R3/R6 (`store=ref` producer,
   pre-push auto-attach hook, determinism) shipped in v0.4.0; R5 (local `--list`/`week`/
   `stats` reads of `refs/receipts` + prune) is not wired, so it stays `building`.
   SPEC-0066 (CI posts from the ref) — R1–R4/R6 (fetch, validate, sanitize, render, post via

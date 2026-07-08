@@ -1,7 +1,7 @@
 ---
 id: SPEC-0071
 title: "Statusline rich default — burn rate, context %, quota reset countdown, M/B tokens"
-status: draft
+status: shipped
 milestone: M5
 depends: [SPEC-0062]
 ---
@@ -115,13 +115,13 @@ a priced ledger value (i.e. would require estimating) is cut, not faked.
 
 ## Success criteria
 
-- [ ] The rich default renders as specified on a full-payload fixture; each new segment omits
+- [x] The rich default renders as specified on a full-payload fixture; each new segment omits
       cleanly on absent/out-of-range data (no fabricated `$/hr`, `%`, or countdown).
-- [ ] Reset countdown derives from real `resets_at` (epoch seconds), with the past/absent
+- [x] Reset countdown derives from real `resets_at` (epoch seconds), with the past/absent
       fallback; `tokens` uses `formatShortTokens`.
-- [ ] Exact-string `renderSegments` tests pin the rich default and every segment guard
+- [x] Exact-string `renderSegments` tests pin the rich default and every segment guard
       (non-finite burn, absurd/absent/past reset, out-of-range context, M/B tokens).
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/spec-lint.mjs` all pass unmasked (`echo $?`).
 
 ## Validation

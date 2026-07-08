@@ -1,7 +1,7 @@
 ---
 id: SPEC-0069
 title: "Mutation testing — incremental PR runs, nightly full sweep"
-status: building # PR open; shipped flips on merge
+status: shipped
 milestone: M5
 depends: [SPEC-0044]
 ---
@@ -102,10 +102,10 @@ proof, on the money paths.
 
 ## Success criteria
 
-- [ ] `stryker.config.json` valid; a scoped local run passes ≥ `break` (attribution.ts
+- [x] `stryker.config.json` valid; a scoped local run passes ≥ `break` (attribution.ts
       81.60% confirmed) and incremental reuse demonstrably reuses prior results.
-- [ ] `.github/workflows/mutation.yml` has a PR incremental job + a nightly full-sweep
+- [x] `.github/workflows/mutation.yml` has a PR incremental job + a nightly full-sweep
       job, cache restore/save wired, actions SHA-pinned, `actionlint`/`zizmor` clean.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs`,
       `node scripts/hygiene.mjs` all pass unmasked (`echo $?`) — no product code changed.

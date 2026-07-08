@@ -120,6 +120,12 @@ describe("SPEC-0071 — rich statusline (burn, context, quota countdown, M/B tok
     expect(renderSegments(segs("tokens"), ctx({ summary: buildMiniSummary(model({ totalTokens: usage(501_368_000) })) }))).toBe("501M");
   });
 
+  it("R1: billion-scale tokens use the B suffix (never 1000M)", () => {
+    expect(renderSegments(segs("tokens"), ctx({ summary: buildMiniSummary(model({ totalTokens: usage(1_500_000_000) })) }))).toBe("1.5B");
+    // just past the M ceiling: ~999.5M rounds up into B, never renders "1000M"
+    expect(renderSegments(segs("tokens"), ctx({ summary: buildMiniSummary(model({ totalTokens: usage(999_500_000) })) }))).toBe("1B");
+  });
+
   it("R2: context segment from context_window.used_percentage; omitted when absent/out-of-range", () => {
     expect(renderSegments(segs("context"), ctx({ payload: { context_window: { used_percentage: 42 } } }))).toBe("ctx 42%");
     expect(renderSegments(segs("context"), ctx({ payload: { context_window: { used_percentage: 1_700_000_000 } } }))).toBe(""); // CC epoch-bug guard

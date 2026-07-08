@@ -1,7 +1,7 @@
 ---
 id: SPEC-0064
 title: PR-receipt check — release-pinned distribution and a self-contained npm-native pr-check
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0019, SPEC-0030, SPEC-0057, SPEC-0066]
 ---
@@ -149,16 +149,15 @@ on the developer's machine (I1/I4). `pr-check` only *transports* what the local 
 
 - [x] R1 landed: every live caller template pins `@latest`; `release-publish.yml` advances the
       tag; a bootstrap `latest` tag exists at the current release.
-- [ ] R2–R6: `aireceipts pr-check` ships in `dist/` and, in a self-contained workflow (no
+- [x] R2–R6: `aireceipts pr-check` ships in `dist/` and, in a self-contained workflow (no
       reusable `uses:`, no base checkout), fetches the ref, upserts the marked comment via
       `GITHUB_TOKEN`, and returns the verdict; render path lazy; reusable-caller permission bug
       fixed; trust model documented.
-- [ ] R7: telemetry enum + docs + parity; body-parity, upsert create/update + 403/404 (mocked),
+- [x] R7: telemetry enum + docs + parity; body-parity, upsert create/update + 403/404 (mocked),
       verdict/exit-code, and hostile-payload tests pass; `verify-goldens` and existing
       `pr-receipt-check` tests stay green.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.
 
-**Shipped in v0.4.0:** R1 only (`@latest` pin + tag-move, #164). R2–R7 (the self-contained
-npm-native `pr-check` that fetches + renders + posts + verdicts) are the current build; the
-spec stays `status: building` until they land.
+**Shipped:** R1 in v0.4.0 (`@latest` pin + tag-move, #164); R2–R7 in v0.5.0 (the self-contained
+npm-native `pr-check` that fetches + renders + posts + verdicts, #176). Spec fully `shipped`.

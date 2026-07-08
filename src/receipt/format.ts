@@ -119,9 +119,10 @@ export function formatTokensK(n: number): string {
 }
 
 /**
- * SPEC-0026 round 2 — abbreviated token counts for stat lines (`371k`, `1.2M`).
- * One decimal only while it disambiguates (< 10 of the unit), deterministic
- * rounding; never truncates a digit mid-value.
+ * SPEC-0026 round 2 / SPEC-0071 R1 — abbreviated token counts for stat lines
+ * (`371k`, `1.2M`, `1.5B`). One decimal only while it disambiguates (< 10 of the
+ * unit), deterministic rounding; never truncates a digit mid-value. The `B`
+ * branch takes over exactly where `M` would otherwise render `1000M`.
  */
 export function formatShortTokens(n: number): string {
   if (n < 1000) {
@@ -129,7 +130,13 @@ export function formatShortTokens(n: number): string {
   }
   const unit = (v: number, suffix: string): string =>
     `${v < 9.95 ? v.toFixed(1).replace(/\.0$/u, "") : String(Math.round(v))}${suffix}`;
-  return n < 999_500 ? unit(n / 1000, "k") : unit(n / 1_000_000, "M");
+  if (n < 999_500) {
+    return unit(n / 1000, "k");
+  }
+  if (n < 999_500_000) {
+    return unit(n / 1_000_000, "M");
+  }
+  return unit(n / 1_000_000_000, "B");
 }
 
 /**
