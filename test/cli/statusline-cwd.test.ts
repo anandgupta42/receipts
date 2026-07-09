@@ -79,6 +79,17 @@ describe("SPEC-0075 R1 attribution policy (home-shadow guard)", () => {
     expect(cwdMatchesForAttribution("/Users/dev/repo", "/Users/dev/repo/sub", home)).toBe(true);
     expect(cwdMatchesForAttribution("/srv/app", "/srv/app/sub", home)).toBe(true);
   });
+
+  it("blocks a root-recorded session even when the home directory is unknown", () => {
+    expect(cwdMatchesForAttribution("/", "/project", "")).toBe(false);
+    expect(cwdMatchesForAttribution("/", "/", "")).toBe(true);
+  });
+
+  it("normalizes the home argument itself (trailing slash, Windows drive fold)", () => {
+    expect(cwdMatchesForAttribution("/Users/dev", "/Users/dev/x", "/Users/dev/")).toBe(false);
+    expect(cwdMatchesForAttribution("c:/Users/dev", "c:/Users/dev/x", String.raw`C:\Users\dev`)).toBe(false);
+    expect(cwdMatchesForAttribution("c:/Users/dev/repo", "c:/Users/dev/repo/x", String.raw`C:\Users\dev`)).toBe(true);
+  });
 });
 
 describe("SPEC-0075 R1 Claude Code cwd encoding", () => {

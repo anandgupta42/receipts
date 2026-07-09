@@ -83,8 +83,13 @@ export function cwdMatchesForAttribution(sessionCwd: string, requestedCwd: strin
   if (!cwdMatches(sessionCwd, requestedCwd)) {
     return false;
   }
+  if (session === "/") {
+    // A root-recorded session shadows everything regardless of whether the
+    // home directory is even known — never an ancestor match.
+    return false;
+  }
   const home = normalizeCwd(homeDir);
-  const homeOrAbove = home !== "" && (session === home || home.startsWith(`${session}/`) || session === "/");
+  const homeOrAbove = home !== "" && (session === home || home.startsWith(`${session}/`));
   return !homeOrAbove;
 }
 
