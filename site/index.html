@@ -311,7 +311,7 @@
 .agterm pre{padding-right:28px}
 .agterm-gif{display:block;height:auto;max-width:100%}
 section.statusstrip{padding:0;margin:calc(-1*clamp(28px,5vw,64px)) 0 0}
-.statusstrip .cap{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 18px;margin:0 0 12px;font-size:16px;line-height:1.55;color:var(--muted)}
+.statusstrip .cap{margin:0 0 12px;font-size:16px;line-height:1.55;color:var(--muted)}
 .statusstrip .cap code{font-family:var(--mono);font-size:.9em;color:var(--ledger);white-space:nowrap}
 .statusline{margin:0;background:var(--term-bg);border:1px solid #1c272d;border-radius:11px;padding:13px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--term-fg);white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:0 24px 64px -44px rgba(9,14,18,.9)}
 .statusline .b{color:var(--term-head)}
@@ -362,13 +362,13 @@ section.statusstrip{padding:0;margin:calc(-1*clamp(28px,5vw,64px)) 0 0}
         <div class="scn">
           <img class="scnimg" src="assets/scn-week.png" alt="" width="76" height="76">
           <h3>The week, in one number</h3>
-          <p>Totals, per-agent split, honest deltas.</p>
+          <p>Totals, per-agent split, honest deltas — your supported agents, one number.</p>
           <div class="bignum">$10,056<span class="cents">.63</span><span class="numcap">one real week · 319 sessions</span></div>
         </div>
         <div class="scn">
           <img class="scnimg" src="assets/scn-pr.png" alt="" width="76" height="76">
           <h3>Receipts on your PRs</h3>
-          <p>What the change cost to make — every agent counted. A pre-push hook attaches it and a self-contained GitHub Action posts it — no manual step, no org-policy gate. This page's repo runs on it — <a href="https://github.com/anandgupta42/receipts/pulls">see the receipts on its PRs</a>.</p>
+          <p>What the change cost to make, across the sessions behind it. A hook attaches it, an Action posts it — no manual step. <a href="https://github.com/anandgupta42/receipts/pulls">This repo runs on it</a>.</p>
           <div class="prmock"><div class="prhead"><span class="prav"></span><span class="prname">aireceipts <em>bot</em> commented</span></div><pre class="art cardart">orchestrator · fable ······ $12.30
 builder · opus ············ $43.80
 TOTAL ····················· <span class="grnl">$56.10</span></pre></div>
@@ -380,7 +380,7 @@ TOTAL ····················· <span class="grnl">$56.10</span
   <!-- ============ STATUSLINE STRIP ============ -->
   <div class="wrap">
     <section class="statusstrip" aria-label="The statusline while you work">
-      <p class="cap">The meter while you work — burn rate, context, and quota countdown in your agent's status bar. <code>aireceipts statusline</code></p>
+      <p class="cap">The meter while you work — burn rate, context, and quota countdown in your agent's status bar: <code>aireceipts statusline</code></p>
       <pre class="statusline" tabindex="0" aria-label="An aireceipts statusline: session cost $31.01, burn rate $96 per hour, 21M tokens, context 41% full, and the 5-hour quota at 62% resetting in 1h 54m."><span class="b">[aireceipts]</span> $31.01 · $96/hr · 21M · ctx 41% · <span class="m">5h 62% ↺1h54m</span></pre>
     </section>
   </div>
@@ -396,7 +396,7 @@ TOTAL ····················· <span class="grnl">$56.10</span
           <li>Every price cited: URL, date, excerpt.</li>
           <li>Comparisons are arithmetic, not predictions.</li>
           <li>Same transcript in, byte-identical receipt out.</li>
-          <li>The only unprompted network call is telemetry — content-free, disclosed, one variable from off.</li>
+          <li>Telemetry is the only unprompted network call — content-free, one variable from off.</li>
           <li>Facts, not rankings. No “model X would have done it better.”</li>
         </ol>
         <div class="proof">
