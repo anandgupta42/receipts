@@ -359,7 +359,7 @@ Write.............................$0.03  (2 calls)
 Read...............................$0.02  (1 call)
 --------------------------------------------------
 TOTAL........................................$0.18
-same tokens on claude-haiku-4-5..............$0.04
+same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      
@@ -367,7 +367,7 @@ same tokens on claude-haiku-4-5..............$0.04
 
 <p>That's a real session: which models ran, where the tokens went by tool, and what it cost — priced against dated, cited price tables. The <code>same tokens on claude-haiku-4-5</code> line re-prices the identical token counts on a cheaper model; it's arithmetic, not a claim that Haiku would have finished the job.</p>
 
-<p>If instead you see <code>no agent session data detected</code>, your agent's logs are somewhere aireceipts doesn't look yet — jump to <a href="12-troubleshooting.html">Troubleshooting</a>.</p>
+<p>If instead you see <code>no agent session data detected</code>, your agent's logs are somewhere aireceipts doesn't look yet. The default command exits <code>0</code> for that empty-state guidance — jump to <a href="12-troubleshooting.html">Troubleshooting</a>.</p>
 
 <p>No sessions of your own yet? See one now:</p>
 
@@ -419,6 +419,18 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
      aireceipts · local · npx aireceipts-cli      </code></pre>
 
 <p>Every session on your machine, across every supported agent, totalled for the last seven days — still local, still no upload.</p>
+
+<h2 id="already-have-sessions-aireceipts-works-retroactively">Already have sessions? aireceipts works retroactively</h2>
+
+<p>Installed today after weeks of agent use? Your history is already on disk, and aireceipts reads it as-is — no re-running anything. Sweep every existing session in one command:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli backfill</code></pre>
+
+<p>That prints a summary of what it found (and writes nothing). To generate the receipts, add <code>--out</code>:</p>
+
+<pre class="doc-code"><code class="language-sh">npx aireceipts-cli backfill --out ./receipts</code></pre>
+
+<p>You get one receipt file per session — byte-identical to running <code>aireceipts &lt;selector&gt;</code> on each — plus an <code>index.txt</code> manifest. <code>--since &lt;date&gt;</code> and <code>--limit N</code> narrow the sweep; <code>--json</code> emits the summary machine-readably. Re-running against the same directory is safe (it refuses to write into a directory it didn't create).</p>
 
 <h2 id="4-make-it-automatic">4. Make it automatic</h2>
 

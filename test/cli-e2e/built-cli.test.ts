@@ -316,6 +316,43 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain(path.join(home, ".codex", "sessions"));
   });
 
+  it("empty default receipt is human guidance, not a failure", async () => {
+    const home = await makeHome();
+
+    const result = await runCli([], home);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("no agent session data detected. Looked in:");
+    expect(result.stdout).toContain("No sessions yet? Run `aireceipts --demo` to see a sample receipt.");
+    expect(result.stdout).toContain(path.join(home, ".claude", "projects"));
+    expect(result.stdout).toContain(path.join(home, ".codex", "sessions"));
+  });
+
+  it("empty mini receipt stays fail-safe and prints the guidance", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["--mini"], home);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("no agent session data detected. Looked in:");
+    expect(result.stderr).toContain("No sessions yet? Run `aireceipts --demo` to see a sample receipt.");
+  });
+
+  it("empty machine receipt exports stay non-zero with no payload", async () => {
+    const home = await makeHome();
+
+    for (const args of [["--json"], ["--csv"], ["--csv=tool"]]) {
+      const result = await runCli(args, home);
+
+      expect(result.code, `${args.join(" ")} stderr:\n${result.stderr}`).toBe(1);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("no agent session data detected. Looked in:");
+      expect(result.stderr).toContain("No sessions yet? Run `aireceipts --demo` to see a sample receipt.");
+    }
+  });
+
   it("SPEC v0.1.1: `--list --json` on zero sessions emits valid JSON `[]` on stdout, message on stderr", async () => {
     const home = await makeHome();
 
@@ -324,6 +361,17 @@ describe("built CLI e2e", () => {
     expect(result.code).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual([]);
     expect(result.stderr).toContain("no agent session data detected");
+  });
+
+  it("selector miss remains an error", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "clean-multi-tool-2-models.jsonl");
+
+    const result = await runCli(["does-not-exist-xyz"], home);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe('no session matched "does-not-exist-xyz"\n');
   });
 
   it("runs setup with no sessions and exits 0 after printing searched roots", async () => {

@@ -370,11 +370,64 @@ footer{
     <tr><td><code>totalTokens</code></td><td>TokenUsage</td><td>Attributed token totals.</td></tr>
     <tr><td><code>sessionTotalTokens</code></td><td>TokenUsage</td><td>Adapter-reported session totals (the only real number for Cursor).</td></tr>
     <tr><td><code>wasteLines</code></td><td>array</td><td>Fired waste findings; see WasteLine.</td></tr>
-    <tr><td><code>caveats</code></td><td>array</td><td>Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code> | <code>cost-lower-bound-cache-tier</code> | <code>dropped-transcript-records</code> | <code>partial-priced-coverage</code>) + <code>text</code>. Never affects <code>$</code> itself. Empty when nothing to flag.</td></tr>
+    <tr><td><code>caveats</code></td><td>array</td><td>Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code> | <code>cost-lower-bound-cache-tier</code> | <code>dropped-transcript-records</code> | <code>partial-priced-coverage</code> | <code>subagents-unreadable</code> | <code>subagents-unpriced</code> | <code>subagents-priced-tokens-only</code> | <code>subagents-dropped-records</code>) + <code>text</code>. Never affects <code>$</code> itself. Empty when nothing to flag.</td></tr>
     <tr><td><code>budget</code></td><td>array (optional)</td><td>Advisory budget lines (SPEC-0009); present only when <code>~/.aireceipts/budget.json</code> is configured.</td></tr>
     <tr><td><code>priceDelta</code></td><td>PriceDelta | null</td><td>Cheapest-current-model arithmetic, or null in tokens-only mode.</td></tr>
     <tr><td><code>methodology</code></td><td>string</td><td>The attribution methodology string (I3).</td></tr>
     <tr><td><code>priceRowsUsed</code></td><td>array</td><td>Every dated price row consulted; see PriceRowUsed.</td></tr>
+    <tr><td><code>costShape</code></td><td>CostShape</td><td>SPEC-0067 — cost-shape facts (standalone, never in savings math): <code>preEdit</code> (pre-edit cost/token share), <code>topTurns</code> (expensive-turn concentration, or null), <code>lateTurn</code> (neutral late-half/early-half cost ratio, low confidence, or null).</td></tr>
+    <tr><td><code>sameFileReReads</code></td><td>SameFileReReads | null</td><td>SPEC-0068 — same-file re-reads diagnostic (standalone, low confidence, NEVER a waste row or savings claim); null when none.</td></tr>
+    <tr><td><code>subagents</code></td><td>Subagents (optional)</td><td>SPEC-0061 — the session's subagent (child-transcript) rollup; present only when children were discovered. Aggregate only — never child ids, titles, or paths.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="subagents-object">Subagents object</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>count</code></td><td>number</td><td>Every discovered child, readable or not.</td></tr>
+    <tr><td><code>pricedUsd</code></td><td>number | null</td><td>Sum over priced children; null when no child priced (I2 — surfaces render tokens).</td></tr>
+    <tr><td><code>tokensTotal</code></td><td>number</td><td>Total tokens across readable children; unreadable children contribute nothing (counted, never guessed).</td></tr>
+    <tr><td><code>unpricedCount</code></td><td>number</td><td>Readable children with no matching price row.</td></tr>
+    <tr><td><code>unreadableCount</code></td><td>number</td><td>Children whose transcripts failed to parse — the rendered TOTAL is a floor.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="costshape-object">CostShape object</h3>
+
+<p>SPEC-0067 cost-shape facts — standalone, never in savings math. <code>preEdit</code> always present; <code>topTurns</code> and <code>lateTurn</code> are null unless every usage-bearing turn is priced.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>preEdit</code></td><td>object</td><td>The pre-edit cost/token split (below).</td></tr>
+    <tr><td><code>preEditUsd</code></td><td>number | null</td><td>Priced cost before the first named edit turn; null unless all pre-edit turns priced (I2).</td></tr>
+    <tr><td><code>postEditUsd</code></td><td>number | null</td><td>Priced cost from the first named edit turn onward; null unless all priced.</td></tr>
+    <tr><td><code>preEditPct</code></td><td>number | null</td><td><code>preEditUsd / totalUsd</code> percent; null unless every usage-bearing turn is priced (never a ratio over a partial denominator).</td></tr>
+    <tr><td><code>preEditTokenPct</code></td><td>number</td><td>The same split in tokens (always present).</td></tr>
+    <tr><td><code>firstEditTurn</code></td><td>number | null</td><td>1-based turn of the first named edit tool, or null when none observed.</td></tr>
+    <tr><td><code>confidence</code></td><td>string</td><td><code>high</code> for <code>preEdit</code>/<code>topTurns</code>, <code>low</code> for <code>lateTurn</code>.</td></tr>
+    <tr><td><code>topTurns</code></td><td>object | null</td><td>Expensive-turn concentration: <code>sharePct</code> and 1-based <code>indices</code> of the top-3 priced turns.</td></tr>
+    <tr><td><code>sharePct</code></td><td>number</td><td>Share of priced cost in the top-3 turns.</td></tr>
+    <tr><td><code>indices</code></td><td>array</td><td>1-based turn numbers of the top-3 turns, ascending.</td></tr>
+    <tr><td><code>lateTurn</code></td><td>object | null</td><td><code>lateRatio</code>: a neutral late-half/early-half average-cost ratio (low confidence; never a &quot;context growth&quot; cause).</td></tr>
+    <tr><td><code>lateRatio</code></td><td>number</td><td>Second-half average turn cost / first-half average.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="samefilerereads-object">SameFileReReads object</h3>
+
+<p>SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to a &quot;could have saved&quot; figure.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>count</code></td><td>number</td><td>No-recorded-cause re-reads (2nd..Nth reads of a path).</td></tr>
+    <tr><td><code>turnIndices</code></td><td>array</td><td>1-/0-based transcript turn indices of the counted re-reads, ascending.</td></tr>
+    <tr><td><code>tokens</code></td><td>TokenUsage</td><td>Per-call token share of the counted re-reads.</td></tr>
+    <tr><td><code>usd</code></td><td>number | null</td><td>Priced share; null if any counted re-read is unpriced (I2).</td></tr>
+    <tr><td><code>confidence</code></td><td>string</td><td>Always <code>low</code> — the transcript cannot prove a re-read was unnecessary.</td></tr>
   </tbody>
 </table></div>
 
@@ -511,7 +564,10 @@ footer{
     <tr><td><code>totals</code></td><td>object</td><td><code>tokens</code> (TokenUsage object) + <code>turnCount</code> + <code>toolCallCount</code>.</td></tr>
     <tr><td><code>turnCount</code></td><td>number</td><td>(totals) Assistant turns in the session.</td></tr>
     <tr><td><code>toolCallCount</code></td><td>number</td><td>(totals) Tool calls in the session.</td></tr>
-    <tr><td><code>wasteLines</code></td><td>array</td><td>Same WasteLine union as the receipt.</td></tr>
+    <tr><td><code>wasteLines</code></td><td>array</td><td>Same WasteLine union as the receipt, plus a per-line <code>rule</code> (SPEC-0059).</td></tr>
+    <tr><td><code>rule</code></td><td>string | null</td><td>(wasteLines) The class's fixed one-line next-time rule; <code>null</code> for a class without one.</td></tr>
+    <tr><td><code>couldHaveSaved</code></td><td>object</td><td>SPEC-0059: the extracted savings ceiling — <code>usd</code> (sum of priced waste lines, <code>null</code> when none priced), <code>tokens</code> (sum over all fired lines), <code>pctOfTotal</code>. Arithmetic, never a prediction.</td></tr>
+    <tr><td><code>pctOfTotal</code></td><td>number | null</td><td>(couldHaveSaved) <code>round(100 · usd / totalUsd)</code>; <code>null</code> without both dollar sides.</td></tr>
     <tr><td><code>suggestions</code></td><td>array</td><td>Standing-rule suggestion strings (SPEC-0013), possibly empty.</td></tr>
     <tr><td><code>threshold</code></td><td>number</td><td>The distinct-session recurrence threshold in effect.</td></tr>
     <tr><td><code>coverage</code></td><td>object</td><td>What the packet covers, checkably: <code>turns</code>, <code>toolCalls</code>, <code>compactions</code>, <code>wasteLines</code> (all numbers).</td></tr>
@@ -521,6 +577,25 @@ footer{
     <tr><td><code>aggregates</code></td><td>array</td><td><code>{class, distinctSessionCount}</code> — exactly the waste classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent).</td></tr>
     <tr><td><code>class</code></td><td>string</td><td>(aggregates) Waste class name.</td></tr>
     <tr><td><code>distinctSessionCount</code></td><td>number</td><td>(aggregates) Distinct recent sessions the class fired in.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="backfill-envelope-backfilljsonschema-spec-0056">Backfill envelope (<code>backfillJsonSchema</code>) — SPEC-0056</h3>
+
+<p><code>aireceipts backfill --json</code>: the bulk-sweep summary. Counts are honest per SPEC-0045 — degraded/unloadable sessions are counted in <code>loadFailureCount</code>, never silently dropped. <code>sessions</code> is one row per matched session (after <code>--since</code>/<code>--limit</code>), newest-first; rows also carry <code>source</code>, <code>sessionId</code>, <code>title</code>, <code>startedAtMs</code> with the same meanings as the handoff envelope above.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>schemaVersion</code></td><td>number</td><td>Same envelope as receipt/compare/handoff.</td></tr>
+    <tr><td><code>discoveredCount</code></td><td>number</td><td>Every discovered session summary, degraded ones included.</td></tr>
+    <tr><td><code>matchedCount</code></td><td>number</td><td>After the <code>--since</code>/<code>--limit</code> filters.</td></tr>
+    <tr><td><code>loadFailureCount</code></td><td>number</td><td>Honest per SPEC-0045, mode-dependent: on an <code>--out</code> run (loads attempted), degraded summaries plus failed loads; on a dry run only known-unreadable summaries — a lower bound (labelled <code>Known unreadable</code> in the text summary).</td></tr>
+    <tr><td><code>writtenCount</code></td><td>number</td><td>Receipt files written this run; <code>0</code> without <code>--out</code>.</td></tr>
+    <tr><td><code>wroteFiles</code></td><td>boolean</td><td><code>true</code> only when <code>--out</code> wrote files.</td></tr>
+    <tr><td><code>sessions</code></td><td>array</td><td>One row per matched session, newest-first.</td></tr>
+    <tr><td><code>fileName</code></td><td>string | null</td><td>(sessions) File written under <code>--out</code>, or <code>null</code> (dry run / load failed).</td></tr>
+    <tr><td><code>loadFailed</code></td><td>boolean</td><td>(sessions) <code>true</code> when the session is known unreadable or (on an <code>--out</code> run) its load failed.</td></tr>
   </tbody>
 </table></div>
 

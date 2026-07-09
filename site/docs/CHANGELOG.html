@@ -335,18 +335,134 @@ footer{
 
 <p>All notable changes to <code>aireceipts-cli</code>. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
 
+<h2 id="v070-2026-07-08">v0.7.0 — 2026-07-08</h2>
+
+<p>Minor: <strong>telemetry now defaults to enabled in CI</strong>, reversing the v0.6.x CI-default-off behavior. Automated CI runs (e.g. the <code>pr-check</code> action) are now counted by default, so CI adoption shows up in the data. CI is no longer special-cased — the <code>isCI</code> field still distinguishes CI from human runs. <strong>Both kill switches still win everywhere</strong>: set <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code> to disable telemetry in CI or anywhere; an empty/malformed connection string also disables. Telemetry payloads remain content-free (no transcript, prompts, file paths, repo names, or dollar amounts — invariant I4). See SPEC-0002's 2026-07-08 amendment and <code>docs/telemetry.md</code>.</p>
+
+<h2 id="v061-2026-07-08">v0.6.1 — 2026-07-08</h2>
+
+<p>Patch: the agent auto-attach hook (SPEC-0073) shipped with a 10s <code>timeout</code> — too tight for its <strong>first</strong> <code>npx -y aireceipts-cli@latest</code> run on a cold npm cache (which downloads the package, including the <code>@resvg/resvg-js</code> native dep, before it can write the ref). On a fresh clone the first push could hit the timeout and silently skip its receipt. Bumped the pre-push hook timeout to <strong>60s</strong> (still bounded — the push is never gated on the receipt). The SessionEnd <code>--mini</code> hook timeout is unchanged (10s). No other behavior change; rendered output is byte-identical.</p>
+
+<h2 id="v060-2026-07-08">v0.6.0 — 2026-07-08</h2>
+
+<p>Minor: receipts can now be produced <strong>automatically</strong> on push, and PR attribution is more robust. No change to rendered receipt output (goldens byte-identical); both additions are opt-in / internal.</p>
+
+<h3 id="added">Added</h3>
+
+<ul>
+  <li><strong>Agent auto-attach</strong> (SPEC-0073): a hidden <code>aireceipts hook pre-push</code> subcommand, wired as a Claude Code <code>PreToolUse</code> hook via a committed <code>.claude/settings.json</code>, writes and pushes the receipt ref (<code>refs/receipts/&lt;slug&gt;</code>) when the coding agent runs a branch push — so a receipt is produced with no manual command. It <strong>never blocks the push</strong> (exits 0 on every path, no stdout, bounded by the hook timeout) and only acts on a real <code>origin</code>/current-branch push (tokenized detection; skips dry-run/delete/tags/non-origin/repo-retargeting/<code>refs/receipts</code>). The adopter kit is now <strong>two files</strong> — the <code>pr-check</code> workflow (produces nothing on its own) plus the <code>.claude/settings.json</code> hook (<code>docs/adopt/</code>, <code>aireceipts integrations</code>).</li>
+</ul>
+
+<h3 id="fixed">Fixed</h3>
+
+<ul>
+  <li><strong>Robust PR-receipt attribution</strong> (SPEC-0072): a session whose commit SHA was orphaned by <code>git commit --amend</code> (or rebase) is now correctly credited by matching its stable <code>git patch-id</code> to the branch commit, instead of showing &quot;no branch commit&quot; while an unrelated helper takes the credit. Strictly under-crediting — duplicated diffs, empty/merge commits, and a diff already directly claimed by another session never produce a match (no fabricated or stolen credit, I2). Adds an <code>unanchored-git-write</code> confidence signal that floors the total when a real git-write can't be tied to the branch.</li>
+</ul>
+
+<p>Minor: PR receipts gain a <strong>self-contained CI path</strong> (no external reusable workflow), the default <strong>statusline</strong> gets richer, and the <strong>samosa tip link</strong> leaves the default PR-posted surfaces (now opt-in). Two deliberate output changes — statusline default and the PR-posted footer — both called out below.</p>
+
+<h3 id="added-2">Added</h3>
+
+<ul>
+  <li><strong>Self-contained <code>pr-check</code></strong> (SPEC-0064 R2–R7): an adopter's own workflow can run <code>npx -y aireceipts-cli@latest pr-check</code> in a single job — <strong>no reusable-workflow <code>uses:</code></strong>, no org Actions-policy gate — to fetch the branch's receipt ref, render + sanitize it, and upsert the marked PR comment via <code>GITHUB_TOKEN</code> (no local <code>gh</code>). Hidden command; for trusted same-repo/internal PRs (the two-job reusable workflow stays the hardened path for untrusted fork PRs). Also fixes the reusable-caller template, which was missing <code>pull-requests: write</code>.</li>
+</ul>
+
+<h3 id="changed-deliberate-output-changes">Changed (deliberate output changes)</h3>
+
+<ul>
+  <li><strong>Richer default statusline</strong> (SPEC-0071): the default line now carries a burn rate (<code>$/hr</code>), context-window %, abbreviated <code>M</code>/<code>B</code> token counts, and an inline 5h reset countdown — e.g. <code>[aireceipts] $423 · $80/hr · 501M · ctx 42% · 5h 26% ↺2h13m</code>. Every segment renders from a real payload field or a priced ledger value; nothing is estimated.</li>
+  <li><strong>Samosa tip link off by default</strong> (SPEC-0070): the <code>buy me a samosa</code> link no longer appears on the surfaces aireceipts posts onto a PR (the comment's <code>&lt;details&gt;</code> and the artifact footer). Opt back in with <code>--samosa</code>; the standalone tip page and the docs-site footer are unchanged.</li>
+</ul>
+
+<h3 id="internal-ci">Internal / CI</h3>
+
+<ul>
+  <li><strong>Incremental mutation testing</strong> (SPEC-0069): Stryker runs incrementally on PRs that touch the money paths (<code>src/pricing/**</code>, <code>src/pr/**</code>), with a nightly full sweep — the same anti-gaming moat at a fraction of the wall-clock. No product code change.</li>
+</ul>
+
+<h2 id="v040-2026-07-07">v0.4.0 — 2026-07-07</h2>
+
+<p>Minor: PR receipts can now <strong>attach and post themselves</strong>. A receipt travels with the branch as a sibling git ref and CI renders + posts the comment, so a receipt lands even when no one runs <code>pr --post</code>. Rendered receipt output is unchanged from v0.3.0 (goldens byte-identical); the new surface is opt-in.</p>
+
+<h3 id="added-3">Added</h3>
+
+<ul>
+  <li><strong>Seamless PR receipts — <code>store=ref</code> + pre-push hook</strong> (SPEC-0065): <code>aireceipts pr --store ref</code> (or <code>AIRECEIPTS_STORE=ref</code>) writes the receipt as a <strong>deterministic</strong> git object on <code>refs/receipts/&lt;slug&gt;</code> — invisible in the tree and PR diff, byte-identical across machines (dated from the session's own <code>endedAt</code>, never wall-clock). A committed <code>.githooks/pre-push</code> hook generates and pushes that ref on <code>git push</code> (best-effort; never blocks a push, no second push). <code>npm run setup:hooks</code> activates the hook for a clone of this repo; the default store stays <code>comment</code>.</li>
+  <li><strong>CI posts the receipt from the ref</strong> (SPEC-0066): a two-job <code>pr-receipt-check.yml</code> fetches the branch ref, validates and sanitizes the <strong>untrusted, fork-author-controlled</strong> payload, renders it through the existing renderer, and upserts one marker comment via <code>GITHUB_TOKEN</code> — no local <code>gh</code> required. Opt-in enforcement (<code>AIRECEIPTS_REQUIRE_PR_RECEIPT=true</code>) makes <strong>same-repo</strong> PRs require a receipt; <strong>fork</strong> PRs always stay notice-only (their transcripts live on the contributor's machine, so CI can't generate one). Enforcement is currently coarse — it does not yet distinguish agent-built from hand-written PRs.</li>
+  <li><strong><code>@latest</code> distribution pin</strong> (SPEC-0064 R1): the PR-receipt-check caller installs the reusable workflow at <code>@latest</code>; the moving <code>latest</code> git tag is advanced by the release workflow on each publish. (SPEC-0064 R2–R4, the npm-native <code>pr-check</code> command, remain in progress.)</li>
+</ul>
+
+<h3 id="performance">Performance</h3>
+
+<ul>
+  <li><strong>Faster feedback</strong> (SPEC-0063): in-process sqlite parsing, a goldens compile cache, and parallel preflight reduce CLI and preflight wall-clock.</li>
+</ul>
+
+<h3 id="security">Security</h3>
+
+<ul>
+  <li>The receipt payload that rides on the branch ref is treated as untrusted input — anyone who can push a branch, including a fork author, controls its bytes. The CI post path is a hardened trust boundary: a field-aware sanitizer (bracket-escape + autolink defang for live-markdown fields, fence-guard for fenced <code>text</code>, an https-allowlist that rejects markdown-breaking characters for artifact URLs), rendered in a <strong>token-less</strong> <code>render</code> job whose data-only artifact is posted by a separate <code>post</code> job — golden-gated against an injection corpus.</li>
+</ul>
+
+<h3 id="docs">Docs</h3>
+
+<ul>
+  <li>Adopter kit: a minimally-invasive default plus opt-in tiers for repos that want to turn enforcement up (<code>docs/pr-receipts.md</code>, <code>docs/adopt/</code>).</li>
+</ul>
+
+<h2 id="v030-2026-07-06">v0.3.0 — 2026-07-06</h2>
+
+<p>Minor: background-agent (subagent) spend becomes visible on every surface, the statusline is rebranded and extensible, and receipts get sharper defaults plus retroactive/first-run tooling. Per the 0.x policy, this minor deliberately changes rendered output — the callouts below list every change.</p>
+
+<h3 id="output-changes-deliberate-golden-gated">Output changes (deliberate, golden-gated)</h3>
+
+<ul>
+  <li>Statusline prefix is now <code>[aireceipts]</code> in stdin mode and <code>[aireceipts · &lt;agent&gt;]</code> in disk-fallback mode (was <code>[Claude Code]</code> etc.), and the default line appends your official 5h quota window (<code>5h N%</code>) when Claude Code's payload carries it (SPEC-0062).</li>
+  <li>Session receipts draw one <code>SUBAGENTS (N)</code> row (with <code>TOTAL</code> covering it) when the session has child transcripts; SPEC-0061 itself adds nothing to childless sessions (their v0.2.0→v0.3.0 rendering differences come only from the SPEC-0054/0055 changes above).</li>
+  <li>The receipt footer now carries the install CTA (<code>npx aireceipts-cli</code>) instead of the samosa link, and the inline methodology paragraph moved behind <code>--methodology</code> (SPEC-0055).</li>
+  <li>The <code>same tokens on &lt;model&gt;</code> line gains a <code>(N% less)</code> suffix when it is real savings (SPEC-0054).</li>
+</ul>
+
+<h3 id="added-4">Added</h3>
+
+<ul>
+  <li><strong>Subagent rollups everywhere</strong> (SPEC-0060, SPEC-0061): PR comments aggregate each contributor's subagents into one fence row plus a capped details table; session receipts, the statusline, the <code>install-hook</code> mini-receipt, and <code>--json</code> (optional <code>subagents</code> object) fold the same priced atoms in, with floor caveats for anything unreadable or unpriced — never a fabricated <code>$</code>.</li>
+  <li><strong>Statusline v2</strong> (SPEC-0062): <code>--format &lt;segments&gt;</code> engine (<code>brand,cost,tokens,waste,quota5h,quota7d,quotaEta</code>); <code>quotaEta</code> is a labeled <code>≈</code> cap-crossing estimate from two observed readings, rendered only when its guards hold (state file: <code>~/.aireceipts/quota-window.json</code>).</li>
+  <li><strong><code>--details</code></strong> (SPEC-0054): opt-in receipt section — token/cache anatomy, turns, peak turn, cache-read repricing, BY MODEL split.</li>
+  <li><strong><code>backfill</code></strong> (SPEC-0056): bulk retroactive receipts for every existing session on disk.</li>
+  <li><strong><code>--demo</code></strong> (SPEC-0051): a bundled sample session renders a real receipt on a machine with no sessions yet; both empty-state messages point at it.</li>
+  <li><strong><code>setup</code> + <code>integrations</code></strong> (SPEC-0050): first-run report and exact local integration snippets for Claude Code, Codex, opencode, Cursor, and GitHub.</li>
+  <li><strong>Savings slip</strong> (SPEC-0059): could-have-saved handoff block and PR section.</li>
+  <li><strong><code>--version</code></strong>, NOTICE file, and the OIDC release pipeline (#134); OpenSSF Scorecard, community files, and CI telemetry default-off (#139).</li>
+  <li>Per-agent docs pages for the five supported agents (SPEC-0058); discovery now flags unreadable sessions instead of silently skipping them (SPEC-0045).</li>
+</ul>
+
+<h3 id="fixed-2">Fixed</h3>
+
+<ul>
+  <li>Weekly-digest delta-direction labels now match the sign of the change (SPEC-0008, #150).</li>
+  <li>spec-lint catches duplicate spec ids across filenames (#136).</li>
+</ul>
+
+<h3 id="docs-2">Docs</h3>
+
+<ul>
+  <li>README rebuilt PR-receipt-first with a real merged-PR receipt comment as the hero, then trimmed to one receipt showing per format (SPEC-0053, #153).</li>
+  <li>Positioning pass across README/FAQ/landing (SPEC-0048/0049); Show HN launch kit and GTM sequencing docs; statusline docs cover the new segments and the host refresh-cadence limitation.</li>
+</ul>
+
 <h2 id="v020-2026-07-05">v0.2.0 — 2026-07-05</h2>
 
 <p>Minor: adds adoption telemetry + a local <code>stats</code> command (SPEC-0043), and lands the security/privacy hardening from the v0.1.0 release-board findings (which were live in v0.1.1).</p>
 
-<h3 id="added">Added</h3>
+<h3 id="added-5">Added</h3>
 
 <ul>
   <li>Adoption telemetry v2 (SPEC-0043): a nine-event catalog (feature-usage events, activation milestones), a pseudonymous random-UUID install identity sent only as a salted hash, and a local receipts counter — all content-free, opt-out, and disclosed in the updated first-run notice. (#110)</li>
   <li><code>aireceipts stats</code> — a new command that prints your local receipts-generated / total-runs / first-run counts from <code>~/.aireceipts/state.json</code>; works fully offline and even with telemetry disabled, and never leaves your machine. (#110)</li>
 </ul>
 
-<h3 id="fixed">Fixed</h3>
+<h3 id="fixed-3">Fixed</h3>
 
 <ul>
   <li>PR-receipt cost confidence — the implemented slices of SPEC-0044 (the spec stays <code>building</code>: its <code>--self-check</code> kill-criterion and cost-model docs are still pending, so it is not flipped to <code>shipped</code>):</li>
@@ -363,7 +479,7 @@ footer{
   <li>Bump the summary-cache version so titles cached by the pre-sanitizer parser are re-parsed rather than served raw. (#112)</li>
 </ul>
 
-<h3 id="docs">Docs</h3>
+<h3 id="docs-3">Docs</h3>
 
 <ul>
   <li>Correct README/getting-started privacy and coverage claims (transcripts/code never uploaded; diagnostics are opt-out; supported-agent list is finite); sync <code>docs/telemetry.md</code> agent-type enums and kill-switch examples; correct the <code>week --json</code> and <code>source</code> entries in <code>docs/json-schema.md</code>; drop a stale pre-release note. (#115)</li>
@@ -380,7 +496,7 @@ footer{
 
 <p>First release through the OIDC trusted-publishing workflow (v0.1.0 was the manual bootstrap).</p>
 
-<h3 id="added-2">Added</h3>
+<h3 id="added-6">Added</h3>
 
 <ul>
   <li>Parse Codex compaction records (<code>compacted</code> + <code>context_compacted</code>) into the normalized model, so <code>context-thrash</code> can fire on Codex sessions. (SPEC-0040)</li>

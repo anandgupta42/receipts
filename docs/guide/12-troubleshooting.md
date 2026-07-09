@@ -23,8 +23,9 @@ those places verbatim, so the fix is usually one of:
   read (wrong owner, restrictive mode) rather than erroring on it. If a directory
   is present but its sessions don't show up, check the file permissions.
 
-The default receipt exits non-zero with this message; `--list` prints the same
-message and exits `0`.
+The default human receipt and `--list` print this as informational guidance and
+exit `0`. Machine exports such as `--json` and `--csv` still exit non-zero with
+no sessions, because they would otherwise report success without a payload.
 
 ## `no session matched "…"`
 
