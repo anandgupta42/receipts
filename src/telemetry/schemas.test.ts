@@ -77,7 +77,7 @@ describe("SPEC-0043 R9: docs parity", () => {
       "result",
     ],
     hook_configured: ["operation", "promptOutcome", "result"],
-    integration_surface_rendered: ["integration", "inputMode", "payloadValid", "result"],
+    integration_surface_rendered: ["integration", "inputMode", "payloadValid", "customFormat", "scoped", "configFile", "result"],
     activation_milestone: ["milestone", "command", "installAgeBucket"],
   } as const;
 
@@ -206,7 +206,15 @@ describe("SPEC-0043 R1-R5: valid events pass their schema", () => {
     ["hook_configured", { operation: "install", promptOutcome: "accepted", result: "success" }],
     [
       "integration_surface_rendered",
-      { integration: "statusline", inputMode: "stdin_payload", payloadValid: true, result: "success" },
+      {
+        integration: "statusline",
+        inputMode: "stdin_payload",
+        payloadValid: true,
+        customFormat: false,
+        scoped: true,
+        configFile: true,
+        result: "success",
+      },
     ],
     ["activation_milestone", { milestone: "first_receipt", command: "receipt", installAgeBucket: "first_day" }],
   ] as const)("accepts a well-formed %s event", (name, properties) => {
@@ -228,6 +236,21 @@ describe("SPEC-0043 R1-R5: valid events pass their schema", () => {
         runOrdinalBucket: "unavailable",
       }).success,
     ).toBe(true);
+  });
+
+  it("SPEC-0075 R6 strictly accepts boolean-only statusline scope/config markers", () => {
+    const valid = {
+      integration: "statusline",
+      inputMode: "disk_fallback",
+      payloadValid: false,
+      result: "success",
+      customFormat: false,
+      scoped: true,
+      configFile: true,
+    };
+    expect(integrationSurfaceRenderedPropertiesSchema.safeParse(valid).success).toBe(true);
+    expect(integrationSurfaceRenderedPropertiesSchema.safeParse({ ...valid, scoped: "/private/repo" }).success).toBe(false);
+    expect(integrationSurfaceRenderedPropertiesSchema.safeParse({ ...valid, configFile: "brand,cost" }).success).toBe(false);
   });
 });
 

@@ -1,6 +1,17 @@
 // SPEC-0075 R1 — pure cwd attribution rules and Claude Code's lossy project
 // directory encoding. These tests never inspect the developer's real home.
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentSource, SessionAdapter, SessionSummary } from "../../src/parse/types.js";
+
+const { adaptersMock } = vi.hoisted(() => ({ adaptersMock: vi.fn() }));
+
+vi.mock("../../src/parse/registry.js", () => ({
+  adapterFor: vi.fn(),
+  adapters: adaptersMock,
+  detectedAdapters: vi.fn(),
+}));
+
+import { listSessionsForCwd } from "../../src/parse/load.js";
 import {
   claudeProjectDirectoryNames,
   cwdMatches,
@@ -8,6 +19,10 @@ import {
   encodeClaudeProjectCwd,
   normalizeCwd,
 } from "../../src/parse/cwdScope.js";
+
+beforeEach(() => {
+  adaptersMock.mockReset();
+});
 
 describe("SPEC-0075 R1 cwd matching", () => {
   it("matches equal POSIX paths", () => {
@@ -57,6 +72,16 @@ describe("SPEC-0075 R1 cwd matching", () => {
     expect(normalizeCwd("C:/..")).toBe("c:");
     expect(cwdMatches("Other", "C:/../Other")).toBe(false);
     expect(cwdMatches("c:/Other", "C:/../Other")).toBe(true);
+  });
+
+  it("never matches an empty normalized path", () => {
+    expect(cwdMatches("", "/x")).toBe(false);
+    expect(cwdMatches("/x", "")).toBe(false);
+  });
+
+  it("preserves host-only UNC paths", () => {
+    expect(normalizeCwd("//server")).toBe("//server");
+    expect(normalizeCwd(String.raw`\\server`)).toBe("//server");
   });
 });
 
@@ -108,11 +133,60 @@ describe("SPEC-0075 R1 Claude Code cwd encoding", () => {
     expect(claudeProjectDirectoryNames("/my/repo")).toEqual(["-", "-my", "-my-repo"]);
   });
 
+  it("handles empty, root, and Windows-drive inputs", () => {
+    expect(claudeProjectDirectoryNames("")).toEqual([]);
+    expect(claudeProjectDirectoryNames("/")).toEqual(["-"]);
+    expect(claudeProjectDirectoryNames("c:/repo/sub")).toEqual(["c-", "c--repo", "c--repo-sub"]);
+  });
+
   it("keeps both UNC leading slashes in encoded ancestor names", () => {
     expect(claudeProjectDirectoryNames("//server/share/repo")).toEqual([
       "--server",
       "--server-share",
       "--server-share-repo",
     ]);
+  });
+});
+
+describe("SPEC-0075 R1 scoped adapter discovery", () => {
+  const totals = {
+    tokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 },
+    turnCount: 0,
+    toolCallCount: 0,
+  };
+
+  function summary(id: string, source: AgentSource, cwd: string, endedAt: number): SessionSummary {
+    return { id, source, cwd, endedAt, totals, filePath: `/${id}.jsonl` };
+  }
+
+  function adapter(id: AgentSource, listSessions: SessionAdapter["listSessions"]): SessionAdapter {
+    return {
+      id,
+      label: id,
+      roots: () => [],
+      detect: async () => true,
+      listSessions,
+      loadSession: async () => null,
+    };
+  }
+
+  it("isolates an adapter exception without dropping another adapter's matches", async () => {
+    const kept = summary("kept", "gemini", "/repo", 1_000);
+    adaptersMock.mockReturnValue([
+      adapter("codex", async () => {
+        throw new Error("broken adapter");
+      }),
+      adapter("gemini", async () => [kept]),
+    ]);
+
+    await expect(listSessionsForCwd("/repo/sub", "/home/dev")).resolves.toEqual([kept]);
+  });
+
+  it("keeps only cwd-matching rows from a codex-like adapter", async () => {
+    const kept = summary("kept", "codex", "/repo", 1_000);
+    const dropped = summary("dropped", "codex", "/elsewhere", 2_000);
+    adaptersMock.mockReturnValue([adapter("codex", async () => [dropped, kept])]);
+
+    await expect(listSessionsForCwd("/repo/sub", "/home/dev")).resolves.toEqual([kept]);
   });
 });

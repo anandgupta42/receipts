@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -683,21 +683,53 @@ describe("built CLI e2e", () => {
     expect(result.stdout.endsWith("\n")).toBe(true);
   });
 
-  it("scopes statusline disk discovery to --cwd", async () => {
+  it("SPEC-0075 R2: sandbox-home statusline config changes the built CLI line", async () => {
+    const home = await makeHome();
+    await writeFile(path.join(home, ".aireceipts", "statusline.json"), JSON.stringify({ items: ["tokens"] }), "utf8");
+    const transcriptPath = path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl");
+
+    const result = await runCli(["statusline"], home, JSON.stringify({ transcript_path: transcriptPath }));
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toBe("147k\n");
+  });
+
+  it("SPEC-0075 R2: corrupt sandbox-home config falls back with one stderr note", async () => {
+    const home = await makeHome();
+    await writeFile(path.join(home, ".aireceipts", "statusline.json"), "{bad json", "utf8");
+    const transcriptPath = path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl");
+
+    const result = await runCli(["statusline"], home, JSON.stringify({ transcript_path: transcriptPath }));
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("[aireceipts] $0.18");
+    expect(result.stderr).toBe("statusline.json ignored: statusline.json is not valid JSON\n");
+  });
+
+  it("scopes statusline disk discovery to --cwd instead of a newer foreign session", async () => {
     const home = await makeHome();
     const sessionCwd = "/home/dev/webapp";
+    const projectsRoot = path.join(home, ".claude", "projects");
     // The literal encoded name, NOT encodeClaudeProjectCwd(sessionCwd): the
     // fixture layout must pin Claude Code's real on-disk convention, so an
     // encoder regression cannot silently reshape the fixture to keep matching.
-    const projectDir = path.join(home, ".claude", "projects", "-home-dev-webapp");
-    await mkdir(projectDir, { recursive: true });
-    await copyFile(path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl"), path.join(projectDir, "session.jsonl"));
+    const projectDir = path.join(projectsRoot, "-home-dev-webapp");
+    const foreignProjectDir = path.join(projectsRoot, "-home-dev-app5");
+    await Promise.all([mkdir(projectDir, { recursive: true }), mkdir(foreignProjectDir, { recursive: true })]);
+    const matchingPath = path.join(projectDir, "session.jsonl");
+    const foreignPath = path.join(foreignProjectDir, "newer-foreign.jsonl");
+    await copyFile(path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl"), matchingPath);
+    await copyFile(path.join(fixturesDir, "claude-code", "trivial-spans-quick-qa.jsonl"), foreignPath);
+    await utimes(matchingPath, 1_700_000_000, 1_700_000_000);
+    await utimes(foreignPath, 1_700_000_100, 1_700_000_100);
 
     const result = await runCli(["statusline", "--cwd", `${sessionCwd}/src`], home);
 
     expect(result.code, result.stderr).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("[aireceipts · Claude Code]");
+    expect(result.stdout).toContain("147k");
   });
 
   it("fails fast when statusline --cwd has no value", async () => {
