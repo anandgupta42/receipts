@@ -98,6 +98,13 @@ function slugify(value, seen) {
   return count === 0 ? base : `${base}-${count + 1}`;
 }
 
+// Docs guides (docs/guide/*.md) reference GIFs via `../../site/assets/<file>`, the
+// path that resolves when the markdown is read on GitHub. Every generated page is
+// written flat under site/docs/, so the same asset is one level up at ../assets/.
+function rewriteImageSrc(src) {
+  return src.replace(/^\.\.\/\.\.\/site\/assets\//u, "../assets/");
+}
+
 function normalizeHref(href) {
   const [pathPart, fragment = ""] = href.split("#", 2);
   const hash = fragment === "" ? "" : `#${fragment}`;
@@ -177,6 +184,20 @@ function renderInline(value) {
         html += `<em>${renderInline(value.slice(index + 1, end))}</em>`;
         index = end + 1;
         continue;
+      }
+    }
+
+    if (value[index] === "!" && value[index + 1] === "[") {
+      const closeAlt = value.indexOf("]", index + 2);
+      if (closeAlt !== -1 && value[closeAlt + 1] === "(") {
+        const closeSrc = findClosingParen(value, closeAlt + 2);
+        if (closeSrc !== -1) {
+          const alt = value.slice(index + 2, closeAlt);
+          const src = rewriteImageSrc(value.slice(closeAlt + 2, closeSrc));
+          html += `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}">`;
+          index = closeSrc + 1;
+          continue;
+        }
       }
     }
 
@@ -572,6 +593,7 @@ h1{
 .doc-content p{margin:0 0 16px;color:var(--ink)}
 .doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
 .doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
 .doc-content blockquote{
   margin:20px 0;
   padding:14px 18px;
@@ -773,7 +795,7 @@ ${body}
   <footer>
     <div class="close">
       <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
         <p class="thanks">Thank you for your tokens.</p>
         <p class="serial">AIRECEIPTS · NO. 0001</p>
       </div>
@@ -823,7 +845,19 @@ function collectPublishableMdFiles() {
   return results;
 }
 
+// Optional `--out <dir>` (or `--out=<dir>`) overrides the output directory; the
+// default (site/docs) is unchanged. hygiene.mjs uses this to render to a temp dir
+// for its freshness check without touching the working tree.
+function parseOutDir(argv) {
+  for (let index = 0; index < argv.length; index++) {
+    if (argv[index] === "--out") return argv[index + 1];
+    if (argv[index].startsWith("--out=")) return argv[index].slice("--out=".length);
+  }
+  return undefined;
+}
+
 function main() {
+  const outDir = parseOutDir(process.argv.slice(2)) ?? OUT_DIR;
   const manifestItems = NAV_SECTIONS.flatMap((s) => s.items);
 
   // Completeness + integrity: every publishable doc must be placed in the nav,
@@ -868,15 +902,15 @@ function main() {
     items: s.items.map((rel) => ({ href: docByPath.get(rel).href, title: docByPath.get(rel).title })),
   }));
 
-  mkdirSync(OUT_DIR, { recursive: true });
-  for (const name of readdirSync(OUT_DIR)) {
-    if (name.endsWith(".html")) rmSync(join(OUT_DIR, name));
+  mkdirSync(outDir, { recursive: true });
+  for (const name of readdirSync(outDir)) {
+    if (name.endsWith(".html")) rmSync(join(outDir, name));
   }
 
   for (const doc of docByPath.values()) {
     const body = renderMarkdown(doc.markdown);
     const html = wrapPage({ title: doc.title, sourcePath: doc.sourcePath, body, navSections });
-    writeHtml(join(OUT_DIR, doc.href), html);
+    writeHtml(join(outDir, doc.href), html);
   }
 
   const indexBody = `
@@ -893,9 +927,11 @@ ${s.items.map((rel) => {
 }).join("\n")}
 </ul>`).join("\n")}`;
   const indexHtml = wrapPage({ title: "Docs", body: indexBody, navSections });
-  writeHtml(join(OUT_DIR, "index.html"), indexHtml);
+  writeHtml(join(outDir, "index.html"), indexHtml);
 
-  console.log(`build-docs-site: wrote ${docByPath.size + 1} page(s) to ${relative(ROOT, OUT_DIR)}`);
+  console.log(`build-docs-site: wrote ${docByPath.size + 1} page(s) to ${relative(ROOT, outDir)}`);
 }
 
-main();
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main();
+}
