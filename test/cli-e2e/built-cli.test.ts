@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -11,11 +11,13 @@ const fixturesDir = path.join(repoRoot, "test", "fixtures");
 const cliPath = path.join(repoRoot, "dist", "cli.js");
 const tempDirs: string[] = [];
 
-// node:sqlite loads unflagged from Node 22.13 (src/parse/sqlite.ts); older
-// runtimes legitimately use the sqlite3-CLI fallback, so the in-process
-// regression test below skips there instead of failing.
-const [nodeMajor = 0, nodeMinor = 0] = process.versions.node.split(".").map(Number);
-const hasNodeSqlite = nodeMajor > 22 || (nodeMajor === 22 && nodeMinor >= 13);
+// Probe whether THIS runtime loads node:sqlite unflagged (22.13+/23.4+, and
+// not disabled via NODE_OPTIONS) by asking a child process that runs exactly
+// like the spawned CLI does. Runtimes without it legitimately use the
+// sqlite3-CLI fallback, so the in-process regression test below skips there
+// instead of failing — a version gate would misclassify 23.0–23.3.
+const hasNodeSqlite =
+  spawnSync(process.execPath, ["-e", 'require("node:sqlite")'], { encoding: "utf8" }).status === 0;
 
 interface RunOptions {
   cwd?: string;
@@ -557,8 +559,8 @@ describe("built CLI e2e", () => {
         .filter((file) => file.endsWith(".js"))
         .map((file) => readFile(path.join(repoRoot, "dist", file), "utf8")),
     );
-    expect(sources.some((source) => source.includes('import("node:sqlite")'))).toBe(true);
-    expect(sources.some((source) => source.includes('import("sqlite")'))).toBe(false);
+    expect(sources.some((source) => /import\(["']node:sqlite["']\)/.test(source))).toBe(true);
+    expect(sources.some((source) => /import\(["']sqlite["']\)/.test(source))).toBe(false);
   });
 
   it.skipIf(!hasNodeSqlite)("reads opencode sessions in-process with no sqlite3 binary on PATH", async () => {
