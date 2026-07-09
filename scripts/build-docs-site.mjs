@@ -104,10 +104,14 @@ function slugify(value, seen) {
 // Allowlist, don't just rewrite: the published site must never load an external
 // or traversal image (scheme/`//`/absolute/`..` srcs render as a broken-image
 // stub instead of an <img>), so a doc typo can't mint an off-site load.
-function rewriteImageSrc(src) {
+function rewriteImageSrc(rawSrc) {
+  const src = rawSrc.trim();
   const local = src.match(/^\.\.\/\.\.\/site\/assets\/([A-Za-z0-9._-]+)$/u);
   if (local) return `../assets/${local[1]}`;
-  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/iu.test(src) || src.includes("..")) return null;
+  // Only plain same-directory-relative file names survive; anything with a
+  // scheme, protocol-relative `//`, absolute path, traversal, whitespace, or
+  // control characters is blocked.
+  if (!/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u.test(src) || src.includes("..")) return null;
   return src;
 }
 
