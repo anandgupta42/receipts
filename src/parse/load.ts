@@ -2,6 +2,8 @@ import { adapterFor, adapters, detectedAdapters } from "./registry.js";
 import type { AgentSource, Session, SessionSummary } from "./types.js";
 import { SummaryCache, completeSummariesWithCache } from "./summaryCache.js";
 import * as fs from "node:fs";
+import * as path from "node:path";
+import { claudeProjectDirectoryNames, cwdMatches } from "./cwdScope.js";
 
 function sortMostRecentFirst(sessions: SessionSummary[]): SessionSummary[] {
   return sessions.sort((a, b) => (b.endedAt ?? b.startedAt ?? 0) - (a.endedAt ?? a.startedAt ?? 0));
@@ -11,6 +13,35 @@ function sortMostRecentFirst(sessions: SessionSummary[]): SessionSummary[] {
 export async function listSessions(agent?: AgentSource): Promise<SessionSummary[]> {
   const pool = agent ? adapters().filter((a) => a.id === agent) : adapters();
   const lists = await Promise.all(pool.map((a) => a.listSessions().catch(() => [] as SessionSummary[])));
+  return sortMostRecentFirst(lists.flat());
+}
+
+/**
+ * SPEC-0075 R1 — lazy session candidates scoped to a requested cwd. Claude
+ * Code is constrained before enumeration to exact encoded ancestor project
+ * directories; cwd-bearing adapters filter their lazy rows; Cursor is never
+ * queried because its rows carry no cwd.
+ */
+export async function listSessionsForCwd(requestedCwd: string): Promise<SessionSummary[]> {
+  const pool = adapters().filter((adapter) => adapter.id !== "cursor");
+  const lists = await Promise.all(
+    pool.map(async (adapter) => {
+      try {
+        if (adapter.id === "claude-code") {
+          const root = adapter.roots()[0];
+          if (!root) {
+            return [];
+          }
+          const roots = claudeProjectDirectoryNames(requestedCwd).map((name) => path.join(root, name));
+          return adapter.listSessions({ roots });
+        }
+        const sessions = await adapter.listSessions();
+        return sessions.filter((session) => typeof session.cwd === "string" && cwdMatches(session.cwd, requestedCwd));
+      } catch {
+        return [] as SessionSummary[];
+      }
+    }),
+  );
   return sortMostRecentFirst(lists.flat());
 }
 

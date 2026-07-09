@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { handoffJsonSchema, receiptJsonSchema } from "../../src/receipt/exportSchema.js";
+import { encodeClaudeProjectCwd } from "../../src/parse/cwdScope.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
@@ -681,6 +682,30 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("$0.18");
     expect(result.stdout).toContain("147k");
     expect(result.stdout.endsWith("\n")).toBe(true);
+  });
+
+  it("scopes statusline disk discovery to --cwd", async () => {
+    const home = await makeHome();
+    const sessionCwd = "/home/dev/webapp";
+    const projectDir = path.join(home, ".claude", "projects", encodeClaudeProjectCwd(sessionCwd));
+    await mkdir(projectDir, { recursive: true });
+    await copyFile(path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl"), path.join(projectDir, "session.jsonl"));
+
+    const result = await runCli(["statusline", "--cwd", `${sessionCwd}/src`], home);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("[aireceipts · Claude Code]");
+  });
+
+  it("fails fast when statusline --cwd has no value", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["statusline", "--cwd"], home);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("--cwd requires a non-empty path\n");
   });
 
   it("statusline falls back to the neutral empty state for malformed stdin and no fixture home", async () => {

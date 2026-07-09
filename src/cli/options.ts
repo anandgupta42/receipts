@@ -74,6 +74,8 @@ export interface CliOptions {
   readonly details: boolean;
   /** SPEC-0062 R3: `aireceipts statusline --format "<segments>"` — comma-separated segment names. */
   readonly format?: string;
+  /** SPEC-0075 R1: `aireceipts statusline --cwd <path>` — scope disk fallback to one cwd. */
+  readonly cwd?: string;
   /** SPEC-0070 R1: `aireceipts pr --samosa` opts the tip link back onto the PR comment + artifact (off by default). */
   readonly samosa: boolean;
 }
@@ -117,6 +119,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let limit: number | undefined;
   let outDir: string | undefined;
   let format: string | undefined;
+  let cwd: string | undefined;
   let samosa = false;
   const positional: string[] = [];
 
@@ -216,6 +219,12 @@ export function parseOptions(argv: string[]): CliOptions {
       format = argv[++i] ?? "";
     } else if (arg.startsWith("--format=")) {
       format = arg.slice("--format=".length);
+    } else if (arg === "--cwd") {
+      // A bare `--cwd` must fail fast downstream rather than silently falling
+      // back to global discovery (SPEC-0075 R1) — normalize to "".
+      cwd = argv[++i] ?? "";
+    } else if (arg.startsWith("--cwd=")) {
+      cwd = arg.slice("--cwd=".length);
     } else if (arg === "--svg") {
       svg = true;
     } else if (arg === "--png") {
@@ -278,6 +287,7 @@ export function parseOptions(argv: string[]): CliOptions {
     demo,
     details,
     format,
+    cwd,
     samosa,
   };
 }

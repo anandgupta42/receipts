@@ -28,6 +28,30 @@ If `aireceipts` isn't on your `PATH`, use an absolute path to the binary
 instead of `aireceipts` in the `command` field (for example, the output of
 `which aireceipts`).
 
+## Terminal surfaces
+
+Any terminal surface that can run a command and display one line of stdout can
+show an aireceipts statusline. Pass that surface's pane or prompt working
+directory to `--cwd`; aireceipts selects the newest session attributed to that
+path (or an ancestor of it) and prints the neutral placeholder when none match.
+It never falls back to another project's newest session. Cursor sessions never
+match in this mode because Cursor's session data carries no cwd.
+
+For tmux, add this to `~/.tmux.conf`:
+
+```tmux
+set -g status-right '#(aireceipts statusline --cwd "#{pane_current_path}")'
+```
+
+tmux refreshes `#(...)` commands on `status-interval`; lower that setting if you
+want a fresher line, keeping in mind that each refresh runs the command again.
+
+For Claude Code, its native `statusLine` stdin hook above remains the recommended
+surface. It is faster because the payload points directly at the active
+transcript, and it is richer: `context`, `quota5h`, `quota7d`, and `quotaEta`
+depend on stdin data. Terminal surfaces are additive when you also want a line
+in tmux or another shell UI.
+
 ## Output
 
 ```

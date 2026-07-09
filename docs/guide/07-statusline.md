@@ -34,6 +34,10 @@ no daemon, one disk read per invocation.
 If `aireceipts` isn't on your `PATH`, put the absolute path (the output of `which
 aireceipts`) in the `command` field.
 
+Using tmux too? The [terminal-surfaces recipe](../statusline.md#terminal-surfaces)
+shows how to put the right session in each pane with `statusline --cwd`, while
+keeping Claude Code's richer native stdin hook as the primary setup.
+
 ## What the line shows
 
 The default line is the segment set `brand,cost,burn,tokens,context,waste,quota5h`
