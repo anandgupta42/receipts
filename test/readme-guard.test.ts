@@ -108,7 +108,7 @@ describe("SPEC-0029 · README guard", () => {
 
   it("SPEC-0053 R1: the PR-receipt proof image is committed and linked to a live comment on this repo", () => {
     const wrapped =
-      /<a href="(https:\/\/github\.com\/anandgupta42\/receipts\/pull\/\d+#issuecomment-\d+)">\s*<img [^>]*src="(docs\/assets\/pr-receipt-comment\.png)"/.exec(readme);
+      /<a href="(https:\/\/github\.com\/anandgupta42\/receipts\/pull\/\d+#issuecomment-\d+)">\s*<img [^>]*src="(docs\/assets\/pr-receipt-[\w-]+\.png)"/.exec(readme);
     expect(wrapped, "README must show the proof image wrapped in a PR-comment permalink").not.toBeNull();
     expect(existsSync(wrapped![2]), `proof image missing on disk: ${wrapped![2]}`).toBe(true);
     // The caption's "read it live" link must point at the same comment as the image wrapper.
@@ -117,7 +117,7 @@ describe("SPEC-0029 · README guard", () => {
     expect(new Set(permalinks).size, "image wrapper and caption must link the same comment").toBe(1);
     // Placement: directly under the badges (inside the hero div), before the first prose paragraph.
     const badgeIdx = lines.findIndex((l) => l.trim().startsWith("[!["));
-    const imgLine = lines.findIndex((l) => l.includes("pr-receipt-comment.png"));
+    const imgLine = lines.findIndex((l) => /docs\/assets\/pr-receipt-[\w-]+\.png/.test(l));
     const proseIdx = lines.findIndex((l) => l.startsWith("**Why this exists.**"));
     expect(imgLine, "proof image must sit directly under the badges").toBeGreaterThan(badgeIdx);
     expect(imgLine - badgeIdx, "proof image must be the first thing after the badges").toBeLessThanOrEqual(3);

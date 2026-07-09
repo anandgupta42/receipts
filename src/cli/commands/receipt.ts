@@ -19,6 +19,18 @@ import type { ExportFormatValue } from "../../telemetry/schemas.js";
 
 const CSV_MODE_HINT = "use --csv=session or --csv=tool";
 
+function isDefaultHumanTextReceipt(ctx: CommandContext): boolean {
+  const { options } = ctx;
+  const selector = options.positional[0];
+  return (
+    (selector === undefined || selector.trim() === "") &&
+    !options.json &&
+    options.csvMode === undefined &&
+    !options.svg &&
+    !options.png
+  );
+}
+
 async function recordReceiptExport(ctx: CommandContext, format: ExportFormatValue, wroteFile: boolean): Promise<void> {
   ctx.telemetry.recordExportGenerated({ surface: "receipt", format, wroteFile, result: "success" });
   await ctx.telemetry.noteMilestone("first_export", "receipt");
@@ -39,6 +51,10 @@ async function run(ctx: CommandContext): Promise<number> {
   }
   const resolved = await resolveSelector(options.positional[0]);
   if ("error" in resolved) {
+    if ((resolved.kind === "no-session-data" || resolved.kind === "no-sessions") && isDefaultHumanTextReceipt(ctx)) {
+      ctx.stdout.write(`${resolved.error}\n`);
+      return 0;
+    }
     ctx.stderr.write(`${resolved.error}\n`);
     return 1;
   }
