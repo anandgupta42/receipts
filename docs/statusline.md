@@ -34,8 +34,11 @@ Any terminal surface that can run a command and display one line of stdout can
 show an aireceipts statusline. Pass that surface's pane or prompt working
 directory to `--cwd`; aireceipts selects the newest session attributed to that
 path (or an ancestor of it) and prints the neutral placeholder when none match.
-It never falls back to another project's newest session. Cursor sessions never
-match in this mode because Cursor's session data carries no cwd.
+It never falls back to another project's newest session, and a session launched
+from your home directory (or above it) only ever matches that exact path — it is
+not treated as an ancestor of everything, so one `~`-launched session can't
+shadow every pane on the machine. Cursor sessions never match in this mode
+because Cursor's session data carries no cwd.
 
 For tmux, add this to `~/.tmux.conf`:
 

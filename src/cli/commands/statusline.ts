@@ -6,9 +6,10 @@
 // renders through the segments engine — the default line IS the format
 // `brand,cost,tokens,waste,quota5h`, and `--format` selects any other segment
 // list (unknown names fail fast, exit 1).
+import * as os from "node:os";
 import { listSessions, listSessionsForCwd, loadById, loadSession } from "../../index.js";
 import type { Session, SessionSummary } from "../../parse/types.js";
-import { cwdMatches } from "../../parse/cwdScope.js";
+import { cwdMatchesForAttribution } from "../../parse/cwdScope.js";
 import { buildReceiptModel } from "../../receipt/model.js";
 import { attachSubagentRollup } from "../../receipt/subagents.js";
 import { buildMiniSummary } from "../../receipt/mini.js";
@@ -102,6 +103,7 @@ export async function loadFromCwd(
   requestedCwd: string,
   listSessionsFn: (cwd: string) => Promise<SessionSummary[]> = listSessionsForCwd,
   loadSessionFn: (summary: SessionSummary) => Promise<Session | null> = loadSession,
+  homeDir: string = os.homedir(),
 ): Promise<Session | null> {
   const sessions = await listSessionsFn(requestedCwd);
   for (const summary of sessions.slice(0, MAX_SCOPED_LOAD_ATTEMPTS)) {
@@ -109,7 +111,10 @@ export async function loadFromCwd(
     if (!session) {
       continue;
     }
-    if (summary.source === "claude-code" && (typeof session.cwd !== "string" || !cwdMatches(session.cwd, requestedCwd))) {
+    if (
+      summary.source === "claude-code" &&
+      (typeof session.cwd !== "string" || !cwdMatchesForAttribution(session.cwd, requestedCwd, homeDir))
+    ) {
       continue;
     }
     return session;

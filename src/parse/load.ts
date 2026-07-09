@@ -2,8 +2,9 @@ import { adapterFor, adapters, detectedAdapters } from "./registry.js";
 import type { AgentSource, Session, SessionSummary } from "./types.js";
 import { SummaryCache, completeSummariesWithCache } from "./summaryCache.js";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
-import { claudeProjectDirectoryNames, cwdMatches } from "./cwdScope.js";
+import { claudeProjectDirectoryNames, cwdMatchesForAttribution } from "./cwdScope.js";
 
 function sortMostRecentFirst(sessions: SessionSummary[]): SessionSummary[] {
   return sessions.sort((a, b) => (b.endedAt ?? b.startedAt ?? 0) - (a.endedAt ?? a.startedAt ?? 0));
@@ -22,7 +23,7 @@ export async function listSessions(agent?: AgentSource): Promise<SessionSummary[
  * directories; cwd-bearing adapters filter their lazy rows; Cursor is never
  * queried because its rows carry no cwd.
  */
-export async function listSessionsForCwd(requestedCwd: string): Promise<SessionSummary[]> {
+export async function listSessionsForCwd(requestedCwd: string, homeDir: string = os.homedir()): Promise<SessionSummary[]> {
   const pool = adapters().filter((adapter) => adapter.id !== "cursor");
   const lists = await Promise.all(
     pool.map(async (adapter) => {
@@ -36,7 +37,9 @@ export async function listSessionsForCwd(requestedCwd: string): Promise<SessionS
           return adapter.listSessions({ roots });
         }
         const sessions = await adapter.listSessions();
-        return sessions.filter((session) => typeof session.cwd === "string" && cwdMatches(session.cwd, requestedCwd));
+        return sessions.filter(
+          (session) => typeof session.cwd === "string" && cwdMatchesForAttribution(session.cwd, requestedCwd, homeDir),
+        );
       } catch {
         return [] as SessionSummary[];
       }

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   claudeProjectDirectoryNames,
   cwdMatches,
+  cwdMatchesForAttribution,
   encodeClaudeProjectCwd,
   normalizeCwd,
 } from "../../src/parse/cwdScope.js";
@@ -56,6 +57,27 @@ describe("SPEC-0075 R1 cwd matching", () => {
     expect(normalizeCwd("C:/..")).toBe("c:");
     expect(cwdMatches("Other", "C:/../Other")).toBe(false);
     expect(cwdMatches("c:/Other", "C:/../Other")).toBe(true);
+  });
+});
+
+describe("SPEC-0075 R1 attribution policy (home-shadow guard)", () => {
+  const home = "/Users/dev";
+
+  it("never ancestor-matches a session recorded at the home directory or above", () => {
+    // Observed on real data: one `~`-launched Codex session is an ancestor of
+    // every path on the machine and would shadow the placeholder forever.
+    expect(cwdMatchesForAttribution(home, "/Users/dev/never-used", home)).toBe(false);
+    expect(cwdMatchesForAttribution("/Users", "/Users/dev/repo", home)).toBe(false);
+    expect(cwdMatchesForAttribution("/", "/Users/dev/repo", home)).toBe(false);
+  });
+
+  it("still exact-matches a home-directory session for a home-directory pane", () => {
+    expect(cwdMatchesForAttribution(home, home, home)).toBe(true);
+  });
+
+  it("keeps ancestor matching for real project roots below home and outside it", () => {
+    expect(cwdMatchesForAttribution("/Users/dev/repo", "/Users/dev/repo/sub", home)).toBe(true);
+    expect(cwdMatchesForAttribution("/srv/app", "/srv/app/sub", home)).toBe(true);
   });
 });
 

@@ -64,6 +64,30 @@ export function cwdMatches(sessionCwd: string, requestedCwd: string): boolean {
   return session !== "" && requested.startsWith(`${session}/`);
 }
 
+/**
+ * SPEC-0075 R1 — the attribution rule scoped discovery actually applies.
+ * `cwdMatches` plus one policy guard: a session recorded at the user's home
+ * directory or above (an agent launched from `~` or `/`) never ancestor-matches
+ * — it matches its exact path only. Without this, one home-launched session is
+ * an ancestor of every path on the machine and permanently shadows the
+ * no-session placeholder (observed on real data: a `~`-launched Codex session
+ * rendered for a path no agent ever touched). `homeDir` is a parameter so the
+ * rule stays a pure string decision.
+ */
+export function cwdMatchesForAttribution(sessionCwd: string, requestedCwd: string, homeDir: string): boolean {
+  const session = normalizeCwd(sessionCwd);
+  const requested = normalizeCwd(requestedCwd);
+  if (session === requested) {
+    return true;
+  }
+  if (!cwdMatches(sessionCwd, requestedCwd)) {
+    return false;
+  }
+  const home = normalizeCwd(homeDir);
+  const homeOrAbove = home !== "" && (session === home || home.startsWith(`${session}/`) || session === "/");
+  return !homeOrAbove;
+}
+
 /** Claude Code replaces every non-ASCII-alphanumeric cwd character with `-`. */
 export function encodeClaudeProjectCwd(cwd: string): string {
   return cwd.replace(/[^A-Za-z0-9]/g, "-");
