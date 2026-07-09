@@ -340,7 +340,7 @@ footer{
 
 <ul>
   <li><strong>On by default</strong>, but every event is one of a fixed nine-event catalog: <code>cli_run</code>, <code>cli_error</code>, <code>parse_failure</code>, <code>receipt_generated</code>, <code>export_generated</code>, <code>pr_flow_completed</code>, <code>hook_configured</code>, <code>integration_surface_rendered</code>, <code>activation_milestone</code>.</li>
-  <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps as event fields (the HTTPS envelope stamps a send time, as any request does).</li>
+  <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.</li>
   <li><strong>Pseudonymous install identity</strong>: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete <code>~/.aireceipts/state.json</code> to reset it.</li>
   <li><strong>Disable anytime</strong>: <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code>. Either one results in <strong>zero network calls</strong> and prevents install-id creation on a fresh install.</li>
   <li><strong>On by default in CI too</strong>: <code>CI</code>/<code>GITHUB_ACTIONS</code> environments are treated the same as any other — telemetry is enabled by default there. Use a kill switch (<code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code>) to disable it in CI. (Before v0.7.0 it defaulted off in CI; reversed — see SPEC-0002.)</li>
@@ -564,7 +564,7 @@ DO_NOT_TRACK=1 aireceipts ...</code></pre>
 
 <h2 id="first-run-notice">First-run notice</h2>
 
-<p>The first time <code>aireceipts</code> runs for a given user, it prints a one-line disclosure pointing here, then persists <code>{ &quot;shown&quot;: true }</code> to <code>~/.aireceipts/telemetry.json</code> so it never prints again. If that file cannot be read or written, the notice is shown again on the next run rather than failing the CLI. The notice prints once even when telemetry is disabled (<code>AIRECEIPTS_TELEMETRY=off</code> / <code>DO_NOT_TRACK=1</code>) — it is the disclosure itself, not a send; the kill switches stop every network call.</p>
+<p>The first time <code>aireceipts</code> runs for a given user while telemetry is enabled, it prints a one-line disclosure pointing here, then persists <code>{ &quot;shown&quot;: true }</code> to <code>~/.aireceipts/telemetry.json</code> so it never prints again. If <code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code> is active before that first enabled run, <code>aireceipts</code> prints no notice and does not persist the shown flag; the notice appears on the first later run where telemetry is enabled. If the notice file cannot be read or written, the notice is shown again on the next enabled run rather than failing the CLI.</p>
 
 <h2 id="source-of-truth">Source of truth</h2>
 

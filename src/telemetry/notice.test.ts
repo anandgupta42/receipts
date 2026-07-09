@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -32,6 +32,21 @@ describe("R5: first-run disclosure notice", () => {
     expect(shownSecondRun).toBe(false);
     expect(shownThirdRun).toBe(false);
     expect(printed).toHaveLength(1);
+  });
+
+  it("stays silent and does not persist shown state while telemetry is disabled", async () => {
+    const printed: string[] = [];
+    const shown = await ensureFirstRunNotice((text) => printed.push(text), homeDir, {
+      AIRECEIPTS_TELEMETRY: "off",
+    });
+
+    expect(shown).toBe(false);
+    expect(printed).toEqual([]);
+    await expect(access(join(homeDir, ".aireceipts", "telemetry.json"))).rejects.toThrow();
+
+    const shownAfterTelemetryEnabled = await ensureFirstRunNotice((text) => printed.push(text), homeDir);
+    expect(shownAfterTelemetryEnabled).toBe(true);
+    expect(printed).toEqual([FIRST_RUN_NOTICE]);
   });
 
   it("mentions both kill switches, --telemetry-show, and docs/telemetry.md", () => {

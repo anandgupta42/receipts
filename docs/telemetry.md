@@ -5,7 +5,7 @@
 ## tl;dr
 
 - **On by default**, but every event is one of a fixed nine-event catalog: `cli_run`, `cli_error`, `parse_failure`, `receipt_generated`, `export_generated`, `pr_flow_completed`, `hook_configured`, `integration_surface_rendered`, `activation_milestone`.
-- **Never sent**: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps as event fields (the HTTPS envelope stamps a send time, as any request does).
+- **Never sent**: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.
 - **Pseudonymous install identity**: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete `~/.aireceipts/state.json` to reset it.
 - **Disable anytime**: `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`) or `DO_NOT_TRACK=1`. Either one results in **zero network calls** and prevents install-id creation on a fresh install.
 - **On by default in CI too**: `CI`/`GITHUB_ACTIONS` environments are treated the same as any other — telemetry is enabled by default there. Use a kill switch (`AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1`) to disable it in CI. (Before v0.7.0 it defaulted off in CI; reversed — see SPEC-0002.)
@@ -206,7 +206,7 @@ This prints whether telemetry is currently enabled and the exact events queued f
 
 ## First-run notice
 
-The first time `aireceipts` runs for a given user, it prints a one-line disclosure pointing here, then persists `{ "shown": true }` to `~/.aireceipts/telemetry.json` so it never prints again. If that file cannot be read or written, the notice is shown again on the next run rather than failing the CLI. The notice prints once even when telemetry is disabled (`AIRECEIPTS_TELEMETRY=off` / `DO_NOT_TRACK=1`) — it is the disclosure itself, not a send; the kill switches stop every network call.
+The first time `aireceipts` runs for a given user while telemetry is enabled, it prints a one-line disclosure pointing here, then persists `{ "shown": true }` to `~/.aireceipts/telemetry.json` so it never prints again. If `AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1` is active before that first enabled run, `aireceipts` prints no notice and does not persist the shown flag; the notice appears on the first later run where telemetry is enabled. If the notice file cannot be read or written, the notice is shown again on the next enabled run rather than failing the CLI.
 
 ## Source of truth
 

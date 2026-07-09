@@ -28,8 +28,9 @@ interface RunResult {
 /**
  * Run `main(argv)` with a captured stdout/stderr and a throwaway HOME so no real
  * transcript roots are scanned (context-safety) and the run is deterministic.
- * `seedNotice` (default true) pre-writes the first-run telemetry marker so the
- * disclosure notice never pollutes stderr — set false to observe the notice.
+ * `seedNotice` (default true) pre-writes the first-run telemetry marker. This
+ * harness also forces telemetry off, so leaving the marker absent should still
+ * keep stderr silent under the kill-switch contract.
  */
 async function runMain(argv: string[], seedNotice = true): Promise<RunResult> {
   const home = mkdtempSync(join(tmpdir(), "aireceipts-preserve-"));
@@ -312,18 +313,16 @@ describe("SPEC-0018 R8 · dispatch behavior (session-scanning path)", () => {
 
 describe("SPEC-0018 R6 · telemetry lifecycle (observable contract)", () => {
   it("--telemetry-show prints the payload, skips the first-run notice, exit 0", async () => {
-    // seedNotice=false so the notice WOULD print for any other command; it must not here.
+    // seedNotice=false keeps the marker absent; telemetry-show must still stay silent.
     const { code, out, err } = await runMain(["--telemetry-show"], false);
     expect(code).toBe(0);
     expect(err).toBe("");
     expect(out).toBe('{\n  "enabled": false,\n  "events": []\n}\n');
   });
 
-  it("a normal command prints the first-run disclosure notice once, on stderr", async () => {
+  it("a normal command stays silent when the first run happens with telemetry disabled", async () => {
     const { code, err } = await runMain(["--check-budget"], false);
     expect(code).toBe(0);
-    expect(err).toContain("anonymous");
-    expect(err).toContain("AIRECEIPTS_TELEMETRY=off");
-    expect(err).toContain("DO_NOT_TRACK=1");
+    expect(err).toBe("");
   });
 });

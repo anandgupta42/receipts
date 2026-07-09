@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { resolveTelemetryConfig } from "./config.js";
 
 /**
  * One-time diagnostics-telemetry disclosure (SPEC-0002 R5). Persists
@@ -58,10 +59,18 @@ async function writeNoticeState(path: string, state: NoticeState): Promise<void>
 
 /**
  * Prints (via `print`) {@link FIRST_RUN_NOTICE} the first time this ever
- * runs for the current user, then persists that it's been shown so later
- * runs stay silent. Returns `true` if the notice was (just) shown.
+ * runs for the current user while telemetry is enabled, then persists that
+ * it's been shown so later runs stay silent. Returns `true` if the notice
+ * was (just) shown.
  */
-export async function ensureFirstRunNotice(print: (text: string) => void, homeOverride?: string): Promise<boolean> {
+export async function ensureFirstRunNotice(
+  print: (text: string) => void,
+  homeOverride?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<boolean> {
+  if (!resolveTelemetryConfig(env).enabled) {
+    return false;
+  }
   const path = noticeStatePath(homeOverride);
   const state = await readNoticeState(path);
   if (state.shown) {
