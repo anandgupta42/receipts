@@ -21,6 +21,23 @@ const ASSISTANT_INSTRUCTION = [
   "Never guess cost. If aireceipts reports tokens-only, preserve that.",
 ].join("\n");
 
+const NPM_NATIVE_PR_CHECK_CALLER_YAML = [
+  "# npm-native, no reusable-workflow `uses:` — no org Actions-policy gate; for trusted",
+  "# same-repo/internal PRs (fork PRs get a read-only token).",
+  "name: aireceipts",
+  "on: [pull_request]",
+  "permissions:",
+  "  contents: read",
+  "  pull-requests: write",
+  "jobs:",
+  "  check:",
+  "    runs-on: ubuntu-latest",
+  "    steps:",
+  "      - run: npx -y aireceipts-cli@latest pr-check",
+  "        env:",
+  "          GH_TOKEN: ${{ github.token }}",
+].join("\n");
+
 export const INTEGRATION_RECIPES: readonly IntegrationRecipe[] = [
   {
     target: "claude-code",
@@ -140,6 +157,14 @@ export const INTEGRATION_RECIPES: readonly IntegrationRecipe[] = [
       "jobs:",
       "  check:",
       "    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest",
+      "```",
+      "",
+      "ALTERNATIVE: self-contained npm-native pr-check",
+      "",
+      "Use this workflow content instead when org Actions policy blocks external reusable workflows:",
+      "",
+      "```yaml",
+      NPM_NATIVE_PR_CHECK_CALLER_YAML,
       "```",
       "",
       "# .claude/settings.json",
