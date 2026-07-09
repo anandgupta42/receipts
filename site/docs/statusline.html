@@ -154,6 +154,7 @@ h1{
 .doc-content p{margin:0 0 16px;color:var(--ink)}
 .doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
 .doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
 .doc-content blockquote{
   margin:20px 0;
   padding:14px 18px;
@@ -352,28 +353,66 @@ footer{
 
 <h2 id="output">Output</h2>
 
-<pre class="doc-code"><code>[Claude Code] $1.23 · 12k tok
-[Claude Code] $2.50 · 20k tok · ⚠ Bash loop ×5
-[Cursor] 8k tok</code></pre>
+<pre class="doc-code"><code>[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+[aireceipts] $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
+[aireceipts · Cursor] 8k</code></pre>
 
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session's cost is priced; <code>Nk tok</code> only when it isn't (never a fabricated <code>$</code> amount).</li>
+  <li><code>$X.XX</code> is the session's priced cost (aireceipts' own cited-price figure, incl. subagents); omitted when it can't be priced — never a fabricated <code>$</code> amount.</li>
+  <li><code>$X/hr</code> is the session-average burn rate (that same priced cost over the session wall-clock); omitted when the session isn't priced or has no duration yet.</li>
+  <li><code>Nk</code> / <code>NM</code> is the session's token count, abbreviated (<code>12k</code>, <code>1.2M</code>, <code>501M</code>).</li>
+  <li><code>ctx N%</code> is how full the current context window is — Claude Code's own pre-calculated <code>context_window.used_percentage</code>, omitted when the payload lacks it.</li>
+  <li><code>5h N% ↺Xh Ym</code> is your official 5-hour rate-limit usage (Claude Code's own <code>rate_limits.five_hour.used_percentage</code>, subscribers only) plus the time until the window resets, derived from the real <code>resets_at</code> — the countdown is dropped (leaving <code>5h N%</code>) when <code>resets_at</code> is absent or already past, never a guessed time.</li>
   <li>The waste flag (<code>⚠ ...</code>) appears only when a waste detector actually fired on the session — its absence is not itself a claim that nothing was found.</li>
-  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk. If no sessions are detected at all, it prints a neutral placeholder line rather than an error, so the statusline layout never breaks.</li>
+  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk — the prefix then names whose session it is (<code>[aireceipts · Codex]</code>). If no sessions are detected at all, it prints a neutral placeholder line rather than an error, so the statusline layout never breaks.</li>
 </ul>
+
+<h2 id="custom-formats-format">Custom formats (<code>--format</code>)</h2>
+
+<p>The default line is the format <code>brand,cost,burn,tokens,context,waste,quota5h</code>. Pick your own segments with <code>--format</code> (comma-separated; a segment with nothing honest to say is omitted, and an unknown name exits 1 with the valid list on stderr):</p>
+
+<pre class="doc-code"><code class="language-json">{
+  &quot;statusLine&quot;: {
+    &quot;type&quot;: &quot;command&quot;,
+    &quot;command&quot;: &quot;aireceipts statusline --format brand,cost,quota5h,quotaEta&quot;
+  }
+}</code></pre>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Segment</th><th>Renders</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td><code>brand</code></td><td><code>[aireceipts]</code> (stdin) / <code>[aireceipts · &lt;agent&gt;]</code> (disk fallback)</td><td>—</td></tr>
+    <tr><td><code>cost</code></td><td><code>$X.XX</code></td><td>priced session total incl. subagents; omitted when unpriced (I2)</td></tr>
+    <tr><td><code>burn</code></td><td><code>$X/hr</code></td><td>session-average burn (priced cost ÷ wall-clock); omitted when unpriced or no duration</td></tr>
+    <tr><td><code>tokens</code></td><td><code>Nk</code> / <code>NM</code></td><td>session + subagent tokens, abbreviated</td></tr>
+    <tr><td><code>context</code></td><td><code>ctx N%</code></td><td>Claude Code's <code>context_window.used_percentage</code> (stdin only)</td></tr>
+    <tr><td><code>waste</code></td><td><code>⚠ ...</code></td><td>first fired waste detector</td></tr>
+    <tr><td><code>quota5h</code> / <code>quota7d</code></td><td><code>5h N% ↺Xh Ym</code> / <code>7d N% ↺…</code></td><td>official <code>rate_limits</code> passthrough + reset countdown (stdin only)</td></tr>
+    <tr><td><code>quotaEta</code></td><td><code>≈ 5h cap HH:MM UTC</code></td><td>labeled arithmetic, see below</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="quotaeta-honesty-rules"><code>quotaEta</code> honesty rules</h3>
+
+<p>The ETA is straight-line arithmetic between exactly two observed readings of your 5h window (the previous invocation's, cached in <code>~/.aireceipts/quota-window.json</code>, and this one's) — the <code>≈</code> label is mandatory, and the segment renders <strong>only</strong> when every guard holds: same window (unchanged <code>resets_at</code>), rising usage, readings at least 60s apart, no clock-skew between them, and the projected crossing landing before the window resets. Anything ambiguous renders nothing — an omitted segment, never a guessed time. It is an extrapolation of your recent burn rate, not a prediction of what you'll do next.</p>
 
 <h2 id="notes">Notes</h2>
 
 <ul>
   <li>One line, one on-disk read per invocation — this is a snapshot, not a live view. Nothing streams mid-session (see the CLI's non-goals).</li>
   <li>Sessions that can't be priced (missing price rows) render tokens-only — <code>aireceipts</code> never estimates a dollar figure it can't source to a price row.</li>
+  <li>Subagent spend is included (SPEC-0061): background agents write their transcripts to separate files under the session's <code>subagents/</code> directory, and the statusline's <code>$</code> and token counts fold that rollup in — the same aggregate the session receipt draws as its <code>SUBAGENTS (N)</code> row.</li>
 </ul>
+
+<h2 id="known-limitation-refresh-cadence">Known limitation: refresh cadence</h2>
+
+<p>Claude Code re-invokes the statusline command only when the main conversation updates. During a long stretch of background-agent work with the main loop idle, the line is not re-invoked and can sit stale until the next main-conversation event — that is host behavior, not a rendering bug: every invocation reads the transcripts fresh.</p>
     </article>
   </main>
   <footer>
     <div class="close">
       <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
         <p class="thanks">Thank you for your tokens.</p>
         <p class="serial">AIRECEIPTS · NO. 0001</p>
       </div>

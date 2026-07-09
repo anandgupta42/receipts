@@ -22,6 +22,8 @@ COULD HAVE SAVED...........................≤ $0.08
 covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line
 ```
 
+![Terminal recording of a synthetic session: aireceipts --handoff printing the waste lines a session hit and a paste-ready savings slip.](../../site/assets/waste-handoff.gif)
+
 The block opens with the session's state — agent, when, how long, which models,
 what it cost, how many turns and tool calls (plus a compaction count when any
 fired). Then comes the savings slip: a `COULD HAVE SAVED` ceiling summing the

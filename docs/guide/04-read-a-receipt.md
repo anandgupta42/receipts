@@ -42,8 +42,13 @@ output on turns that called no tool. `TOTAL` is the sum; `same tokens on …`
 re-prices those exact tokens on a cheaper model as a reference point — the
 `(78% less)` is the same arithmetic as a percentage, never a prediction.
 
-Three lines appear only when they have something to say:
+A few lines appear only when they have something to say:
 
+- a **pre-edit line** — `pre-edit: 11% of cost (1/10 turns)` — the share of
+  the session's cost spent *before the first named edit-tool call*, and how
+  many turns that covered. It's a shape fact, not a verdict: a hard bug can
+  deserve a high share, and a routine edit usually doesn't — a share that
+  surprises you is worth a look;
 - a **stuck-loop waste line** names where to look — `at turns 1-5` — so you
   can jump straight to the loop in your own transcript;
 - a **coverage caveat** — `caveat: 2 of 3 turns unpriced — TOTAL excludes

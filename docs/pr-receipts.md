@@ -111,12 +111,43 @@ who viewed which receipt.
 
 ## For maintainers (automatic repo integration, 2 files)
 
-1. Commit the PR receipt check workflow as `.github/workflows/pr-receipt-check.yml`
-   ([template](adopt/pr-receipt-check-caller.yml)):
+1. Commit a PR receipt check workflow under `.github/workflows/`. Two caller
+   variants do the same job — pick one:
+
+   **Recommended — self-contained, npm-native**
+   ([`adopt/pr-check-caller.yml`](adopt/pr-check-caller.yml)). *Use this one if*
+   your org restricts third-party reusable workflows, or you'd simply rather not
+   depend on one: it runs the check inside your own workflow with no
+   reusable-workflow `uses:`, so it never hits an Actions org-policy gate. Commit
+   it as e.g. `.github/workflows/aireceipts.yml`:
+
+   ```yaml
+   name: aireceipts
+   on: [pull_request]
+   permissions:
+     contents: read
+     pull-requests: write
+   jobs:
+     check:
+       runs-on: ubuntu-latest
+       steps:
+         - run: npx -y aireceipts-cli@latest pr-check
+           env:
+             GH_TOKEN: ${{ github.token }}
+   ```
+
+   **Reusable workflow**
+   ([`adopt/pr-receipt-check-caller.yml`](adopt/pr-receipt-check-caller.yml)).
+   *Use this one if* your org allows third-party reusable workflows and you want
+   the check logic to track upstream automatically via `@latest`. Commit it as
+   `.github/workflows/pr-receipt-check.yml`:
 
    ```yaml
    name: pr-receipt-check
    on: [pull_request]
+   permissions:
+     contents: read
+     pull-requests: write
    jobs:
      check:
        uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest
@@ -166,9 +197,9 @@ would fight over the same namespace. `pr-check` fails safe on a foreign-schema r
 posts nothing, but avoiding the collision is still the adopter's responsibility.
 
 **Footprint (what this actually adds to your repo).** Two committed files for the
-automatic path (plus, optionally, a one-line note in `CONTRIBUTING.md`). The check
-**never fails a build** — a neutral `::notice` when a receipt is missing, and nothing
-otherwise. aireceipts **never commits receipt files** to your tree: a receipt is a PR
+automatic path (plus, optionally, a one-line note in `CONTRIBUTING.md`). The check is
+**notice-only by default** — a neutral `::notice` when a receipt is missing, nothing
+otherwise, and a failing build only if you opt into same-repo enforcement. aireceipts **never commits receipt files** to your tree: a receipt is a PR
 comment or a git ref (`refs/receipts/…`), both invisible in your source and your PR
 diffs. Remove it anytime by deleting the workflow and the `.claude/settings.json` hook
 entry.
@@ -185,10 +216,9 @@ entry.
   `git push`. For this repo's own contributors, the older `.githooks/pre-push` path still
   exists behind `npm run setup:hooks`. Either way a contributor can still just run
   `npx aireceipts-cli pr --post`. Each layer is opt-in and notice-only until turned on.
-- **npm-native (no `uses:`)** — for trusted same-repo/internal repos, use the
-  [self-contained caller](adopt/pr-check-caller.yml). It runs
-  `npx -y aireceipts-cli@latest pr-check` in your own workflow, avoids the public
-  reusable-workflow org-policy gate, and keeps fork PRs notice-only.
+
+The two workflow variants above (self-contained npm-native, or the reusable workflow)
+are the reader/poster half of this; the enforcement and seamless tiers apply to either.
 
 CI still never generates a receipt itself: the source transcripts stay local (I1/I4).
 Rolling out across a whole org: [docs/adopt/org-rollout.md](adopt/org-rollout.md).

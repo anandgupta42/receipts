@@ -154,6 +154,7 @@ h1{
 .doc-content p{margin:0 0 16px;color:var(--ink)}
 .doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
 .doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
 .doc-content blockquote{
   margin:20px 0;
   padding:14px 18px;
@@ -333,13 +334,15 @@ footer{
     <article class="doc-content">
 <h1 id="rolling-out-receipt-checks-across-a-fleet-of-repos">Rolling out receipt checks across a fleet of repos</h1>
 
-<p>For one repo, adoption is the 3-line caller — see <a href="pr-receipt-check-caller.yml">pr-receipt-check-caller.yml</a> and <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
+<p>For one repo, notice-only adoption starts with the workflow caller; automatic receipt posting needs the two-file kit (workflow + Claude Code hook). See <a href="pr-receipt-check-caller.yml">pr-receipt-check-caller.yml</a>, <a href="claude-settings.json">claude-settings.json</a>, and <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
 
 <p>For many repos (an org dogfood, a platform team), generate the adoption packet:</p>
 
 <pre class="doc-code"><code class="language-sh">node scripts/rollout-dogfood.mjs --org your-org --days 90</code></pre>
 
 <p>It enumerates repos active in the window (skipping archived repos, forks, and repos already carrying the caller) and prints, per repo: the caller file, the CONTRIBUTING line, and a copy-paste command sheet that opens a PR. <strong>It performs no repo or GitHub mutations</strong> — each repo's owners review and merge their own PR, and the script refuses to run until <code>aireceipts</code> is actually on npm (a packet telling developers to run an unpublished command helps nobody).</p>
+
+<p><strong>The default footprint is deliberately minimal.</strong> The notice-only packet adds one non-blocking workflow file (plus, optionally, a one-line CONTRIBUTING note): it never fails a build, and aireceipts never commits receipt files (a receipt is a PR comment or a git ref, invisible in the tree and PR diffs). Automatic receipts add the committed <code>.claude/settings.json</code> PreToolUse hook that produces the ref when Claude Code runs <code>git push</code>; the workflow alone is a no-op until that hook, or a manual <code>pr --store ref --push-ref</code>, produces a ref. Enforcement (<code>AIRECEIPTS_REQUIRE_PR_RECEIPT</code>) is opt-in and coarse — it makes same-repo PRs require a receipt (fork PRs always stay notice-only). See the tiers in <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
 
 <p>Two constraints inherited from GitHub:</p>
 
@@ -352,7 +355,7 @@ footer{
   <footer>
     <div class="close">
       <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
         <p class="thanks">Thank you for your tokens.</p>
         <p class="serial">AIRECEIPTS · NO. 0001</p>
       </div>
