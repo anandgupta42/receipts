@@ -101,8 +101,14 @@ function slugify(value, seen) {
 // Docs guides (docs/guide/*.md) reference GIFs via `../../site/assets/<file>`, the
 // path that resolves when the markdown is read on GitHub. Every generated page is
 // written flat under site/docs/, so the same asset is one level up at ../assets/.
+// Allowlist, don't just rewrite: the published site must never load an external
+// or traversal image (scheme/`//`/absolute/`..` srcs render as a broken-image
+// stub instead of an <img>), so a doc typo can't mint an off-site load.
 function rewriteImageSrc(src) {
-  return src.replace(/^\.\.\/\.\.\/site\/assets\//u, "../assets/");
+  const local = src.match(/^\.\.\/\.\.\/site\/assets\/([A-Za-z0-9._-]+)$/u);
+  if (local) return `../assets/${local[1]}`;
+  if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|\/)/iu.test(src) || src.includes("..")) return null;
+  return src;
 }
 
 function normalizeHref(href) {
@@ -194,7 +200,9 @@ function renderInline(value) {
         if (closeSrc !== -1) {
           const alt = value.slice(index + 2, closeAlt);
           const src = rewriteImageSrc(value.slice(closeAlt + 2, closeSrc));
-          html += `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}">`;
+          html += src === null
+            ? `<span class="doc-img-blocked">[image blocked: non-local src]</span>`
+            : `<img src="${escapeAttr(src)}" alt="${escapeAttr(alt)}">`;
           index = closeSrc + 1;
           continue;
         }

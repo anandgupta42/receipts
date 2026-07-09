@@ -259,7 +259,7 @@ function diffDirectories(committed, rendered) {
     }
   }
   for (const file of renderedFiles) {
-    if (!committedFiles.includes(file)) differences.push(`unexpected committed file removed by render: ${file}`);
+    if (!committedFiles.includes(file)) differences.push(`render produced a file not committed: ${file}`);
   }
   return differences.sort();
 }
