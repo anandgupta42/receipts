@@ -11,11 +11,17 @@
  */
 export function normalizeCwd(cwd: string): string {
   const withForwardSlashes = cwd.replace(/\\/g, "/");
-  const isAbsolute = withForwardSlashes.startsWith("/");
-  const isUnc = withForwardSlashes.startsWith("//");
+  // A `X:` drive prefix is a root boundary: it folds to lowercase and can
+  // never be popped by `..` (`C:/../Other` resolves to `c:/Other`, not a
+  // relative `Other` that would match an unrelated session).
+  const driveMatch = /^([A-Za-z]):(?=\/|$)/.exec(withForwardSlashes);
+  const drive = driveMatch ? `${driveMatch[1].toLowerCase()}:` : "";
+  const rest = drive ? withForwardSlashes.slice(2) : withForwardSlashes;
+  const isAbsolute = drive !== "" || rest.startsWith("/");
+  const isUnc = drive === "" && rest.startsWith("//");
 
   const resolved: string[] = [];
-  for (const segment of withForwardSlashes.split("/")) {
+  for (const segment of rest.split("/")) {
     if (segment === "" || segment === ".") {
       continue;
     }
@@ -33,10 +39,12 @@ export function normalizeCwd(cwd: string): string {
     resolved.push(segment);
   }
 
+  if (drive) {
+    return resolved.length > 0 ? `${drive}/${resolved.join("/")}` : drive;
+  }
   const prefix = isUnc ? "//" : isAbsolute ? "/" : "";
   const joined = prefix + resolved.join("/");
-  const normalized = joined === "" ? "" : joined === "//" ? "/" : joined;
-  return normalized.replace(/^([A-Z]):(?=\/|$)/, (_, drive: string) => `${drive.toLowerCase()}:`);
+  return joined === "" ? "" : joined === "//" ? "/" : joined;
 }
 
 /** True when the session cwd is the requested cwd or one of its whole-segment ancestors. */

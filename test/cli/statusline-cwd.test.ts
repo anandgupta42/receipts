@@ -50,6 +50,13 @@ describe("SPEC-0075 R1 cwd matching", () => {
     expect(cwdMatches("repo", "/repo/sub")).toBe(false);
     expect(cwdMatches("../repo", "/repo")).toBe(false);
   });
+
+  it("treats a drive prefix as a root boundary that `..` can never pop", () => {
+    expect(normalizeCwd("C:/../Other")).toBe("c:/Other");
+    expect(normalizeCwd("C:/..")).toBe("c:");
+    expect(cwdMatches("Other", "C:/../Other")).toBe(false);
+    expect(cwdMatches("c:/Other", "C:/../Other")).toBe(true);
+  });
 });
 
 describe("SPEC-0075 R1 Claude Code cwd encoding", () => {
