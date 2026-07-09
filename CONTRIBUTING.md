@@ -41,6 +41,14 @@ npx tsc --noEmit && npx eslint . --max-warnings 0 && npx vitest run \
 All must exit 0 before a PR merges. `AGENTS.md` is the operating manual if you
 want the full picture (invariants, file ownership, verification commands).
 
+**One command, before you push:** `npm run ship-check -- --title "<your PR title>"`
+runs every fast gate CI enforces in one shot — `preflight --quick` (build, tsc,
+eslint, goldens, spec-lint, hygiene, and the README guard) plus the PR-title lint —
+so a mechanical failure never bounces off CI or a reviewer. Run it (and fix what it
+finds) *before* asking for review, not after. Working in a git worktree? Run
+`npm run setup:worktree` once first — it links the main checkout's `node_modules`
+(without it, `vitest` and `verify-goldens` fail spuriously) and fetches `origin/main`.
+
 If your session built the change, attach its receipt before opening the PR:
 `npx aireceipts-cli pr --post` (see `docs/pr-receipts.md`). Humans without a
 session to attach can skip this.
