@@ -127,11 +127,15 @@ who viewed which receipt.
    permissions:
      contents: read
      pull-requests: write
+   concurrency:
+     group: aireceipts-${{ github.workflow }}-${{ github.ref }}
+     cancel-in-progress: true
    jobs:
      check:
        runs-on: ubuntu-latest
        steps:
          - run: npx -y aireceipts-cli@latest pr-check
+           continue-on-error: true
            env:
              GH_TOKEN: ${{ github.token }}
    ```

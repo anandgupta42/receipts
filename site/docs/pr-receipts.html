@@ -393,7 +393,7 @@ git receipt                  # after pushing your branch</code></pre>
 
 <p><strong>Recommended — self-contained, npm-native</strong> (<a href="adopt/pr-check-caller.yml"><code>adopt/pr-check-caller.yml</code></a>). <em>Use this one if</em> your org restricts third-party reusable workflows, or you'd simply rather not depend on one: it runs the check inside your own workflow with no reusable-workflow <code>uses:</code>, so it never hits an Actions org-policy gate. Commit it as e.g. <code>.github/workflows/aireceipts.yml</code>:</p>
 
-<p><code></code><code>yaml name: aireceipts on: [pull_request] permissions: contents: read pull-requests: write jobs: check: runs-on: ubuntu-latest steps: - run: npx -y aireceipts-cli@latest pr-check env: GH_TOKEN: ${{ github.token }} </code><code></code></p>
+<p><code></code><code>yaml name: aireceipts on: [pull_request] permissions: contents: read pull-requests: write concurrency: group: aireceipts-${{ github.workflow }}-${{ github.ref }} cancel-in-progress: true jobs: check: runs-on: ubuntu-latest steps: - run: npx -y aireceipts-cli@latest pr-check continue-on-error: true env: GH_TOKEN: ${{ github.token }} </code><code></code></p>
 
 <p><strong>Reusable workflow</strong> (<a href="adopt/pr-receipt-check-caller.yml"><code>adopt/pr-receipt-check-caller.yml</code></a>). <em>Use this one if</em> your org allows third-party reusable workflows and you want the check logic to track upstream automatically via <code>@latest</code>. Commit it as <code>.github/workflows/pr-receipt-check.yml</code>:</p>
 
