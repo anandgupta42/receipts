@@ -29,6 +29,13 @@ describe("SPEC-0050 integration recipes", () => {
     expect(matrix).toContain("opencode");
     expect(matrix).toContain("npx aireceipts-cli integrations");
 
+    // #192 — a value whose dotted row would leave no room for the label must
+    // fall back to `Label: value`, never truncate the label to "Sta…".
+    expect(matrix).not.toContain("…");
+    for (const line of matrix.split("\n")) {
+      if (line.trimStart().startsWith("Start")) expect(line).toMatch(/^\s+Start(\.{3,}|: )/);
+    }
+
     const github = integrationRecipe("github");
     expect(github).toBeDefined();
     const rendered = renderIntegrationRecipe(github!);
