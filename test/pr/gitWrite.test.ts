@@ -79,6 +79,8 @@ describe("SPEC-0073 classifyPush", () => {
     [["git", "push", "--mirror"]],
     [["git", "push", "--all"]],
     [["git", "push", "upstream", "feat"]],
+    [["git", "push", "origin", "refs/aireceipts/x"]],
+    [["git", "push", "origin", "+refs/aireceipts/x:refs/aireceipts/x"]],
     [["git", "push", "origin", "refs/receipts/x"]],
     [["git", "push", "origin", "+refs/receipts/x:refs/receipts/x"]],
     [["git", "push", "origin", "HEAD"]],

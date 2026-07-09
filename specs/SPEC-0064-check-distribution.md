@@ -28,7 +28,7 @@ dependency, and the runner constraint at once.
 
 The hard boundary is unchanged: **CI never generates a receipt** — the transcript lives only
 on the developer's machine (I1/I4). `pr-check` only *transports* what the local hook
-(SPEC-0065) produced on `refs/receipts/<slug>`: fetch → sanitize → render → post.
+(SPEC-0065) produced on `refs/aireceipts/<slug>`: fetch → sanitize → render → post.
 
 ## Requirements
 
@@ -39,7 +39,7 @@ on the developer's machine (I1/I4). `pr-check` only *transports* what the local 
   internal self-checkout stays `ref: main`.
 - **R2 — `pr-check` is the self-contained CI entrypoint (fetch → render → post), no base
   checkout.** It creates a throwaway temp git repo (`git init` in an OS temp dir) and fetches
-  `refs/receipts/<slug>` from the **head** repo via a token-authenticated URL
+  `refs/aireceipts/<slug>` from the **head** repo via a token-authenticated URL
   (`https://x-access-token:<token>@github.com/<head-full-name>.git`), reusing SPEC-0066
   `fetchReceiptRef` — so no `actions/checkout` of the base repo is required. Context resolves
   from Actions env: base repo full name `GITHUB_REPOSITORY`; head repo full name + PR number

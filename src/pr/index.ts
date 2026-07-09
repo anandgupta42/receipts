@@ -604,7 +604,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
 
   // SPEC-0065 R1 — `store=ref`: in addition to (never instead of) the comment
   // path below, which stays the unconditional default, write the exact
-  // renderer input as a schema-versioned payload to `refs/receipts/<slug>`
+  // renderer input as a schema-versioned payload to `refs/aireceipts/<slug>`
   // via pure git plumbing. Precedence: flag > `AIRECEIPTS_STORE` env >
   // default `"comment"`; R3's committed-settings layer is out of scope here.
   const store = opts.store ?? (process.env.AIRECEIPTS_STORE === "ref" ? "ref" : undefined) ?? "comment";

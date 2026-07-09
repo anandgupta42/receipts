@@ -7,6 +7,7 @@
 import { renderPrBody } from "./body.js";
 import { deserializePrReceipt, sanitizePrReceiptPayload } from "./sanitize.js";
 import { receiptRefSlug } from "./payloadTypes.js";
+import { receiptRef } from "./store.js";
 
 /** Validate + sanitize an untrusted ref payload JSON, then render the PR comment body. */
 export function renderReceiptPayload(json: string): { ok: true; body: string } | { ok: false; reason: string } {
@@ -43,16 +44,17 @@ export interface FetchRenderOutcome {
  */
 export function fetchAndRenderReceipt(args: FetchRenderArgs, deps: FetchRenderDeps): FetchRenderOutcome {
   const slug = receiptRefSlug(args.branch);
+  const ref = receiptRef(slug);
   if (!deps.fetchRef(slug, args.remoteUrl, args.cwd)) {
-    return { code: 2, message: `no receipt ref refs/receipts/${slug} on the PR head repo` };
+    return { code: 2, message: `no receipt ref ${ref} on the PR head repo` };
   }
   const json = deps.readRef(slug, args.cwd);
   if (json === null) {
-    return { code: 2, message: `refs/receipts/${slug} present but receipt.json is unreadable` };
+    return { code: 2, message: `${ref} present but receipt.json is unreadable` };
   }
   const rendered = renderReceiptPayload(json);
   if (!rendered.ok) {
     return { code: 3, message: `invalid receipt payload — ${rendered.reason}` };
   }
-  return { code: 0, body: rendered.body, message: `rendered receipt for refs/receipts/${slug}` };
+  return { code: 0, body: rendered.body, message: `rendered receipt for ${ref}` };
 }

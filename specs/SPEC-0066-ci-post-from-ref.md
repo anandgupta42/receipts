@@ -10,7 +10,7 @@ depends: [SPEC-0019, SPEC-0064, SPEC-0065]
 
 ## Purpose
 
-SPEC-0065 makes a receipt travel with the branch as `refs/receipts/<slug>`, generated
+SPEC-0065 makes a receipt travel with the branch as `refs/aireceipts/<slug>`, generated
 locally. This spec is the other half: CI fetches that ref, and — instead of the developer
 running `pr --post` with local `gh` — **CI itself renders and posts the PR comment** via
 `GITHUB_TOKEN`, so a receipt lands with zero manual action. It is carved out of SPEC-0065
@@ -24,7 +24,7 @@ transports what the local hook produced.
 
 - **R1 — locate + fetch order.** `pr-receipt-check.yml` / `scripts/check-pr-receipt.mjs`:
   existing comment marker (back-compat, wins) → `git fetch <remote>
-  +refs/receipts/<slug>:refs/receipts/<slug>` then read `receipt.json`. Fork PRs fetch from
+  +refs/aireceipts/<slug>:refs/aireceipts/<slug>` then read `receipt.json`. Fork PRs fetch from
   the head-repo clone URL; on failure, fall through to the current missing-receipt path.
   `slug` comes from SPEC-0065's shared `receiptRefSlug`.
 - **R2 — validate the untrusted payload.** Parse the blob as `PrReceiptPayload`

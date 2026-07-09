@@ -71,7 +71,7 @@ export const command: CommandDef = {
       "                                         --share prints ready-to-paste X/LinkedIn",
       "                                         intent URLs to stderr, requires --artifact;",
       "                                         --store ref also writes the receipt to",
-      "                                         refs/receipts/<slug> (SPEC-0065); default",
+      "                                         refs/aireceipts/<slug> (SPEC-0065); default",
       "                                         comment; --push-ref also pushes that ref to",
       "                                         origin, only meaningful with --store ref;",
       "                                         --samosa opts the tip link back onto the",

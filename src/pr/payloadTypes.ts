@@ -2,7 +2,7 @@ import type { PrBodyExtras, PrBodyInput } from "./body.js";
 
 /**
  * SPEC-0065 / SPEC-0066 — the versioned, JSON-plain PR-receipt payload stored at
- * `refs/receipts/<slug>` by the local producer and re-rendered by CI. It is exactly the
+ * `refs/aireceipts/<slug>` by the local producer and re-rendered by CI. It is exactly the
  * renderer's input (`renderPrBody(bodyInput, extras)`), so a round-trip reproduces the
  * comment byte-for-byte. Bump `PR_RECEIPT_SCHEMA_VERSION` on any INCOMPATIBLE shape change
  * (renamed/removed field, changed type/meaning). A purely additive OPTIONAL field whose
@@ -23,7 +23,7 @@ export interface PrReceiptPayload {
 }
 
 /**
- * The ref slug for a branch (`refs/receipts/<slug>`). Shared verbatim by the producer's
+ * The ref slug for a branch (`refs/aireceipts/<slug>`). Shared verbatim by the producer's
  * write path and CI's fetch path so they never diverge. Deterministic and ref-safe: every
  * character outside `[A-Za-z0-9._-]` collapses to `-`.
  */

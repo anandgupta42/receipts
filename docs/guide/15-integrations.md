@@ -70,7 +70,7 @@ for every user. Keep the rollout explicit:
 5. Add the committed Claude Code hook when the team wants automatic ref production.
 6. Keep enforcement opt-in; notice-only is the default.
 
-CI checks for marked PR receipt comments and can post from a `refs/receipts/*` ref. It
+CI checks for marked PR receipt comments and can post from a `refs/aireceipts/*` ref. It
 does not generate receipts and does not read local transcripts. The workflow alone is a
 no-op until the Claude hook, or a manual `npx aireceipts-cli pr --store ref --push-ref`,
 produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.

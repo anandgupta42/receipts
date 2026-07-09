@@ -376,15 +376,24 @@ function refspecTarget(refspec: string): string {
   return colon >= 0 ? normalized.slice(colon + 1) : normalized;
 }
 
+// aireceipts writes `refs/aireceipts/*` (store.ts); the legacy/foreign
+// `refs/receipts/*` is still matched so another tool's (or an older aireceipts')
+// receipt-ref push is never mis-counted as a branch commit anchor.
+const RECEIPT_REF_NAMESPACES = ["refs/aireceipts/", "refs/receipts/"] as const;
+
+function isReceiptRef(target: string): boolean {
+  return RECEIPT_REF_NAMESPACES.some((ns) => target.startsWith(ns));
+}
+
 function isReceiptRefspec(refspec: string): boolean {
-  return refspecTarget(refspec).startsWith("refs/receipts/");
+  return isReceiptRef(refspecTarget(refspec));
 }
 
 function isBranchName(value: string): boolean {
   if (!value || value.startsWith("-") || value.startsWith(":") || value.includes(":") || value.includes("*")) {
     return false;
   }
-  if (value === "HEAD" || value === "tag" || value.startsWith("refs/tags/") || value.startsWith("refs/receipts/")) {
+  if (value === "HEAD" || value === "tag" || value.startsWith("refs/tags/") || isReceiptRef(value)) {
     return false;
   }
   if (/^[0-9a-f]{7,40}$/i.test(value)) {

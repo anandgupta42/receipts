@@ -25,6 +25,16 @@ afterEach(async () => {
   await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
+describe("receipt-ref namespace", () => {
+  it("is product-namespaced under refs/aireceipts/ to avoid colliding with a generic refs/receipts/* producer", () => {
+    // Regression guard: another tool (e.g. an attestation producer) writing
+    // refs/receipts/* left pr-check reading a foreign payload and silently
+    // posting nothing. aireceipts must own its own namespace.
+    expect(RECEIPT_REF_PREFIX).toBe("refs/aireceipts/");
+    expect(receiptRef("feat-x")).toBe("refs/aireceipts/feat-x");
+  });
+});
+
 describe("writeReceiptRef / readReceiptRef", () => {
   it("round-trips byte-identical JSON", async () => {
     const cwd = await tempRepo();
