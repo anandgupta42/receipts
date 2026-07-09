@@ -154,6 +154,7 @@ h1{
 .doc-content p{margin:0 0 16px;color:var(--ink)}
 .doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
 .doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
 .doc-content blockquote{
   margin:20px 0;
   padding:14px 18px;
@@ -363,9 +364,10 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 
 <p>Reading it top to bottom: the <strong>title</strong> is your opening prompt; the header line gives the <strong>agent, start time, and duration</strong>; then the <strong>model mix</strong> (share of tokens per model) and how much of the input was served from <strong>cache</strong>. The body lists <strong>cost per tool</strong>, highest first. <code>(thinking/reply)</code> is the model's own output on turns that called no tool. <code>TOTAL</code> is the sum; <code>same tokens on …</code> re-prices those exact tokens on a cheaper model as a reference point — the <code>(78% less)</code> is the same arithmetic as a percentage, never a prediction.</p>
 
-<p>Three lines appear only when they have something to say:</p>
+<p>A few lines appear only when they have something to say:</p>
 
 <ul>
+  <li>a <strong>pre-edit line</strong> — <code>pre-edit: 11% of cost (1/10 turns)</code> — the share of the session's cost spent <em>before the first named edit-tool call</em>, and how many turns that covered. It's a shape fact, not a verdict: a hard bug can deserve a high share, and a routine edit usually doesn't — a share that surprises you is worth a look;</li>
   <li>a <strong>stuck-loop waste line</strong> names where to look — <code>at turns 1-5</code> — so you can jump straight to the loop in your own transcript;</li>
   <li>a <strong>coverage caveat</strong> — <code>caveat: 2 of 3 turns unpriced — TOTAL excludes their tokens</code> — whenever a session mixed a priced model with one that has no cited price row, so a partial TOTAL never poses as a complete one;</li>
   <li>time-integrity caveats (inconsistent timestamps, skipped records) as before.</li>
@@ -442,7 +444,7 @@ run  aireceipts  for the full receipt</code></pre>
   <footer>
     <div class="close">
       <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
         <p class="thanks">Thank you for your tokens.</p>
         <p class="serial">AIRECEIPTS · NO. 0001</p>
       </div>

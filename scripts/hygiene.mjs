@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -226,6 +227,68 @@ export function checkWorkflowPins(rootDir = process.cwd()) {
   return violations;
 }
 
+// Every file under `dir`, recursively, as sorted paths relative to `dir`.
+function listFilesRecursive(dir) {
+  const results = [];
+  const walk = (relDir) => {
+    const abs = relDir === "" ? dir : join(dir, relDir);
+    for (const entry of readdirSync(abs, { withFileTypes: true })) {
+      const rel = relDir === "" ? entry.name : `${relDir}/${entry.name}`;
+      if (entry.isDirectory()) walk(rel);
+      else results.push(rel);
+    }
+  };
+  walk("");
+  return results.sort();
+}
+
+// Byte-level recursive diff between two directories; returns a human-readable
+// list of differences (empty when identical).
+function diffDirectories(committed, rendered) {
+  const differences = [];
+  const committedFiles = listFilesRecursive(committed);
+  const renderedFiles = new Set(listFilesRecursive(rendered));
+
+  for (const file of committedFiles) {
+    if (!renderedFiles.has(file)) {
+      differences.push(`missing after render: ${file}`);
+      continue;
+    }
+    if (!readFileSync(join(committed, file)).equals(readFileSync(join(rendered, file)))) {
+      differences.push(`differs: ${file}`);
+    }
+  }
+  for (const file of renderedFiles) {
+    if (!committedFiles.includes(file)) differences.push(`render produced a file not committed: ${file}`);
+  }
+  return differences.sort();
+}
+
+// Freshness gate: the committed site/docs must be byte-identical to a fresh
+// render of docs/. Renders to a throwaway temp dir (never mutating the working
+// tree) and diffs recursively. No-op when the site or the generator is absent,
+// so synthetic-root unit tests don't trip it.
+export function checkDocsSiteFresh(rootDir = process.cwd()) {
+  const committed = join(rootDir, "site", "docs");
+  const generator = join(rootDir, "scripts", "build-docs-site.mjs");
+  if (!existsSync(committed) || !existsSync(generator)) return [];
+
+  let tempDir;
+  try {
+    tempDir = mkdtempSync(join(tmpdir(), "aireceipts-docs-site-"));
+    execFileSync("node", [generator, "--out", tempDir], { cwd: rootDir, stdio: "pipe" });
+    const differences = diffDirectories(committed, tempDir);
+    if (differences.length > 0) {
+      return [`site/docs is stale — run npm run docs:site (${differences.join("; ")})`];
+    }
+    return [];
+  } catch (error) {
+    return [`site/docs freshness check could not run: ${error.message ?? error}`];
+  } finally {
+    if (tempDir) rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 export function getTrackedFiles(rootDir = process.cwd()) {
   const output = execFileSync("git", ["ls-files"], { cwd: rootDir, encoding: "utf8" });
   return output.split("\n").filter(Boolean);
@@ -293,6 +356,7 @@ export function runHygiene({ rootDir = process.cwd(), title, trackedFiles } = {}
     ...checkGitleaksIgnore(rootDir),
     ...checkWorkflowPins(rootDir),
     ...checkNoSilentDrop(rootDir),
+    ...checkDocsSiteFresh(rootDir),
     ...(title === undefined ? [] : checkPrTitle(title)),
   ];
 }
@@ -336,6 +400,7 @@ Runs the fast local hygiene gates:
   R6 .gitleaksignore suppression entries require preceding "# reason:" comments
   R3 PR-title lint when --title is provided
   R9 (SPEC-0033) every workflow "uses:" is SHA-pinned (40-hex + "# <tag>" comment); no inline zizmor pragmas
+  docs-site freshness: committed site/docs matches a fresh render of docs/ (run npm run docs:site)
 
 CI-only or slower commands:
   R4 determinism: node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs

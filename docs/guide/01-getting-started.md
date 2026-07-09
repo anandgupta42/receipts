@@ -8,6 +8,8 @@ transcripts and code are never uploaded (anonymous diagnostics are opt-out — s
 This page takes you from nothing to a receipt, a setup report, a weekly total,
 and optional automation — in about a minute.
 
+![Terminal recording of a synthetic Claude Code session: running aireceipts prints an itemized receipt — each tool priced, TOTAL $0.18, and the arithmetic line: same tokens on claude-haiku-4-5 $0.04 (78% less).](../../site/assets/quickstart.gif)
+
 ## 1. Run it
 
 You don't install anything first. One command reads your newest session and
@@ -69,10 +71,11 @@ Ask aireceipts what it found and what to do next:
 npx aireceipts-cli setup
 ```
 
-The setup report is read-only. It shows supported-agent session counts, the
-latest session's priced-or-token total, the trailing-week total, and local
-integration options. It does not post to GitHub, install hooks, or upload
-transcripts. If no sessions are found, it exits 0, lists the searched roots, and
+The setup report only reports — it changes nothing about your agents, repos, or
+settings (its only writes are aireceipts' own local cache and state under
+`~/.aireceipts/`). It shows supported-agent session counts, the latest session's
+priced-or-token total, the trailing-week total, and local integration options.
+It does not post to GitHub, install hooks, or upload transcripts. If no sessions are found, it exits 0, lists the searched roots, and
 tells you to run a supported agent session first.
 
 For exact snippets by assistant or CI surface:
@@ -116,8 +119,11 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
      aireceipts · local · npx aireceipts-cli      
 ```
 
+(This example pinned its dates with `--since`, which is why the header says
+`since override` — a plain `week` says `trailing 7 days`.)
+
 Every session on your machine, across every supported agent, totalled for the
-last seven days — still local, still no upload.
+last seven days — still local, transcripts never leave your machine.
 
 ## Already have sessions? aireceipts works retroactively
 
