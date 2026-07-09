@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Report privately via [GitHub Security Advisories](../../security/advisories/new)
+Report privately via [GitHub Security Advisories](https://github.com/anandgupta42/receipts/security/advisories/new)
 for this repo — not a public issue, so nothing exploitable sits in the open
 while it's unfixed. Include repro steps and, if relevant, the exact
 `aireceipts --json` output (never a raw transcript — see below).
