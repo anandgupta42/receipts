@@ -100,6 +100,9 @@ function runProcess(command: string, args: string[], options: RunOptions = {}): 
       cwd: options.cwd ?? repoRoot,
       env: { ...process.env, ...options.env },
       stdio: ["pipe", "pipe", "pipe"],
+      // Node throws EINVAL spawning .cmd shims (npm.cmd) without a shell since
+      // the CVE-2024-27980 hardening — windows-latest hits this in beforeAll.
+      shell: command.endsWith(".cmd"),
     });
     let stdout = "";
     let stderr = "";
