@@ -3,6 +3,21 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.7.2 — 2026-07-09
+
+Patch: **PR-receipt refs are now written under `refs/aireceipts/*` instead of the generic
+`refs/receipts/*`.** The old namespace collided with other tools that also publish to
+`refs/receipts/<slug>` (e.g. an attestation producer storing an in-toto `receipt.json` at
+the same path). In a repo running both, the namespace was occupied by the other tool's
+payloads, so CI `pr-check` fetched a foreign ref, failed its `schemaVersion` check, and
+silently posted nothing — the auto-attach hook fired and pushed refs, yet no receipt ever
+appeared. aireceipts now owns `refs/aireceipts/*` and never reads or writes
+`refs/receipts/*`, so the two coexist; the push classifier still recognizes both namespaces
+so a foreign receipt-ref push is never mis-counted as a branch commit (PR #204). No
+migration: aireceipts had never written a `refs/receipts/*` ref. Hooks and CI on `@latest`
+adopt the new namespace together on this release. Rendered receipt output is byte-identical
+(goldens unchanged); the only user-visible surface change is the ref name in `pr --help`.
+
 ## v0.7.1 — 2026-07-09
 
 Patch: **Claude Code receipts were over-reporting cost by ~2.5–3× and are now correct.**
