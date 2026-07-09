@@ -163,7 +163,15 @@ describe("SPEC-0043 recorders", () => {
       result: "success",
     });
     recordHookConfigured({ operation: "install", promptOutcome: "accepted", result: "success" });
-    recordIntegrationSurfaceRendered({ integration: "statusline", inputMode: "stdin_payload", payloadValid: true, result: "success" });
+    recordIntegrationSurfaceRendered({
+      integration: "statusline",
+      inputMode: "stdin_payload",
+      payloadValid: true,
+      result: "success",
+      customFormat: false,
+      scoped: true,
+      configFile: true,
+    });
 
     const names = peekQueuedEvents().map((e) => e.name);
     expect(new Set(names)).toEqual(new Set(EVENT_NAMES));

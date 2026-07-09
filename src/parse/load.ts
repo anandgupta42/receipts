@@ -30,7 +30,7 @@ export async function listSessionsForCwd(requestedCwd: string, homeDir: string =
       try {
         if (adapter.id === "claude-code") {
           const root = adapter.roots()[0];
-          if (!root) {
+          if (!root || !root.trim()) {
             return [];
           }
           const roots = claudeProjectDirectoryNames(requestedCwd).map((name) => path.join(root, name));
@@ -41,6 +41,7 @@ export async function listSessionsForCwd(requestedCwd: string, homeDir: string =
           (session) => typeof session.cwd === "string" && cwdMatchesForAttribution(session.cwd, requestedCwd, homeDir),
         );
       } catch {
+        // Statusline discovery is deliberately fail-safe: one adapter failure contributes no rows.
         return [] as SessionSummary[];
       }
     }),

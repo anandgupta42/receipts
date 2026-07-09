@@ -7,6 +7,7 @@
 // `brand,cost,tokens,waste,quota5h`, and `--format` selects any other segment
 // list (unknown names fail fast, exit 1).
 import * as os from "node:os";
+import * as path from "node:path";
 import { listSessions, listSessionsForCwd, loadById, loadSession } from "../../index.js";
 import type { Session, SessionSummary } from "../../parse/types.js";
 import { cwdMatchesForAttribution } from "../../parse/cwdScope.js";
@@ -14,6 +15,7 @@ import { buildReceiptModel } from "../../receipt/model.js";
 import { attachSubagentRollup } from "../../receipt/subagents.js";
 import { buildMiniSummary } from "../../receipt/mini.js";
 import { DEFAULT_FORMAT, parseFormat, renderSegments, SEGMENT_NAMES } from "../statuslineSegments.js";
+import { loadStatuslineFormatConfig } from "../statuslineConfig.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import type { InputModeValue, ResultValue } from "../../telemetry/schemas.js";
 
@@ -23,6 +25,10 @@ export interface StatuslineTelemetryInfo {
   result: ResultValue;
   /** SPEC-0062 R5 — the invocation carried an explicit `--format` (boolean, never the format string). */
   customFormat: boolean;
+  /** SPEC-0075 R6 — boolean only; the raw `--cwd` path must never enter a telemetry payload. */
+  scoped: boolean;
+  /** SPEC-0075 R6 — boolean only; config contents must never enter a telemetry payload. */
+  configFile: boolean;
 }
 
 /**
@@ -94,27 +100,26 @@ export async function loadFromDisk(
 export const MAX_SCOPED_LOAD_ATTEMPTS = 8;
 
 /**
- * SPEC-0075 R1 — load the newest cwd-scoped candidate. Claude Code directory
- * names are lossy, so its candidate must be confirmed against the cwd parsed
- * from the full transcript; a collision or unreadable candidate falls through
- * to the next-most-recent row, and the walk stops at MAX_SCOPED_LOAD_ATTEMPTS.
+ * SPEC-0075 R1 — load the newest cwd-scoped candidate. Claude Code needs
+ * post-load cwd confirmation because its directory names are lossy; every
+ * other adapter gets the same belt-and-suspenders check so an injected
+ * `listSessionsFn` or future lazy/full divergence can never render a mismatched
+ * session. A mismatch or unreadable candidate falls through to the next row,
+ * and the walk stops at MAX_SCOPED_LOAD_ATTEMPTS.
  */
 export async function loadFromCwd(
   requestedCwd: string,
-  listSessionsFn: (cwd: string) => Promise<SessionSummary[]> = listSessionsForCwd,
+  listSessionsFn: (cwd: string, homeDir: string) => Promise<SessionSummary[]> = listSessionsForCwd,
   loadSessionFn: (summary: SessionSummary) => Promise<Session | null> = loadSession,
   homeDir: string = os.homedir(),
 ): Promise<Session | null> {
-  const sessions = await listSessionsFn(requestedCwd);
+  const sessions = await listSessionsFn(requestedCwd, homeDir);
   for (const summary of sessions.slice(0, MAX_SCOPED_LOAD_ATTEMPTS)) {
     const session = await loadSessionFn(summary);
     if (!session) {
       continue;
     }
-    if (
-      summary.source === "claude-code" &&
-      (typeof session.cwd !== "string" || !cwdMatchesForAttribution(session.cwd, requestedCwd, homeDir))
-    ) {
+    if (typeof session.cwd !== "string" || !cwdMatchesForAttribution(session.cwd, requestedCwd, homeDir)) {
       continue;
     }
     return session;
@@ -134,6 +139,8 @@ export interface RunStatuslineOptions {
   /** Clock + state-file seams for the `quotaEta` segment (tests). */
   nowMs?: number;
   quotaStatePath?: string;
+  /** SPEC-0075 R2 — exact config-file path seam for tests. */
+  formatConfigPath?: string;
 }
 
 /**
@@ -153,26 +160,47 @@ export async function runStatusline(
   record?: (info: StatuslineTelemetryInfo) => void | Promise<void>,
   opts: RunStatuslineOptions = {},
 ): Promise<number> {
+  const writeError =
+    opts.writeError ??
+    ((s: string) => {
+      process.stderr.write(s);
+    });
   const customFormat = opts.format !== undefined;
-  const parsed = parseFormat(opts.format ?? DEFAULT_FORMAT);
-  if ("unknown" in parsed) {
-    const writeError =
-      opts.writeError ??
-      ((s: string) => {
-        process.stderr.write(s);
-      });
+  let configFile = false;
+  let parsed = parseFormat(opts.format ?? DEFAULT_FORMAT);
+  if (customFormat && "unknown" in parsed) {
     writeError(`unknown statusline segment "${parsed.unknown}" (valid: ${SEGMENT_NAMES.join(", ")})\n`);
     return 1;
   }
   if (opts.cwd !== undefined && !opts.cwd.trim()) {
-    const writeError =
-      opts.writeError ??
-      ((s: string) => {
-        process.stderr.write(s);
-      });
     writeError("--cwd requires a non-empty path\n");
     return 1;
   }
+  // Resolve only genuinely relative input (`--cwd .`). A path that is already
+  // absolute in EITHER platform's spelling passes through untouched — on
+  // Windows, `path.resolve("/home/x")` would prepend the current drive and a
+  // POSIX-recorded session (or a fixture) would never match again.
+  const requestedCwd =
+    opts.cwd === undefined
+      ? undefined
+      : path.posix.isAbsolute(opts.cwd) || path.win32.isAbsolute(opts.cwd)
+        ? opts.cwd
+        : path.resolve(opts.cwd);
+  if (!customFormat) {
+    const loaded = await loadStatuslineFormatConfig(opts.formatConfigPath);
+    if (loaded.status === "ok") {
+      parsed = { segments: loaded.config.items };
+      configFile = true;
+    } else if (loaded.status === "invalid") {
+      writeError(`statusline.json ignored: ${loaded.reason}\n`);
+    }
+  }
+  // `DEFAULT_FORMAT` is a source-controlled constant; only user input can
+  // produce the unknown branch, which returned above.
+  if ("unknown" in parsed) {
+    return 1;
+  }
+  const scoped = requestedCwd !== undefined;
   const raw = await readStdin(stdin);
   const payload = parsePayload(raw);
   let inputMode: InputModeValue = raw.trim() ? "stdin_payload" : "none";
@@ -181,7 +209,8 @@ export async function runStatusline(
   if (session) {
     payloadValid = true;
   } else {
-    const diskSession = opts.cwd !== undefined ? await (opts.loadFromCwdFn ?? loadFromCwd)(opts.cwd) : await loadFromDiskFn();
+    const diskSession =
+      requestedCwd !== undefined ? await (opts.loadFromCwdFn ?? loadFromCwd)(requestedCwd) : await loadFromDiskFn();
     if (diskSession) {
       inputMode = "disk_fallback";
       session = diskSession;
@@ -189,7 +218,7 @@ export async function runStatusline(
   }
   if (!session) {
     write("aireceipts: no sessions detected\n");
-    await record?.({ inputMode, payloadValid, result: "no_data", customFormat });
+    await record?.({ inputMode, payloadValid, result: "no_data", customFormat, scoped, configFile });
     return 0;
   }
   // SPEC-0061 R3 — the one-liner covers parent + subagents (no children → zero extra transcript reads).
@@ -202,7 +231,7 @@ export async function runStatusline(
     ...(opts.quotaStatePath !== undefined ? { quotaStatePath: opts.quotaStatePath } : {}),
   });
   write(`${line}\n`);
-  await record?.({ inputMode, payloadValid, result: "success", customFormat });
+  await record?.({ inputMode, payloadValid, result: "success", customFormat, scoped, configFile });
   return 0;
 }
 
@@ -220,6 +249,9 @@ export const command: CommandDef = {
   name: "statusline",
   priority: 90,
   matches: (options) => options.positional[0] === "statusline",
+  // SPEC-0075 R6 — `--cwd` is a polling integration: keep local counters and
+  // event recording, but do not turn a 15s prompt/tmux poll into a network send.
+  shouldFlushTelemetry: (options) => options.cwd === undefined,
   run,
   help: {
     order: 180,

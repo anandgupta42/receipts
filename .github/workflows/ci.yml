@@ -110,3 +110,20 @@ jobs:
 
       - name: built CLI and packed tarball
         run: npx vitest run test/cli-e2e
+
+  windows-statusline:
+    # SPEC-0075 R7 — prove cwd/config path handling and the built CLI on native
+    # Windows without duplicating the full Linux verification matrix.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: statusline Windows paths and built CLI
+        run: npx vitest run test/cli/statusline-cwd.test.ts test/cli/statusline.test.ts test/cli-e2e/built-cli.test.ts

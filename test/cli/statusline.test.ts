@@ -6,9 +6,11 @@
 // `~/.claude/projects` directory (context-safety rule: never scan real
 // transcripts).
 import { fileURLToPath } from "node:url";
+import { mkdir, mkdtemp, rm, unlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadById } from "../../src/index.js";
 import type { Session, SessionSummary } from "../../src/parse/types.js";
 import {
@@ -21,6 +23,21 @@ import {
 } from "../../src/cli/index.js";
 
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/claude-code");
+let isolatedHome: string;
+let savedAireceiptsHome: string | undefined;
+
+beforeAll(async () => {
+  savedAireceiptsHome = process.env.AIRECEIPTS_HOME;
+  isolatedHome = await mkdtemp(path.join(tmpdir(), "aireceipts-statusline-test-"));
+  process.env.AIRECEIPTS_HOME = isolatedHome;
+  await mkdir(path.join(isolatedHome, ".aireceipts"), { recursive: true });
+});
+
+afterAll(async () => {
+  if (savedAireceiptsHome === undefined) delete process.env.AIRECEIPTS_HOME;
+  else process.env.AIRECEIPTS_HOME = savedAireceiptsHome;
+  await rm(isolatedHome, { recursive: true, force: true });
+});
 
 function fixturePath(name: string): string {
   return path.join(fixturesDir, name);
@@ -149,15 +166,85 @@ describe("loadFromCwd (SPEC-0075 R1, fixture-injected)", () => {
     expect(output).not.toContain("Claude Code");
   });
 
-  it("caps full-transcript loads at MAX_SCOPED_LOAD_ATTEMPTS on a collision-heavy candidate list", async () => {
+  it("rejects a non-Claude candidate when its fully loaded cwd no longer matches", async () => {
     const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
-    // 20 colliding CC candidates; the walk must stop at the cap and render the
-    // placeholder — bounded work, never a long stall in a polling status bar.
-    const candidates: SessionSummary[] = Array.from({ length: 20 }, (_, i) => ({
+    const candidate: Session = { ...fixture, id: "codex-lazy-match", source: "codex", cwd: "/repo" };
+    const loaded: Session = { ...candidate, cwd: "/elsewhere" };
+    let listArgs: [string, string] | undefined;
+
+    const session = await loadFromCwd(
+      "/repo/sub",
+      async (cwd, homeDir) => {
+        listArgs = [cwd, homeDir];
+        return [candidate];
+      },
+      async () => loaded,
+      "/Users/test",
+    );
+
+    expect(session).toBeNull();
+    expect(listArgs).toEqual(["/repo/sub", "/Users/test"]);
+  });
+
+  it("accepts a non-Claude candidate only after its fully loaded cwd is confirmed", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    const candidate: Session = { ...fixture, id: "codex-confirmed", source: "codex", cwd: "/repo" };
+    let loads = 0;
+
+    const session = await loadFromCwd(
+      "/repo/sub",
+      async () => [candidate],
+      async () => {
+        loads++;
+        return candidate;
+      },
+      "/Users/test",
+    );
+
+    expect(session).toBe(candidate);
+    expect(loads).toBe(1);
+  });
+
+  it("renders a genuine match at the final allowed load index", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    const collisions: Session[] = Array.from({ length: MAX_SCOPED_LOAD_ATTEMPTS - 1 }, (_, i) => ({
       ...fixture,
       id: `collision-${i}`,
       cwd: "/my/repo",
     }));
+    const match: Session = { ...fixture, id: "match-at-cap-minus-one", cwd: "/my-repo" };
+    let loads = 0;
+    const scopedLoader = (cwd: string) =>
+      loadFromCwd(
+        cwd,
+        async () => [...collisions, match],
+        async (summary) => {
+          loads++;
+          return [...collisions, match].find((session) => session.id === summary.id) ?? null;
+        },
+      );
+
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        cwd: "/my-repo",
+        loadFromCwdFn: scopedLoader,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toContain("[aireceipts · Claude Code]");
+    expect(loads).toBe(MAX_SCOPED_LOAD_ATTEMPTS);
+  });
+
+  it("renders the placeholder when the first genuine match is beyond the load cap", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    const collisions: Session[] = Array.from({ length: MAX_SCOPED_LOAD_ATTEMPTS }, (_, i) => ({
+      ...fixture,
+      id: `collision-${i}`,
+      cwd: "/my/repo",
+    }));
+    const match: Session = { ...fixture, id: "match-at-cap", cwd: "/my-repo" };
+    const candidates = [...collisions, match];
     let loads = 0;
     const scopedLoader = (cwd: string) =>
       loadFromCwd(
@@ -165,7 +252,7 @@ describe("loadFromCwd (SPEC-0075 R1, fixture-injected)", () => {
         async () => candidates,
         async (summary) => {
           loads++;
-          return { ...fixture, id: summary.id, cwd: "/my/repo" };
+          return candidates.find((session) => session.id === summary.id) ?? null;
         },
       );
 
@@ -184,7 +271,8 @@ describe("loadFromCwd (SPEC-0075 R1, fixture-injected)", () => {
   it("rejects a Claude Code encoding collision after full load", async () => {
     const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
     const collision: Session = { ...fixture, id: "collision", cwd: "/my/repo" };
-    const scopedLoader = (cwd: string) => loadFromCwd(cwd, async () => [collision], async () => collision);
+    const scopedLoader = (cwd: string) =>
+      loadFromCwd(cwd, async () => [collision], async () => collision);
 
     const { code, output } = await captureStdout(() =>
       runStatusline(stdinStub("", true), async () => fixture, undefined, undefined, {
@@ -245,6 +333,176 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     const explicitDefaults = await captureStdout(() => runStatusline(stdinStub("", true), loadFromDiskFn, undefined, undefined, {}));
 
     expect(explicitDefaults).toEqual(baseline);
+  });
+
+  it("SPEC-0075 R1: resolves --cwd . against the invocation directory before scoped loading", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    let loadedCwd: string | undefined;
+
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        cwd: ".",
+        loadFromCwdFn: async (cwd) => {
+          loadedCwd = cwd;
+          return cwd === process.cwd() ? fixture : null;
+        },
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(loadedCwd).toBe(process.cwd());
+    expect(output).toContain("[aireceipts · Claude Code]");
+  });
+
+  it("SPEC-0075 R1: an already-absolute --cwd passes through unresolved (never drive-mangled on Windows)", async () => {
+    // On win32, path.resolve("/home/x") prepends the current drive — a
+    // POSIX-recorded session would then never match. Absolute input in either
+    // platform's spelling must reach the scoped loader byte-identical.
+    for (const absolute of ["/home/dev/webapp", "C:\\repo\\sub"]) {
+      let loadedCwd: string | undefined;
+      await captureStdout(() =>
+        runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+          cwd: absolute,
+          loadFromCwdFn: async (cwd) => {
+            loadedCwd = cwd;
+            return null;
+          },
+        }),
+      );
+      expect(loadedCwd).toBe(absolute);
+    }
+  });
+
+  it("SPEC-0075 R2: stdin/native mode renders configured items in literal order, including duplicates", async () => {
+    const configPath = path.join(isolatedHome, "ordered-statusline.json");
+    await writeFile(configPath, JSON.stringify({ items: ["tokens", "brand", "cost", "brand"] }), "utf8");
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub(JSON.stringify({ transcript_path: transcriptPath })), async () => null, undefined, undefined, {
+        formatConfigPath: configPath,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toBe("147k · [aireceipts] · $0.18 · [aireceipts]\n");
+  });
+
+  it("SPEC-0075 R2: explicit --format beats a valid config file", async () => {
+    const configPath = path.join(isolatedHome, "overridden-statusline.json");
+    await writeFile(configPath, JSON.stringify({ items: ["tokens"] }), "utf8");
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub(JSON.stringify({ transcript_path: transcriptPath })), async () => null, undefined, undefined, {
+        format: "cost,brand",
+        formatConfigPath: configPath,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toBe("$0.18 · [aireceipts]\n");
+  });
+
+  it.each([
+    ["bad JSON", "{bad json"],
+    ["unknown item", JSON.stringify({ items: ["brand", "bogus"] })],
+    ["wrong shape", JSON.stringify({ items: "brand" })],
+    ["empty items", JSON.stringify({ items: [] })],
+  ])("SPEC-0075 R2: %s falls back to the default with one stderr note", async (_case, rawConfig) => {
+    const configPath = path.join(isolatedHome, `invalid-${_case.replace(/\s/g, "-")}.json`);
+    const absentPath = path.join(isolatedHome, "absent-default.json");
+    await writeFile(configPath, rawConfig, "utf8");
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const payload = JSON.stringify({ transcript_path: transcriptPath });
+    const baseline = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, { formatConfigPath: absentPath }),
+    );
+    let err = "";
+    const actual = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, {
+        formatConfigPath: configPath,
+        writeError: (s) => {
+          err += s;
+        },
+      }),
+    );
+
+    expect(actual.code).toBe(0);
+    expect(actual.output).toBe(baseline.output);
+    expect(err).toContain("statusline.json ignored:");
+    expect(err.trimEnd().split("\n")).toHaveLength(1);
+  });
+
+  it("SPEC-0075 R2: an unreadable config falls back to the default with one stderr note", async () => {
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const payload = JSON.stringify({ transcript_path: transcriptPath });
+    const absentPath = path.join(isolatedHome, "absent-unreadable-default.json");
+    const baseline = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, { formatConfigPath: absentPath }),
+    );
+    let err = "";
+    const actual = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, {
+        formatConfigPath: isolatedHome,
+        writeError: (s) => {
+          err += s;
+        },
+      }),
+    );
+
+    expect(actual).toEqual({ code: 0, output: baseline.output });
+    expect(err).toBe("statusline.json ignored: could not read statusline.json\n");
+  });
+
+  it("SPEC-0075 R2: an absent config silently preserves the default", async () => {
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    let err = "";
+    const baseline = await captureStdout(() =>
+      runStatusline(stdinStub(JSON.stringify({ transcript_path: transcriptPath })), async () => null, undefined, undefined, {
+        formatConfigPath: path.join(isolatedHome, "definitely-absent.json"),
+        writeError: (s) => {
+          err += s;
+        },
+      }),
+    );
+
+    expect(baseline.code).toBe(0);
+    expect(baseline.output).toContain("[aireceipts] $0.18");
+    expect(err).toBe("");
+  });
+
+  it("SPEC-0075 R2: AIRECEIPTS_HOME is resolved at call time", async () => {
+    const configPath = path.join(isolatedHome, ".aireceipts", "statusline.json");
+    await writeFile(configPath, JSON.stringify({ items: ["tokens"] }), "utf8");
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    try {
+      const { code, output } = await captureStdout(() =>
+        runStatusline(stdinStub(JSON.stringify({ transcript_path: transcriptPath })), async () => null),
+      );
+      expect(code).toBe(0);
+      expect(output).toBe("147k\n");
+    } finally {
+      await unlink(configPath);
+    }
+  });
+
+  it("SPEC-0075 R2: invalid explicit --format still fails fast when config is valid", async () => {
+    const configPath = path.join(isolatedHome, "valid-but-unused.json");
+    await writeFile(configPath, JSON.stringify({ items: ["tokens"] }), "utf8");
+    let err = "";
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        format: "bogus",
+        formatConfigPath: configPath,
+        writeError: (s) => {
+          err += s;
+        },
+      }),
+    );
+
+    expect(code).toBe(1);
+    expect(output).toBe("");
+    expect(err).toContain('unknown statusline segment "bogus"');
+    expect(err).not.toContain("statusline.json ignored");
   });
 
   it("R3a: prefers the stdin payload's session over disk fallback", async () => {
@@ -346,33 +604,55 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     expect(err).toContain("unknown statusline segment");
   });
 
-  it("SPEC-0075 R1: a bare or empty --cwd fails fast with stderr only", async () => {
+  it("SPEC-0075 R1: parses relative, absolute, and leading-dash --cwd values", async () => {
+    const { parseOptions } = await import("../../src/cli/options.js");
+    expect(parseOptions(["statusline", "--cwd", "."]).cwd).toBe(".");
+    expect(parseOptions(["statusline", "--cwd=/repo"]).cwd).toBe("/repo");
+    expect(parseOptions(["statusline", "--cwd=-negative-path"]).cwd).toBe("-negative-path");
+  });
+
+  it("SPEC-0075 R1: a bare, empty, or whitespace-only --cwd fails fast with stderr only", async () => {
     const { parseOptions } = await import("../../src/cli/options.js");
     expect(parseOptions(["statusline", "--cwd"]).cwd).toBe("");
     expect(parseOptions(["statusline", "--cwd="]).cwd).toBe("");
-    let err = "";
-    const { code, output } = await captureStdout(() =>
-      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
-        cwd: "",
-        writeError: (s) => {
-          err += s;
-        },
-      }),
-    );
+    for (const cwd of ["", "  "]) {
+      let err = "";
+      const { code, output } = await captureStdout(() =>
+        runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+          cwd,
+          writeError: (s) => {
+            err += s;
+          },
+        }),
+      );
 
-    expect(code).toBe(1);
-    expect(output).toBe("");
-    expect(err).toBe("--cwd requires a non-empty path\n");
+      expect(code).toBe(1);
+      expect(output).toBe("");
+      expect(err).toBe("--cwd requires a non-empty path\n");
+    }
   });
 
-  it("SPEC-0062 R5: telemetry customFormat is false by default and true under --format", async () => {
+  it("SPEC-0062 R5 / SPEC-0075 R6: telemetry records format, scope, and config booleans only", async () => {
     const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
     const stdin1 = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
-    const infos: { customFormat: boolean }[] = [];
+    const infos: Array<{ customFormat: boolean; scoped: boolean; configFile: boolean }> = [];
     await captureStdout(() => runStatusline(stdin1, async () => null, undefined, (i) => void infos.push(i)));
     const stdin2 = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
-    await captureStdout(() => runStatusline(stdin2, async () => null, undefined, (i) => void infos.push(i), { format: "brand,cost" }));
-    expect(infos.map((i) => i.customFormat)).toEqual([false, true]);
+    await captureStdout(() =>
+      runStatusline(stdin2, async () => null, undefined, (i) => void infos.push(i), {
+        format: "brand,cost",
+        cwd: "/repo",
+      }),
+    );
+    const configPath = path.join(isolatedHome, "telemetry-config.json");
+    await writeFile(configPath, JSON.stringify({ items: ["brand", "tokens"] }), "utf8");
+    const stdin3 = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
+    await captureStdout(() =>
+      runStatusline(stdin3, async () => null, undefined, (i) => void infos.push(i), { formatConfigPath: configPath }),
+    );
+    expect(infos.map((i) => i.customFormat)).toEqual([false, true, false]);
+    expect(infos.map((i) => i.scoped)).toEqual([false, true, false]);
+    expect(infos.map((i) => i.configFile)).toEqual([false, false, true]);
   });
 
   it("SPEC-0062 R3 mixed mode: dead transcript_path falls back to disk for the session, but payload quota still renders", async () => {

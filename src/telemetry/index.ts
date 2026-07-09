@@ -236,6 +236,10 @@ export interface RecordIntegrationSurfaceRenderedInput {
   result: ResultValue;
   /** SPEC-0062 R5 — statusline only: an explicit `--format` was passed (boolean, never the format string). */
   customFormat?: boolean;
+  /** SPEC-0075 R6 — boolean only; the raw `--cwd` path must never enter a telemetry payload. */
+  scoped?: boolean;
+  /** SPEC-0075 R6 — boolean only; config contents must never enter a telemetry payload. */
+  configFile?: boolean;
 }
 
 export function recordIntegrationSurfaceRendered(input: RecordIntegrationSurfaceRenderedInput): void {

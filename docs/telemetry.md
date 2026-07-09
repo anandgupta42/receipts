@@ -109,7 +109,14 @@ Every field below is validated against a `.strict()` zod schema before it is que
 | `inputMode` | enum | `stdin_payload` \| `disk_fallback` \| `none` | |
 | `payloadValid` | boolean | | Whether the stdin payload was usable for the integration. |
 | `customFormat` | boolean (optional) | | statusline only (SPEC-0062): an explicit `--format` was passed. The boolean only — never the format string. |
+| `scoped` | boolean (optional) | | statusline only (SPEC-0075 R6): `--cwd` was supplied. The boolean only — never the path. |
+| `configFile` | boolean (optional) | | statusline only (SPEC-0075 R6): a valid `statusline.json` supplied the item order. The boolean only — never the items. |
 | `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
+
+`statusline --cwd` is a polled surface: it still advances the local run counter
+and records these bounded booleans in-process, but that invocation skips the
+network flush. A 15-second tmux poll therefore does not become a stream of
+network events.
 
 ### `activation_milestone` — once per milestone per local state file
 

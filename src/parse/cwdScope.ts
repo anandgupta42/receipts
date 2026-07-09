@@ -51,17 +51,26 @@ export function normalizeCwd(cwd: string): string {
   return joined === "" ? "" : joined === "//" ? "/" : joined;
 }
 
-/** True when the session cwd is the requested cwd or one of its whole-segment ancestors. */
-export function cwdMatches(sessionCwd: string, requestedCwd: string): boolean {
-  const session = normalizeCwd(sessionCwd);
-  const requested = normalizeCwd(requestedCwd);
+function matchesNormalized(session: string, requested: string): boolean {
+  if (session === "" || requested === "") {
+    return false;
+  }
   if (session === requested) {
     return true;
   }
   if (session === "/") {
     return requested.startsWith("/");
   }
-  return session !== "" && requested.startsWith(`${session}/`);
+  return requested.startsWith(`${session}/`);
+}
+
+/**
+ * RAW whole-segment ancestor rule: a session cwd matches itself and its whole
+ * subtree (including root `/` and its whole subtree). Attribution callers MUST
+ * use `cwdMatchesForAttribution`, which also blocks home-or-above shadowing.
+ */
+export function cwdMatches(sessionCwd: string, requestedCwd: string): boolean {
+  return matchesNormalized(normalizeCwd(sessionCwd), normalizeCwd(requestedCwd));
 }
 
 /**
@@ -77,11 +86,11 @@ export function cwdMatches(sessionCwd: string, requestedCwd: string): boolean {
 export function cwdMatchesForAttribution(sessionCwd: string, requestedCwd: string, homeDir: string): boolean {
   const session = normalizeCwd(sessionCwd);
   const requested = normalizeCwd(requestedCwd);
+  if (!matchesNormalized(session, requested)) {
+    return false;
+  }
   if (session === requested) {
     return true;
-  }
-  if (!cwdMatches(sessionCwd, requestedCwd)) {
-    return false;
   }
   if (session === "/") {
     // A root-recorded session shadows everything regardless of whether the
