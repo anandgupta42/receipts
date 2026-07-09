@@ -9,15 +9,14 @@
 
 [![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/aireceipts-cli.svg)](https://www.npmjs.com/package/aireceipts-cli) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/anandgupta42/receipts/badge)](https://scorecard.dev/viewer/?uri=github.com/anandgupta42/receipts) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-<a href="https://github.com/anandgupta42/receipts/pull/131#issuecomment-4886722030">
-  <img alt="a real aireceipts receipt comment on a merged pull request of this repo, its correction block above the as-posted receipt: 6 sessions, two Claude models and five Codex helpers — $172.76 as posted, $71.31 corrected by the v0.7.1 parser fix" src="docs/assets/pr-receipt-comment.png" width="480">
+<a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">
+  <img alt="a real aireceipts receipt comment on a merged pull request of this repo: 3 sessions — a Claude Code orchestrator sliced to just this PR's turns, plus two Codex helpers — $3.13 total" src="docs/assets/pr-receipt-comment.png" width="480">
 </a>
 
 <sub>not a mockup — a receipt comment on a merged PR of this repo, posted by
-<code>aireceipts pr --post</code>: 6 sessions, two Claude models, five Codex helpers.
-A v0.7.1 parser fix found the as-posted $172.76 over-counted Claude Code dollars;
-the receipt carries its own exact correction ($71.31), shown here as it stands.
-<a href="https://github.com/anandgupta42/receipts/pull/131#issuecomment-4886722030">Read it live.</a></sub>
+<code>aireceipts pr --post</code>: three sessions — a Claude orchestrator sliced
+to just this PR's turns, plus two Codex helpers — $3.13 total.
+<a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live.</a></sub>
 
 </div>
 
