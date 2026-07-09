@@ -351,6 +351,18 @@ footer{
 
 <p>If <code>aireceipts</code> isn't on your <code>PATH</code>, use an absolute path to the binary instead of <code>aireceipts</code> in the <code>command</code> field (for example, the output of <code>which aireceipts</code>).</p>
 
+<h2 id="terminal-surfaces">Terminal surfaces</h2>
+
+<p>Any terminal surface that can run a command and display one line of stdout can show an aireceipts statusline. Pass that surface's pane or prompt working directory to <code>--cwd</code>; aireceipts selects the newest session attributed to that path (or an ancestor of it) and prints the neutral placeholder when none match. It never falls back to another project's newest session, and a session launched from your home directory (or above it) only ever matches that exact path — it is not treated as an ancestor of everything, so one <code>~</code>-launched session can't shadow every pane on the machine. Cursor sessions never match in this mode because Cursor's session data carries no cwd.</p>
+
+<p>For tmux, add this to <code>~/.tmux.conf</code>:</p>
+
+<pre class="doc-code"><code class="language-tmux">set -g status-right '#(aireceipts statusline --cwd &quot;#{pane_current_path}&quot;)'</code></pre>
+
+<p>tmux refreshes <code>#(...)</code> commands on <code>status-interval</code>; lower that setting if you want a fresher line, keeping in mind that each refresh runs the command again.</p>
+
+<p>For Claude Code, its native <code>statusLine</code> stdin hook above remains the recommended surface. It is faster because the payload points directly at the active transcript, and it is richer: <code>context</code>, <code>quota5h</code>, <code>quota7d</code>, and <code>quotaEta</code> depend on stdin data. Terminal surfaces are additive when you also want a line in tmux or another shell UI.</p>
+
 <h2 id="output">Output</h2>
 
 <pre class="doc-code"><code>[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m

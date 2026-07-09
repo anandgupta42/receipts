@@ -6,8 +6,10 @@
 // renders through the segments engine — the default line IS the format
 // `brand,cost,tokens,waste,quota5h`, and `--format` selects any other segment
 // list (unknown names fail fast, exit 1).
-import { listSessions, loadById, loadSession } from "../../index.js";
+import * as os from "node:os";
+import { listSessions, listSessionsForCwd, loadById, loadSession } from "../../index.js";
 import type { Session, SessionSummary } from "../../parse/types.js";
+import { cwdMatchesForAttribution } from "../../parse/cwdScope.js";
 import { buildReceiptModel } from "../../receipt/model.js";
 import { attachSubagentRollup } from "../../receipt/subagents.js";
 import { buildMiniSummary } from "../../receipt/mini.js";
@@ -82,9 +84,51 @@ export async function loadFromDisk(
   return loadSessionFn(summary);
 }
 
+/**
+ * SPEC-0075 R1 — the cap on full-transcript loads while walking scoped
+ * candidates newest-first. A collision-heavy Claude Code project dir could
+ * otherwise trigger an unbounded sequence of full parses in a status bar that
+ * polls; past the cap the line renders the neutral placeholder — bounded work
+ * and an honest omission, never a wrong session and never a latency blowup.
+ */
+export const MAX_SCOPED_LOAD_ATTEMPTS = 8;
+
+/**
+ * SPEC-0075 R1 — load the newest cwd-scoped candidate. Claude Code directory
+ * names are lossy, so its candidate must be confirmed against the cwd parsed
+ * from the full transcript; a collision or unreadable candidate falls through
+ * to the next-most-recent row, and the walk stops at MAX_SCOPED_LOAD_ATTEMPTS.
+ */
+export async function loadFromCwd(
+  requestedCwd: string,
+  listSessionsFn: (cwd: string) => Promise<SessionSummary[]> = listSessionsForCwd,
+  loadSessionFn: (summary: SessionSummary) => Promise<Session | null> = loadSession,
+  homeDir: string = os.homedir(),
+): Promise<Session | null> {
+  const sessions = await listSessionsFn(requestedCwd);
+  for (const summary of sessions.slice(0, MAX_SCOPED_LOAD_ATTEMPTS)) {
+    const session = await loadSessionFn(summary);
+    if (!session) {
+      continue;
+    }
+    if (
+      summary.source === "claude-code" &&
+      (typeof session.cwd !== "string" || !cwdMatchesForAttribution(session.cwd, requestedCwd, homeDir))
+    ) {
+      continue;
+    }
+    return session;
+  }
+  return null;
+}
+
 export interface RunStatuslineOptions {
   /** SPEC-0062 R3 — explicit `--format` segment spec; absent → `DEFAULT_FORMAT`. */
   format?: string;
+  /** SPEC-0075 R1 — requested cwd for scoped disk fallback; stdin still wins. */
+  cwd?: string;
+  /** Injectable scoped loader seam for fixture-only statusline tests. */
+  loadFromCwdFn?: (cwd: string) => Promise<Session | null>;
   /** Error sink for the fail-fast unknown-segment path; defaults to `process.stderr`. */
   writeError?: (s: string) => void;
   /** Clock + state-file seams for the `quotaEta` segment (tests). */
@@ -95,10 +139,10 @@ export interface RunStatuslineOptions {
 /**
  * R3/R4 (SPEC-0007) + SPEC-0062: stdin mode first, then disk fallback, then a
  * neutral no-session placeholder (never an error, always exit 0 — except a
- * malformed `--format`, which is a caller mistake and fails fast with exit 1,
- * segment list on stderr, nothing on stdout). `write` is the output seam — the
- * command passes `ctx.stdout` so output routes through the context; it defaults
- * to `process.stdout` for the direct-call tests.
+ * malformed `--format` or empty `--cwd`, which is a caller mistake and fails
+ * fast with exit 1, one line on stderr, and nothing on stdout). `write` is the
+ * output seam — the command passes `ctx.stdout` so output routes through the
+ * context; it defaults to `process.stdout` for the direct-call tests.
  */
 export async function runStatusline(
   stdin: NodeJS.ReadStream = process.stdin,
@@ -120,6 +164,15 @@ export async function runStatusline(
     writeError(`unknown statusline segment "${parsed.unknown}" (valid: ${SEGMENT_NAMES.join(", ")})\n`);
     return 1;
   }
+  if (opts.cwd !== undefined && !opts.cwd.trim()) {
+    const writeError =
+      opts.writeError ??
+      ((s: string) => {
+        process.stderr.write(s);
+      });
+    writeError("--cwd requires a non-empty path\n");
+    return 1;
+  }
   const raw = await readStdin(stdin);
   const payload = parsePayload(raw);
   let inputMode: InputModeValue = raw.trim() ? "stdin_payload" : "none";
@@ -128,7 +181,7 @@ export async function runStatusline(
   if (session) {
     payloadValid = true;
   } else {
-    const diskSession = await loadFromDiskFn();
+    const diskSession = opts.cwd !== undefined ? await (opts.loadFromCwdFn ?? loadFromCwd)(opts.cwd) : await loadFromDiskFn();
     if (diskSession) {
       inputMode = "disk_fallback";
       session = diskSession;
@@ -159,7 +212,7 @@ function run(ctx: CommandContext): Promise<number> {
     loadFromDisk,
     (s) => ctx.stdout.write(s),
     (info) => ctx.telemetry.recordIntegrationSurfaceRendered({ integration: "statusline", ...info }),
-    { format: ctx.options.format, writeError: (s) => ctx.stderr.write(s) },
+    { format: ctx.options.format, cwd: ctx.options.cwd, writeError: (s) => ctx.stderr.write(s) },
   );
 }
 
@@ -170,6 +223,6 @@ export const command: CommandDef = {
   run,
   help: {
     order: 180,
-    lines: ["  aireceipts statusline [--format <s>]  one-line summary for Claude Code's statusLine"],
+    lines: ["  aireceipts statusline [--format <s>] [--cwd <path>]  one-line summary for Claude Code's statusLine"],
   },
 };

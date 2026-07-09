@@ -12,8 +12,10 @@ import { describe, expect, it } from "vitest";
 import { loadById } from "../../src/index.js";
 import type { Session, SessionSummary } from "../../src/parse/types.js";
 import {
+  loadFromCwd,
   loadFromDisk,
   loadFromStdinPayload,
+  MAX_SCOPED_LOAD_ATTEMPTS,
   readStdin,
   runStatusline,
 } from "../../src/cli/index.js";
@@ -118,7 +120,133 @@ describe("loadFromDisk (R3b, fixture-injected — never touches real ~/.claude/p
   });
 });
 
+describe("loadFromCwd (SPEC-0075 R1, fixture-injected)", () => {
+  it("skips a newer colliding Claude Code candidate and selects the matching Codex session", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    const claudeElsewhere: Session = { ...fixture, id: "cc-collision", cwd: "/elsewhere", endedAt: 2_000 };
+    const codexHere: Session = { ...fixture, id: "codex-here", source: "codex", cwd: "/repo", endedAt: 1_000 };
+    const candidates: SessionSummary[] = [claudeElsewhere, codexHere];
+    const loaded = new Map<string, Session>([
+      [claudeElsewhere.id, claudeElsewhere],
+      [codexHere.id, codexHere],
+    ]);
+    const scopedLoader = (cwd: string) =>
+      loadFromCwd(
+        cwd,
+        async () => candidates,
+        async (summary) => loaded.get(summary.id) ?? null,
+      );
+
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        cwd: "/repo/sub",
+        loadFromCwdFn: scopedLoader,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toContain("[aireceipts · Codex]");
+    expect(output).not.toContain("Claude Code");
+  });
+
+  it("caps full-transcript loads at MAX_SCOPED_LOAD_ATTEMPTS on a collision-heavy candidate list", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    // 20 colliding CC candidates; the walk must stop at the cap and render the
+    // placeholder — bounded work, never a long stall in a polling status bar.
+    const candidates: SessionSummary[] = Array.from({ length: 20 }, (_, i) => ({
+      ...fixture,
+      id: `collision-${i}`,
+      cwd: "/my/repo",
+    }));
+    let loads = 0;
+    const scopedLoader = (cwd: string) =>
+      loadFromCwd(
+        cwd,
+        async () => candidates,
+        async (summary) => {
+          loads++;
+          return { ...fixture, id: summary.id, cwd: "/my/repo" };
+        },
+      );
+
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        cwd: "/my-repo",
+        loadFromCwdFn: scopedLoader,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toBe("aireceipts: no sessions detected\n");
+    expect(loads).toBe(MAX_SCOPED_LOAD_ATTEMPTS);
+  });
+
+  it("rejects a Claude Code encoding collision after full load", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    const collision: Session = { ...fixture, id: "collision", cwd: "/my/repo" };
+    const scopedLoader = (cwd: string) => loadFromCwd(cwd, async () => [collision], async () => collision);
+
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => fixture, undefined, undefined, {
+        cwd: "/my-repo",
+        loadFromCwdFn: scopedLoader,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toBe("aireceipts: no sessions detected\n");
+  });
+
+  it("returns the neutral placeholder without falling back globally when no scoped session matches", async () => {
+    let globalFallbackCalled = false;
+    const { code, output } = await captureStdout(() =>
+      runStatusline(
+        stdinStub("", true),
+        async () => {
+          globalFallbackCalled = true;
+          return loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl"));
+        },
+        undefined,
+        undefined,
+        { cwd: "/repo", loadFromCwdFn: async () => null },
+      ),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toBe("aireceipts: no sessions detected\n");
+    expect(globalFallbackCalled).toBe(false);
+  });
+});
+
 describe("runStatusline (R3/R4 end-to-end)", () => {
+  it("SPEC-0075 R1: a usable stdin payload wins over --cwd with byte-identical output", async () => {
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const payload = JSON.stringify({ transcript_path: transcriptPath });
+    const baseline = await captureStdout(() => runStatusline(stdinStub(payload), async () => null));
+    let scopedLoaderCalled = false;
+    const scoped = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, {
+        cwd: "/some/other/project",
+        loadFromCwdFn: async () => {
+          scopedLoaderCalled = true;
+          return null;
+        },
+      }),
+    );
+
+    expect(scoped).toEqual(baseline);
+    expect(scopedLoaderCalled).toBe(false);
+  });
+
+  it("SPEC-0075 R1: an unscoped invocation preserves the existing disk-fallback bytes", async () => {
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const loadFromDiskFn = async (): Promise<Session | null> => loadById("claude-code", transcriptPath);
+    const baseline = await captureStdout(() => runStatusline(stdinStub("", true), loadFromDiskFn));
+    const explicitDefaults = await captureStdout(() => runStatusline(stdinStub("", true), loadFromDiskFn, undefined, undefined, {}));
+
+    expect(explicitDefaults).toEqual(baseline);
+  });
+
   it("R3a: prefers the stdin payload's session over disk fallback", async () => {
     const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
     const stdin = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
@@ -218,6 +346,25 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     expect(err).toContain("unknown statusline segment");
   });
 
+  it("SPEC-0075 R1: a bare or empty --cwd fails fast with stderr only", async () => {
+    const { parseOptions } = await import("../../src/cli/options.js");
+    expect(parseOptions(["statusline", "--cwd"]).cwd).toBe("");
+    expect(parseOptions(["statusline", "--cwd="]).cwd).toBe("");
+    let err = "";
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        cwd: "",
+        writeError: (s) => {
+          err += s;
+        },
+      }),
+    );
+
+    expect(code).toBe(1);
+    expect(output).toBe("");
+    expect(err).toBe("--cwd requires a non-empty path\n");
+  });
+
   it("SPEC-0062 R5: telemetry customFormat is false by default and true under --format", async () => {
     const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
     const stdin1 = stdinStub(JSON.stringify({ transcript_path: transcriptPath }));
@@ -274,6 +421,41 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     const model = await attachSubagentRollup(await buildReceiptModel(session!), session!.filePath);
     const elapsedMs = performance.now() - started;
     expect(model.subagents?.count).toBe(2);
+    expect(elapsedMs).toBeLessThanOrEqual(200);
+  });
+
+  it("SPEC-0075 R8 latency: cwd-scoped discovery + load + render stays within the 200ms budget", async () => {
+    const { copyFile, mkdir, mkdtemp } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { ClaudeCodeAdapter } = await import("../../src/parse/claudeCode.js");
+    const { claudeProjectDirectoryNames, encodeClaudeProjectCwd } = await import("../../src/parse/cwdScope.js");
+    const home = await mkdtemp(path.join(tmpdir(), "aireceipts-cwd-lat-"));
+    const projectsRoot = path.join(home, ".claude", "projects");
+    const sessionCwd = "/home/dev/webapp";
+    const requestedCwd = `${sessionCwd}/src`;
+    const projectDir = path.join(projectsRoot, encodeClaudeProjectCwd(sessionCwd));
+    await mkdir(projectDir, { recursive: true });
+    await copyFile(fixturePath("clean-multi-tool-2-models.jsonl"), path.join(projectDir, "session.jsonl"));
+    const adapter = new ClaudeCodeAdapter({ root: projectsRoot });
+    const scopedLoader = (cwd: string) =>
+      loadFromCwd(
+        cwd,
+        (value) =>
+          adapter.listSessions({ roots: claudeProjectDirectoryNames(value).map((name) => path.join(projectsRoot, name)) }),
+        (summary) => adapter.loadSession(summary.id),
+      );
+
+    const started = performance.now();
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        cwd: requestedCwd,
+        loadFromCwdFn: scopedLoader,
+      }),
+    );
+    const elapsedMs = performance.now() - started;
+
+    expect(code).toBe(0);
+    expect(output).toContain("[aireceipts · Claude Code]");
     expect(elapsedMs).toBeLessThanOrEqual(200);
   });
 });
