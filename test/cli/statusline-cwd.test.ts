@@ -31,6 +31,25 @@ describe("SPEC-0075 R1 cwd matching", () => {
     expect(normalizeCwd("C:\\Repo\\")).toBe("c:/Repo");
     expect(cwdMatches("c:/Repo", "c:/repo/sub")).toBe(false);
   });
+
+  it("resolves dot segments lexically — a traversal never matches the traversed-out project", () => {
+    expect(normalizeCwd("/repo/../other")).toBe("/other");
+    expect(cwdMatches("/repo", "/repo/../other")).toBe(false);
+    expect(cwdMatches("/other", "/repo/../other")).toBe(true);
+    expect(normalizeCwd("/repo/./sub")).toBe("/repo/sub");
+    expect(normalizeCwd("/../..")).toBe("/");
+  });
+
+  it("collapses duplicate interior slashes and keeps a UNC prefix", () => {
+    expect(normalizeCwd("/repo//sub///dir")).toBe("/repo/sub/dir");
+    expect(normalizeCwd(String.raw`\\server\share\repo`)).toBe("//server/share/repo");
+    expect(cwdMatches("//server/share/repo", String.raw`\\server\share\repo\sub`)).toBe(true);
+  });
+
+  it("keeps a relative session cwd from matching an unrelated absolute path", () => {
+    expect(cwdMatches("repo", "/repo/sub")).toBe(false);
+    expect(cwdMatches("../repo", "/repo")).toBe(false);
+  });
 });
 
 describe("SPEC-0075 R1 Claude Code cwd encoding", () => {
@@ -47,5 +66,13 @@ describe("SPEC-0075 R1 Claude Code cwd encoding", () => {
 
   it("computes ancestor lookups before encoding", () => {
     expect(claudeProjectDirectoryNames("/my/repo")).toEqual(["-", "-my", "-my-repo"]);
+  });
+
+  it("keeps both UNC leading slashes in encoded ancestor names", () => {
+    expect(claudeProjectDirectoryNames("//server/share/repo")).toEqual([
+      "--server",
+      "--server-share",
+      "--server-share-repo",
+    ]);
   });
 });

@@ -221,8 +221,11 @@ export function parseOptions(argv: string[]): CliOptions {
       format = arg.slice("--format=".length);
     } else if (arg === "--cwd") {
       // A bare `--cwd` must fail fast downstream rather than silently falling
-      // back to global discovery (SPEC-0075 R1) — normalize to "".
-      cwd = argv[++i] ?? "";
+      // back to global discovery (SPEC-0075 R1) — normalize to "". A following
+      // flag (`--cwd --help`) is another spelling of "no value": don't consume
+      // it as the path (a path may still start with `-` via `--cwd=<path>`).
+      const next = argv[i + 1];
+      cwd = next !== undefined && !next.startsWith("-") ? argv[++i] : "";
     } else if (arg.startsWith("--cwd=")) {
       cwd = arg.slice("--cwd=".length);
     } else if (arg === "--svg") {

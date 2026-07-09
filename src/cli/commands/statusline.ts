@@ -84,10 +84,19 @@ export async function loadFromDisk(
 }
 
 /**
+ * SPEC-0075 R1 — the cap on full-transcript loads while walking scoped
+ * candidates newest-first. A collision-heavy Claude Code project dir could
+ * otherwise trigger an unbounded sequence of full parses in a status bar that
+ * polls; past the cap the line renders the neutral placeholder — bounded work
+ * and an honest omission, never a wrong session and never a latency blowup.
+ */
+export const MAX_SCOPED_LOAD_ATTEMPTS = 8;
+
+/**
  * SPEC-0075 R1 — load the newest cwd-scoped candidate. Claude Code directory
  * names are lossy, so its candidate must be confirmed against the cwd parsed
  * from the full transcript; a collision or unreadable candidate falls through
- * to the next-most-recent row.
+ * to the next-most-recent row, and the walk stops at MAX_SCOPED_LOAD_ATTEMPTS.
  */
 export async function loadFromCwd(
   requestedCwd: string,
@@ -95,7 +104,7 @@ export async function loadFromCwd(
   loadSessionFn: (summary: SessionSummary) => Promise<Session | null> = loadSession,
 ): Promise<Session | null> {
   const sessions = await listSessionsFn(requestedCwd);
-  for (const summary of sessions) {
+  for (const summary of sessions.slice(0, MAX_SCOPED_LOAD_ATTEMPTS)) {
     const session = await loadSessionFn(summary);
     if (!session) {
       continue;

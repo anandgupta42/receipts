@@ -15,6 +15,7 @@ import {
   loadFromCwd,
   loadFromDisk,
   loadFromStdinPayload,
+  MAX_SCOPED_LOAD_ATTEMPTS,
   readStdin,
   runStatusline,
 } from "../../src/cli/index.js";
@@ -146,6 +147,38 @@ describe("loadFromCwd (SPEC-0075 R1, fixture-injected)", () => {
     expect(code).toBe(0);
     expect(output).toContain("[aireceipts · Codex]");
     expect(output).not.toContain("Claude Code");
+  });
+
+  it("caps full-transcript loads at MAX_SCOPED_LOAD_ATTEMPTS on a collision-heavy candidate list", async () => {
+    const fixture = (await loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl")))!;
+    // 20 colliding CC candidates; the walk must stop at the cap and render the
+    // placeholder — bounded work, never a long stall in a polling status bar.
+    const candidates: SessionSummary[] = Array.from({ length: 20 }, (_, i) => ({
+      ...fixture,
+      id: `collision-${i}`,
+      cwd: "/my/repo",
+    }));
+    let loads = 0;
+    const scopedLoader = (cwd: string) =>
+      loadFromCwd(
+        cwd,
+        async () => candidates,
+        async (summary) => {
+          loads++;
+          return { ...fixture, id: summary.id, cwd: "/my/repo" };
+        },
+      );
+
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub("", true), async () => null, undefined, undefined, {
+        cwd: "/my-repo",
+        loadFromCwdFn: scopedLoader,
+      }),
+    );
+
+    expect(code).toBe(0);
+    expect(output).toBe("aireceipts: no sessions detected\n");
+    expect(loads).toBe(MAX_SCOPED_LOAD_ATTEMPTS);
   });
 
   it("rejects a Claude Code encoding collision after full load", async () => {

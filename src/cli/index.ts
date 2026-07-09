@@ -10,7 +10,7 @@ import { parseOptions } from "./options.js";
 import { loadCommands, selectCommand } from "./registry.js";
 import { createContext } from "./context.js";
 
-export { readStdin, loadFromStdinPayload, loadFromDisk, loadFromCwd, runStatusline } from "./commands/statusline.js";
+export { readStdin, loadFromStdinPayload, loadFromDisk, loadFromCwd, MAX_SCOPED_LOAD_ATTEMPTS, runStatusline } from "./commands/statusline.js";
 export { recentWasteAggregates } from "./commands/handoff.js";
 
 /** CLI entrypoint: parse → discover/select → first-run notice → run → telemetry record → bounded flush (SPEC-0002 wiring). */

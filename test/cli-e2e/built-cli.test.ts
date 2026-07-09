@@ -5,7 +5,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { handoffJsonSchema, receiptJsonSchema } from "../../src/receipt/exportSchema.js";
-import { encodeClaudeProjectCwd } from "../../src/parse/cwdScope.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
@@ -687,7 +686,10 @@ describe("built CLI e2e", () => {
   it("scopes statusline disk discovery to --cwd", async () => {
     const home = await makeHome();
     const sessionCwd = "/home/dev/webapp";
-    const projectDir = path.join(home, ".claude", "projects", encodeClaudeProjectCwd(sessionCwd));
+    // The literal encoded name, NOT encodeClaudeProjectCwd(sessionCwd): the
+    // fixture layout must pin Claude Code's real on-disk convention, so an
+    // encoder regression cannot silently reshape the fixture to keep matching.
+    const projectDir = path.join(home, ".claude", "projects", "-home-dev-webapp");
     await mkdir(projectDir, { recursive: true });
     await copyFile(path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl"), path.join(projectDir, "session.jsonl"));
 
@@ -702,6 +704,16 @@ describe("built CLI e2e", () => {
     const home = await makeHome();
 
     const result = await runCli(["statusline", "--cwd"], home);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("--cwd requires a non-empty path\n");
+  });
+
+  it("does not consume a following flag as the --cwd value", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["statusline", "--cwd", "--format", "brand"], home);
 
     expect(result.code).toBe(1);
     expect(result.stdout).toBe("");
