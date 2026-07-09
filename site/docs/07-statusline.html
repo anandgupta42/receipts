@@ -154,6 +154,7 @@ h1{
 .doc-content p{margin:0 0 16px;color:var(--ink)}
 .doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
 .doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
 .doc-content blockquote{
   margin:20px 0;
   padding:14px 18px;
@@ -337,7 +338,9 @@ footer{
 
 <p><code>aireceipts statusline</code> prints exactly one line, meant to be wired into Claude Code's <code>statusLine</code> config:</p>
 
-<pre class="doc-code"><code>[Claude Code] $0.18 · 147k tok</code></pre>
+<pre class="doc-code"><code>[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m</code></pre>
+
+<p><img src="../assets/statusline.gif" alt="Terminal recording: piping a Claude Code statusLine payload through aireceipts statusline prints one line — session cost, burn rate, tokens, context fullness, a waste flag, and the 5-hour window countdown; --format trims it to chosen segments."></p>
 
 <h2 id="set-it-up">Set it up</h2>
 
@@ -356,11 +359,17 @@ footer{
 
 <h2 id="what-the-line-shows">What the line shows</h2>
 
+<p>The default line is the segment set <code>brand,cost,burn,tokens,context,waste,quota5h</code> — cost, burn rate, tokens, context fullness, a waste flag, and your rate-limit window:</p>
+
 <ul>
-  <li><code>$X.XX · Nk tok</code> when the session is priced; <code>Nk tok</code> alone when it isn't — never a fabricated dollar amount.</li>
+  <li><code>$X.XX</code> is the session's priced cost (<code>Nk</code>/<code>NM</code> tokens alone when it can't be priced — never a fabricated dollar amount), and <code>$X/hr</code> its session-average burn rate.</li>
+  <li><code>ctx N%</code> is how full the current context window is; token counts abbreviate to <code>k</code>/<code>M</code> (<code>128k</code>, <code>1.2M</code>).</li>
+  <li><code>5h N% ↺Xh Ym</code> is your official 5-hour rate-limit usage plus the time until it resets — subscribers only, on by default, and dropped when Claude Code doesn't provide it.</li>
   <li>A waste flag (<code>⚠ Bash loop ×5</code>) appears only when a detector actually fired.</li>
   <li>Outside a piped call, or when the payload carries no session, it falls back to the newest session on disk, and prints a neutral placeholder rather than an error if there are none — so your statusline layout never breaks.</li>
 </ul>
+
+<p>Pick your own segments with <code>--format</code>; the full segment table and the <code>≈</code> quota ETA honesty rules are in <a href="statusline.html">docs/statusline.md</a>.</p>
 
 <h2 id="rate-limit-window-quota">Rate-limit window (<code>--quota</code>)</h2>
 
@@ -381,7 +390,7 @@ footer{
   <footer>
     <div class="close">
       <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
         <p class="thanks">Thank you for your tokens.</p>
         <p class="serial">AIRECEIPTS · NO. 0001</p>
       </div>

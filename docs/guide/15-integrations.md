@@ -7,9 +7,10 @@ npx aireceipts-cli
 npx aireceipts-cli setup
 ```
 
-`setup` is read-only. It reports found sessions, the latest session cost or
+`setup` only reports. It shows found sessions, the latest session cost or
 tokens, the trailing-week total, and integration options. Nothing uploads, posts,
-or writes settings from this command.
+or writes settings from this command — its only writes are aireceipts' own local
+cache under `~/.aireceipts/`.
 
 ## Pick by intent
 
@@ -22,7 +23,7 @@ or writes settings from this command.
 | Claude Code prompt statusline | `aireceipts statusline` in `statusLine` config | user/repo | none |
 | A weekly habit | `npx aireceipts-cli week` | local | none |
 | PR receipt comments | `npx aireceipts-cli pr --post` | repo/PR | GitHub only when explicitly run |
-| Team PR receipt presence checks | reusable GitHub workflow | repo | GitHub Actions only |
+| Team PR receipt presence checks | GitHub workflow (npm-native or reusable) | repo | GitHub Actions only |
 | Automatic PR receipt refs | workflow + `.claude/settings.json` hook | repo | GitHub Actions + git push |
 
 ## Recipes
@@ -65,7 +66,7 @@ for every user. Keep the rollout explicit:
 1. Use local receipts first.
 2. Add assistant snippets or local hooks if they help the workflow.
 3. For PR-producing tasks, run `npx aireceipts-cli pr --post`.
-4. Add the reusable GitHub check when the team wants visibility.
+4. Add the GitHub check when the team wants visibility (two caller variants below).
 5. Add the committed Claude Code hook when the team wants automatic ref production.
 6. Keep enforcement opt-in; notice-only is the default.
 
@@ -73,3 +74,20 @@ CI checks for marked PR receipt comments and can post from a `refs/receipts/*` r
 does not generate receipts and does not read local transcripts. The workflow alone is a
 no-op until the Claude hook, or a manual `npx aireceipts-cli pr --store ref --push-ref`,
 produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.
+
+### Two ways to add the CI check
+
+The check ships as two interchangeable caller files — commit whichever fits your org:
+
+- **[`pr-check-caller.yml`](../adopt/pr-check-caller.yml)** — self-contained,
+  npm-native: it runs `npx -y aireceipts-cli@latest pr-check` inside your own
+  workflow with no reusable-workflow `uses:`. *Use this one if* your org restricts
+  third-party reusable workflows, or you want a single self-contained file.
+- **[`pr-receipt-check-caller.yml`](../adopt/pr-receipt-check-caller.yml)** — the
+  reusable workflow (`uses: anandgupta42/receipts/…@latest`). *Use this one if* your
+  org allows reusable workflows and you want the check logic to track upstream
+  automatically.
+
+Both are notice-only by default — a build fails only if you opt into enforcement.
+Full setup, enforcement tiers,
+and the auto-attach hook: [docs/pr-receipts.md](../pr-receipts.md).

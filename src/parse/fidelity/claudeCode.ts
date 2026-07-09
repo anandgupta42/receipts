@@ -1,8 +1,10 @@
 // SPEC-0028 R2 — Claude Code fidelity validator: usage-shape invariants
 // provable from the normalized Session. Duplicate raw-record detection is a
-// named non-goal (the normalized surface can't prove it); these invariants
-// catch component corruption and total-arithmetic breakage over real data —
-// the `withTotal` discipline (src/parse/util.ts:46) holding outside fixtures.
+// named non-goal here (the normalized surface can't prove it) — it is handled
+// upstream at parse time, where the adapter merges same-`message.id` records
+// into one turn (src/parse/claudeCode.ts). These invariants catch component
+// corruption and total-arithmetic breakage over real data — the `withTotal`
+// discipline (src/parse/util.ts:46) holding outside fixtures.
 import type { AdapterFidelity, FidelityFinding, Session, TokenUsage } from "../types.js";
 
 const COMPONENTS: readonly (keyof Pick<TokenUsage, "input" | "output" | "cacheRead" | "cacheCreation">)[] = [

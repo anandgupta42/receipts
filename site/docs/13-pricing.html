@@ -154,6 +154,7 @@ h1{
 .doc-content p{margin:0 0 16px;color:var(--ink)}
 .doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
 .doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
 .doc-content blockquote{
   margin:20px 0;
   padding:14px 18px;
@@ -341,7 +342,7 @@ footer{
 
 <pre class="doc-code"><code class="language-sh">aireceipts --methodology</code></pre>
 
-<blockquote>Cost is attributed per assistant turn: each turn's priced usage (tokens × the dated price row matching its model and date) is split evenly across the tool(s) it called; a turn with no tool calls is attributed to &quot;(thinking/reply)&quot;. Turns whose model has no matching price row contribute tokens only — never a guessed dollar amount. Cache-write tokens are priced per known TTL tier when the transcript splits them (5-minute and 1-hour rates); any unsplit cache-write tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and priced at that rate, or the plain input rate if the price row cites neither — a conservative fallback that may understate real cost (cache-write billing runs ≥1.25× input) but never overstates it with a guessed premium.</blockquote>
+<blockquote>Cost is attributed per assistant turn. A turn is one billed API response: when an agent's transcript repeats a response across several records (Claude Code writes one record per content block, each carrying the same message id and the same usage snapshot), the response is counted once, deduplicated by message id. Each turn's priced usage (tokens × the dated price row matching its model and date) is split evenly across the tool(s) it called; a turn with no tool calls is attributed to &quot;(thinking/reply)&quot;. Turns whose model has no matching price row contribute tokens only — never a guessed dollar amount. Cache-write tokens are priced per known TTL tier when the transcript splits them (5-minute and 1-hour rates); any unsplit cache-write tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and priced at that rate, or the plain input rate if the price row cites neither — a conservative fallback that may understate real cost (cache-write billing runs ≥1.25× input) but never overstates it with a guessed premium.</blockquote>
 
 <p>Two properties fall out of this. First, cost is per-tool because it's split across the tools a turn called — that's why <code>Bash</code> and <code>Edit</code> carry a dollar figure. Second, every fallback is chosen to <strong>under</strong>-state rather than over-state, so the receipt is a floor, not an inflated guess.</p>
 
@@ -394,7 +395,7 @@ footer{
   <footer>
     <div class="close">
       <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
         <p class="thanks">Thank you for your tokens.</p>
         <p class="serial">AIRECEIPTS · NO. 0001</p>
       </div>
