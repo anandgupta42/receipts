@@ -19,7 +19,14 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
 const ti = argv.indexOf("--title");
-const title = ti >= 0 ? argv[ti + 1] : undefined;
+const hasTitle = ti >= 0;
+const title = hasTitle ? argv[ti + 1] : undefined;
+// A requested check must never be silently skipped: `--title` with no (or an
+// empty) value is a hard error, not a fall-through to "skipping PR-title lint".
+if (hasTitle && (title === undefined || title === "")) {
+  console.error('ship-check: --title needs a non-empty value, e.g. --title "docs: add X"');
+  process.exit(1);
+}
 
 function step(name, cmd, args) {
   process.stdout.write(`\n▶ ${name}\n`);
@@ -31,7 +38,7 @@ function step(name, cmd, args) {
 }
 
 step("preflight --quick", "node", ["scripts/preflight-release.mjs", "--quick"]);
-if (title) {
+if (hasTitle) {
   step("pr-title lint", "node", ["scripts/hygiene.mjs", "--title", title]);
 } else {
   console.log('\n(no --title given — skipping the PR-title lint; pass --title "<PR title>" to check it before you open the PR)');
