@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>aireceipts — your agent works, you get the receipt</title>
-<meta name="description" content="Local, deterministic cost receipts for AI coding agents. One command, no account, no upload — it reads the transcripts already on your disk.">
+<meta name="description" content="Local, deterministic cost receipts for AI coding agents. One command, no account, no server — it reads the transcripts already on your disk, and they stay there.">
 <meta name="theme-color" content="#0e1417">
 <meta property="og:type" content="website">
 <meta property="og:title" content="aireceipts — your agent works, you get the receipt">
-<meta property="og:description" content="Every session, itemized and priced — locally. No account. Nothing uploaded.">
+<meta property="og:description" content="Every session, itemized and priced — locally. No account. Transcripts never leave your machine.">
 <meta property="og:image" content="assets/hero-receipt.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="assets/hero-receipt.png">
@@ -309,6 +309,13 @@
 .grn2{color:#3d8f68;font-weight:600;white-space:nowrap}
 .agterm{width:fit-content;max-width:100%;justify-self:center}
 .agterm pre{padding-right:28px}
+.agterm-gif{display:block;height:auto;max-width:100%}
+section.statusstrip{padding:0;margin:calc(-1*clamp(28px,5vw,64px)) 0 0}
+.statusstrip .cap{margin:0 0 12px;font-size:16px;line-height:1.55;color:var(--muted)}
+.statusstrip .cap code{font-family:var(--mono);font-size:.9em;color:var(--ledger);white-space:nowrap}
+.statusline{margin:0;background:var(--term-bg);border:1px solid #1c272d;border-radius:11px;padding:13px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--term-fg);white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:0 24px 64px -44px rgba(9,14,18,.9)}
+.statusline .b{color:var(--term-head)}
+.statusline .m{color:var(--term-dim)}
 </style>
 </head>
 <body>
@@ -327,7 +334,7 @@
   <div class="stage">
     <div class="stage-in">
       <h1 class="display">Your agent works. <span class="soft">You get the receipt.</span></h1>
-      <p class="stage-sub">Every session, itemized and priced — locally. No account. Nothing uploaded.</p>
+      <p class="stage-sub">Every session, itemized and priced — locally. No account. Transcripts never leave your machine.</p>
       <div class="cta-hold">
         <div class="copybox">
           <code><span class="p" aria-hidden="true">$</span>npx aireceipts-cli</code>
@@ -355,18 +362,26 @@
         <div class="scn">
           <img class="scnimg" src="assets/scn-week.png" alt="" width="76" height="76">
           <h3>The week, in one number</h3>
-          <p>Totals, per-agent split, honest deltas.</p>
+          <p>Totals, per-agent split, honest deltas — your supported agents, one number.</p>
           <div class="bignum">$10,056<span class="cents">.63</span><span class="numcap">one real week · 319 sessions</span></div>
         </div>
         <div class="scn">
           <img class="scnimg" src="assets/scn-pr.png" alt="" width="76" height="76">
           <h3>Receipts on your PRs</h3>
-          <p>What the change cost to make — every agent counted. This page's repo runs on it — <a href="https://github.com/anandgupta42/receipts/pulls">every PR carries its receipt</a>.</p>
+          <p>What the change cost to make, across the sessions behind it. A hook attaches it, an Action posts it — no manual step. <a href="https://github.com/anandgupta42/receipts/pulls">This repo runs on it</a>.</p>
           <div class="prmock"><div class="prhead"><span class="prav"></span><span class="prname">aireceipts <em>bot</em> commented</span></div><pre class="art cardart">orchestrator · fable ······ $12.30
 builder · opus ············ $43.80
 TOTAL ····················· <span class="grnl">$56.10</span></pre></div>
         </div>
       </div>
+    </section>
+  </div>
+
+  <!-- ============ STATUSLINE STRIP ============ -->
+  <div class="wrap">
+    <section class="statusstrip" aria-label="The statusline while you work">
+      <p class="cap">The meter while you work — burn rate, context, and quota countdown in your agent's status bar: <code>aireceipts statusline</code></p>
+      <pre class="statusline" tabindex="0" aria-label="An aireceipts statusline: session cost $31.01, burn rate $96 per hour, 21M tokens, context 41% full, and the 5-hour quota at 62% resetting in 1h 54m."><span class="b">[aireceipts]</span> $31.01 · $96/hr · 21M · ctx 41% · <span class="m">5h 62% ↺1h54m</span></pre>
     </section>
   </div>
 
@@ -381,6 +396,8 @@ TOTAL ····················· <span class="grnl">$56.10</span
           <li>Every price cited: URL, date, excerpt.</li>
           <li>Comparisons are arithmetic, not predictions.</li>
           <li>Same transcript in, byte-identical receipt out.</li>
+          <li>Telemetry is the only unprompted network call — content-free, one variable from off.</li>
+          <li>Facts, not rankings. No “model X would have done it better.”</li>
         </ol>
         <div class="proof">
           <pre class="art proofcard" aria-label="A real cited price-table row">"claude-fable-5": {
@@ -444,21 +461,7 @@ TOTAL ····················· $0.09</pre>
           <li><span class="agtile agdim"><img class="agmark" src="assets/agents/cursor.svg" alt="" width="14" height="14"></span><span class="agname">Cursor</span><span class="lead"></span><span class="agval">totals only<span class="agfoot"> — its logs stop there, so we do too</span></span></li>
         </ul>
 </div>
-        <div class="proof-term agterm">
-          <div class="bar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="cmd"><span class="p">$ </span>npx aireceipts-cli</span></div>
-<pre class="render" tabindex="0" aria-label="An itemized receipt for a 10m 30s Claude Code session: Bash $0.05, Edit $0.05, thinking $0.03, Write $0.03, Read $0.02, total $0.18; the same tokens on claude-haiku-4-5 would be $0.04."><span class="d">- - - - - - - - - - - - - - - - - - - - - - - - -</span>
-<span class="h">                    AIRECEIPTS                    </span>
- “Add email format validation to the signup for…”
- Claude Code · Jun 18 2026 09:30:30 UTC · 10m 30s
-Bash..............................$0.05  (3 calls)
-Edit..............................$0.05  (2 calls)
-(thinking/reply)..................$0.03  (2 turns)
-Write.............................$0.03  (2 calls)
-Read...............................$0.02  (1 call)
-<span class="d">--------------------------------------------------</span>
-<span class="g">TOTAL........................................$0.18</span>
-<span class="d">same tokens on claude-haiku-4-5..............$0.04</span></pre>
-        </div>
+        <img class="agterm agterm-gif" src="assets/quickstart.gif" width="620" height="640" alt="A terminal recording: typing the aireceipts command prints an itemized receipt for a synthetic 10m 30s Claude Code session — Bash $0.05, Edit $0.05, thinking/reply $0.03, Write $0.03, Read $0.02, TOTAL $0.18, and the arithmetic line: same tokens on claude-haiku-4-5 $0.04 (78% less).">
       </div>
       </section>
     </div>
@@ -474,7 +477,7 @@ Read...............................$0.02  (1 call)
           <button type="button" class="copy-btn" data-cmd="npx aireceipts-cli" aria-label="Copy the command npx aireceipts-cli to the clipboard">Copy</button>
         </div>
       </div>
-      <p class="closing-note"><b>Apache-2.0</b> · your transcripts never leave your machine.</p>
+      <p class="closing-note"><b>Apache-2.0</b> · transcripts never leave your machine · telemetry is content-free — one env var ends it.</p>
       <nav class="foot">
         <a href="https://github.com/anandgupta42/receipts">GitHub</a><span class="sep" aria-hidden="true">·</span>
         <a href="docs/index.html">docs</a><span class="sep" aria-hidden="true">·</span>

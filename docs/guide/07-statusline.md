@@ -7,8 +7,10 @@ running a command yourself.
 Code's `statusLine` config:
 
 ```
-[aireceipts] $0.18 · 147k tok
+[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
 ```
+
+![Terminal recording: piping a Claude Code statusLine payload through aireceipts statusline prints one line — session cost, burn rate, tokens, context fullness, a waste flag, and the 5-hour window countdown; --format trims it to chosen segments.](../../site/assets/statusline.gif)
 
 ## Set it up
 
@@ -34,12 +36,25 @@ aireceipts`) in the `command` field.
 
 ## What the line shows
 
-- `$X.XX · Nk tok` when the session is priced; `Nk tok` alone when it isn't —
-  never a fabricated dollar amount.
+The default line is the segment set `brand,cost,burn,tokens,context,waste,quota5h`
+— cost, burn rate, tokens, context fullness, a waste flag, and your rate-limit
+window:
+
+- `$X.XX` is the session's priced cost (`Nk`/`NM` tokens alone when it can't be
+  priced — never a fabricated dollar amount), and `$X/hr` its session-average
+  burn rate.
+- `ctx N%` is how full the current context window is; token counts abbreviate to
+  `k`/`M` (`128k`, `1.2M`).
+- `5h N% ↺Xh Ym` is your official 5-hour rate-limit usage plus the time until it
+  resets — subscribers only, on by default, and dropped when Claude Code doesn't
+  provide it.
 - A waste flag (`⚠ Bash loop ×5`) appears only when a detector actually fired.
 - Outside a piped call, or when the payload carries no session, it falls back to
   the newest session on disk, and prints a neutral placeholder rather than an
   error if there are none — so your statusline layout never breaks.
+
+Pick your own segments with `--format`; the full segment table and the `≈` quota
+ETA honesty rules are in [docs/statusline.md](../statusline.md).
 
 ## Rate-limit window (`--quota`)
 

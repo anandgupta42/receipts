@@ -154,6 +154,7 @@ h1{
 .doc-content p{margin:0 0 16px;color:var(--ink)}
 .doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
 .doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
 .doc-content blockquote{
   margin:20px 0;
   padding:14px 18px;
@@ -338,7 +339,7 @@ footer{
 <pre class="doc-code"><code class="language-sh">npx aireceipts-cli
 npx aireceipts-cli setup</code></pre>
 
-<p><code>setup</code> is read-only. It reports found sessions, the latest session cost or tokens, the trailing-week total, and integration options. Nothing uploads, posts, or writes settings from this command.</p>
+<p><code>setup</code> only reports. It shows found sessions, the latest session cost or tokens, the trailing-week total, and integration options. Nothing uploads, posts, or writes settings from this command — its only writes are aireceipts' own local cache under <code>~/.aireceipts/</code>.</p>
 
 <h2 id="pick-by-intent">Pick by intent</h2>
 
@@ -352,7 +353,8 @@ npx aireceipts-cli setup</code></pre>
     <tr><td>Claude Code prompt statusline</td><td><code>aireceipts statusline</code> in <code>statusLine</code> config</td><td>user/repo</td><td>none</td></tr>
     <tr><td>A weekly habit</td><td><code>npx aireceipts-cli week</code></td><td>local</td><td>none</td></tr>
     <tr><td>PR receipt comments</td><td><code>npx aireceipts-cli pr --post</code></td><td>repo/PR</td><td>GitHub only when explicitly run</td></tr>
-    <tr><td>Team PR receipt presence checks</td><td>reusable GitHub workflow</td><td>repo</td><td>GitHub Actions only</td></tr>
+    <tr><td>Team PR receipt presence checks</td><td>GitHub workflow (npm-native or reusable)</td><td>repo</td><td>GitHub Actions only</td></tr>
+    <tr><td>Automatic PR receipt refs</td><td>workflow + <code>.claude/settings.json</code> hook</td><td>repo</td><td>GitHub Actions + git push</td></tr>
   </tbody>
 </table></div>
 
@@ -385,17 +387,29 @@ npx aireceipts-cli integrations github</code></pre>
   <li>Use local receipts first.</li>
   <li>Add assistant snippets or local hooks if they help the workflow.</li>
   <li>For PR-producing tasks, run <code>npx aireceipts-cli pr --post</code>.</li>
-  <li>Add the reusable GitHub check when the team wants visibility.</li>
+  <li>Add the GitHub check when the team wants visibility (two caller variants below).</li>
+  <li>Add the committed Claude Code hook when the team wants automatic ref production.</li>
   <li>Keep enforcement opt-in; notice-only is the default.</li>
 </ol>
 
-<p>CI checks for marked PR receipt comments. It does not generate receipts and does not read local transcripts.</p>
+<p>CI checks for marked PR receipt comments and can post from a <code>refs/receipts/*</code> ref. It does not generate receipts and does not read local transcripts. The workflow alone is a no-op until the Claude hook, or a manual <code>npx aireceipts-cli pr --store ref --push-ref</code>, produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.</p>
+
+<h3 id="two-ways-to-add-the-ci-check">Two ways to add the CI check</h3>
+
+<p>The check ships as two interchangeable caller files — commit whichever fits your org:</p>
+
+<ul>
+  <li><strong><a href="../adopt/pr-check-caller.yml"><code>pr-check-caller.yml</code></a></strong> — self-contained, npm-native: it runs <code>npx -y aireceipts-cli@latest pr-check</code> inside your own workflow with no reusable-workflow <code>uses:</code>. <em>Use this one if</em> your org restricts third-party reusable workflows, or you want a single self-contained file.</li>
+  <li><strong><a href="../adopt/pr-receipt-check-caller.yml"><code>pr-receipt-check-caller.yml</code></a></strong> — the reusable workflow (<code>uses: anandgupta42/receipts/…@latest</code>). <em>Use this one if</em> your org allows reusable workflows and you want the check logic to track upstream automatically.</li>
+</ul>
+
+<p>Both are notice-only by default — a build fails only if you opt into enforcement. Full setup, enforcement tiers, and the auto-attach hook: <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
     </article>
   </main>
   <footer>
     <div class="close">
       <div class="close-copy">
-        <p class="issued"><span>No account</span><span>No upload</span><span>Docs</span></p>
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
         <p class="thanks">Thank you for your tokens.</p>
         <p class="serial">AIRECEIPTS · NO. 0001</p>
       </div>

@@ -36,6 +36,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "docs:site": "node scripts/build-docs-site.mjs",
     "preflight": "node scripts/preflight-release.mjs",
     "prepublishOnly": "tsup",
     "setup:hooks": "git config core.hooksPath .githooks && npm run build",
