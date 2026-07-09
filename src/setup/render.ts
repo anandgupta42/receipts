@@ -1,4 +1,4 @@
-import { dottedLine, formatInt, formatUsd } from "../receipt/format.js";
+import { dottedLine, formatInt, formatUsd, MIN_LEADER } from "../receipt/format.js";
 import type { IntegrationRecipe } from "./integrations.js";
 import { INTEGRATION_RECIPES, INTEGRATION_TARGETS } from "./integrations.js";
 import type { SetupReport } from "./report.js";
@@ -10,7 +10,10 @@ function costOrTokens(usd: number | null, tokens: number): string {
 }
 
 function row(label: string, value: string): string {
-  if (value.startsWith(".") || label.length + value.length + 2 > WIDTH) {
+  // Fall back to `label: value` whenever the dotted grid can't fit the full
+  // label plus MIN_LEADER dots — dottedLine would truncate the label ("Sta…")
+  // rather than move the value column (#192).
+  if (value.startsWith(".") || label.length + value.length + MIN_LEADER > WIDTH) {
     return `${label}: ${value}`;
   }
   return dottedLine(label, value, WIDTH);

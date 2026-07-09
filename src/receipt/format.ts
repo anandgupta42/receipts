@@ -63,7 +63,7 @@ export function formatUsd(n: number): string {
 }
 
 /** `label` left-aligned, `value` right-aligned, `.` leaders filling the gap — the till-receipt line style. Falls back to a single-space gap if `label`+`value` already meet/exceed `width`. */
-const MIN_LEADER = 3;
+export const MIN_LEADER = 3;
 
 /** Fixed-grid row: label left, dotted leader, value flush right. A label too long
  * for the grid is truncated with `…` — the value column NEVER moves (anti-pattern
