@@ -1,6 +1,6 @@
 {
   "name": "aireceipts-cli",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Your AI coding agent just billed you. Here's the receipt.",
   "keywords": [
     "ai",

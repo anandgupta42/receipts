@@ -3,6 +3,27 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.7.1 — 2026-07-09
+
+Patch: **Claude Code receipts were over-reporting cost by ~2.5–3× and are now correct.**
+Claude Code writes one `assistant` transcript record per content block of a response, and
+every record of that response repeats the same `message.id` and a byte-identical `usage`
+snapshot. The adapter had counted each record as its own billed turn, multiplying a
+response's tokens by its block count. Turns are now deduped by `message.id` — the first
+record of a response books its usage once, later records only add their tool calls — so
+`turnCount` and every `$` reflect real billed responses (PR #196). **After upgrading, every
+Claude Code receipt you render shows lower dollars and fewer turns than 0.7.0 showed for
+the same session**: a real local session dropped from $102.97 to $36.69 (2.81×), and one PR
+slice from $5.17 to $1.61. This was a silent **over**-report — the first known arithmetic
+case of a receipt exceeding the true floor rather than under-reporting it. Codex, opencode,
+and Cursor are unaffected (Codex reconciles against the rollout's own cumulative total and
+was re-verified correct to the cent). Synthetic-fixture output is byte-identical (goldens
+unchanged); the summary-cache version was bumped (2 → 3) so stale inflated totals recompute
+on the next run. Receipts posted on this repo's own past PRs carry per-session correction
+blocks with exact recomputed figures. Full audit and evidence: PR #196,
+`docs/cost-model.md`, and the 2026-07-08 addendum in
+`docs/internal/cost-attribution-evidence.md`.
+
 ## v0.7.0 — 2026-07-08
 
 Minor: **telemetry now defaults to enabled in CI**, reversing the v0.6.x CI-default-off behavior.

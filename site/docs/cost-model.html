@@ -359,12 +359,30 @@ footer{
 <div class="table-wrap"><table>
   <thead><tr><th>Agent</th><th>Per-turn model</th><th>Per-turn usage</th><th>Cache tiers</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td>Claude Code</td><td>yes</td><td>input/output/cacheRead/cacheCreation (5m/1h split when present)</td><td>yes</td><td>shape-validated; no vendor cumulative total to reconcile against</td></tr>
+    <tr><td>Claude Code</td><td>yes</td><td>input/output/cacheRead/cacheCreation (5m/1h split when present)</td><td>yes</td><td>shape-validated; one turn per <code>message.id</code> (see below); no vendor cumulative total to reconcile against</td></tr>
     <tr><td>Codex CLI</td><td>yes (<code>turn_context</code>)</td><td>input/output/cacheRead; <code>reasoning_output_tokens</code> folded into output; no cache-write</td><td>read-only</td><td>zero-tolerance reconciliation vs the rollout's own cumulative envelope</td></tr>
     <tr><td>opencode</td><td>per-message (multi-provider)</td><td>input/output(+reasoning)/cacheRead/cacheCreation</td><td>flat (no split)</td><td>vendor resolves per turn from the model id; unknown models stay tokens-only</td></tr>
     <tr><td>Cursor</td><td>none</td><td>session totals only</td><td>none</td><td><code>unpriceable</code> — receipt states &quot;totals only&quot;, never a guessed <code>$</code></td></tr>
   </tbody>
 </table></div>
+
+<h2 id="from-transcript-records-to-billed-turns-the-whole-pipeline-in-four-steps">From transcript records to billed turns — the whole pipeline in four steps</h2>
+
+<p>Everything a receipt shows reduces to this chain; each step lives in exactly one place:</p>
+
+<ol>
+  <li><strong>Parse</strong> (<code>src/parse/&lt;agent&gt;.ts</code>) — read the agent's on-disk transcript and normalize it into a <code>Session</code> of <code>Turn</code>s, where <strong>one turn = one billed API response</strong>. This is where per-vendor record quirks are absorbed (below).</li>
+  <li><strong>Select</strong> (<code>src/pr/select.ts</code> + <code>slice.ts</code>) — for PR receipts only: pick the sessions whose <code>cwd</code>/branch match this repo, then slice each session to the turn range anchored by this branch's commit SHAs appearing in <code>git commit</code> output. No anchor → labeled full session, never a confident wrong cut.</li>
+  <li><strong>Price</strong> (<code>src/pricing/resolve.ts</code>) — for each turn, look up the dated, cited price row for (vendor, model, date) and multiply: <code>input</code>, <code>output</code>, <code>cacheRead</code> (at the cited cached rate), <code>cacheCreation</code> (at the cited cache-write tier rates). No row → tokens only, never a guessed dollar (I2).</li>
+  <li><strong>Attribute</strong> (<code>src/pricing/attribution.ts</code>) — split each turn's cost evenly across the tools it called and sum per tool; the receipt's TOTAL is the sum of those rows by construction.</li>
+</ol>
+
+<p><strong>The turn-identity rule (step 1) is where a cost can silently multiply, so it is pinned per agent:</strong></p>
+
+<ul>
+  <li><strong>Claude Code</strong> writes one <code>assistant</code> JSONL record <strong>per content block</strong> of a response — a reply with text + N tool calls appears as up to N+1 records, each repeating the same <code>message.id</code> and the <strong>same <code>usage</code> snapshot</strong>. The adapter keys turns by <code>message.id</code>: the first record opens the turn and books usage once; later records only add their tool calls. (Audited 2026-07-08 over 19 real transcripts: up to 12 records per id, usage byte-identical across duplicates; per-record counting inflated a real session's cost 2.8× — see <code>internal/cost-attribution-evidence.md</code>.) Records without a <code>message.id</code> can't be matched to a response and stay individual turns.</li>
+  <li><strong>Codex</strong> emits cumulative <code>token_count</code> envelopes; the adapter books the per-turn <code>last_token_usage</code> <strong>delta</strong> and reconciles the sum against the rollout's own final cumulative total (zero tolerance, enforced by fidelity checks). Verified 2026-07-08 against a real rollout: delta sum == cumulative == the posted receipt's figure, to the cent.</li>
+</ul>
 
 <h2 id="nested-subagent-rollups-dedup-by-subtree-not-by-file">Nested subagent rollups — dedup by subtree, not by file</h2>
 

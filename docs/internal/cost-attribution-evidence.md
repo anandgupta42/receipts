@@ -59,3 +59,45 @@ reconciliation vs the rollout's own cumulative envelope.
 The gap is not "no honesty model" — it's a strong honesty model with **specific
 holes** (Category A) and **no systematic scenario×agent matrix** proving each
 cell stays correct-or-flagged as the code changes.
+
+## Addendum — 2026-07-08 audit: Claude Code per-record usage multiplication (A-class, FIXED)
+
+Found by replaying every receipt posted on this repo's closed PRs against the
+local transcripts that produced them.
+
+**Finding (A-class, OVER-report — the first confirmed *arithmetic* violation
+of "the receipt is a floor"; PR #87's earlier over-credit was an
+attribution-scope error, not a token-arithmetic one):** Claude Code writes one `assistant` JSONL record per
+content block of a response. Every record of the same response repeats the same
+`message.id` and a byte-identical `usage` snapshot. The adapter counted each
+record as its own billed turn, multiplying the response's usage by its block
+count.
+
+**Evidence (real local transcripts, 19 sessions):**
+
+- Largest session: 3,867 usage-carrying assistant records, only 1,443 distinct
+  `message.id`s (up to 12 records per id). Across all duplicated ids, usage was
+  byte-identical (1,071 duplicated ids, 0 with differing usage); no
+  `message.id` ever spanned two `requestId`s.
+- Session `9ae6a4a2` (PR #189's orchestrator): whole-session cost $102.97 as
+  computed per-record vs **$36.69** deduped by message id — 2.81× inflation.
+  The receipt posted on PR #189 claimed **$5.17** for the slice "turns
+  359–377"; replaying the per-record logic reproduces $5.17 exactly, and the
+  deduped figure is **$1.61** — every Claude Code dollar posted before the fix
+  over-reports by roughly the session's average blocks-per-response (~2.5–3×).
+- Codex cross-check (same PR, session `6ddefcc9`): per-turn `last_token_usage`
+  delta sum == final cumulative envelope == the posted $1.20, to the cent. The
+  Codex path was and is correct.
+
+**Why no gate caught it:** synthetic fixtures give every assistant record a
+unique `message.id`, so goldens/matrix cells never modeled the duplication; the
+fidelity validator explicitly listed duplicate-record detection as a non-goal;
+and Claude Code (unlike Codex) carries no vendor cumulative total to reconcile
+against.
+
+**Fix:** `src/parse/claudeCode.ts` keys turns by `message.id` — the first
+record of an id opens the turn and books usage once; later records only merge
+their `tool_use` blocks into it. Regression-pinned by
+`test/parse/claudeCode-dedupe.test.ts`; summary cache version bumped (2 → 3) to
+invalidate inflated cached totals; methodology string + `docs/cost-model.md`
+now state the turn-identity rule per agent.
