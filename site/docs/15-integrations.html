@@ -392,7 +392,7 @@ npx aireceipts-cli integrations github</code></pre>
   <li>Keep enforcement opt-in; notice-only is the default.</li>
 </ol>
 
-<p>CI checks for marked PR receipt comments and can post from a <code>refs/receipts/*</code> ref. It does not generate receipts and does not read local transcripts. The workflow alone is a no-op until the Claude hook, or a manual <code>npx aireceipts-cli pr --store ref --push-ref</code>, produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.</p>
+<p>CI checks for marked PR receipt comments and can post from a <code>refs/aireceipts/*</code> ref. It does not generate receipts and does not read local transcripts. The workflow alone is a no-op until the Claude hook, or a manual <code>npx aireceipts-cli pr --store ref --push-ref</code>, produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.</p>
 
 <h3 id="two-ways-to-add-the-ci-check">Two ways to add the CI check</h3>
 

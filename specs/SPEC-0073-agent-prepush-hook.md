@@ -10,7 +10,7 @@ depends: [SPEC-0064, SPEC-0065]
 
 ## Purpose
 
-Receipts only reach a PR when a branch carries a `refs/receipts/<slug>` ref (SPEC-0065/0066)
+Receipts only reach a PR when a branch carries a `refs/aireceipts/<slug>` ref (SPEC-0065/0066)
 and CI posts it (SPEC-0064 `pr-check`). Today aireceipts produces that ref only via the
 committed `.githooks/pre-push` (this repo's own contributors, `npm run setup:hooks`) or a
 manual `npx aireceipts-cli pr --store ref --push-ref`. An **adopter** repo therefore gets
@@ -41,7 +41,7 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   branch** (a bare `git push`, `git push origin`, `git push origin <branch>`, or an explicit
   `HEAD:refs/heads/<branch>` refspec). It must **NOT** act on: non-`git` commands; `git`
   non-`push` verbs; `git push --delete`/`--tags`-only/`--prune`-only/`--dry-run`; a push whose
-  only refspec is `refs/receipts/*` (recursion guard); a push to a non-`origin` remote; a
+  only refspec is `refs/aireceipts/*` (recursion guard); a push to a non-`origin` remote; a
   **repo-retargeting push** (`git -C <dir> push`, `--git-dir`/`--work-tree`/`--namespace`/
   `--exec-path`) whose target repo/worktree differs from the hook's cwd — the attach only runs
   against the hook's cwd, so attaching would write the ref to the wrong repo; or any command the
@@ -80,12 +80,14 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   `.claude/settings.json` (the `PreToolUse` auto-attach hook, R3). The kit states plainly that the
   workflow alone is a no-op until the hook (or a manual `pr --store ref --push-ref`) produces a
   ref. `aireceipts integrations` surfaces the same two-file recipe.
-- **R5 — collision safety with a sibling ref producer.** The `refs/receipts/<slug>` namespace is
-  shared with the internal sibling. The kit's docs state the hazard: do **not** enable the
-  aireceipts auto-attach hook on a repo already running another `refs/receipts/*` producer (they
-  would fight over the ref). `pr-check` already fails safe on a foreign-schema `receipt.json`
-  (rejects, posts nothing — no fabrication); this spec adds no new write that could clobber a
-  foreign ref beyond the existing `--push-ref` force semantics, which the docs call out.
+- **R5 — collision safety with a sibling ref producer (RESOLVED).** aireceipts writes and reads
+  only its own `refs/aireceipts/*` namespace (SPEC-0065 R1), so it never touches a sibling tool's
+  `refs/receipts/*` refs and the two coexist without fighting over a ref. This closed a real
+  field collision: while both tools shared `refs/receipts/*`, an org repo running an in-toto
+  attestation producer left every `refs/receipts/<slug>` occupied by a foreign payload, so
+  `pr-check` fetched it, failed its `schemaVersion` check, and silently posted nothing (fails
+  safe — rejects, no fabrication — but also never posts an aireceipts receipt). The dedicated
+  namespace removes the hazard; the kit's docs now state that coexistence is safe.
 - **R6 — Codex scope is honest.** Codex `exec` does not currently invoke lifecycle hooks, so the
   auto-attach is **Claude Code** for now; the subcommand still parses a Codex-shaped payload if
   one is piped (forward-compatible), and the kit documents Codex as manual (`pr --store ref
@@ -94,15 +96,16 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
 ## Scenarios
 
 - **Given** an adopter repo with the two-file kit, **when** the coding agent runs `git push` on a
-  feature branch, **then** `hook pre-push` writes+pushes `refs/receipts/<slug>` before/with the
+  feature branch, **then** `hook pre-push` writes+pushes `refs/aireceipts/<slug>` before/with the
   push, the developer's push proceeds unblocked, and the next CI run posts the receipt.
 - **Given** the same hook, **when** the agent runs any non-push Bash command (or `git status`,
-  `git push --dry-run`, a tag-only push, or the nested `refs/receipts/*` push), **then** the hook
+  `git push --dry-run`, a tag-only push, or the nested `refs/aireceipts/*` push), **then** the hook
   does nothing and exits 0 — no ref written, no recursion.
 - **Given** a session with no attributable receipt / no `git` / a failing ref push, **when** the
   hook fires on a branch push, **then** it exits 0 silently and the developer's push is unaffected.
 - **Given** a repo already running the internal sibling's `refs/receipts` producer, **when** the
-  adopter reads the kit, **then** the docs tell them not to enable the aireceipts hook there.
+  aireceipts hook fires, **then** it writes to `refs/aireceipts/<slug>` (never `refs/receipts/*`),
+  so both tools coexist and the docs state the coexistence is safe.
 
 ## Non-goals
 
@@ -111,8 +114,6 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   (not in the npm package); adopters use the agent hook (R3) or the manual command.
 - **Codex auto-attach.** Documented manual until Codex invokes hooks (R6).
 - **Blocking or gating a push on receipt success.** Structurally forbidden (R2).
-- **Resolving the `refs/receipts` namespace collision with the sibling.** Documented as a hazard
-  (R5); a shared-namespace redesign is out of scope.
 
 ## Test matrix
 
@@ -125,7 +126,7 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
 | R1 | git non-push | `git status` | no action |
 | R1 | delete/tag-only/dry-run | `git push --delete`, `git push --tags`, `git push --dry-run` | no action |
 | R1 | non-origin remote | `git push upstream feat` | no action (only origin) |
-| R1 | nested receipts push (recursion) | `git push origin refs/receipts/x` | no action |
+| R1 | nested receipts push (recursion) | `git push origin refs/aireceipts/x` | no action |
 | R1 | echoed / heredoc / alias | `echo "git push"`, push inside a heredoc, ambiguous `&&`-chain | no action (tokenized parser, under-attach) |
 | R1 | repo-retargeting push | `git -C sub push …`, `git --git-dir=… push …`, `--work-tree`/`--namespace`/`--exec-path` | **no action** — the attach only runs against the hook's cwd, so a push aimed at another repo/worktree must not attach (would write the ref to the wrong repo) |
 | R2 | never blocks | attach throws / no git / empty stdin / bad JSON / no session | exit 0, empty stdout, empty stderr, no decision object |

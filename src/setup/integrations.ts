@@ -144,7 +144,7 @@ export const INTEGRATION_RECIPES: readonly IntegrationRecipe[] = [
     label: "GitHub PR check + Claude auto-attach",
     status: "works today",
     scope: "external",
-    network: "GitHub Actions plus local git push of refs/receipts/*; transcripts never upload",
+    network: "GitHub Actions plus local git push of refs/aireceipts/*; transcripts never upload",
     files: [".github/workflows/pr-receipt-check.yml", ".claude/settings.json"],
     start: "commit both the workflow and Claude Code hook below",
     undo: "remove .github/workflows/pr-receipt-check.yml and .claude/settings.json hook entry",
@@ -190,7 +190,7 @@ export const INTEGRATION_RECIPES: readonly IntegrationRecipe[] = [
     ].join("\n"),
     notes: [
       "Automatic PR receipts need both files: the workflow alone is a no-op until the hook, or a manual `pr --store ref --push-ref`, produces a ref.",
-      "Do not enable the hook in a repo already running another refs/receipts/* producer; --push-ref force-updates that namespace.",
+      "Safe to run alongside another refs/receipts/* producer: aireceipts uses its own refs/aireceipts/* namespace and never reads or writes refs/receipts/*.",
       "Codex is manual for now: run `npx aireceipts-cli pr --store ref --push-ref` until Codex invokes lifecycle hooks.",
       "notice-only is the default; same-repo enforcement is opt-in through the documented repo variable.",
       "Fork PRs stay advisory, and CI never generates receipts or reads transcripts.",

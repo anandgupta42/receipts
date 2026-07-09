@@ -1,6 +1,6 @@
 // SPEC-0073 — hidden Claude Code PreToolUse hook. It reads the hook payload,
 // recognizes a real `git push` branch push with the tokenized git parser, and
-// best-effort attaches `refs/receipts/<slug>` without ever writing a hook
+// best-effort attaches `refs/aireceipts/<slug>` without ever writing a hook
 // decision object or blocking the developer's push.
 import { runPrDetailed, defaultPrDeps } from "../../pr/index.js";
 import { classifyPush, toolCallInvocations } from "../../pr/gitWrite.js";

@@ -1,6 +1,6 @@
 // SPEC-0065 R1 — pure git-plumbing ref store for `store=ref` PR receipts.
 // Writes the schema-versioned `PrReceiptPayload` as a git object on
-// `refs/receipts/<slug>` via plumbing only (`hash-object` → `mktree` →
+// `refs/aireceipts/<slug>` via plumbing only (`hash-object` → `mktree` →
 // `commit-tree` → `update-ref`), touching no index or worktree. The wrapping
 // commit is dated from the receipt's own `endedAt` (never wall-clock) with a
 // fixed author/committer identity, so the same payload yields the same
@@ -25,10 +25,18 @@ const IDENT_ENV = {
   GIT_COMMITTER_EMAIL: "receipts@aireceipts.dev",
 } as const;
 
-/** Prefix of every PR-receipt ref (SPEC-0065 R1). */
-export const RECEIPT_REF_PREFIX = "refs/receipts/";
+/**
+ * Prefix of every PR-receipt ref (SPEC-0065 R1). Product-namespaced under
+ * `refs/aireceipts/` — NOT the generic `refs/receipts/` — so aireceipts never
+ * collides with another tool's `refs/receipts/*` producer. That collision was
+ * real: a repo running a separate attestation tool on `refs/receipts/*` left
+ * `pr-check` reading a foreign payload, failing its `schemaVersion` check, and
+ * silently posting nothing (see `src/setup/integrations.ts`). Owning a
+ * dedicated namespace lets the two coexist — each reads only its own refs.
+ */
+export const RECEIPT_REF_PREFIX = "refs/aireceipts/";
 
-/** The full ref name for a slug (from `receiptRefSlug(branch)`), e.g. `refs/receipts/feat-x`. */
+/** The full ref name for a slug (from `receiptRefSlug(branch)`), e.g. `refs/aireceipts/feat-x`. */
 export function receiptRef(slug: string): string {
   return `${RECEIPT_REF_PREFIX}${slug}`;
 }

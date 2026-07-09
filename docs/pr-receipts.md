@@ -74,7 +74,7 @@ npm run setup:hooks
 That points `core.hooksPath` at the committed `.githooks/` and builds the CLI (the hook
 runs the built `dist/`, or a global `aireceipts` if you have one). From then on, every
 `git push` of a branch runs `aireceipts pr --store ref --push-ref` for you: it writes the
-receipt to `refs/receipts/<slug>` and pushes that ref alongside your branch, with no extra
+receipt to `refs/aireceipts/<slug>` and pushes that ref alongside your branch, with no extra
 step. It's best-effort and **never blocks the push** — a missing session, a repo without
 `gh`, an unbuilt CLI, or a push failure is swallowed silently and the push proceeds. (Git
 never runs a fetched hook automatically, so this one command is unavoidable; the CI check
@@ -180,7 +180,7 @@ who viewed which receipt.
    > Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.
 
 The workflow is the reader/poster; the hook is the producer. The workflow alone is a
-no-op until a branch carries `refs/receipts/<slug>`, produced by the Claude hook above
+no-op until a branch carries `refs/aireceipts/<slug>`, produced by the Claude hook above
 or manually with:
 
 ```sh
@@ -191,16 +191,17 @@ Codex is manual for now: Codex `exec` does not currently invoke lifecycle hooks.
 hidden `hook pre-push` subcommand accepts a Codex-shaped payload for forward
 compatibility, but do not count on Codex auto-attach until Codex hooks exist.
 
-Do **not** enable this hook in a repo already running another `refs/receipts/*`
-producer. `--push-ref` force-updates the receipt ref for a branch, so two producers
-would fight over the same namespace. `pr-check` fails safe on a foreign-schema ref and
-posts nothing, but avoiding the collision is still the adopter's responsibility.
+Safe to run alongside another `refs/receipts/*` producer (e.g. an attestation tool):
+aireceipts writes and reads only its own `refs/aireceipts/*` namespace, so the two never
+fight over the same refs. (Earlier versions shared `refs/receipts/*`, which left
+`pr-check` reading a foreign-schema payload and silently posting nothing; the dedicated
+namespace removes that collision.)
 
 **Footprint (what this actually adds to your repo).** Two committed files for the
 automatic path (plus, optionally, a one-line note in `CONTRIBUTING.md`). The check is
 **notice-only by default** — a neutral `::notice` when a receipt is missing, nothing
 otherwise, and a failing build only if you opt into same-repo enforcement. aireceipts **never commits receipt files** to your tree: a receipt is a PR
-comment or a git ref (`refs/receipts/…`), both invisible in your source and your PR
+comment or a git ref (`refs/aireceipts/…`), both invisible in your source and your PR
 diffs. Remove it anytime by deleting the workflow and the `.claude/settings.json` hook
 entry.
 
@@ -210,7 +211,7 @@ entry.
   PRs require a receipt. Fork PRs always stay notice-only (source transcripts live on the
   contributor's machine, so CI can't generate one).
 - **Fully seamless** — two opt-in layers now exist. **CI posts for you:** when a
-  branch carries a `refs/receipts/<slug>` ref, the check renders and posts the receipt
+  branch carries a `refs/aireceipts/<slug>` ref, the check renders and posts the receipt
   comment itself via `GITHUB_TOKEN`, so a contributor needs no local `gh`. **Auto-attach on
   push:** the committed Claude Code hook above writes and pushes that ref before an agent-run
   `git push`. For this repo's own contributors, the older `.githooks/pre-push` path still

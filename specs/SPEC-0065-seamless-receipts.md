@@ -14,7 +14,7 @@ Today a receipt reaches a PR only if a human/agent remembers to run `npx airecei
 pr --post` with local `gh` auth. If they forget, the PR has no receipt — the exact miss
 the org rollout can't tolerate. This spec makes the receipt **attach itself**: a
 committed pre-push git hook generates it locally and stores it as a git ref
-(`refs/receipts/<slug>`) that travels with the push; CI reads the ref and renders + posts
+(`refs/aireceipts/<slug>`) that travels with the push; CI reads the ref and renders + posts
 the PR comment itself (no dev `gh` auth), enforcing presence when a repo opts in.
 
 The hard boundary is unchanged and load-bearing: **CI never generates a receipt** — the
@@ -35,7 +35,10 @@ same transcript yields the same object SHA.
   (parse + schema-validate) as the round-trip; feeding the deserialized payload to the
   existing `renderPrBody` must reproduce the comment byte-for-byte. **String fields inside
   the payload stay untrusted across the CI trust boundary — sanitizing them at render time
-  is SPEC-0066's job, not the producer's.** It is written as a git object on `refs/receipts/<slug>` via pure plumbing
+  is SPEC-0066's job, not the producer's.** It is written as a git object on `refs/aireceipts/<slug>`
+  — a product-dedicated namespace, **not** the generic `refs/receipts/*`, so aireceipts never
+  collides with another tool's `refs/receipts/*` producer (a shared namespace let `pr-check`
+  read a foreign-schema payload and silently post nothing) — via pure plumbing
   (`hash-object -w` → `mktree` with one `receipt.json` → `commit-tree` → `update-ref`),
   touching no index or worktree, through a **dedicated fixed-env git invocation** (the
   existing `CommandRunner` has no env seam): `GIT_AUTHOR_*`/`GIT_COMMITTER_*` pinned to a
@@ -49,7 +52,7 @@ same transcript yields the same object SHA.
   `AIRECEIPTS_STORE=ref`; default stays `comment` (opt-in first).
 - **R2 — pre-push hook.** `.githooks/pre-push` acts only on a branch push (guards on
   `refs/heads/*` from stdin), runs `aireceipts pr --store ref`, then pushes the ref
-  (`git push <remote> +refs/receipts/<slug>:refs/receipts/<slug>`). The nested ref push
+  (`git push <remote> +refs/aireceipts/<slug>:refs/aireceipts/<slug>`). The nested ref push
   carries no `refs/heads/*`, so the same branch guard prevents recursion — **no
   commit-then-re-push dance, no second `git push` for the user.** Every failure path is
   best-effort: no session, not a repo, or push failure ⇒ one stderr line, the branch push
@@ -63,7 +66,7 @@ same transcript yields the same object SHA.
   `git config core.hooksPath .githooks` (or the CI-only path) — CI (R4) is the only
   universal, install-free layer.
 - **R4 — CI consumer: split to SPEC-0066 (the trust boundary).** The CI side — fetch
-  `refs/receipts/<slug>`, validate the **untrusted, fork-author-controlled** payload against
+  `refs/aireceipts/<slug>`, validate the **untrusted, fork-author-controlled** payload against
   its `schemaVersion`, sanitize every string field (neutralize code fences, Markdown links,
   HTML `<details>`; reject non-finite numbers, cap lengths, reject unknown fields), render
   through the hardened renderer, upsert via `GITHUB_TOKEN` (workflow gains
@@ -74,7 +77,7 @@ same transcript yields the same object SHA.
   round-trip contract (`PrReceiptPayload`) is the seam both sides build to. The matrix rows
   below state that seam contract; their CI-side verification lives in SPEC-0066.
 - **R5 — local tooling reads refs.** `aireceipts --list` / `week` / `stats` include
-  ref-stored receipts (`git for-each-ref refs/receipts`) alongside file/session discovery;
+  ref-stored receipts (`git for-each-ref refs/aireceipts`) alongside file/session discovery;
   a prune deletes local+remote receipt refs for merged/gone branches.
 - **R6 — determinism + tests.** Same transcript ⇒ same object bytes (dated from
   `endedAt`). Tests: plumbing round-trip (write ref → read back byte-identical); hook
@@ -84,7 +87,7 @@ same transcript yields the same object SHA.
 ## Scenarios
 
 - **Given** `AIRECEIPTS_STORE=ref` and a matching session, **when** the developer runs
-  `git push`, **then** the pre-push hook writes and pushes `refs/receipts/<slug>` and the
+  `git push`, **then** the pre-push hook writes and pushes `refs/aireceipts/<slug>` and the
   branch push completes with no second push.
 - **Given** a PR whose branch carries a receipt ref, **when** CI runs, **then** it fetches
   the ref, renders the comment from it, upserts the marked comment via `GITHUB_TOKEN`, and
@@ -117,7 +120,7 @@ same transcript yields the same object SHA.
 | R1 | derived date | model with startedAtMs+durationMs | date = `max(startedAtMs+durationMs)`, no wall-clock |
 | R1 | slug edges | branch names with `/`, spaces, unicode, empty | `receiptRefSlug` stable, matches CI's slug |
 | R2 | branch-push triggers | stdin has `refs/heads/x` | runs producer, pushes ref, exit 0 |
-| R2 | ref-push no recursion | stdin has only `refs/receipts/x` | guard exits 0, no regen |
+| R2 | ref-push no recursion | stdin has only `refs/aireceipts/x` | guard exits 0, no regen |
 | R2 | multi-ref / `--all` push | stdin has heads + other refs | acts once on the branch, explicit refspec only |
 | R2 | no session | producer non-zero | push proceeds, one stderr line |
 | R3 | precedence | flag vs env vs settings | flag > env > settings > `comment` |
@@ -126,7 +129,7 @@ same transcript yields the same object SHA.
 | R4 | untrusted payload | ref JSON with fences/links/`<details>`/NaN/unknown fields | schema-rejected or escaped; no raw injection posted |
 | R4 | write permission | reusable workflow | declares `pull-requests: write`; posts via `GITHUB_TOKEN` |
 | R4 | enforce miss | agent PR, no receipt, require on | check fails + fix comment |
-| R5 | list refs | `for-each-ref refs/receipts` | ref receipts appear in `--list` |
+| R5 | list refs | `for-each-ref refs/aireceipts` | ref receipts appear in `--list` |
 | R6 | determinism gate | same transcript, 10 runs | `determinism-check` byte-identical; goldens green |
 
 ## Success criteria
@@ -145,7 +148,7 @@ same transcript yields the same object SHA.
 
 **Shipped in v0.4.0:** the push→CI-post arc — R1 (`store=ref` producer), R2 (pre-push
 hook), R3 (activation), R6 (determinism), and R4 via SPEC-0066. **Deferred:** R5 (local
-`--list`/`week`/`stats` reading `refs/receipts` + a prune for merged branches) is not yet
+`--list`/`week`/`stats` reading `refs/aireceipts` + a prune for merged branches) is not yet
 wired — `listReceiptRefs` has no CLI caller. Also deferred with SPEC-0066: enforcement's
 agent-built vs hand-written discrimination (opt-in enforcement is currently coarse —
 same-repo vs fork only). Both are follow-ups; neither gates the seamless push→CI-post arc.

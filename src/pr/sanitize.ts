@@ -1,5 +1,5 @@
 // SPEC-0066 R2/R3 — validate + sanitize the untrusted `PrReceiptPayload` read
-// from `refs/receipts/<slug>` before it ever reaches `renderPrBody`. The ref is
+// from `refs/aireceipts/<slug>` before it ever reaches `renderPrBody`. The ref is
 // fork/branch-author-controlled input crossing a new trust boundary: CI parses
 // it and posts the rendered result with a write token (`GITHUB_TOKEN`). Every
 // string the payload carries is therefore untrusted and could carry a
