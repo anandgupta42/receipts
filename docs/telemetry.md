@@ -206,7 +206,7 @@ This prints whether telemetry is currently enabled and the exact events queued f
 
 ## First-run notice
 
-The first time `aireceipts` runs for a given user, it prints a one-line disclosure pointing here, then persists `{ "shown": true }` to `~/.aireceipts/telemetry.json` so it never prints again. If that file cannot be read or written, the notice is shown again on the next run rather than failing the CLI.
+The first time `aireceipts` runs for a given user while telemetry is enabled, it prints a one-line disclosure pointing here, then persists `{ "shown": true }` to `~/.aireceipts/telemetry.json` so it never prints again. If `AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1` is active before that first enabled run, `aireceipts` prints no notice and does not persist the shown flag; the notice appears on the first later run where telemetry is enabled. If the notice file cannot be read or written, the notice is shown again on the next enabled run rather than failing the CLI.
 
 ## Source of truth
 
