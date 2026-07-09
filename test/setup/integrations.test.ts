@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { INTEGRATION_RECIPES, INTEGRATION_TARGETS, integrationRecipe } from "../../src/setup/integrations.js";
 import { integrationsToJson, renderIntegrationMatrix, renderIntegrationRecipe } from "../../src/setup/render.js";
@@ -32,6 +33,11 @@ describe("SPEC-0050 integration recipes", () => {
     const github = integrationRecipe("github");
     expect(github).toBeDefined();
     const rendered = renderIntegrationRecipe(github!);
+    const npmNativeWorkflow = readFileSync("docs/adopt/pr-check-caller.yml", "utf8").trimEnd();
+    expect(rendered.indexOf("uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest")).toBeLessThan(
+      rendered.indexOf("ALTERNATIVE: self-contained npm-native pr-check"),
+    );
+    expect(rendered).toContain(["```yaml", npmNativeWorkflow, "```"].join("\n"));
     expect(rendered).toContain("notice-only");
     expect(rendered).toContain("CI never generates receipts");
   });

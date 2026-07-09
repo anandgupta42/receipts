@@ -374,6 +374,12 @@ describe("built CLI e2e", () => {
     expect(opencode.stdout).toContain(".opencode/commands/receipt.md");
     expect(opencode.stdout).toContain("npx aireceipts-cli pr --post");
 
+    const github = await runCli(["integrations", "github"], home);
+    expectSuccess(github);
+    expect(github.stdout).toContain("uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest");
+    expect(github.stdout).toContain("ALTERNATIVE: self-contained npm-native pr-check");
+    expect(github.stdout).toContain("npx -y aireceipts-cli@latest pr-check");
+
     const unknown = await runCli(["integrations", "unknown"], home);
     expect(unknown.code).toBe(1);
     expect(unknown.stderr).toContain('unknown integration target "unknown"');
