@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +10,14 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
 const cliPath = path.join(repoRoot, "dist", "cli.js");
 const tempDirs: string[] = [];
+
+// Probe whether THIS runtime loads node:sqlite unflagged (22.13+/23.4+, and
+// not disabled via NODE_OPTIONS) by asking a child process that runs exactly
+// like the spawned CLI does. Runtimes without it legitimately use the
+// sqlite3-CLI fallback, so the in-process regression test below skips there
+// instead of failing — a version gate would misclassify 23.0–23.3.
+const hasNodeSqlite =
+  spawnSync(process.execPath, ["-e", 'require("node:sqlite")'], { encoding: "utf8" }).status === 0;
 
 interface RunOptions {
   cwd?: string;
@@ -537,6 +545,40 @@ describe("built CLI e2e", () => {
     expectSuccess(textResult);
     expect(textResult.stdout).toContain("no price table matched");
     expect(textResult.stdout).not.toContain("$");
+  });
+
+  // Regression pair for tsup's removeNodeProtocol default: it rewrote
+  // `import("node:sqlite")` to `import("sqlite")` in dist (ERR_MODULE_NOT_FOUND
+  // at runtime), silently forcing every sqlite read onto a per-query
+  // sqlite3-CLI spawn (~4x slower end-to-end on sqlite-heavy machines). Unit
+  // tests import src and can never catch this — only the built artifact shows it.
+  it("keeps the node:sqlite import specifier intact in the built artifact", async () => {
+    const distFiles = await readdir(path.join(repoRoot, "dist"), { recursive: true });
+    const sources = await Promise.all(
+      distFiles
+        .filter((file) => file.endsWith(".js"))
+        .map((file) => readFile(path.join(repoRoot, "dist", file), "utf8")),
+    );
+    expect(sources.some((source) => /import\(["']node:sqlite["']\)/.test(source))).toBe(true);
+    expect(sources.some((source) => /import\(["']sqlite["']\)/.test(source))).toBe(false);
+  });
+
+  it.skipIf(!hasNodeSqlite)("reads opencode sessions in-process with no sqlite3 binary on PATH", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "clean-multi-vendor.db");
+    // An empty PATH dir makes the sqlite3-CLI fallback unreachable, so this
+    // passes only when the built CLI's node:sqlite import actually resolves.
+    const emptyPathDir = path.join(home, "empty-path-dir");
+    await mkdir(emptyPathDir, { recursive: true });
+
+    const listed = readJson<ListRowJson[]>(
+      await runProcess(process.execPath, [cliPath, "--list", "--json"], {
+        env: { ...cliEnv(home), PATH: emptyPathDir },
+      }),
+    );
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.source).toBe("opencode");
   });
 
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
