@@ -65,8 +65,9 @@ cell stays correct-or-flagged as the code changes.
 Found by replaying every receipt posted on this repo's closed PRs against the
 local transcripts that produced them.
 
-**Finding (A-class, OVER-report — the first confirmed violation of "the
-receipt is a floor"):** Claude Code writes one `assistant` JSONL record per
+**Finding (A-class, OVER-report — the first confirmed *arithmetic* violation
+of "the receipt is a floor"; PR #87's earlier over-credit was an
+attribution-scope error, not a token-arithmetic one):** Claude Code writes one `assistant` JSONL record per
 content block of a response. Every record of the same response repeats the same
 `message.id` and a byte-identical `usage` snapshot. The adapter counted each
 record as its own billed turn, multiplying the response's usage by its block
