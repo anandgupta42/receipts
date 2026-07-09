@@ -56,7 +56,9 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
-<sub>the same receipt renders as a shareable SVG (`--svg`, light and dark themes),
+<sub>`pre-edit` is the share of cost spent before the first edit-tool call
+([reading a receipt](docs/guide/04-read-a-receipt.md)).
+The same receipt renders as a shareable SVG (`--svg`, light and dark themes),
 versioned JSON (`--json`), or CSV (`--csv`).</sub>
 
 <div align="center">
