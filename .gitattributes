@@ -1,6 +1,0 @@
-# I5: goldens are byte-exact contracts and fixtures are parsed byte streams —
-# git line-ending conversion must never touch them on any platform (Windows
-# checkouts default core.autocrlf=true, which CRLF-converts them and breaks
-# byte-equal comparisons).
-goldens/** -text
-test/fixtures/** -text

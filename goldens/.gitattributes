@@ -1,0 +1,2 @@
+# I5: goldens are byte-exact contracts — no platform git may rewrite line endings.
+* -text
