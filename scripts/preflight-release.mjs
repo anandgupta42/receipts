@@ -150,6 +150,7 @@ async function main() {
     "verify-goldens",
     "spec-lint",
     "hygiene",
+    "readme-guard (fast)",
     "vitest run (full suite, incl. install+run e2e)",
     "determinism-check ×10",
   ];
@@ -201,6 +202,14 @@ async function main() {
         return record(results, "determinism-check ×10", () =>
           sh("node", ["scripts/determinism-check.mjs", "--runs=10", "--", "node", "scripts/verify-goldens.mjs"]));
       }),
+    );
+  } else {
+    // The full suite (above) already covers the README guard. In --quick we run
+    // just that one fast, deterministic test, so a README or spec change can't
+    // pass the pre-push gate while breaking CI's readme-guard (SPEC-0029/0053).
+    concurrent.push(
+      record(results, "readme-guard (fast)", () =>
+        sh("npx", ["vitest", "run", "test/readme-guard.test.ts"])),
     );
   }
 

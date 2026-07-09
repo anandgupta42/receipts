@@ -39,6 +39,8 @@
     "preflight": "node scripts/preflight-release.mjs",
     "prepublishOnly": "tsup",
     "setup:hooks": "git config core.hooksPath .githooks && npm run build",
+    "setup:worktree": "node scripts/worktree-setup.mjs",
+    "ship-check": "node scripts/ship-check.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
