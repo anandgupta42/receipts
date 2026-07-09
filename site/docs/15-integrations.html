@@ -353,7 +353,6 @@ npx aireceipts-cli setup</code></pre>
     <tr><td>A weekly habit</td><td><code>npx aireceipts-cli week</code></td><td>local</td><td>none</td></tr>
     <tr><td>PR receipt comments</td><td><code>npx aireceipts-cli pr --post</code></td><td>repo/PR</td><td>GitHub only when explicitly run</td></tr>
     <tr><td>Team PR receipt presence checks</td><td>reusable GitHub workflow</td><td>repo</td><td>GitHub Actions only</td></tr>
-    <tr><td>Automatic PR receipt refs</td><td>workflow + <code>.claude/settings.json</code> hook</td><td>repo</td><td>GitHub Actions + git push</td></tr>
   </tbody>
 </table></div>
 
@@ -387,11 +386,10 @@ npx aireceipts-cli integrations github</code></pre>
   <li>Add assistant snippets or local hooks if they help the workflow.</li>
   <li>For PR-producing tasks, run <code>npx aireceipts-cli pr --post</code>.</li>
   <li>Add the reusable GitHub check when the team wants visibility.</li>
-  <li>Add the committed Claude Code hook when the team wants automatic ref production.</li>
   <li>Keep enforcement opt-in; notice-only is the default.</li>
 </ol>
 
-<p>CI checks for marked PR receipt comments and can post from a <code>refs/receipts/*</code> ref. It does not generate receipts and does not read local transcripts. The workflow alone is a no-op until the Claude hook, or a manual <code>npx aireceipts-cli pr --store ref --push-ref</code>, produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.</p>
+<p>CI checks for marked PR receipt comments. It does not generate receipts and does not read local transcripts.</p>
     </article>
   </main>
   <footer>

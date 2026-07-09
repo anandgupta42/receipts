@@ -348,7 +348,7 @@ footer{
   <li><strong>The files aren't readable.</strong> aireceipts silently skips a transcript it can't read (wrong owner, restrictive mode) rather than erroring on it. If a directory is present but its sessions don't show up, check the file permissions.</li>
 </ul>
 
-<p>The default human receipt and <code>--list</code> print this as informational guidance and exit <code>0</code>. Machine exports such as <code>--json</code> and <code>--csv</code> still exit non-zero with no sessions, because they would otherwise report success without a payload.</p>
+<p>The default receipt exits non-zero with this message; <code>--list</code> prints the same message and exits <code>0</code>.</p>
 
 <h2 id="no-session-matched"><code>no session matched &quot;…&quot;</code></h2>
 

@@ -56,6 +56,11 @@ export async function resolveSelector(
     return { error: empty.message, kind };
   }
   const sessions = await listFullSessions();
+  if (sessions.length === 0) {
+    const empty = await emptySessionState();
+    const kind = empty.detected ? "no-sessions" : "no-session-data";
+    return { error: empty.message, kind };
+  }
   const summary = selectSummary(sessions, selector);
   if (!summary) {
     return { error: `no session matched "${selector}"`, kind: "no-match" };

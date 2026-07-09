@@ -374,6 +374,38 @@ describe("built CLI e2e", () => {
     expect(result.stderr).toBe('no session matched "does-not-exist-xyz"\n');
   });
 
+  it("selector miss on an empty machine prints searched roots and exits 1", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["does-not-exist-xyz"], home);
+
+    expect(result.code, result.stderr).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toContain("no agent session data detected. Looked in:");
+    expect(result.stderr).toContain("No sessions yet? Run `aireceipts --demo` to see a sample receipt.");
+    expect(result.stderr).toContain(path.join(home, ".claude", "projects"));
+    expect(result.stderr).toContain(path.join(home, ".codex", "sessions"));
+  });
+
+  it("empty-machine handoff and mini selector paths print searched-root guidance", async () => {
+    const cases: Array<{ args: string[]; expectedCode: number }> = [
+      { args: ["--handoff", "does-not-exist-xyz"], expectedCode: 1 },
+      { args: ["--mini", "does-not-exist-xyz"], expectedCode: 0 },
+    ];
+    for (const { args, expectedCode } of cases) {
+      const home = await makeHome();
+
+      const result = await runCli(args, home);
+
+      expect(result.code, `${args.join(" ")} stderr:\n${result.stderr}`).toBe(expectedCode);
+      expect(result.stdout).toBe("");
+      expect(result.stderr).toContain("no agent session data detected. Looked in:");
+      expect(result.stderr).toContain("No sessions yet? Run `aireceipts --demo` to see a sample receipt.");
+      expect(result.stderr).toContain(path.join(home, ".claude", "projects"));
+      expect(result.stderr).toContain(path.join(home, ".codex", "sessions"));
+    }
+  });
+
   it("runs setup with no sessions and exits 0 after printing searched roots", async () => {
     const home = await makeHome();
 
