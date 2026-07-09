@@ -47,8 +47,15 @@ R6, R7. The `node:sqlite` fix PR precedes stage 1.*
   matching; Codex/opencode: their summaries' `cwd` field, measured present 652/652
   and 1/1). Matching = normalized equality or path-prefix (a pane deep in the repo
   matches the repo-root session; normalization is platform-aware: case-folded drive
-  letters, `\`→`/`; prefix means whole path segments — `/repo` never matches
-  `/repo-old`). **Confirm-on-load:** because the CC encoding collides (`/my-repo`
+  letters, `\`→`/`, lexical `.`/`..` resolution; prefix means whole path segments —
+  `/repo` never matches `/repo-old`). **Home-shadow guard** (found by real-data
+  visual e2e during the stage-1 build): a session recorded at the user's home
+  directory or above (an agent launched from `~` or `/`) matches its **exact** path
+  only — it never ancestor-matches, because one `~`-launched session is an ancestor
+  of every path on the machine and would permanently shadow the placeholder.
+  Ancestor matching stays for project roots below home and outside it (`/srv/app`
+  still matches `/srv/app/sub`); a monorepo rooted exactly at `$HOME` needs the
+  exact path — a deliberate, documented trade. **Confirm-on-load:** because the CC encoding collides (`/my-repo`
   and `/my/repo` both encode to `-my-repo`), a candidate matched by directory name
   is confirmed against the loaded session's own `cwd` field (`src/parse/types.ts:126`
   — the SPEC-0019 attribution field PR receipts already rely on); disagreement → not
@@ -137,6 +144,9 @@ tmux-only (timer surfaces tolerate latency; wrong data is never tolerated).
   placeholder renders, never the colliding project's dollars.
 - **Given** no session ever ran in `/repo`, **When** `--cwd /repo` renders, **Then**
   the neutral placeholder — never another project's line.
+- **Given** only a session launched from `~`, **When** `--cwd /repo` renders, **Then**
+  the placeholder (home-or-above sessions match their exact path only); **When**
+  `--cwd ~` renders, **Then** that session's line (exact match still allowed).
 - **Given** a usable stdin payload **and** `--cwd`, **When** the line renders,
   **Then** stdin wins (native behavior, unchanged).
 - **Given** `statusline.json` `{"items":["brand","cost","burn"]}` and no `--format`,
@@ -176,6 +186,7 @@ tmux-only (timer surfaces tolerate latency; wrong data is never tolerated).
 | R1 CC encoded match | CC project dir `-my-repo`, `--cwd /my/repo`, loaded cwd `/my/repo` | matches |
 | R1 collision guarded | CC project dir `-my-repo`, `--cwd /my-repo`, loaded cwd `/my/repo` | no match, placeholder |
 | R1 no match | `--cwd /never-used` | neutral placeholder, exit 0 |
+| R1 home-shadow guard | only a `~`-launched session exists, `--cwd /never-used` | placeholder (home session never ancestor-matches) |
 | R1 cursor excluded | only a Cursor session for the cwd | placeholder (never matched) |
 | R1 unscoped unchanged | no `--cwd`, no stdin | today's global-newest line, byte-identical |
 | R2 config renders | `statusline.json` items `brand,cost` | exactly those, in order |
