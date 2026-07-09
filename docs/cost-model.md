@@ -32,10 +32,48 @@ introduced.
 
 | Agent | Per-turn model | Per-turn usage | Cache tiers | Notes |
 |---|---|---|---|---|
-| Claude Code | yes | input/output/cacheRead/cacheCreation (5m/1h split when present) | yes | shape-validated; no vendor cumulative total to reconcile against |
+| Claude Code | yes | input/output/cacheRead/cacheCreation (5m/1h split when present) | yes | shape-validated; one turn per `message.id` (see below); no vendor cumulative total to reconcile against |
 | Codex CLI | yes (`turn_context`) | input/output/cacheRead; `reasoning_output_tokens` folded into output; no cache-write | read-only | zero-tolerance reconciliation vs the rollout's own cumulative envelope |
 | opencode | per-message (multi-provider) | input/output(+reasoning)/cacheRead/cacheCreation | flat (no split) | vendor resolves per turn from the model id; unknown models stay tokens-only |
 | Cursor | none | session totals only | none | `unpriceable` — receipt states "totals only", never a guessed `$` |
+
+## From transcript records to billed turns — the whole pipeline in four steps
+
+Everything a receipt shows reduces to this chain; each step lives in exactly one
+place:
+
+1. **Parse** (`src/parse/<agent>.ts`) — read the agent's on-disk transcript and
+   normalize it into a `Session` of `Turn`s, where **one turn = one billed API
+   response**. This is where per-vendor record quirks are absorbed (below).
+2. **Select** (`src/pr/select.ts` + `slice.ts`) — for PR receipts only: pick the
+   sessions whose `cwd`/branch match this repo, then slice each session to the
+   turn range anchored by this branch's commit SHAs appearing in `git commit`
+   output. No anchor → labeled full session, never a confident wrong cut.
+3. **Price** (`src/pricing/resolve.ts`) — for each turn, look up the dated,
+   cited price row for (vendor, model, date) and multiply: `input`, `output`,
+   `cacheRead` (at the cited cached rate), `cacheCreation` (at the cited
+   cache-write tier rates). No row → tokens only, never a guessed dollar (I2).
+4. **Attribute** (`src/pricing/attribution.ts`) — split each turn's cost evenly
+   across the tools it called and sum per tool; the receipt's TOTAL is the sum
+   of those rows by construction.
+
+**The turn-identity rule (step 1) is where a cost can silently multiply, so it
+is pinned per agent:**
+
+- **Claude Code** writes one `assistant` JSONL record **per content block** of a
+  response — a reply with text + N tool calls appears as up to N+1 records, each
+  repeating the same `message.id` and the **same `usage` snapshot**. The adapter
+  keys turns by `message.id`: the first record opens the turn and books usage
+  once; later records only add their tool calls. (Audited 2026-07-08 over 19
+  real transcripts: up to 12 records per id, usage byte-identical across
+  duplicates; per-record counting inflated a real session's cost 2.8× — see
+  `internal/cost-attribution-evidence.md`.) Records without a `message.id`
+  can't be matched to a response and stay individual turns.
+- **Codex** emits cumulative `token_count` envelopes; the adapter books the
+  per-turn `last_token_usage` **delta** and reconciles the sum against the
+  rollout's own final cumulative total (zero tolerance, enforced by fidelity
+  checks). Verified 2026-07-08 against a real rollout: delta sum == cumulative
+  == the posted receipt's figure, to the cent.
 
 ## Nested subagent rollups — dedup by subtree, not by file
 

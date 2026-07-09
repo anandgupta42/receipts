@@ -7,7 +7,11 @@ const THINKING_REPLY = "(thinking/reply)";
 
 /** R3's one exported methodology string — `aireceipts --methodology` prints this verbatim and `--json` ships it, so the attribution is self-explaining (I3; SPEC-0055 removed the on-card brief). */
 export const METHODOLOGY =
-  "Cost is attributed per assistant turn: each turn's priced usage (tokens × the " +
+  "Cost is attributed per assistant turn. A turn is one billed API response: when " +
+  "an agent's transcript repeats a response across several records (Claude Code " +
+  "writes one record per content block, each carrying the same message id and the " +
+  "same usage snapshot), the response is counted once, deduplicated by message id. " +
+  "Each turn's priced usage (tokens × the " +
   "dated price row matching its model and date) is split evenly across the tool(s) " +
   'it called; a turn with no tool calls is attributed to "(thinking/reply)". Turns ' +
   "whose model has no matching price row contribute tokens only — never a guessed " +

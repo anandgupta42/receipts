@@ -40,6 +40,8 @@ interface RawContentBlock {
 
 interface RawMessage {
   role?: string;
+  /** The API message id (`msg_…`). One billed response = one id, even when the CLI writes several records for it. */
+  id?: string;
   model?: string;
   content?: unknown;
   usage?: RawUsage;
@@ -181,10 +183,19 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let gitBranch: string | undefined;
   let rawSidechain = false;
   let totalUsage = emptyUsage();
-  let turnCount = 0;
   let toolCallCount = 0;
   const turns: Turn[] = [];
   const toolCallById = new Map<string, ToolCall>();
+  // One billed API response = one turn, keyed by `message.id`. Claude Code
+  // writes one `assistant` record per content block, and EVERY record of the
+  // same response repeats the same `message.id` and the same `usage` snapshot
+  // — so counting per record multiplies real cost by the block count (audited
+  // 2026-07-08 over 19 local transcripts: up to 12 records per id, usage
+  // byte-identical across them, ~2.8× session-cost inflation; see
+  // docs/internal/cost-attribution-evidence.md). The first record of an id
+  // opens the turn and books its usage once; follow-up records only add their
+  // tool_use blocks to that turn.
+  const turnByMessageId = new Map<string, Turn>();
   // SPEC-0017 R1/R2 — one entry per distinct next-assistant-turn index that a
   // compact summary/boundary record precedes. Keyed by `turnIndex` so an echo +
   // summary (or two summary shapes) at the same position collapse to one event.
@@ -227,9 +238,9 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     if (r.type === "fork-context-ref") {
       turns.length = 0;
       toolCallById.clear();
+      turnByMessageId.clear();
       compactionByTurn.clear();
       totalUsage = emptyUsage();
-      turnCount = 0;
       toolCallCount = 0;
       model = undefined;
       firstUserText = undefined;
@@ -250,20 +261,36 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
 
     if (r.type === "assistant" && r.message) {
       const msg = r.message;
-      model ??= msg.model;
-      const usage = mapUsage(msg.usage);
-      if (usage) {
-        totalUsage = addUsage(totalUsage, usage);
+      // CLI-injected command echo, not a billed model response.
+      if (typeof msg.content === "string" && COMMAND_ECHO_RE.test(msg.content)) {
+        return;
       }
-      turnCount++;
+      model ??= msg.model;
 
-      const toolCalls: ToolCall[] = [];
-
-      if (typeof msg.content === "string") {
-        if (COMMAND_ECHO_RE.test(msg.content)) {
-          return;
+      // Reuse the open turn for this message id (see `turnByMessageId`); a
+      // record without an id can't be matched to a response, so it stays its
+      // own turn.
+      const existing = msg.id !== undefined ? turnByMessageId.get(msg.id) : undefined;
+      const turn: Turn = existing ?? { index: turns.length, timestamp: ts, model: msg.model, toolCalls: [] };
+      if (!existing) {
+        turns.push(turn);
+        if (msg.id !== undefined) {
+          turnByMessageId.set(msg.id, turn);
         }
-      } else if (Array.isArray(msg.content)) {
+      }
+      turn.model ??= msg.model;
+      // Book the response's usage exactly once — duplicate records repeat the
+      // same snapshot, so the first one seen is the billed figure.
+      if (!turn.usage) {
+        const usage = mapUsage(msg.usage);
+        if (usage) {
+          turn.usage = usage;
+          turn.outputTokens = usage.output;
+          totalUsage = addUsage(totalUsage, usage);
+        }
+      }
+
+      if (Array.isArray(msg.content)) {
         for (const block of msg.content as RawContentBlock[]) {
           if (block.type === "tool_use") {
             toolCallCount++;
@@ -274,22 +301,13 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
               startedAt: ts,
               ...(block.name === "Bash" ? { shell: true } : {}),
             };
-            toolCalls.push(call);
+            turn.toolCalls.push(call);
             if (block.id) {
               toolCallById.set(block.id, call);
             }
           }
         }
       }
-
-      turns.push({
-        index: turns.length,
-        timestamp: ts,
-        model: msg.model,
-        usage,
-        outputTokens: usage?.output,
-        toolCalls,
-      });
       return;
     }
 
@@ -327,7 +345,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   const totals = {
     tokens: totalUsage,
     durationMs: startedAt !== undefined && endedAt !== undefined ? endedAt - startedAt : undefined,
-    turnCount,
+    turnCount: turns.length,
     toolCallCount,
   };
 
