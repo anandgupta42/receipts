@@ -1,6 +1,10 @@
 // SPEC-0075 R1 — shared path matching and Claude Code project-directory
 // encoding for cwd-scoped statusline discovery. These are string operations,
 // not filesystem resolution: the transcript's recorded cwd is the authority.
+// `.`/`..` resolve lexically to wherever the requested path actually points
+// (defense for hand-typed --cwd values; real surfaces pass resolved paths),
+// and a root — `/`, a drive `x:`, a UNC `//server` prefix — matches its own
+// subtree, per the whole-segment ancestor rule.
 
 /**
  * Normalize the cross-platform spelling differences relevant to cwd
