@@ -51,7 +51,8 @@ claude-haiku-4-5` line re-prices the identical token counts on a cheaper model;
 it's arithmetic, not a claim that Haiku would have finished the job.
 
 If instead you see `no agent session data detected`, your agent's logs are
-somewhere aireceipts doesn't look yet — jump to [Troubleshooting](12-troubleshooting.md).
+somewhere aireceipts doesn't look yet. The default command exits `0` for that
+empty-state guidance — jump to [Troubleshooting](12-troubleshooting.md).
 
 No sessions of your own yet? See one now:
 
