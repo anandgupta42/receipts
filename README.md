@@ -34,17 +34,14 @@ transcripts never leave your machine, and a shared receipt carries figures, neve
 Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a bundled example if you have no sessions yet). Then let it run like a cab ride:
 
 **While the agent works — the meter.** One settings line ([setup](docs/statusline.md))
-pins `aireceipts statusline` to the bottom of Claude Code's TUI — the bar right under
-the input box, updating with every prompt:
+pins `aireceipts statusline` to the bottom of Claude Code's TUI — the bar under the
+input box, ticking up as the session runs:
+
+<p align="center"><img alt="An agent session replayed with the aireceipts meter pinned in the status bar: cost climbs $2.67 to $23.78 and tokens 1.5M to 17M as the session runs, a Bash loop ×5 waste flag appears mid-session, and the replay ends on the final reading — cost, tokens, and the waste flag re-priced by aireceipts from the transcript at each step, with the host-supplied payload fields simulated." src="site/assets/statusline.gif" width="640"></p>
+
+The line, segment by segment:
 
 ```
-> fix the payment retry race, then get the queue suite green
-
-⏺ Bash(npx vitest run test/queue)
-  ⎿  PASS  12 files, 214 tests
-╭─────────────────────────────────────────────────────────────────╮
-│ >                                                               │
-╰─────────────────────────────────────────────────────────────────╯
 [aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
              │      │       │       │      │         └ how much of your 5-hour cap is gone · when it resets
              │      │       │       │      └ how full the context window is
@@ -58,7 +55,6 @@ A waste flag (`Bash loop ×5`) joins only when a detector fired — nothing is
 zero-filled. `--cwd` gives any terminal pane (tmux, starship, PowerShell) its own
 session — Codex and opencode included.
 
-<p align="center"><img alt="An agent session replayed with the aireceipts meter pinned in the status bar: cost climbs $2.67 to $23.78 and tokens 1.5M to 17M as the session runs, a Bash loop ×5 waste flag appears mid-session, and the replay ends on the final reading — cost, tokens, and the waste flag re-priced by aireceipts from the transcript at each step, with the host-supplied payload fields simulated." src="site/assets/statusline.gif" width="640"></p>
 
 **When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
 receipt — every tool priced, waste flagged (loops, context thrash, trivial spans),
