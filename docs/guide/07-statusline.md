@@ -10,7 +10,7 @@ Code's `statusLine` config:
 [aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
 ```
 
-![Terminal recording: piping a Claude Code statusLine payload through aireceipts statusline prints the meter line — the model (Opus), session cost, burn rate, tokens, context fullness, a waste flag, and the 5-hour window reset countdown; --format trims it to chosen segments.](../../site/assets/statusline.gif)
+![An agent session replayed with the aireceipts meter pinned in the status bar: cost climbs $2.67 to $23.78 and tokens 1.5M to 17M as the session runs, a Bash loop ×5 waste flag appears mid-session, and the replay ends on the final reading — cost, tokens, and the waste flag re-priced by aireceipts from the transcript at each step, with the host-supplied payload fields simulated.](../../site/assets/statusline.gif)
 
 ## Set it up
 
