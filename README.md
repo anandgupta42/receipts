@@ -9,10 +9,28 @@
 
 [![CI](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml/badge.svg)](https://github.com/anandgupta42/receipts/actions/workflows/ci.yml) [![npm](https://img.shields.io/npm/v/aireceipts-cli.svg)](https://www.npmjs.com/package/aireceipts-cli) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/anandgupta42/receipts/badge)](https://scorecard.dev/viewer/?uri=github.com/anandgupta42/receipts) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
+<a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">
+  <img alt="a real aireceipts receipt comment on a merged pull request of this repo: 3 sessions — a Claude Code orchestrator sliced to just this PR's turns, plus two Codex helpers — $3.13 total" src="docs/assets/pr-receipt-189.png" width="480">
+</a>
+
+<sub>not a mockup — a receipt comment on a merged PR of this repo, posted by
+<code>aireceipts pr --post</code>: three sessions — a Claude orchestrator sliced
+to just this PR's turns, plus two Codex helpers — $3.13 total.
+<a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live.</a></sub>
+
 </div>
 
-<div align="center">
-<table><tr><td>
+**Why this exists.** AI coding agents spend real money invisibly — you see the diff,
+never the bill. aireceipts reads the transcripts your agent already writes to disk and
+turns them into receipts: what a session cost, tool by tool; what a PR cost, across
+every session it can attribute; where tokens were wasted. It's local — your code, file
+contents, and raw transcripts never leave your machine, and pricing needs no network. A
+receipt is the one thing worth sharing, and sharing is always your call — a PR comment,
+a git ref, or an artifact page. A shared receipt carries cost, token, model, and tool
+figures, plus a short session title (often prompt-derived) — never your code, file
+contents, or the transcript itself ([how](docs/pr-receipts.md)).
+
+Here's what one looks like — the exact bytes your terminal prints:
 
 ```
 - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -39,46 +57,25 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
-</td></tr></table>
+<sub>`pre-edit` is the share of cost spent before the first edit-tool call
+([reading a receipt](docs/guide/04-read-a-receipt.md)).
+The same receipt renders as a shareable SVG (`--svg`, light and dark themes),
+versioned JSON (`--json`), or CSV (`--csv`).</sub>
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
+  <img alt="the same receipt rendered as a shareable SVG, light and dark themes" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
+</picture>
+
 </div>
 
-AI coding agents spend real money, and the bill is invisible. You see the diff,
-never the cost. aireceipts reads the transcripts your agent already writes to
-disk and turns them into receipts: what a session cost tool by tool, what a PR
-cost across every session behind it, and where tokens were wasted.
+## Start here — three commands
 
-Everything runs locally. Your code, file contents, and raw transcripts never
-leave your machine, and pricing needs no network. Sharing a receipt is always
-your call, as a PR comment, a git ref, or an artifact page. A shared receipt
-carries cost, token, model, and tool figures plus a short session title, never
-your code or the transcript itself ([how](docs/pr-receipts.md)).
-
-## Supported agents
-
-| Agent | Depth |
-|---|---|
-| [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
-| [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
-| [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
-| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; unknown models stay tokens-only |
-| [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
-
-Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
-independent dataset and opens an issue when they disagree; every table change lands
-as a cited price-table PR.
-
-## What did that session cost?
-
-Every session on your machine, listed and priced — pick one and get its receipt:
-
-```sh
-aireceipts --list    # your sessions, newest first, numbered
-aireceipts 3         # the receipt for #3 on that list
-```
-
-Tool by tool, locally, including where tokens went to waste. `aireceipts` with
-no arguments prices the newest session; `aireceipts --demo` shows a bundled
-example if you have no sessions yet.
+**See what a session cost** — `npx aireceipts-cli`
+Tool by tool, locally, including where tokens went to waste. No install, no account
+(`--demo` shows a bundled example if you have no sessions yet).
 
 <div align="center">
 
@@ -86,15 +83,8 @@ example if you have no sessions yet.
 
 </div>
 
-## Live cost in your status bar
-
-Claude Code's status line can show what the session is costing *as you work*, not
-just a total at the end — session cost, burn rate, tokens, context fullness, a
-waste flag if one fired, and your 5-hour rate-limit window with its reset countdown:
-
-```
-[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
-```
+**Live cost in your status bar** — `npx aireceipts-cli statusline`
+Claude Code's status line shows running cost as you work, not just a total at the end.
 
 <div align="center">
 
@@ -102,72 +92,15 @@ waste flag if one fired, and your 5-hour rate-limit window with its reset countd
 
 </div>
 
-Every number is real: aireceipts' own cited-price cost figure, Claude Code's own
-context and rate-limit readings, and a waste flag only when a detector actually
-fired. Unpriced sessions show tokens, never a made-up dollar amount.
+**A receipt on every PR** — `npx aireceipts-cli pr --post`
+Attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
+drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to carry one.
 
-## Append a receipt on every PR
+Prefer a global install: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
+Full walkthrough: [getting started](docs/guide/01-getting-started.md) · a real one, live:
+[PR #189](https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222).
 
-```sh
-aireceipts pr --post
-```
-
-Run it from the checkout with your PR branch. It finds the local agent sessions
-that built the branch, renders the receipt, and posts it as a single marked PR
-comment through the `gh` CLI. Re-running after more commits updates the same
-comment in place, so there is no comment spam. Generation stays local: your
-transcripts never leave your machine, and only the receipt (cost, tokens,
-models, tools, a short session title) is posted.
-
-<div align="center">
-
-<a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">
-  <img alt="a real aireceipts receipt comment on a merged pull request of this repo: 3 sessions — a Claude Code orchestrator sliced to just this PR's turns, plus two Codex helpers — $3.13 total" src="docs/assets/pr-receipt-189.png" width="520">
-</a>
-
-Not a mockup: this is a receipt comment on a merged PR of this repo, three
-sessions totaling $3.13.
-[Read it live](https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222).
-
-</div>
-
-**Per developer, or repo-wide?** Posting runs per developer (or per coding
-agent) because receipts are built from the transcripts on that developer's
-machine; CI never sees them. Maintainers can still make it repo policy with a
-one-time setup of two committed files: a drop-in
-[CI check](docs/adopt/pr-check-caller.yml) that flags any PR missing a receipt
-(notice-only by default, opt-in to require it), and a Claude Code hook in
-`.claude/settings.json` that auto-attaches receipts for every contributor using
-Claude Code. Both are covered in [PR receipts](docs/pr-receipts.md).
-
-## Everything else it does
-
-| Command | What it does |
-|---|---|
-| `aireceipts` | Receipt for the newest session (`--list` to pick another) |
-| `aireceipts --mini` | Six-line mini-receipt for the newest session |
-| `aireceipts --details` | Adds a DETAILS section — token composition, session shape, per-model split (classic template) |
-| `aireceipts --template <name>` / `templates` | Render a receipt style (`classic`, `grocery`, `datavis`); `templates` previews each — [guide](docs/guide/10-templates.md) |
-| `aireceipts setup` | Found sessions, latest cost, week total, and the integrations that fit your machine — [guide](docs/guide/01-getting-started.md) |
-| `aireceipts pr --post [--artifact]` | Attach the receipt of the sessions behind a PR as a comment; `--artifact` also publishes a durable receipt page — [guide](docs/pr-receipts.md) |
-| `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
-| `aireceipts week` | Trailing-7-day digest: totals, per-agent split, top waste — [guide](docs/guide/06-week.md) |
-| `aireceipts backfill [--out <dir>]` | Bulk receipts across your existing session history; summary by default, one file per session with `--out` — [guide](docs/guide/01-getting-started.md) |
-| `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, opencode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
-| `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time — [guide](docs/guide/09-handoff.md) |
-| `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt — [guide](docs/guide/03-install-hook.md) |
-| `aireceipts statusline` | Live cost line in Claude Code's status bar — [setup](docs/statusline.md) |
-| `aireceipts --quota` / `--check-budget` | Claude Code rate-limit window, read from the statusline stdin payload (silent otherwise); `--check-budget` exits 1 when your local budget cap is exceeded |
-| `aireceipts --json` / `--csv` / `--svg` / `--png` | Versioned schema, RFC 4180 rows, shareable SVG/PNG image — [schema](docs/json-schema.md) |
-| `aireceipts stats` | Local usage counters — receipts generated on this machine |
-
-<div align="center">
-
-<img alt="Terminal recording of a synthetic session: aireceipts --handoff prints COULD HAVE SAVED ≤ $0.08 (81%, arithmetic not a prediction), the flagged Bash loop ×5 waste line with its fix, and the coverage line." src="site/assets/waste-handoff.gif" width="640">
-
-</div>
-
-## Install
+## Install — or let your agent do it
 
 ```sh
 npm i -g aireceipts-cli
@@ -229,8 +162,32 @@ If you are an AI agent asked to install aireceipts, do the following:
    (consent-gated end-of-session mini-receipt) and `aireceipts integrations`
    (snippets for Codex, opencode, Cursor, and GitHub PR receipts).
 
-Everything runs locally: no account, no API key, and transcripts never leave
-the machine ([telemetry details](docs/telemetry.md)).
+## Everything else it does
+
+| Command | What it does |
+|---|---|
+| `aireceipts` | Receipt for the newest session (`--list` to pick another) |
+| `aireceipts --mini` | Six-line mini-receipt for the newest session |
+| `aireceipts --details` | Adds a DETAILS section — token composition, session shape, per-model split (classic template) |
+| `aireceipts --template <name>` / `templates` | Render a receipt style (`classic`, `grocery`, `datavis`); `templates` previews each — [guide](docs/guide/10-templates.md) |
+| `aireceipts setup` | Found sessions, latest cost, week total, and the integrations that fit your machine — [guide](docs/guide/01-getting-started.md) |
+| `aireceipts pr --post [--artifact]` | Attach the receipt of the sessions behind a PR as a comment; `--artifact` also publishes a durable receipt page — [guide](docs/pr-receipts.md) |
+| `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
+| `aireceipts week` | Trailing-7-day digest: totals, per-agent split, top waste — [guide](docs/guide/06-week.md) |
+| `aireceipts backfill [--out <dir>]` | Bulk receipts across your existing session history; summary by default, one file per session with `--out` — [guide](docs/guide/01-getting-started.md) |
+| `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, opencode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
+| `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time — [guide](docs/guide/09-handoff.md) |
+| `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt — [guide](docs/guide/03-install-hook.md) |
+| `aireceipts statusline` | Live cost line in Claude Code's status bar — [setup](docs/statusline.md) |
+| `aireceipts --quota` / `--check-budget` | Claude Code rate-limit window, read from the statusline stdin payload (silent otherwise); `--check-budget` exits 1 when your local budget cap is exceeded |
+| `aireceipts --json` / `--csv` / `--svg` / `--png` | Versioned schema, RFC 4180 rows, shareable SVG/PNG image — [schema](docs/json-schema.md) |
+| `aireceipts stats` | Local usage counters — receipts generated on this machine |
+
+<div align="center">
+
+<img alt="Terminal recording of a synthetic session: aireceipts --handoff prints COULD HAVE SAVED ≤ $0.08 (81%, arithmetic not a prediction), the flagged Bash loop ×5 waste line with its fix, and the coverage line." src="site/assets/waste-handoff.gif" width="640">
+
+</div>
 
 ## The honesty rules
 
@@ -239,6 +196,20 @@ receipt is deterministic: same transcript in, byte-identical receipt out, golden
 every commit — including the receipts shown on this page. No model without a cited price
 row ever shows a dollar figure — tokens-only instead of a guess. Comparisons re-price the identical tokens; they never predict. What a
 receipt proves, and what it can't: [docs/trust.md](docs/trust.md) · `aireceipts --methodology`.
+
+## Supported agents
+
+| Agent | Depth |
+|---|---|
+| [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
+| [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
+| [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
+| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; unknown models stay tokens-only |
+| [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
+
+Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
+independent dataset and opens an issue when they disagree; every table change lands
+as a cited price-table PR.
 
 ## Telemetry
 
