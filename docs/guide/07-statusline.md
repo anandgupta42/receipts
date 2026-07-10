@@ -34,10 +34,20 @@ no daemon, one disk read per invocation.
 If `aireceipts` isn't on your `PATH`, put the absolute path (the output of `which
 aireceipts`) in the `command` field.
 
-Using tmux too? The [terminal-surfaces recipe](../statusline.md#terminal-surfaces)
-shows tmux, Starship, raw zsh/bash, OSC terminal-title, and PowerShell patterns
-that pass each pane's cwd to `statusline --cwd`, while keeping Claude Code's
-richer native stdin hook as the primary setup.
+## In tmux or another shell (Codex, opencode)
+
+The statusline is not Claude-Code-only. Any terminal surface that can run a
+command shows it — which is how Codex and opencode sessions get a live cost
+line. With `aireceipts` installed globally, add to `~/.tmux.conf`:
+
+```tmux
+set -g status-right '#(aireceipts statusline --cwd "#{pane_current_path}")'
+```
+
+Each pane shows its own session's cost. Starship, raw zsh/bash, PowerShell, and
+OSC terminal-title recipes — plus the path-matching rules — are in the
+[terminal-surfaces reference](../statusline.md#terminal-surfaces). For Claude
+Code itself, the native stdin hook above stays the richer, recommended setup.
 
 ## What the line shows
 

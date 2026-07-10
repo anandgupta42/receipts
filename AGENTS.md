@@ -81,7 +81,7 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 *Updated only by the `release` skill. Keep this section, and only this section, current
 after each release — don't hand-edit it elsewhere.*
 
-- **Shipped (npm `aireceipts-cli`, v0.7.2):** the receipt engine and its whole surface
+- **Shipped (npm `aireceipts-cli`, v0.8.0):** the receipt engine and its whole surface
   are live — parse adapters (Claude Code, Codex, Cursor, Gemini, opencode), cited price
   tables, per-tool attribution, waste lines (stuck-loop, trivial-spans, context-thrash
   incl. Codex compactions), price-delta + routable-spend (now with `% less`), `compare`,
@@ -101,6 +101,11 @@ after each release — don't hand-edit it elsewhere.*
   npm-native `pr-check`** an adopter runs in its own workflow with no reusable-workflow `uses:`
   and no org Actions-policy gate (SPEC-0064, shipped v0.5.0, #176); a **richer default
   statusline** — burn rate, context %, `M`/`B` tokens, inline 5h reset countdown (SPEC-0071);
+  a **terminal-surface statusline** — `statusline --cwd` scoped per-pane session selection with
+  attribution guards (confirm-on-load, home-shadow, bounded loads), `statusline.json` item
+  config, tmux/starship/pwsh/OSC recipes, poll-safe telemetry, and a `windows-latest` CI job
+  (SPEC-0075, v0.8.0), plus the `node:sqlite` bundle fix making sqlite-backed reads ~3.5×
+  faster in the published CLI (#214);
   the **samosa tip link off by default** on PR-posted surfaces, behind `--samosa` (SPEC-0070);
   and a faster parse/preflight path — in-process sqlite, goldens compile cache, parallel
   preflight (SPEC-0063) — plus **incremental mutation testing** on the money paths (SPEC-0069);
@@ -111,7 +116,7 @@ after each release — don't hand-edit it elsewhere.*
   was orphaned by `--amend`/rebase, with an authorship guard so a cherry-pick can't steal credit
   from a session that already directly claimed the commit (a narrower residual — a cherry-pick
   onto a branch SHA the true author never claims — is documented in the spec's Non-goals)
-  (SPEC-0072, v0.6.0). 42 specs at `status: shipped`.
+  (SPEC-0072, v0.6.0). 43 specs at `status: shipped`.
 - **In progress (`building`):** SPEC-0044 cost-attribution confidence — its
   implemented slices ship in v0.2.0 (ConfidenceEvent contract + no-silent-drop,
   cost matrix, rows-sum-to-total, cache-write caveat, parse-skip/load-failure

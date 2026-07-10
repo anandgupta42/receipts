@@ -336,6 +336,33 @@ footer{
 
 <p>All notable changes to <code>aireceipts-cli</code>. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
 
+<h2 id="v080-2026-07-10">v0.8.0 — 2026-07-10</h2>
+
+<p>Minor: <strong>the statusline now works at the terminal level — tmux, starship, zsh/bash, PowerShell, terminal titles — so Codex and opencode sessions get a live cost line too, not just Claude Code.</strong> Neither Codex nor opencode exposes a command-backed status hook (openai/codex#17827 and sst/opencode#8619 are open), so the surface moved to the terminal itself (SPEC-0075, PRs #217/#221).</p>
+
+<h3 id="feat">feat</h3>
+
+<ul>
+  <li><code>aireceipts statusline --cwd &lt;path&gt;</code> selects the newest session <strong>attributed to that path</strong> instead of the machine's globally newest one, so a tmux <code>status-right</code> line (<code>--cwd &quot;#{pane_current_path}&quot;</code>) shows each pane its own session. Attribution is guarded: Claude Code's lossy project-directory encoding is confirmed against the transcript's own recorded <code>cwd</code> after load, sessions launched from the home directory (or <code>/</code>) never ancestor-match everything, dot-segments resolve lexically, full-parse work is capped, and no match renders the neutral placeholder — never another project's line. Cursor sessions carry no cwd and are excluded. Relative paths resolve against the invocation directory; a usable Claude Code stdin payload still wins. Recipes for tmux, starship, plain zsh/bash, PowerShell, and OSC terminal titles are in <code>docs/statusline.md</code> — the Claude Code native <code>statusLine</code> hook remains the recommended (richer, faster) surface where it exists (PRs #217, #221).</li>
+  <li><code>~/.aireceipts/statusline.json</code> (<code>{&quot;items&quot;: [&quot;brand&quot;, &quot;cost&quot;, …]}</code>) sets a persistent default segment list for the statusline. Precedence: explicit <code>--format</code> &gt; config file &gt; built-in default. An invalid file degrades to the default line with one stderr note (exit 0); the <code>--format</code> flag keeps its fail-fast contract (PR #221).</li>
+  <li>Telemetry: <code>--cwd</code> invocations are polling surfaces, so they count locally but never network-flush (a 15-second tmux poll adds zero events). The <code>integration_surface_rendered</code> event gains <code>scoped</code> and <code>configFile</code> booleans — never the path or the format string (<code>docs/telemetry.md</code>, PR #221).</li>
+</ul>
+
+<h3 id="fix">fix</h3>
+
+<ul>
+  <li><strong>The published CLI is ~3.5× faster wherever sqlite-backed sessions (opencode, Cursor) are read</strong> (PR #214). tsup's <code>removeNodeProtocol</code> default rewrote <code>import(&quot;node:sqlite&quot;)</code> to <code>import(&quot;sqlite&quot;)</code> in <code>dist/</code>, which fails at runtime, so every published build silently fell back to spawning the <code>sqlite3</code> CLI per query — measured 4.0s → 1.15s for one statusline render on a sqlite-heavy machine. On Node ≥ 22.13 the <code>sqlite3</code> binary is no longer needed at all; older runtimes keep the fallback. Built-artifact regression tests now pin the import specifier and the in-process read path.</li>
+</ul>
+
+<h3 id="chore">chore</h3>
+
+<ul>
+  <li>CI gains a <code>windows-latest</code> job (cwd matching, statusline suites, built-CLI e2e). Its first runs surfaced and fixed three real Windows issues: <code>.cmd</code> spawns need a shell under Node's CVE-2024-27980 hardening, goldens/fixtures gained <code>-text</code> line-ending exemptions, and absolute POSIX paths are never drive-prefixed by <code>path.resolve</code> (PR #221).</li>
+  <li>OpenSSF Scorecard hardening: esbuild override for the open advisory, absolute <code>SECURITY.md</code> link (PR #212); adopter <code>pr-check</code> workflow hardened with <code>continue-on-error</code> + concurrency groups (PR #207).</li>
+</ul>
+
+<p>Rendered receipt output is byte-identical (receipt goldens unchanged; the help golden gains the <code>--cwd</code> line); the default statusline line renders through the exact same code path as 0.7.2 when neither <code>--cwd</code> nor a config file is present.</p>
+
 <h2 id="v072-2026-07-09">v0.7.2 — 2026-07-09</h2>
 
 <p>Patch: <strong>PR-receipt refs are now written under <code>refs/aireceipts/*</code> instead of the generic <code>refs/receipts/*</code>.</strong> The old namespace collided with other tools that also publish to <code>refs/receipts/&lt;slug&gt;</code> (e.g. an attestation producer storing an in-toto <code>receipt.json</code> at the same path). In a repo running both, the namespace was occupied by the other tool's payloads, so CI <code>pr-check</code> fetched a foreign ref, failed its <code>schemaVersion</code> check, and silently posted nothing — the auto-attach hook fired and pushed refs, yet no receipt ever appeared. aireceipts now owns <code>refs/aireceipts/*</code> and never reads or writes <code>refs/receipts/*</code>, so the two coexist; the push classifier still recognizes both namespaces so a foreign receipt-ref push is never mis-counted as a branch commit (PR #204). No migration: aireceipts had never written a <code>refs/receipts/*</code> ref. Hooks and CI on <code>@latest</code> adopt the new namespace together on this release. Rendered receipt output is byte-identical (goldens unchanged); the only user-visible surface change is the ref name in <code>pr --help</code>.</p>
@@ -494,7 +521,7 @@ footer{
   <li>Correct README/getting-started privacy and coverage claims (transcripts/code never uploaded; diagnostics are opt-out; supported-agent list is finite); sync <code>docs/telemetry.md</code> agent-type enums and kill-switch examples; correct the <code>week --json</code> and <code>source</code> entries in <code>docs/json-schema.md</code>; drop a stale pre-release note. (#115)</li>
 </ul>
 
-<h3 id="chore">Chore</h3>
+<h3 id="chore-2">Chore</h3>
 
 <ul>
   <li>Restructure the opencode combinatorial unit test: validate all summaries from one <code>listSessions()</code> and deep round-trip only a structural-coverage sample, instead of reopening the SQLite DB per session (6m40s → ~20s, coverage retained). Local <code>preflight-release.mjs</code> sets <code>AIRECEIPTS_SKIP_STRESS=1</code> so the spawn-heavy 100-session e2e stress case doesn't wedge on throttled dev macOS; CI runs the full suite (env unset), so coverage is unchanged.</li>
@@ -513,7 +540,7 @@ footer{
   <li><code>--handoff</code> resume packet: a deterministic state header, a <code>covers:</code> line, and a versioned <code>--handoff --json</code> surface. (SPEC-0042)</li>
 </ul>
 
-<h3 id="chore-2">Chore</h3>
+<h3 id="chore-3">Chore</h3>
 
 <ul>
   <li>Size two long-running SQLite test timeouts for macOS background-QoS throttling of vitest-spawned children; CI unaffected. (#111)</li>

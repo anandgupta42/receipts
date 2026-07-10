@@ -83,8 +83,10 @@ Tool by tool, locally, including where tokens went to waste. No install, no acco
 
 </div>
 
-**Live cost in your status bar** — `npx aireceipts-cli statusline`
-Claude Code's status line shows running cost as you work, not just a total at the end.
+**Live cost in your status bar** — wire in `aireceipts statusline` ([setup](docs/statusline.md))
+One settings line puts running cost in Claude Code's status bar — and with
+`--cwd`, any terminal surface (tmux, starship, PowerShell) shows each pane its
+own session's cost, covering Codex and opencode too.
 
 <div align="center">
 
@@ -116,7 +118,7 @@ Full walkthrough: [getting started](docs/guide/01-getting-started.md) · a real 
 | `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, opencode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
 | `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time — [guide](docs/guide/09-handoff.md) |
 | `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt — [guide](docs/guide/03-install-hook.md) |
-| `aireceipts statusline` | Live cost line in Claude Code's status bar — [setup](docs/statusline.md) |
+| `aireceipts statusline` | Live cost line in Claude Code's status bar, or any terminal via `--cwd` (tmux/starship/pwsh) — [setup](docs/statusline.md) |
 | `aireceipts --quota` / `--check-budget` | Claude Code rate-limit window, read from the statusline stdin payload (silent otherwise); `--check-budget` exits 1 when your local budget cap is exceeded |
 | `aireceipts --json` / `--csv` / `--svg` / `--png` | Versioned schema, RFC 4180 rows, shareable SVG/PNG image — [schema](docs/json-schema.md) |
 | `aireceipts stats` | Local usage counters — receipts generated on this machine |

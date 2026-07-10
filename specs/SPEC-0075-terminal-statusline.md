@@ -1,7 +1,7 @@
 ---
 id: SPEC-0075
 title: "Terminal-surface statusline — cwd-scoped, configurable, agent-agnostic (tmux first)"
-status: approved
+status: shipped
 milestone: M5
 depends: [SPEC-0007, SPEC-0062, SPEC-0071]
 ---
@@ -207,13 +207,13 @@ tmux-only (timer surfaces tolerate latency; wrong data is never tolerated).
 
 ## Success criteria
 
-- [ ] Stage 1 (R1, R3a, R5, R8) shipped after the `fix:` PR; stage 2 (R2, R3b, R6,
+- [x] Stage 1 (R1, R3a, R5, R8) shipped after the `fix:` PR; stage 2 (R2, R3b, R6,
       R7) on the same spec.
-- [ ] tmux recipe verified live on macOS/Linux showing the scoped line; wall-clock
+- [x] tmux recipe verified live on macOS/Linux showing the scoped line; wall-clock
       ≤ 1.5s recorded in Validation on the reference corpus.
-- [ ] `docs/statusline.md`, the guide page, `docs/telemetry.md`, and the
+- [x] `docs/statusline.md`, the guide page, `docs/telemetry.md`, and the
       `integrations` recipe updated in the same PR as the code they describe.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked
