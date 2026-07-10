@@ -3,6 +3,21 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.8.2 — 2026-07-10
+
+Patch: **the auto-attach hook now fires on bare-`HEAD` branch publishes** —
+`git push -u origin HEAD` (and `--force-with-lease` / `HEAD:refs/heads/<x>` forms), the
+dominant idiom for coding agents, previously classified as not-a-branch-publish and the
+SPEC-0073 hook silently wrote no receipt ref. Root-caused from the org dogfood pilots
+producing zero receipts (issue #228, PR #230): the sibling hook on the same event fired
+while ours declined classification. The receipt ref slug always derives from the
+resolved checked-out branch; detached `HEAD` still attaches nothing (fail-safe), and
+tag/sha/receipt-ref/delete publishes stay excluded.
+
+Also: docs — terminal-statusline pages now say what happens without tmux (silent
+fallback + alternatives, #226) and add a shell-wrapper recipe so the statusline appears
+whenever the agent launches (#225).
+
 ## v0.8.1 — 2026-07-10
 
 Patch: **OpenAI `gpt-5.6` family price rows** — `gpt-5.6-sol` ($5.00 in / $0.50 cached /

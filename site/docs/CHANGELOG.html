@@ -336,6 +336,12 @@ footer{
 
 <p>All notable changes to <code>aireceipts-cli</code>. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
 
+<h2 id="v082-2026-07-10">v0.8.2 — 2026-07-10</h2>
+
+<p>Patch: <strong>the auto-attach hook now fires on bare-<code>HEAD</code> branch publishes</strong> — <code>git push -u origin HEAD</code> (and <code>--force-with-lease</code> / <code>HEAD:refs/heads/&lt;x&gt;</code> forms), the dominant idiom for coding agents, previously classified as not-a-branch-publish and the SPEC-0073 hook silently wrote no receipt ref. Root-caused from the org dogfood pilots producing zero receipts (issue #228, PR #230): the sibling hook on the same event fired while ours declined classification. The receipt ref slug always derives from the resolved checked-out branch; detached <code>HEAD</code> still attaches nothing (fail-safe), and tag/sha/receipt-ref/delete publishes stay excluded.</p>
+
+<p>Also: docs — terminal-statusline pages now say what happens without tmux (silent fallback + alternatives, #226) and add a shell-wrapper recipe so the statusline appears whenever the agent launches (#225).</p>
+
 <h2 id="v081-2026-07-10">v0.8.1 — 2026-07-10</h2>
 
 <p>Patch: <strong>OpenAI <code>gpt-5.6</code> family price rows</strong> — <code>gpt-5.6-sol</code> ($5.00 in / $0.50 cached / $30.00 out per 1M), <code>gpt-5.6-terra</code> ($2.50 / $0.25 / $15.00), <code>gpt-5.6-luna</code> ($1.00 / $0.10 / $6.00); Standard short-context tier, effective 2026-07-09, every row cited to the official OpenAI pricing page (PR #223). Codex CLI sessions on these models — which rendered tokens-only under I2's no-fabricated-dollars rule — now price in receipts and the statusline. Additive data change only; no code touched.</p>
