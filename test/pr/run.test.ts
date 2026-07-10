@@ -1,13 +1,18 @@
 // SPEC-0019 R3 — render-first, fail-visible. The full body is ALWAYS written to
 // stdout before any gh call; a failed/absent gh only adds a stderr diagnostic and
 // exits 1. Also covers auto-select success and the zero/many selection outcomes.
+import { spawnSync } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { loadById } from "../../src/parse/load.js";
 import type { CommandResult, CommandRunner } from "../../src/pr/git.js";
 import { DOGFOOD_MARKER } from "../../src/pr/body.js";
+import { classifyPush } from "../../src/pr/gitWrite.js";
 import { runPr, runPrDetailed, type PrDeps } from "../../src/pr/index.js";
+import { listReceiptRefs } from "../../src/pr/store.js";
 import type { SessionSummary } from "../../src/parse/types.js";
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtures", "pr");
@@ -66,6 +71,58 @@ async function makeDeps(over: Partial<PrDeps> = {}): Promise<{ deps: PrDeps; eve
   };
   return { deps, events, out, err };
 }
+
+describe("SPEC-0073 HEAD publish attach/store integration", () => {
+  const dirs: string[] = [];
+
+  afterEach(async () => {
+    await Promise.all(dirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  });
+
+  async function tempRepo(): Promise<string> {
+    const cwd = await mkdtemp(path.join(tmpdir(), "aireceipts-head-push-"));
+    dirs.push(cwd);
+    const init = spawnSync("git", ["init", "--quiet"], { cwd, encoding: "utf8" });
+    if (init.status !== 0) {
+      throw new Error(`git init failed: ${init.stderr}`);
+    }
+    return cwd;
+  }
+
+  async function attachForPush(argv: string[], resolvedBranch: string) {
+    expect(classifyPush(argv).attach).toBe(true);
+    const cwd = await tempRepo();
+    const runGit: CommandRunner = (cmd, args) => {
+      if (args[0] === "rev-parse" && args[1] === "--abbrev-ref" && args[2] === "HEAD") {
+        return ok(`${resolvedBranch}\n`);
+      }
+      return gitOk(cmd, args);
+    };
+    const { deps, err } = await makeDeps({ cwd, runGit });
+    const result = await runPrDetailed({ post: false, store: "ref" }, deps);
+    return { err, refs: listReceiptRefs(cwd), result };
+  }
+
+  it("writes the resolved current-branch slug identically for named and bare-HEAD publishes", async () => {
+    const named = await attachForPush(["git", "push", "origin", "fix/hook-push-head"], "fix/hook-push-head");
+    const head = await attachForPush(["git", "push", "-u", "origin", "HEAD"], "fix/hook-push-head");
+    const expected = [{ ref: "refs/aireceipts/fix-hook-push-head", slug: "fix-hook-push-head" }];
+
+    expect(named.result.code).toBe(0);
+    expect(head.result.code).toBe(0);
+    expect(named.refs).toEqual(expected);
+    expect(head.refs).toEqual(expected);
+  });
+
+  it("writes no receipt ref when bare HEAD resolves to a detached HEAD", async () => {
+    const detached = await attachForPush(["git", "push", "origin", "HEAD"], "HEAD");
+
+    expect(detached.result.code).toBe(0);
+    expect(detached.refs).toEqual([]);
+    expect(detached.err).toContain("store=ref skipped: could not resolve current branch");
+    expect(detached.err.some((line) => line.startsWith("wrote receipt ref "))).toBe(false);
+  });
+});
 
 describe("R3 render-first ordering", () => {
   it("auto-selects, slices, and dry-runs the body to stdout (no gh, exit 0)", async () => {

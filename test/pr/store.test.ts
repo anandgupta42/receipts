@@ -6,6 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { currentBranchName, type CommandRunner } from "../../src/pr/git.js";
 import { listReceiptRefs, readReceiptRef, RECEIPT_REF_PREFIX, receiptRef, writeReceiptRef } from "../../src/pr/store.js";
 import { receiptRefSlug } from "../../src/pr/payloadTypes.js";
 
@@ -32,6 +33,32 @@ describe("receipt-ref namespace", () => {
     // posting nothing. aireceipts must own its own namespace.
     expect(RECEIPT_REF_PREFIX).toBe("refs/aireceipts/");
     expect(receiptRef("feat-x")).toBe("refs/aireceipts/feat-x");
+  });
+});
+
+describe("SPEC-0073 HEAD publish branch resolution", () => {
+  it("slugs the resolved current branch identically to an explicit branch publish", () => {
+    const calls: Array<{ cmd: string; args: string[]; cwd?: string }> = [];
+    const run: CommandRunner = (cmd, args, opts) => {
+      calls.push({ cmd, args, cwd: opts?.cwd });
+      return { stdout: "fix/hook-push-head\n", stderr: "", code: 0, missing: false };
+    };
+
+    const branch = currentBranchName(run, "/repo");
+    expect(branch).toBe("fix/hook-push-head");
+    expect(branch).not.toBe("HEAD");
+    expect(receiptRef(receiptRefSlug(branch!))).toBe(receiptRef(receiptRefSlug("fix/hook-push-head")));
+    expect(receiptRef(receiptRefSlug(branch!))).toBe("refs/aireceipts/fix-hook-push-head");
+    expect(calls).toEqual([{ cmd: "git", args: ["rev-parse", "--abbrev-ref", "HEAD"], cwd: "/repo" }]);
+  });
+
+  it.each([
+    { stdout: "HEAD\n", code: 0 },
+    { stdout: "\n", code: 0 },
+    { stdout: "fix/hook-push-head\n", code: 1 },
+  ])("returns no store target for a detached or unresolvable HEAD (%j)", ({ stdout, code }) => {
+    const run: CommandRunner = () => ({ stdout, stderr: "", code, missing: false });
+    expect(currentBranchName(run, "/repo")).toBeNull();
   });
 });
 

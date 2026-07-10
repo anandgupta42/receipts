@@ -407,6 +407,12 @@ function isBranchPushRefspec(refspec: string): boolean {
   if (normalized.startsWith(":")) {
     return false;
   }
+  // Bare HEAD means "publish the checked-out branch". The attach/store path
+  // resolves that branch with `rev-parse --abbrev-ref HEAD`; it never slugs
+  // this token directly and rejects a detached HEAD fail-safe.
+  if (normalized === "HEAD") {
+    return true;
+  }
   const colon = normalized.indexOf(":");
   if (colon >= 0) {
     const src = normalized.slice(0, colon);

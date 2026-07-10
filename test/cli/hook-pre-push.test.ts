@@ -66,6 +66,8 @@ describe("SPEC-0073 hook pre-push command", () => {
   it.each([
     claudePayload("git push"),
     claudePayload("git push origin feat"),
+    claudePayload("git push -u origin HEAD"),
+    claudePayload("git push --force-with-lease origin HEAD"),
     claudePayload("git push origin HEAD:refs/heads/main"),
     { tool_name: "exec_command", tool_input: { cmd: "git push origin feat" } },
     { name: "functions.exec_command", arguments: JSON.stringify({ command: ["git", "push", "origin", "feat"] }) },

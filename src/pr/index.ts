@@ -15,7 +15,7 @@ import { renderReceipt } from "../receipt/render.js";
 import { cacheServedPct, compactDuration } from "../receipt/present.js";
 import { formatDuration, formatShortTokens } from "../receipt/format.js";
 import { HELPER_FULL_LABEL } from "./body.js";
-import { branchCommits, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
+import { branchCommits, currentBranchName, currentWorktreeRoot, defaultRunner, worktreeRoots, type CommandRunner } from "./git.js";
 import { isBranchCandidate, overlapsBranchWindow, selectExplicitSession } from "./select.js";
 import { computeSlice } from "./slice.js";
 import { anchorEvents } from "./slice.js";
@@ -609,9 +609,8 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   // default `"comment"`; R3's committed-settings layer is out of scope here.
   const store = opts.store ?? (process.env.AIRECEIPTS_STORE === "ref" ? "ref" : undefined) ?? "comment";
   if (store === "ref") {
-    const branchResult = deps.runGit("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: deps.cwd });
-    const branch = branchResult.code === 0 ? branchResult.stdout.trim() : "";
-    if (!branch || branch === "HEAD") {
+    const branch = currentBranchName(deps.runGit, deps.cwd);
+    if (!branch) {
       deps.err("store=ref skipped: could not resolve current branch");
     } else {
       const payload = buildPrReceiptPayload(bodyInput, extras);

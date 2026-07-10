@@ -68,6 +68,13 @@ export function currentWorktreeRoot(run: CommandRunner, cwd?: string): string | 
   return path.resolve(res.stdout.trim());
 }
 
+/** The checked-out branch name, or null when HEAD is detached/unresolvable. */
+export function currentBranchName(run: CommandRunner, cwd?: string): string | null {
+  const res = run("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd });
+  const branch = res.code === 0 ? res.stdout.trim() : "";
+  return branch && branch !== "HEAD" ? branch : null;
+}
+
 /** The repo's default branch ref for merge-base (origin/HEAD's target, else `main`). */
 export function defaultBranchRef(run: CommandRunner, cwd?: string): string {
   const res = run("git", ["rev-parse", "--abbrev-ref", "origin/HEAD"], { cwd });

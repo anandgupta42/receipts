@@ -60,12 +60,22 @@ describe("SPEC-0073 classifyPush", () => {
     [["git", "push"]],
     [["git", "push", "origin"]],
     [["git", "push", "origin", "feat"]],
-    [["git", "push", "origin", "HEAD:refs/heads/main"]],
+    [["git", "push", "origin", "HEAD"]],
     [["GIT_SSH_COMMAND=ssh -i key", "git", "push", "origin", "feat"]],
     [["git", "push", "--force-with-lease"]],
     [["git", "push", "-u", "origin", "feat"]],
+    [["git", "push", "-u", "origin", "HEAD"]],
+    [["git", "push", "--set-upstream", "origin", "HEAD"]],
+    [["git", "push", "--force-with-lease", "origin", "HEAD"]],
   ])("attaches on branch push argv %j", (argv) => {
     expect(classifyPush(argv).attach).toBe(true);
+  });
+
+  it("classifies HEAD:refs/heads/x by its branch target (target-name slug propagation is a tested non-goal)", () => {
+    // The classifier validates the explicit remote branch target, but returns no
+    // branch metadata. The attach path therefore keeps slugging the resolved
+    // local current branch; propagating a divergent target name is out of scope.
+    expect(classifyPush(["git", "push", "origin", "HEAD:refs/heads/review"]).attach).toBe(true);
   });
 
   it.each([
@@ -83,8 +93,11 @@ describe("SPEC-0073 classifyPush", () => {
     [["git", "push", "origin", "+refs/aireceipts/x:refs/aireceipts/x"]],
     [["git", "push", "origin", "refs/receipts/x"]],
     [["git", "push", "origin", "+refs/receipts/x:refs/receipts/x"]],
-    [["git", "push", "origin", "HEAD"]],
+    [["git", "push", "origin", "refs/tags/v1"]],
+    [["git", "push", "origin", "HEAD:refs/tags/v1"]],
+    [["git", "push", "origin", "deadbeef"]],
     [["git", "push", "origin", "abc1234:refs/heads/tmp"]],
+    [["git", "push", "origin", ":refs/heads/review"]],
     [["git", "-C", "sub", "push", "origin", "feat"]],
     [["git", "--git-dir=/other/.git", "--work-tree=/other", "push", "origin", "feat"]],
     [["git", "--namespace=ns", "push", "origin", "feat"]],
