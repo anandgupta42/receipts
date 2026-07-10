@@ -62,6 +62,17 @@ activity() { # $1 = prefix line count; prints the last $ACTIVITY_ROWS rows in Cl
   ' "$FIXTURE" "$1" "$ACTIVITY_ROWS"
 }
 
+# Claude Code's bottom chrome: the bordered input box, then the statusline
+# under it. The meter line is rendered on a highlighted band so the demo's eye
+# lands on the bar — presentational staging only; the TEXT is the CLI's exact
+# output bytes.
+BOX_W=79
+input_box() {
+  printf '\033[2m╭%s╮\033[0m\n' "$(printf '─%.0s' $(seq 1 $BOX_W))"
+  printf '\033[2m│\033[0m > %*s\033[2m│\033[0m\n' "$(( BOX_W - 3 ))" ''
+  printf '\033[2m╰%s╯\033[0m\n' "$(printf '─%.0s' $(seq 1 $BOX_W))"
+}
+
 for i in "${!STEPS_LINES[@]}"; do
   head -n "${STEPS_LINES[$i]}" "$FIXTURE" > "$SESSION"
   node -e '
@@ -85,8 +96,11 @@ for i in "${!STEPS_LINES[@]}"; do
   else
     printf '\n'
   fi
-  printf '\033[2m%s\033[0m\n' '──────────────────────────────────────────────────────────────────────────────────'
-  printf '%s\n' "$METER"
+  input_box
+  printf '\033[1m\033[48;5;236m %s \033[0m\n' "$METER"
+  if [ "$i" -eq "$(( ${#STEPS_LINES[@]} - 1 ))" ]; then
+    printf '\033[38;5;173m └ the meter — aireceipts statusline, one settings line\033[0m\n'
+  fi
   sleep 1.7
 done
 sleep 3.5

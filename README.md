@@ -33,11 +33,11 @@ transcripts never leave your machine, and a shared receipt carries figures, neve
 
 Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a bundled example if you have no sessions yet). Then let it run like a cab ride:
 
-**While the agent works — the meter.** One settings line ([setup](docs/statusline.md))
+**1 · While the agent works — the meter.** One settings line ([setup](docs/statusline.md))
 pins `aireceipts statusline` to the bottom of Claude Code's TUI — the bar under the
 input box, ticking up as the session runs:
 
-<p align="center"><img alt="An agent session replayed with the aireceipts meter pinned in the status bar: cost climbs $2.67 to $23.78 and tokens 1.5M to 17M as the session runs, a Bash loop ×5 waste flag appears mid-session, and the replay ends on the final reading — cost, tokens, and the waste flag re-priced by aireceipts from the transcript at each step, with the host-supplied payload fields simulated." src="site/assets/statusline.gif" width="640"></p>
+<p align="center"><img alt="An agent session replayed in a Claude Code-shaped terminal — tool rows and results scrolling above the input box, the aireceipts meter highlighted beneath it: cost climbs $2.67 to $23.78, a Bash loop ×5 waste flag appears mid-session, and the hold frame labels the bar "the meter — aireceipts statusline, one settings line". Cost, tokens, and the waste flag are re-priced by aireceipts from the transcript at each step; host-supplied payload fields are simulated." src="site/assets/statusline.gif" width="640"></p>
 
 The line, segment by segment:
 
@@ -51,12 +51,12 @@ The line, segment by segment:
              └ which model is billing you right now
 ```
 
-A waste flag (`Bash loop ×5`) joins only when a detector fired — nothing is
-zero-filled. `--cwd` gives any terminal pane (tmux, starship, PowerShell) its own
-session — Codex and opencode included.
+When money is being wasted — a stuck retry loop, say — a flag appears right on
+the line. tmux, starship, and PowerShell get the same meter
+([recipes](docs/statusline.md)), so Codex and opencode are covered too.
 
 
-**When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
+**2 · When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
 receipt — every tool priced, waste flagged (loops, context thrash, trivial spans),
 the cheaper-model line as arithmetic, not a prediction. The exact bytes:
 
@@ -87,7 +87,7 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 
 <sub>`pre-edit` is the share of cost spent before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 
-**When the PR ships — the receipt rides along.** `npx aireceipts-cli pr --post`
+**3 · When the PR ships — the receipt rides along.** `npx aireceipts-cli pr --post`
 attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
 drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to
 carry one — a real one, live:
