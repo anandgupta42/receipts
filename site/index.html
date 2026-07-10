@@ -107,12 +107,9 @@
   .darkcard pre{margin:0;font:12.5px/1.9 var(--mono);white-space:pre}
   .darkcard .dim{color:var(--dark-dim)} .darkcard .red{color:#e88579} .darkcard .grn{color:#7fbf8e}
 
-  /* PR mock */
-  .prmock{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;overflow:hidden;box-shadow:0 26px 54px -40px rgba(23,24,26,.35)}
-  .prhead{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--rule);font-size:12px;color:var(--muted)}
-  .prav{width:18px;height:18px;border-radius:50%;background:var(--ink);display:inline-block}
-  .prmock pre{margin:0;padding:16px 18px;font:12.5px/1.9 var(--mono);white-space:pre;overflow-x:auto}
-  .prmock .grn{color:var(--ledger);font-weight:700} .prmock .dim{color:var(--faint)}
+  /* the real PR receipt */
+  .prshot{display:block;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;overflow:hidden;box-shadow:0 26px 54px -40px rgba(23,24,26,.35)}
+  .prshot img{display:block;width:100%;height:auto}
 
   /* handoff cards */
   .hands{display:grid;grid-template-columns:1fr 1fr;gap:18px}
@@ -165,7 +162,6 @@
     <div class="nav-links">
       <a href="#meter">The meter</a>
       <a href="#pr">PR receipts</a>
-      <a href="docs/trust.html">Honesty rules</a>
       <a href="docs/index.html">Docs</a>
       <a href="https://github.com/anandgupta42/receipts">GitHub</a>
       <button type="button" class="nav-cta copy-btn" data-cmd="npx aireceipts-cli" aria-label="Copy the command npx aireceipts-cli">$ npx aireceipts-cli</button>
@@ -304,15 +300,12 @@ same tokens on claude-haiku-4-5....$0.04 <span class="dim">(78% less)</span>
       what it changed.</p>
     </div>
     <div>
-      <div class="prmock">
-        <div class="prhead"><span class="prav"></span><span>aireceipts <em>bot</em> commented</span></div>
-<pre>orchestrator · fable ······ $12.30
-builder · opus ············ $43.80
-TOTAL ····················· <span class="grn">$56.10</span>
-<span class="dim">counted: 2 sessions · cache served 96%</span></pre>
-      </div>
-      <p class="cap">An illustration — the live one came to $3.13.
-      <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read the receipt on PR #189 &rarr;</a></p>
+      <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222" class="prshot">
+        <img src="assets/pr-receipt-189.png" width="1176" height="870" loading="lazy"
+             alt="The real aireceipts receipt comment on merged PR #189: three sessions — a Claude orchestrator sliced to this PR's turns plus two Codex helpers — $3.13 total.">
+      </a>
+      <p class="cap">Not a mockup — the receipt on PR #189 of this repo, $3.13.
+      <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live &rarr;</a></p>
     </div>
   </div>
 </section>
