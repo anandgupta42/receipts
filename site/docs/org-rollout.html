@@ -334,7 +334,7 @@ footer{
     <article class="doc-content">
 <h1 id="rolling-out-receipt-checks-across-a-fleet-of-repos">Rolling out receipt checks across a fleet of repos</h1>
 
-<p>For one repo, notice-only adoption starts with the workflow caller; automatic receipt posting needs the two-file kit (workflow + Claude Code hook). See <a href="pr-receipt-check-caller.yml">pr-receipt-check-caller.yml</a>, <a href="claude-settings.json">claude-settings.json</a>, and <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
+<p>For one repo, notice-only adoption starts with the workflow caller; automatic receipt posting needs the workflow plus a producer hook for each agent in use. See <a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/pr-receipt-check-caller.yml">pr-receipt-check-caller.yml</a>, <a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/claude-settings.json">claude-settings.json</a>, <a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/codex-hooks.json">codex-hooks.json</a>, and <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
 
 <p>For many repos (an org dogfood, a platform team), generate the adoption packet:</p>
 
@@ -342,13 +342,17 @@ footer{
 
 <p>It enumerates repos active in the window (skipping archived repos, forks, and repos already carrying the caller) and prints, per repo: the caller file, the CONTRIBUTING line, and a copy-paste command sheet that opens a PR. <strong>It performs no repo or GitHub mutations</strong> — each repo's owners review and merge their own PR, and the script refuses to run until <code>aireceipts</code> is actually on npm (a packet telling developers to run an unpublished command helps nobody).</p>
 
-<p><strong>The default footprint is deliberately minimal.</strong> The notice-only packet adds one non-blocking workflow file (plus, optionally, a one-line CONTRIBUTING note): it never fails a build, and aireceipts never commits receipt files (a receipt is a PR comment or a git ref, invisible in the tree and PR diffs). Automatic receipts add the committed <code>.claude/settings.json</code> PreToolUse hook that produces the ref when Claude Code runs <code>git push</code>; the workflow alone is a no-op until that hook, or a manual <code>pr --store ref --push-ref</code>, produces a ref. Enforcement (<code>AIRECEIPTS_REQUIRE_PR_RECEIPT</code>) is opt-in and coarse — it makes same-repo PRs require a receipt (fork PRs always stay notice-only). See the tiers in <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
+<p><strong>The default footprint is deliberately minimal.</strong> The notice-only packet adds one non-blocking workflow file (plus, optionally, a one-line CONTRIBUTING note): it never fails a build, and aireceipts never commits receipt files (a receipt is a PR comment or a git ref, invisible in the tree and PR diffs). Automatic receipts add a committed <code>.claude/settings.json</code> or <code>.codex/hooks.json</code> PreToolUse hook that produces the ref when the agent runs a supported <code>git push</code>; the workflow alone is a no-op until a hook, or a manual <code>pr --store ref --push-ref</code>, produces a ref. Enforcement (<code>AIRECEIPTS_REQUIRE_PR_RECEIPT</code>) is opt-in and coarse — it makes same-repo PRs require a receipt (fork PRs always stay notice-only). See the tiers in <a href="pr-receipts.html">docs/pr-receipts.md</a>.</p>
+
+<p>To block merges, also mark the receipt-check job as required in the target branch's ruleset or branch protection. The repo variable makes the job fail; the branch rule makes that failure merge-blocking.</p>
+
+<p>Codex project hooks require a trusted project and one-time review through <code>/hooks</code>. Because Codex documents incomplete <code>PreToolUse</code> interception for some <code>unified_exec</code> shell paths, keep the <code>AGENTS.md</code> finalizer and strict CI check as backstops.</p>
 
 <p>Two constraints inherited from GitHub:</p>
 
 <ul>
   <li>The caller references the receipts repo by name; reusable-workflow references are <strong>not</strong> redirected if that repo is ever renamed — callers should only be created once the source repo's name is final.</li>
-  <li>The receipt check never fails a build (it emits a neutral notice), so adopting it is zero-risk for CI.</li>
+  <li>In the default notice-only mode, the receipt check never fails a build. Opt-in enforcement deliberately fails same-repo misses; forks stay advisory.</li>
 </ul>
     </article>
   </main>

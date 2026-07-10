@@ -17,12 +17,14 @@ manual `npx aireceipts-cli pr --store ref --push-ref`. An **adopter** repo there
 *nothing* automatically — the org dogfood rollout added the CI post side to 19 repos and
 observed **zero receipts**, because no ref is ever produced.
 
-The internal sibling makes it automatic with **one committed file**: a Claude Code
+At initial shipment, the internal sibling made it automatic with **one committed file**: a Claude Code
 `.claude/settings.json` `PreToolUse: Bash` hook that runs its `hook pre-push` subcommand, so
 when the coding agent runs `git push` the receipt ref is written and pushed with **no extra
 step**. This spec brings the same to aireceipts: **R1** a `hook pre-push` subcommand that reads
 the agent hook payload and attaches the ref only on a real branch push, never blocking; **R2**
-an adopter kit that commits the `.claude/settings.json` hook alongside the `pr-check` workflow.
+an adopter kit that commits an agent hook alongside the `pr-check` workflow. Codex added
+stable project hooks after this spec shipped; the maintenance update now includes the same
+producer as `.codex/hooks.json` without changing the producer or ref format.
 
 Boundary unchanged: generation is local (I1/I4); the hook only writes+pushes a deterministic
 ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricates a receipt
@@ -57,8 +59,8 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   **nothing to stdout** (a PreToolUse hook's stdout can carry a permission-decision JSON; the
   reused `runPrDetailed` is invoked with **no-op `out`/`err` writers** so its rendered body and
   status lines never reach the hook's stdout/stderr). It emits **no** decision object. Because
-  Claude Code runs a `PreToolUse` command hook **synchronously** (it waits for the hook before the
-  matched push runs), the hook does add latency: this is **bounded** by the per-hook `timeout`
+  the supported agent hosts run a `PreToolUse` command hook before the matched push, the hook
+  does add latency: this is **bounded** by the per-hook `timeout`
   (R3) and the attach is best-effort within it — a slow/failed ref push is abandoned at timeout
   and the developer's push proceeds regardless. The invariant is "the push always succeeds and is
   never gated on the receipt," **not** "zero added latency." (A background/async variant was
@@ -75,11 +77,12 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   (the push is never gated on the receipt). It is **separate** from the SessionEnd
   `--mini` entry (SPEC-0006) — both coexist; installing/removing one never touches the other.
   Idempotent: re-adding is a no-op; `(PreToolUse, command)` is the identity key.
-- **R4 — the two-file adopter kit.** `docs/adopt/` documents the automatic setup as **two**
-  committed files: `.github/workflows/aireceipts.yml` (the `pr-check` post side, SPEC-0064) **and**
-  `.claude/settings.json` (the `PreToolUse` auto-attach hook, R3). The kit states plainly that the
-  workflow alone is a no-op until the hook (or a manual `pr --store ref --push-ref`) produces a
-  ref. `aireceipts integrations` surfaces the same two-file recipe.
+- **R4 — the workflow + agent-producer adopter kit.** `docs/adopt/` documents
+  `.github/workflows/aireceipts.yml` (the `pr-check` post side, SPEC-0064) plus the producer
+  hook for each agent in use: `.claude/settings.json` for Claude Code and
+  `.codex/hooks.json` for Codex. The kit states plainly that the workflow alone is a no-op
+  until a hook (or a manual `pr --store ref --push-ref`) produces a ref. `aireceipts
+  integrations` surfaces the same recipe.
 - **R5 — collision safety with a sibling ref producer (RESOLVED).** aireceipts writes and reads
   only its own `refs/aireceipts/*` namespace (SPEC-0065 R1), so it never touches a sibling tool's
   `refs/receipts/*` refs and the two coexist without fighting over a ref. This closed a real
@@ -88,14 +91,18 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   `pr-check` fetched it, failed its `schemaVersion` check, and silently posted nothing (fails
   safe — rejects, no fabrication — but also never posts an aireceipts receipt). The dedicated
   namespace removes the hazard; the kit's docs now state that coexistence is safe.
-- **R6 — Codex scope is honest.** Codex `exec` does not currently invoke lifecycle hooks, so the
-  auto-attach is **Claude Code** for now; the subcommand still parses a Codex-shaped payload if
-  one is piped (forward-compatible), and the kit documents Codex as manual (`pr --store ref
-  --push-ref`) until Codex hooks land. No claim that Codex auto-attaches.
+- **R6 — Codex scope is honest.** Current Codex supports trusted repo-local lifecycle hooks,
+  so the kit ships `.codex/hooks.json` using the already-supported Codex payload shape.
+  Project hooks run only after the project and exact hook definition are reviewed and trusted
+  through `/hooks`. Codex documents incomplete `PreToolUse` interception for some
+  `unified_exec` shell paths, so the hook remains best-effort: the `AGENTS.md` finalizer and
+  opt-in same-repo CI enforcement are the backstops. No claim that the hook alone is a complete
+  enforcement boundary.
 
 ## Scenarios
 
-- **Given** an adopter repo with the two-file kit, **when** the coding agent runs `git push` on a
+- **Given** an adopter repo with the workflow and its agent's producer hook, **when** the
+  coding agent runs `git push` on a
   feature branch, **then** `hook pre-push` writes+pushes `refs/aireceipts/<slug>` before/with the
   push, the developer's push proceeds unblocked, and the next CI run posts the receipt.
 - **Given** the same hook, **when** the agent runs any non-push Bash command (or `git status`,
@@ -112,7 +119,8 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
 - **Generating receipts in CI or changing the ref format.** Reuses SPEC-0065 `store=ref` verbatim.
 - **A git `pre-push` hook for adopters.** The committed `.githooks/pre-push` stays this repo's own
   (not in the npm package); adopters use the agent hook (R3) or the manual command.
-- **Codex auto-attach.** Documented manual until Codex invokes hooks (R6).
+- **Complete enforcement from an agent hook alone.** Codex `PreToolUse` interception is
+  incomplete for some shell paths; strict CI is the merge-time backstop (R6).
 - **Blocking or gating a push on receipt success.** Structurally forbidden (R2).
 
 ## Test matrix
@@ -132,9 +140,9 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
 | R2 | never blocks | attach throws / no git / empty stdin / bad JSON / no session | exit 0, empty stdout, empty stderr, no decision object |
 | R2 | zero stdout on success | valid branch push, attach succeeds | ref written; hook stdout is empty (runPrDetailed given no-op writers) |
 | R3 | per-event entry | fresh + settings with an existing SessionEnd and/or PreToolUse entry | PreToolUse Bash entry added; SessionEnd `--mini` + unrelated keys untouched; idempotent |
-| R4 | adopter kit | `docs/adopt/*` + `integrations` | two files documented; no-op-without-hook stated |
+| R4 | adopter kit | `docs/adopt/*` + `integrations` | workflow + Claude/Codex producer hooks documented; no-op-without-hook stated |
 | R5 | collision note | kit docs | warns against enabling on a sibling-ref repo |
-| R6 | codex payload shape | a Codex-shaped push payload piped | parses + acts (forward-compat); docs say manual |
+| R6 | Codex project hook | `.codex/hooks.json` + a Codex-shaped push payload | parses + acts; trust and `unified_exec` limits documented |
 
 ## Success criteria
 
@@ -143,7 +151,7 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
       stdout, and exits 0 on every path (push never blocked; bounded delay only).
 - [x] Per-event settings helpers land; the `.claude/settings.json` PreToolUse entry
       install/idempotency/coexistence with SessionEnd (and pre-existing PreToolUse entries) is
-      tested; the two-file adopter kit + `integrations` recipe document it, incl. the
+      tested; the workflow + agent-producer kit and `integrations` recipe document it, incl. the
       no-op-without-hook and the sibling-collision warnings.
 - [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.

@@ -354,7 +354,7 @@ npx aireceipts-cli setup</code></pre>
     <tr><td>A weekly habit</td><td><code>npx aireceipts-cli week</code></td><td>local</td><td>none</td></tr>
     <tr><td>PR receipt comments</td><td><code>npx aireceipts-cli pr --post</code></td><td>repo/PR</td><td>GitHub only when explicitly run</td></tr>
     <tr><td>Team PR receipt presence checks</td><td>GitHub workflow (npm-native or reusable)</td><td>repo</td><td>GitHub Actions only</td></tr>
-    <tr><td>Automatic PR receipt refs</td><td>workflow + <code>.claude/settings.json</code> hook</td><td>repo</td><td>GitHub Actions + git push</td></tr>
+    <tr><td>Automatic PR receipt refs</td><td>workflow + the Claude Code and/or Codex producer hook</td><td>repo</td><td>GitHub Actions + git push</td></tr>
   </tbody>
 </table></div>
 
@@ -388,11 +388,11 @@ npx aireceipts-cli integrations github</code></pre>
   <li>Add assistant snippets or local hooks if they help the workflow.</li>
   <li>For PR-producing tasks, run <code>npx aireceipts-cli pr --post</code>.</li>
   <li>Add the GitHub check when the team wants visibility (two caller variants below).</li>
-  <li>Add the committed Claude Code hook when the team wants automatic ref production.</li>
+  <li>Add the committed Claude Code and/or Codex hook when the team wants automatic ref production.</li>
   <li>Keep enforcement opt-in; notice-only is the default.</li>
 </ol>
 
-<p>CI checks for marked PR receipt comments and can post from a <code>refs/aireceipts/*</code> ref. It does not generate receipts and does not read local transcripts. The workflow alone is a no-op until the Claude hook, or a manual <code>npx aireceipts-cli pr --store ref --push-ref</code>, produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.</p>
+<p>CI checks for marked PR receipt comments and can post from a <code>refs/aireceipts/*</code> ref. It does not generate receipts and does not read local transcripts. The workflow alone is a no-op until an agent hook, or a manual <code>npx aireceipts-cli pr --store ref --push-ref</code>, produces that ref. Codex project hooks require trust and one-time review through <code>/hooks</code>; keep the <code>AGENTS.md</code> finalizer because <code>PreToolUse</code> does not intercept every <code>unified_exec</code> shell path.</p>
 
 <h3 id="two-ways-to-add-the-ci-check">Two ways to add the CI check</h3>
 

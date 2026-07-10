@@ -57,6 +57,8 @@ describe("SPEC-0030 R4 rollout report", () => {
     expect(r.text).toContain("has-it: already carries the caller — skipped");
     expect(r.text).toContain("### example-org/needs-it");
     expect(r.text).toContain(CALLER_YAML.trimEnd());
+    expect(CALLER_YAML).toContain("pull-requests: write");
+    expect(r.text).toContain("After opening or updating a PR");
   });
 
   it("has no built-in org default: --org is required and errors with usage on missing/flag-shaped value", () => {

@@ -17,12 +17,15 @@ import { defaultRunner } from "../src/pr/git.js";
 export const CALLER_PATH = ".github/workflows/pr-receipt-check.yml";
 export const CALLER_YAML = `name: pr-receipt-check
 on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: write
 jobs:
   check:
     uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest
 `;
 export const CONTRIBUTING_LINE =
-  "Before opening a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.";
+  "After opening or updating a PR, run `npx aireceipts-cli pr --post` to attach your build receipt.";
 
 export interface RepoInfo {
   name: string;
