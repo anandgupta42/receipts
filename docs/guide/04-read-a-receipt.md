@@ -31,6 +31,7 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      
+         github.com/anandgupta42/receipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 

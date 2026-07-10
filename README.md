@@ -79,8 +79,13 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      
+         github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
+
+The final line identifies the open-source project that generated the receipt; the line
+above it is the install command. PR comments and their HTML artifacts make the same
+source-and-install destination clickable.
 
 <sub>`pre-edit` is the share of cost spent before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 

@@ -15,4 +15,5 @@ SUBAGENTS (2)................................$0.02
 TOTAL........................................$0.04
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      
+         github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

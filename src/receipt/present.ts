@@ -22,6 +22,7 @@ import type { Block, ReceiptView, TemplateName } from "./blocks.js";
 import { formatAbsoluteUtc, formatCentsAmount, formatDuration, formatInt, formatShortTokens, formatUsd, reconcileCents } from "./format.js";
 import type { ModelMixEntry, ReceiptModel, ToolRow, WasteLine } from "./model.js";
 import type { TokenUsage } from "../parse/types.js";
+import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "./branding.js";
 
 export type { ReceiptView } from "./blocks.js";
 export { PRICE_DELTA_NOTE, TRIVIAL_SPANS_LABEL } from "./blocks.js";
@@ -32,7 +33,6 @@ export const CURSOR_DEGRADED_NOTE = "Cursor transcripts carry no per-turn model/
 export const NO_PRICE_MATCH_NOTE = "no price table matched";
 
 const WORDMARK = "AIRECEIPTS";
-const FOOTER_TEXT = "aireceipts · local · npx aireceipts-cli";
 const THINKING_REPLY = "(thinking/reply)";
 
 const TITLE_MAX = 46;
@@ -427,7 +427,7 @@ function caveatBlocks(model: ReceiptModel): Block[] {
 }
 
 /**
- * The rule/total/price-delta/footer sequence every template ends its body with
+ * The rule/total/price-delta/footer/provenance sequence every template ends its body with
  * (honesty invariants live here — I3; SPEC-0055: the card carries no
  * methodology footnote — the full methodology is one flag away,
  * `aireceipts --methodology`, and ships in `--json`). `extra` (SPEC-0054 R4's
@@ -451,7 +451,7 @@ function tailBlocks(model: ReceiptModel, footer: Block, extra?: Block[]): Block[
   if (extra) {
     blocks.push(...extra);
   }
-  blocks.push(footer);
+  blocks.push(footer, { kind: "note", text: REPOSITORY_DISPLAY, align: "center", muted: true });
   return blocks;
 }
 
@@ -483,7 +483,7 @@ function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
   const extra = view?.details ? detailsBlocks(model) : undefined;
-  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT }, extra));
+  blocks.push(...tailBlocks(model, { kind: "footer", text: INSTALL_FOOTER_TEXT }, extra));
   return blocks;
 }
 
@@ -530,6 +530,8 @@ function buildGrocery(model: ReceiptModel): Block[] {
   blocks.push({ kind: "note", text: `CARDHOLDER: ${dominantModel}`, spaceBefore: true });
   blocks.push({ kind: "footer", text: `THANK YOU FOR VIBING WITH ${model.agentLabel}` });
   blocks.push({ kind: "barcode", pattern: barcodePattern(token) });
+  blocks.push({ kind: "footer", text: INSTALL_FOOTER_TEXT });
+  blocks.push({ kind: "note", text: REPOSITORY_DISPLAY, align: "center", muted: true });
   return blocks;
 }
 
@@ -589,7 +591,7 @@ function buildDatavis(model: ReceiptModel): Block[] {
     const block = wasteRowBlock(waste);
     blocks.push(i === 0 ? { ...block, spaceBefore: true } : block);
   });
-  blocks.push(...tailBlocks(model, { kind: "footer", text: FOOTER_TEXT }));
+  blocks.push(...tailBlocks(model, { kind: "footer", text: INSTALL_FOOTER_TEXT }));
   return blocks;
 }
 

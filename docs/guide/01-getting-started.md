@@ -42,8 +42,13 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      
+         github.com/anandgupta42/receipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
+
+The final footer line identifies the open-source project that generated the receipt;
+the line above it is the install command. In PR comments and HTML artifacts, the same
+source-and-install destination is clickable.
 
 That's a real session: which models ran, where the tokens went by tool, and what
 it cost — priced against dated, cited price tables. The `same tokens on
@@ -118,6 +123,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
      aireceipts · local · npx aireceipts-cli      
+         github.com/anandgupta42/receipts
 ```
 
 (This example pinned its dates with `--since`, which is why the header says

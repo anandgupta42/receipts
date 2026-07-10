@@ -15,4 +15,5 @@ TOTAL....................................3,325 tok
 no price table matched
 - - - - - - - - - - - - - - - - - - - - - - - - -
      aireceipts · local · npx aireceipts-cli      
+         github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

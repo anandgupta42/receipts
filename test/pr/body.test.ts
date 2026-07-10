@@ -5,6 +5,7 @@
 // lives in the details table), separate priced/unpriced totals (I2/I3), and
 // the classic footer.
 import { describe, expect, it } from "vitest";
+import { PR_ATTRIBUTION_LINE } from "../../src/receipt/branding.js";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
 import type { ModelMixEntry } from "../../src/receipt/model.js";
 import { DOGFOOD_MARKER, HELPER_FULL_LABEL, renderPrBody, renderPrReceiptText, sliceHeaderLine, subagentDetailsTable, type ContributorView } from "../../src/pr/body.js";
@@ -316,6 +317,11 @@ describe("SPEC-0026 R4 · footer hint", () => {
 describe("SPEC-0026 R5 · collapsed full receipts", () => {
   const detail = (label: string, text = "RECEIPT-TEXT") => ({ label, row: ["**r**", "`id`", "scope", "1", "1m", "1 / 1", "—"], text });
 
+  it("ends every PR body with the canonical clickable provenance, including the no-details path", () => {
+    const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
+    expect(body.trimEnd().split("\n").at(-1)).toBe(PR_ATTRIBUTION_LINE);
+  });
+
   it("appends the details section after the fence, receipts in row order, marker still first", () => {
     const body = renderPrBody(
       { contributors: [builder(), builder({ sessionId: "def456" })], excludedCount: 0 },
@@ -337,6 +343,7 @@ describe("SPEC-0026 R5 · collapsed full receipts", () => {
     // Without the blank line GitHub swallows the link into the HTML block and
     // renders it as raw text (maintainer catch on PR #63, 2026-07-03).
     expect(body).toContain("</details>\n\nfull receipt: [pr-9.html]");
+    expect(body.trimEnd().split("\n").at(-1)).toBe(PR_ATTRIBUTION_LINE);
   });
 
   it("omits the section entirely without details (--no-details path)", () => {
@@ -462,6 +469,7 @@ describe("SPEC-0026 R5 · details size cap", () => {
       { details: [detail("builder · abc123", big), detail("builder · def456", big)] },
     );
     expect([...body].length).toBeLessThanOrEqual(65_000);
+    expect(body.trimEnd().split("\n").at(-1)).toBe(PR_ATTRIBUTION_LINE);
     expect(body).toContain("builder · def456 — full receipt omitted (comment size limit)");
     // The kept receipt is intact, not truncated.
     expect(body).toContain(big);

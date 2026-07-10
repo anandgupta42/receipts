@@ -24,6 +24,7 @@ import { renderReceipt, renderReceiptLines, RECEIPT_WIDTH } from "../../src/rece
 import { renderReceiptSvg } from "../../src/receipt/svg.js";
 import { previewModel } from "../../src/receipt/preview.js";
 import { main } from "../../src/cli/index.js";
+import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "../../src/receipt/branding.js";
 
 const PRICED = { source: "claude-code", path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
 const UNPRICED = { source: "claude-code", path: "test/fixtures/claude-code/unpriced-unknown-model.jsonl" };
@@ -35,6 +36,35 @@ async function modelFor(source: string, path: string): Promise<ReceiptModel> {
   }
   return buildReceiptModel(session);
 }
+
+describe("SPEC-0076 R1 receipt provenance", () => {
+  it.each([...TEMPLATE_NAMES])("%s ends with centered provenance inside the 50-column contract", async (template) => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    const lines = renderReceiptLines(model, { color: false, template });
+    const install = lines.findIndex((line) => line.trim() === INSTALL_FOOTER_TEXT);
+    const repository = lines.findIndex((line) => line.trim() === REPOSITORY_DISPLAY);
+    expect(install).toBeGreaterThan(-1);
+    expect(repository).toBe(install + 1);
+    expect(lines[repository].trim()).toBe(REPOSITORY_DISPLAY);
+    expect(lines.every((line) => [...line].length <= RECEIPT_WIDTH)).toBe(true);
+    const svg = renderReceiptSvg(model, { template });
+    expect(svg).toContain(REPOSITORY_DISPLAY);
+    expect(svg).not.toContain("<a");
+  });
+
+  it("grocery preserves thank-you then barcode before its provenance footer", async () => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    const lines = renderReceiptLines(model, { color: false, template: "grocery" });
+    const thanks = lines.findIndex((line) => line.includes("THANK YOU FOR VIBING WITH"));
+    const barcode = lines.findIndex((line, index) => index > thanks && /^[| ]+$/.test(line.trim()));
+    const install = lines.findIndex((line, index) => index > barcode && line.trim() === INSTALL_FOOTER_TEXT);
+    const repository = lines.findIndex((line, index) => index > install && line.trim() === REPOSITORY_DISPLAY);
+    expect(thanks).toBeGreaterThan(-1);
+    expect(barcode).toBeGreaterThan(thanks);
+    expect(install).toBeGreaterThan(barcode);
+    expect(repository).toBe(install + 1);
+  });
+});
 
 function footnoteTokens(text: string): string[] {
   return text.split(/\s+/).filter((token) => token.length >= 8);
