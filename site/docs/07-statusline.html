@@ -357,7 +357,13 @@ footer{
 
 <p>If <code>aireceipts</code> isn't on your <code>PATH</code>, put the absolute path (the output of <code>which aireceipts</code>) in the <code>command</code> field.</p>
 
-<p>Using tmux too? The <a href="statusline.html#terminal-surfaces">terminal-surfaces recipe</a> shows tmux, Starship, raw zsh/bash, OSC terminal-title, and PowerShell patterns that pass each pane's cwd to <code>statusline --cwd</code>, while keeping Claude Code's richer native stdin hook as the primary setup.</p>
+<h2 id="in-tmux-or-another-shell-codex-opencode">In tmux or another shell (Codex, opencode)</h2>
+
+<p>The statusline is not Claude-Code-only. Any terminal surface that can run a command shows it — which is how Codex and opencode sessions get a live cost line. With <code>aireceipts</code> installed globally, add to <code>~/.tmux.conf</code>:</p>
+
+<pre class="doc-code"><code class="language-tmux">set -g status-right '#(aireceipts statusline --cwd &quot;#{pane_current_path}&quot;)'</code></pre>
+
+<p>Each pane shows its own session's cost. Starship, raw zsh/bash, PowerShell, and OSC terminal-title recipes — plus the path-matching rules — are in the <a href="statusline.html#terminal-surfaces">terminal-surfaces reference</a>. For Claude Code itself, the native stdin hook above stays the richer, recommended setup.</p>
 
 <h2 id="what-the-line-shows">What the line shows</h2>
 

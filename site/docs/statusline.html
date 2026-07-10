@@ -353,15 +353,19 @@ footer{
 
 <h2 id="terminal-surfaces">Terminal surfaces</h2>
 
-<p>Any terminal surface that can run a command and display one line of stdout can show an aireceipts statusline. Pass that surface's pane or prompt working directory to <code>--cwd</code>; aireceipts selects the newest session attributed to that path (or an ancestor of it) and prints the neutral placeholder when none match. It never falls back to another project's newest session, and a session launched from your home directory (or above it) only ever matches that exact path — it is not treated as an ancestor of everything, so one <code>~</code>-launched session can't shadow every pane on the machine. Relative <code>--cwd</code> paths resolve against the directory where <code>aireceipts</code> is invoked; a path beginning with <code>-</code> must use the <code>--cwd=&lt;path&gt;</code> form. Matching intentionally folds only a Windows drive letter's case: the rest of every path remains case-sensitive because over-matching on a case-sensitive filesystem is the worse failure. Cursor is excluded from scoped discovery entirely because its session data carries no cwd.</p>
-
-<p>Path matching is lexical rather than filesystem-canonical. If <code>$PWD</code> uses a symlinked spelling while a session records the physical path, they do not match. tmux's <code>#{pane_current_path}</code> is resolved, so the tmux recipe below is unaffected.</p>
+<p>Pass a pane's working directory to <code>--cwd</code> and aireceipts shows that pane its own session — any terminal surface that can run a command and display one line of stdout works, which is how Codex and opencode sessions get a statusline. These recipes call <code>aireceipts</code> directly: install it first (<code>npm i -g aireceipts-cli</code>) — paying <code>npx</code> startup on every refresh is too slow for a polled bar.</p>
 
 <p>For tmux, add this to <code>~/.tmux.conf</code>:</p>
 
 <pre class="doc-code"><code class="language-tmux">set -g status-right '#(aireceipts statusline --cwd &quot;#{pane_current_path}&quot;)'</code></pre>
 
 <p>tmux refreshes <code>#(...)</code> commands on <code>status-interval</code>; lower that setting if you want a fresher line, keeping in mind that each refresh runs the command again.</p>
+
+<h3 id="matching-rules">Matching rules</h3>
+
+<p><code>--cwd</code> selects the newest session attributed to that path (or an ancestor of it) and prints the neutral placeholder when none match — it never falls back to another project's newest session. A session launched from your home directory (or above it) only ever matches that exact path, so one <code>~</code>-launched session can't shadow every pane on the machine. Relative <code>--cwd</code> paths resolve against the directory where <code>aireceipts</code> is invoked; a path beginning with <code>-</code> must use the <code>--cwd=&lt;path&gt;</code> form. Matching intentionally folds only a Windows drive letter's case — the rest of every path remains case-sensitive, because over-matching on a case-sensitive filesystem is the worse failure. Cursor is excluded from scoped discovery entirely because its session data carries no cwd.</p>
+
+<p>Path matching is lexical rather than filesystem-canonical. If <code>$PWD</code> uses a symlinked spelling while a session records the physical path, they do not match. tmux's <code>#{pane_current_path}</code> is resolved, so the tmux recipe above is unaffected.</p>
 
 <p>tmux is the recommended live terminal surface because it keeps polling while a command or agent owns the pane. The prompt and title recipes below refresh only <strong>between commands</strong>: while an agent owns the terminal they sit stale, and the cached line you see is one prompt behind. Each refresh is a per-prompt fire-and-forget process that exits after its atomic cache write — there is no resident daemon.</p>
 
@@ -493,7 +497,8 @@ function global:prompt {
 
 <pre class="doc-code"><code>[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
 [aireceipts] $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
-[aireceipts · Cursor] 8k</code></pre>
+[aireceipts · Cursor] 8k
+aireceipts: no sessions detected</code></pre>
 
 <ul>
   <li><code>$X.XX</code> is the session's priced cost (aireceipts' own cited-price figure, incl. subagents); omitted when it can't be priced — never a fabricated <code>$</code> amount.</li>
@@ -502,7 +507,7 @@ function global:prompt {
   <li><code>ctx N%</code> is how full the current context window is — Claude Code's own pre-calculated <code>context_window.used_percentage</code>, omitted when the payload lacks it.</li>
   <li><code>5h N% ↺Xh Ym</code> is your official 5-hour rate-limit usage (Claude Code's own <code>rate_limits.five_hour.used_percentage</code>, subscribers only) plus the time until the window resets, derived from the real <code>resets_at</code> — the countdown is dropped (leaving <code>5h N%</code>) when <code>resets_at</code> is absent or already past, never a guessed time.</li>
   <li>The waste flag (<code>⚠ ...</code>) appears only when a waste detector actually fired on the session — its absence is not itself a claim that nothing was found.</li>
-  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk — the prefix then names whose session it is (<code>[aireceipts · Codex]</code>). If no sessions are detected at all, it prints a neutral placeholder line rather than an error, so the statusline layout never breaks.</li>
+  <li>Outside a piped invocation (or when stdin carries no usable payload), <code>aireceipts statusline</code> falls back to the most-recently-ended session found on disk — the prefix then names whose session it is (<code>[aireceipts · Codex]</code>). If no sessions are detected at all, it prints the neutral placeholder line shown above rather than an error, so the statusline layout never breaks.</li>
 </ul>
 
 <h2 id="custom-formats-format">Custom formats (<code>--format</code>)</h2>

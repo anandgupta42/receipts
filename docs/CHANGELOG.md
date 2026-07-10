@@ -3,6 +3,64 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.8.0 — 2026-07-10
+
+Minor: **the statusline now works at the terminal level — tmux, starship, zsh/bash,
+PowerShell, terminal titles — so Codex and opencode sessions get a live cost line too,
+not just Claude Code.** Neither Codex nor opencode exposes a command-backed status hook
+(openai/codex#17827 and sst/opencode#8619 are open), so the surface moved to the
+terminal itself (SPEC-0075, PRs #217/#221).
+
+### feat
+
+- `aireceipts statusline --cwd <path>` selects the newest session **attributed to that
+  path** instead of the machine's globally newest one, so a tmux `status-right` line
+  (`--cwd "#{pane_current_path}"`) shows each pane its own session. Attribution is
+  guarded: Claude Code's lossy project-directory encoding is confirmed against the
+  transcript's own recorded `cwd` after load, sessions launched from the home directory
+  (or `/`) never ancestor-match everything, dot-segments resolve lexically, full-parse
+  work is capped, and no match renders the neutral placeholder — never another
+  project's line. Cursor sessions carry no cwd and are excluded. Relative paths resolve
+  against the invocation directory; a usable Claude Code stdin payload still wins.
+  Recipes for tmux, starship, plain zsh/bash, PowerShell, and OSC terminal titles are
+  in `docs/statusline.md` — the Claude Code native `statusLine` hook remains the
+  recommended (richer, faster) surface where it exists (PRs #217, #221).
+- `~/.aireceipts/statusline.json` (`{"items": ["brand", "cost", …]}`) sets a persistent
+  default segment list for the statusline. Precedence: explicit `--format` > config
+  file > built-in default. An invalid file degrades to the default line with one stderr
+  note (exit 0); the `--format` flag keeps its fail-fast contract (PR #221).
+- Telemetry: `--cwd` invocations are polling surfaces, so they count locally but never
+  network-flush (a 15-second tmux poll adds zero events). The
+  `integration_surface_rendered` event gains `scoped` and `configFile` booleans — never
+  the path or the format string (`docs/telemetry.md`, PR #221).
+
+### fix
+
+- **The published CLI is ~3.5× faster wherever sqlite-backed sessions (opencode,
+  Cursor) are read** (PR #214). tsup's `removeNodeProtocol` default rewrote
+  `import("node:sqlite")` to `import("sqlite")` in `dist/`, which fails at runtime, so
+  every published build silently fell back to spawning the `sqlite3` CLI per query —
+  measured 4.0s → 1.15s for one statusline render on a sqlite-heavy machine. On
+  Node ≥ 22.13 the `sqlite3` binary is no longer needed at all; older runtimes keep the
+  fallback. Built-artifact regression tests now pin the import specifier and the
+  in-process read path.
+
+### chore
+
+- CI gains a `windows-latest` job (cwd matching, statusline suites, built-CLI e2e). Its
+  first runs surfaced and fixed three real Windows issues: `.cmd` spawns need a shell
+  under Node's CVE-2024-27980 hardening, goldens/fixtures gained `-text` line-ending
+  exemptions, and absolute POSIX paths are never drive-prefixed by `path.resolve`
+  (PR #221).
+- OpenSSF Scorecard hardening: esbuild override for the open advisory, absolute
+  `SECURITY.md` link (PR #212); adopter `pr-check` workflow hardened with
+  `continue-on-error` + concurrency groups (PR #207).
+
+Rendered receipt output is byte-identical (receipt goldens unchanged; the help golden
+gains the `--cwd` line); the default statusline
+line renders through the exact same code path as 0.7.2 when neither `--cwd` nor a
+config file is present.
+
 ## v0.7.2 — 2026-07-09
 
 Patch: **PR-receipt refs are now written under `refs/aireceipts/*` instead of the generic

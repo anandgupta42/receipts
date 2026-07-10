@@ -30,24 +30,12 @@ instead of `aireceipts` in the `command` field (for example, the output of
 
 ## Terminal surfaces
 
-Any terminal surface that can run a command and display one line of stdout can
-show an aireceipts statusline. Pass that surface's pane or prompt working
-directory to `--cwd`; aireceipts selects the newest session attributed to that
-path (or an ancestor of it) and prints the neutral placeholder when none match.
-It never falls back to another project's newest session, and a session launched
-from your home directory (or above it) only ever matches that exact path — it is
-not treated as an ancestor of everything, so one `~`-launched session can't
-shadow every pane on the machine. Relative `--cwd` paths resolve against the
-directory where `aireceipts` is invoked; a path beginning with `-` must use the
-`--cwd=<path>` form. Matching intentionally folds only a Windows drive letter's
-case: the rest of every path remains case-sensitive because over-matching on a
-case-sensitive filesystem is the worse failure. Cursor is excluded from scoped
-discovery entirely because its session data carries no cwd.
-
-Path matching is lexical rather than filesystem-canonical. If `$PWD` uses a
-symlinked spelling while a session records the physical path, they do not
-match. tmux's `#{pane_current_path}` is resolved, so the tmux recipe below is
-unaffected.
+Pass a pane's working directory to `--cwd` and aireceipts shows that pane its
+own session — any terminal surface that can run a command and display one line
+of stdout works, which is how Codex and opencode sessions get a statusline.
+These recipes call `aireceipts` directly: install it first
+(`npm i -g aireceipts-cli`) — paying `npx` startup on every refresh is too slow
+for a polled bar.
 
 For tmux, add this to `~/.tmux.conf`:
 
@@ -57,6 +45,25 @@ set -g status-right '#(aireceipts statusline --cwd "#{pane_current_path}")'
 
 tmux refreshes `#(...)` commands on `status-interval`; lower that setting if you
 want a fresher line, keeping in mind that each refresh runs the command again.
+
+### Matching rules
+
+`--cwd` selects the newest session attributed to that path (or an ancestor of
+it) and prints the neutral placeholder when none match — it never falls back to
+another project's newest session. A session launched from your home directory
+(or above it) only ever matches that exact path, so one `~`-launched session
+can't shadow every pane on the machine. Relative `--cwd` paths resolve against
+the directory where `aireceipts` is invoked; a path beginning with `-` must use
+the `--cwd=<path>` form. Matching intentionally folds only a Windows drive
+letter's case — the rest of every path remains case-sensitive, because
+over-matching on a case-sensitive filesystem is the worse failure. Cursor is
+excluded from scoped discovery entirely because its session data carries no
+cwd.
+
+Path matching is lexical rather than filesystem-canonical. If `$PWD` uses a
+symlinked spelling while a session records the physical path, they do not
+match. tmux's `#{pane_current_path}` is resolved, so the tmux recipe above is
+unaffected.
 
 <!-- SPEC-0075 R3b -->
 
@@ -221,6 +228,7 @@ in tmux or another shell UI.
 [aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
 [aireceipts] $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
 [aireceipts · Cursor] 8k
+aireceipts: no sessions detected
 ```
 
 - `$X.XX` is the session's priced cost (aireceipts' own cited-price figure, incl.
@@ -239,8 +247,8 @@ in tmux or another shell UI.
 - Outside a piped invocation (or when stdin carries no usable payload),
   `aireceipts statusline` falls back to the most-recently-ended session found
   on disk — the prefix then names whose session it is (`[aireceipts · Codex]`).
-  If no sessions are detected at all, it prints a neutral placeholder line
-  rather than an error, so the statusline layout never breaks.
+  If no sessions are detected at all, it prints the neutral placeholder line
+  shown above rather than an error, so the statusline layout never breaks.
 
 ## Custom formats (`--format`)
 
