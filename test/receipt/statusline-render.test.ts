@@ -1,7 +1,10 @@
 // SPEC-0007 R1 rules on the SPEC-0062 segments engine: the one-liner's
 // rendering rules, exercised directly against constructed `ReceiptModel`s (no
 // fixture I/O — `renderSegments` over `buildMiniSummary` is pure given a
-// context). The default line is the format `brand,cost,burn,tokens,context,waste,quota5h`.
+// context). The default line is the format
+// `brand,model,cost,burn,tokens,context,waste,quota5h` (SPEC-0076): `baseModel`
+// carries a `claude-opus-4-8` mix, so the default line shows that model between
+// the brand and the cost.
 import { describe, expect, it } from "vitest";
 import { buildMiniSummary } from "../../src/receipt/mini.js";
 import { DEFAULT_FORMAT, parseFormat, renderSegments, type SegmentContext } from "../../src/cli/statuslineSegments.js";
@@ -63,12 +66,12 @@ function renderDefault(model: ReceiptModel, over: Partial<SegmentContext> = {}):
 describe("default line (R1 priced, no waste)", () => {
   it("renders [aireceipts] $usd · Nk tok with no waste-flag segment", () => {
     const model = baseModel({ totalUsd: 1.23, totalTokens: usage(12345) });
-    expect(renderDefault(model)).toBe("[aireceipts] $1.23 · 12k");
+    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · $1.23 · 12k");
   });
 
   it("disk-fallback mode names the session's agent in the brand", () => {
     const model = baseModel({ agentLabel: "Codex", source: "codex" });
-    expect(renderDefault(model, { inputMode: "disk_fallback" })).toBe("[aireceipts · Codex] $1.23 · 12k");
+    expect(renderDefault(model, { inputMode: "disk_fallback" })).toBe("[aireceipts · Codex] claude-opus-4-8 · $1.23 · 12k");
   });
 });
 
@@ -92,7 +95,7 @@ describe("default line (R1 unpriced — I2: zero $ bytes)", () => {
   it("renders tokens-only when nothing in the session priced (totalUsd null)", () => {
     const model = baseModel({ totalUsd: null, totalTokens: usage(500) });
     const line = renderDefault(model);
-    expect(line).toBe("[aireceipts] 500");
+    expect(line).toBe("[aireceipts] claude-opus-4-8 · 500");
     expect(line).not.toContain("$");
   });
 });
@@ -108,7 +111,7 @@ describe("default line (R1 waste flags)", () => {
       wallClockMs: 15000,
     };
     const model = baseModel({ totalUsd: 2.5, totalTokens: usage(20000), wasteLines: [waste] });
-    expect(renderDefault(model)).toBe("[aireceipts] $2.50 · 20k · ⚠ Bash loop ×5");
+    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · $2.50 · 20k · ⚠ Bash loop ×5");
   });
 
   it("appends a trivial-spans flag with the eligible turn count", () => {
@@ -120,7 +123,7 @@ describe("default line (R1 waste flags)", () => {
       cheaperModel: "claude-haiku-4-5",
     };
     const model = baseModel({ totalUsd: 2.5, totalTokens: usage(20000), wasteLines: [waste] });
-    expect(renderDefault(model)).toBe("[aireceipts] $2.50 · 20k · ⚠ 7 trivial spans");
+    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · $2.50 · 20k · ⚠ 7 trivial spans");
   });
 
   it("omits the waste segment entirely when nothing fired (I6: absence, not a claim)", () => {
@@ -155,12 +158,12 @@ describe("SPEC-0062 R2 — quota on the default line", () => {
   const payload = { rate_limits: { five_hour: { used_percentage: 23.5 } } };
 
   it("appends the official 5h percentage, integer-rounded", () => {
-    expect(renderDefault(baseModel(), { payload })).toBe("[aireceipts] $1.23 · 12k · 5h 24%");
+    expect(renderDefault(baseModel(), { payload })).toBe("[aireceipts] claude-opus-4-8 · $1.23 · 12k · 5h 24%");
   });
 
   it("omits the segment for an out-of-range percentage (SPEC-0014 R4: never a guess)", () => {
     const bad = { rate_limits: { five_hour: { used_percentage: 130 } } };
-    expect(renderDefault(baseModel(), { payload: bad })).toBe("[aireceipts] $1.23 · 12k");
+    expect(renderDefault(baseModel(), { payload: bad })).toBe("[aireceipts] claude-opus-4-8 · $1.23 · 12k");
   });
 
   it("the 7d window stays off the default line", () => {

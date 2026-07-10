@@ -466,7 +466,9 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     );
 
     expect(baseline.code).toBe(0);
-    expect(baseline.output).toContain("[aireceipts] $0.18");
+    // SPEC-0076: no payload `model` field → the model segment falls back to the
+    // session's dominant model (this fixture's `claude-opus-4-8`) before the cost.
+    expect(baseline.output).toContain("[aireceipts] claude-opus-4-8 · $0.18");
     expect(err).toBe("");
   });
 
@@ -517,6 +519,21 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     expect(code).toBe(0);
     expect(diskFallbackCalled.value).toBe(false);
     expect(output).toContain("[aireceipts]");
+  });
+
+  it("SPEC-0076 R1 stale-payload gate (command level): a payload with a dead transcript_path never leaks its model into disk fallback", async () => {
+    // The payload parses (so it survives into the SegmentContext) but its
+    // transcript can't load; the disk-fallback session's dominant model must
+    // win — never the stale payload's "Opus".
+    const stdin = stdinStub(
+      JSON.stringify({ transcript_path: "/no/such/file.jsonl", model: { id: "claude-opus-4-8", display_name: "Opus" } }),
+    );
+    const loadFromDiskFn = async (): Promise<Session | null> =>
+      loadById("claude-code", fixturePath("clean-multi-tool-2-models.jsonl"));
+    const { code, output } = await captureStdout(() => runStatusline(stdin, loadFromDiskFn));
+    expect(code).toBe(0);
+    expect(output).toContain("[aireceipts · Claude Code] claude-opus-4-8 ·");
+    expect(output).not.toContain("] Opus ·");
   });
 
   it("R3b: falls back to disk when stdin is empty (TTY)", async () => {
@@ -737,5 +754,45 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     expect(code).toBe(0);
     expect(output).toContain("[aireceipts · Claude Code]");
     expect(elapsedMs).toBeLessThanOrEqual(200);
+  });
+
+  it("SPEC-0076 R7: --format brand,model renders exactly [aireceipts] <model> from the payload", async () => {
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const payload = JSON.stringify({ transcript_path: transcriptPath, model: { id: "claude-opus-4-8", display_name: "Opus" } });
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, { format: "brand,model" }),
+    );
+    expect(code).toBe(0);
+    expect(output).toBe("[aireceipts] Opus\n");
+  });
+
+  it("SPEC-0076 R7: a statusline.json with items [brand, model] renders the same line", async () => {
+    const configPath = path.join(isolatedHome, "brand-model-statusline.json");
+    await writeFile(configPath, JSON.stringify({ items: ["brand", "model"] }), "utf8");
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const payload = JSON.stringify({ transcript_path: transcriptPath, model: { id: "claude-opus-4-8", display_name: "Opus" } });
+    const { code, output } = await captureStdout(() =>
+      runStatusline(stdinStub(payload), async () => null, undefined, undefined, { formatConfigPath: configPath }),
+    );
+    expect(code).toBe(0);
+    expect(output).toBe("[aireceipts] Opus\n");
+  });
+
+  it("SPEC-0076 R1: a stale payload model never rides beside the disk-fallback session's numbers", async () => {
+    // The live payload names the current model "Opus", but its transcript_path
+    // is dead, so the line is built from the disk-fallback session instead —
+    // whose dominant model is `claude-opus-4-8`. R1's stale-payload gate must
+    // hold at the command level: the payload model may not leak onto another
+    // session's row.
+    const transcriptPath = fixturePath("clean-multi-tool-2-models.jsonl");
+    const payload = JSON.stringify({
+      transcript_path: "/no/such/file.jsonl",
+      model: { id: "claude-opus-4-8", display_name: "Opus" },
+    });
+    const loadFromDiskFn = async (): Promise<Session | null> => loadById("claude-code", transcriptPath);
+    const { code, output } = await captureStdout(() => runStatusline(stdinStub(payload), loadFromDiskFn));
+    expect(code).toBe(0);
+    expect(output).toContain("[aireceipts · Claude Code] claude-opus-4-8");
+    expect(output).not.toContain("Opus");
   });
 });

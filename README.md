@@ -21,9 +21,12 @@ to just this PR's turns, plus two Codex helpers — $3.13 total.
 </div>
 
 **Why this exists.** AI coding agents spend real money invisibly — you see the diff,
-never the bill. aireceipts reads the transcripts your agent already writes to disk and
-turns them into receipts: what a session cost, tool by tool; what a PR cost, across
-every session it can attribute; where tokens were wasted. It's local — your code, file
+never the bill. aireceipts works the way a cab does: a **meter** ticks in your status
+bar while the agent works, an itemized **receipt** prints when the session ends, and the
+receipt **rides along with the PR** it paid for. It reads the transcripts your agent
+already writes to disk and turns them into those receipts: what a session cost, tool by
+tool; what a PR cost, across every session it can attribute; where tokens were wasted.
+It's local — your code, file
 contents, and raw transcripts never leave your machine, and pricing needs no network. A
 receipt is the one thing worth sharing, and sharing is always your call — a PR comment,
 a git ref, or an artifact page. A shared receipt carries cost, token, model, and tool
@@ -71,22 +74,16 @@ versioned JSON (`--json`), or CSV (`--csv`).</sub>
 
 </div>
 
-## Start here — three commands
+## Start here — the meter, the receipt, the PR
 
-**See what a session cost** — `npx aireceipts-cli`
-Tool by tool, locally, including where tokens went to waste. No install, no account
-(`--demo` shows a bundled example if you have no sessions yet).
+Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a
+bundled example if you have no sessions yet). Then let it run like a cab ride:
 
-<div align="center">
-
-<img alt="Terminal recording of a synthetic Claude Code session: running aireceipts prints an itemized receipt — each tool priced, TOTAL $0.18, and the arithmetic line: same tokens on claude-haiku-4-5 $0.04 (78% less)." src="site/assets/quickstart.gif" width="640">
-
-</div>
-
-**Live cost in your status bar** — wire in `aireceipts statusline` ([setup](docs/statusline.md))
-One settings line puts running cost in Claude Code's status bar — and with
-`--cwd`, any terminal surface (tmux, starship, PowerShell) shows each pane its
-own session's cost, covering Codex and opencode too.
+**While the agent works — the meter.** Wire `aireceipts statusline` into your status
+bar ([setup](docs/statusline.md)) and the fare is on every prompt: the model that's
+running, cost so far, burn rate, context fullness, and the 5-hour quota countdown.
+With `--cwd`, any terminal surface (tmux, starship, PowerShell) shows each pane its own
+session — Codex and opencode included.
 
 <div align="center">
 
@@ -94,9 +91,20 @@ own session's cost, covering Codex and opencode too.
 
 </div>
 
-**A receipt on every PR** — `npx aireceipts-cli pr --post`
-Attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
-drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to carry one.
+**When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
+receipt: every tool priced, waste flagged (loops, context thrash, trivial spans), and
+the cheaper-model line — arithmetic, not a prediction.
+
+<div align="center">
+
+<img alt="Terminal recording of a synthetic Claude Code session: running aireceipts prints an itemized receipt — each tool priced, TOTAL $0.18, and the arithmetic line: same tokens on claude-haiku-4-5 $0.04 (78% less)." src="site/assets/quickstart.gif" width="640">
+
+</div>
+
+**When the PR ships — the receipt rides along.** `npx aireceipts-cli pr --post`
+attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
+drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to
+carry one.
 
 Prefer a global install: `npm i -g aireceipts-cli`, then the command is `aireceipts`.
 Full walkthrough: [getting started](docs/guide/01-getting-started.md) · a real one, live:

@@ -49,7 +49,7 @@ Usage:
   aireceipts --mini [selector]          6-line mini-receipt (newest session)
   aireceipts install-hook               add a Claude Code SessionEnd auto-receipt hook
   aireceipts uninstall-hook             remove that hook
-  aireceipts statusline [--format <s>] [--cwd <path>]  one-line summary for Claude Code's statusLine
+  aireceipts statusline [--format <s>] [--cwd <path>]  the meter — model + running cost for Claude Code's statusLine (any bar via --cwd)
   aireceipts --help                     show this help
   aireceipts --version                  print the installed version
 
