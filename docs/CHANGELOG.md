@@ -3,6 +3,19 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.8.1 — 2026-07-10
+
+Patch: **OpenAI `gpt-5.6` family price rows** — `gpt-5.6-sol` ($5.00 in / $0.50 cached /
+$30.00 out per 1M), `gpt-5.6-terra` ($2.50 / $0.25 / $15.00), `gpt-5.6-luna` ($1.00 /
+$0.10 / $6.00); Standard short-context tier, effective 2026-07-09, every row cited to
+the official OpenAI pricing page (PR #223). Codex CLI sessions on these models — which
+rendered tokens-only under I2's no-fabricated-dollars rule — now price in receipts and
+the statusline. Additive data change only; no code touched.
+
+Also: the README was restructured around a features-first flow with an agent-assisted
+install section ("point your agent at this README and it installs + wires the
+statusline"), contributed in PR #213. Docs-only; ships as the npm package README.
+
 ## v0.8.0 — 2026-07-10
 
 Minor: **the statusline now works at the terminal level — tmux, starship, zsh/bash,
