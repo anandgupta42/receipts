@@ -363,7 +363,7 @@ footer{
 
 <pre class="doc-code"><code class="language-tmux">set -g status-right '#(aireceipts statusline --cwd &quot;#{pane_current_path}&quot;)'</code></pre>
 
-<p>Each pane shows its own session's cost. Starship, raw zsh/bash, PowerShell, and OSC terminal-title recipes — plus the path-matching rules — are in the <a href="statusline.html#terminal-surfaces">terminal-surfaces reference</a>. For Claude Code itself, the native stdin hook above stays the richer, recommended setup.</p>
+<p>Each pane shows its own session's cost. To get the bar automatically every time you launch the agent — without living in tmux full-time — see the <a href="statusline.html#make-the-bar-appear-whenever-you-launch-your-agent">shell-wrapper recipe</a> (a <code>codex()</code> function that starts tmux on demand). Starship, raw zsh/bash, PowerShell, and OSC terminal-title recipes — plus the path-matching rules — are in the <a href="statusline.html#terminal-surfaces">terminal-surfaces reference</a>. For Claude Code itself, the native stdin hook above stays the richer, recommended setup.</p>
 
 <h2 id="what-the-line-shows">What the line shows</h2>
 

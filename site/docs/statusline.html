@@ -361,6 +361,23 @@ footer{
 
 <p>tmux refreshes <code>#(...)</code> commands on <code>status-interval</code>; lower that setting if you want a fresher line, keeping in mind that each refresh runs the command again.</p>
 
+<h3 id="make-the-bar-appear-whenever-you-launch-your-agent">Make the bar appear whenever you launch your agent</h3>
+
+<p>The tmux bar only exists inside tmux — a plain terminal tab has no status bar to draw on. To get the bar automatically every time you run Codex or opencode (without changing how the rest of your terminal behaves), wrap the command in a shell function that starts tmux on demand. In <code>~/.zshrc</code> (or <code>~/.bashrc</code>):</p>
+
+<pre class="doc-code"><code class="language-sh">_aireceipts_tmux_wrap() {
+  local bin=&quot;$1&quot;; shift
+  if [ -n &quot;$TMUX&quot; ] || ! command -v tmux &gt;/dev/null; then
+    command &quot;$bin&quot; &quot;$@&quot;
+  else
+    tmux new-session -- &quot;$bin&quot; &quot;$@&quot;
+  fi
+}
+codex()    { _aireceipts_tmux_wrap codex &quot;$@&quot;; }
+opencode() { _aireceipts_tmux_wrap opencode &quot;$@&quot;; }</code></pre>
+
+<p>Running <code>codex</code> in any new tab now opens it inside a fresh tmux session with the status bar live; when the agent exits, the session ends (tmux's default — one window, <code>remain-on-exit</code> off) and you are back in your plain shell. Inside an existing tmux session the wrapper steps aside and runs the command directly. tmux auto-names each session, so concurrent launches never collide or mirror each other. Multiple arguments are passed through to the program verbatim (no shell re-parsing). If a TUI's colors or keys look wrong inside the wrapper, set <code>set -g default-terminal &quot;tmux-256color&quot;</code> in <code>~/.tmux.conf</code>. Claude Code needs no wrapper — its native <code>statusLine</code> hook above renders inside the app itself.</p>
+
 <h3 id="matching-rules">Matching rules</h3>
 
 <p><code>--cwd</code> selects the newest session attributed to that path (or an ancestor of it) and prints the neutral placeholder when none match — it never falls back to another project's newest session. A session launched from your home directory (or above it) only ever matches that exact path, so one <code>~</code>-launched session can't shadow every pane on the machine. Relative <code>--cwd</code> paths resolve against the directory where <code>aireceipts</code> is invoked; a path beginning with <code>-</code> must use the <code>--cwd=&lt;path&gt;</code> form. Matching intentionally folds only a Windows drive letter's case — the rest of every path remains case-sensitive, because over-matching on a case-sensitive filesystem is the worse failure. Cursor is excluded from scoped discovery entirely because its session data carries no cwd.</p>

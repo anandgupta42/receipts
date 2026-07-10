@@ -44,9 +44,12 @@ line. With `aireceipts` installed globally, add to `~/.tmux.conf`:
 set -g status-right '#(aireceipts statusline --cwd "#{pane_current_path}")'
 ```
 
-Each pane shows its own session's cost. Starship, raw zsh/bash, PowerShell, and
-OSC terminal-title recipes — plus the path-matching rules — are in the
-[terminal-surfaces reference](../statusline.md#terminal-surfaces). For Claude
+Each pane shows its own session's cost. To get the bar automatically every
+time you launch the agent — without living in tmux full-time — see the
+[shell-wrapper recipe](../statusline.md#make-the-bar-appear-whenever-you-launch-your-agent)
+(a `codex()` function that starts tmux on demand). Starship, raw zsh/bash,
+PowerShell, and OSC terminal-title recipes — plus the path-matching rules —
+are in the [terminal-surfaces reference](../statusline.md#terminal-surfaces). For Claude
 Code itself, the native stdin hook above stays the richer, recommended setup.
 
 ## What the line shows
