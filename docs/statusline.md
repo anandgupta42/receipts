@@ -46,6 +46,37 @@ set -g status-right '#(aireceipts statusline --cwd "#{pane_current_path}")'
 tmux refreshes `#(...)` commands on `status-interval`; lower that setting if you
 want a fresher line, keeping in mind that each refresh runs the command again.
 
+### Make the bar appear whenever you launch your agent
+
+The tmux bar only exists inside tmux — a plain terminal tab has no status bar
+to draw on. To get the bar automatically every time you run Codex or opencode
+(without changing how the rest of your terminal behaves), wrap the command in
+a shell function that starts tmux on demand. In `~/.zshrc` (or `~/.bashrc`):
+
+```sh
+_aireceipts_tmux_wrap() {
+  local bin="$1"; shift
+  if [ -n "$TMUX" ] || ! command -v tmux >/dev/null; then
+    command "$bin" "$@"
+  else
+    tmux new-session -- "$bin" "$@"
+  fi
+}
+codex()    { _aireceipts_tmux_wrap codex "$@"; }
+opencode() { _aireceipts_tmux_wrap opencode "$@"; }
+```
+
+Running `codex` in any new tab now opens it inside a fresh tmux session with
+the status bar live; when the agent exits, the session ends (tmux's default —
+one window, `remain-on-exit` off) and you are back in your plain shell. Inside
+an existing tmux session the wrapper steps aside and runs the command
+directly. tmux auto-names each session, so concurrent launches never collide
+or mirror each other. Multiple arguments are passed through to the program
+verbatim (no shell re-parsing). If a TUI's colors or keys look
+wrong inside the wrapper, set `set -g default-terminal "tmux-256color"` in
+`~/.tmux.conf`. Claude Code needs no wrapper — its native `statusLine` hook
+above renders inside the app itself.
+
 ### Matching rules
 
 `--cwd` selects the newest session attributed to that path (or an ancestor of
