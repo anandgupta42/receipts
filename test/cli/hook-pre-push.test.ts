@@ -77,6 +77,22 @@ describe("SPEC-0073 hook pre-push command", () => {
     expect(result).toEqual({ code: 0, out: "", err: "", attaches: ["/repo"] });
   });
 
+  it("accepts the documented Codex PreToolUse payload", async () => {
+    const result = await runPayload({
+      session_id: "session-1",
+      transcript_path: "/tmp/session.jsonl",
+      cwd: "/repo",
+      hook_event_name: "PreToolUse",
+      model: "gpt-5.6-codex",
+      turn_id: "turn-1",
+      permission_mode: "default",
+      tool_name: "Bash",
+      tool_use_id: "tool-1",
+      tool_input: { command: "git push origin feat" },
+    });
+    expect(result).toEqual({ code: 0, out: "", err: "", attaches: ["/repo"] });
+  });
+
   it.each([
     claudePayload("npm test"),
     claudePayload("git status"),

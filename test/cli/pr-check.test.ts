@@ -177,11 +177,30 @@ describe("SPEC-0064 pr-check", () => {
     expect(err()).toContain("pr --store ref --push-ref");
   });
 
-  it("keeps a found fork receipt green when posting gets a read-only token", async () => {
+  it("enables same-repo enforcement from the documented repo variable", async () => {
+    const { ctx, out } = fakeContext(["pr-check"], {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_EVENT_PATH: eventFile("owner/repo", "branch"),
+      GITHUB_TOKEN: "tok",
+      AIRECEIPTS_REQUIRE_PR_RECEIPT: "true",
+    });
+
+    const exit = await runPrCheck(ctx, {
+      makeTempRepo: tempRepoDeps().makeTempRepo,
+      fetchAndRender: () => ({ code: 2, message: "no ref" }),
+      findMarker: async () => null,
+    });
+
+    expect(exit).toBe(1);
+    expect(out()).toBe("missing-required\n");
+  });
+
+  it("keeps a fork advisory when its read-only token cannot attach the found ref", async () => {
     const { ctx, out, err } = fakeContext(["pr-check"], {
       GITHUB_REPOSITORY: "owner/repo",
       GITHUB_EVENT_PATH: eventFile("fork/repo", "branch"),
       GITHUB_TOKEN: "tok",
+      AIRECEIPTS_REQUIRE_PR_RECEIPT: "true",
     });
 
     const exit = await runPrCheck(ctx, {
@@ -192,8 +211,64 @@ describe("SPEC-0064 pr-check", () => {
     });
 
     expect(exit).toBe(0);
-    expect(out()).toBe("found\n");
+    expect(out()).toBe("missing-notice\n");
     expect(err()).toContain("read-only token");
+  });
+
+  it("fails enforced same-repo PRs when a ref exists but the comment cannot be attached", async () => {
+    const { ctx, out, err } = fakeContext(["pr-check", "--require-same-repo"], {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_EVENT_PATH: eventFile("owner/repo", "branch"),
+      GITHUB_TOKEN: "tok",
+    });
+
+    const exit = await runPrCheck(ctx, {
+      makeTempRepo: tempRepoDeps().makeTempRepo,
+      fetchAndRender: () => foundBody(),
+      upsertMarker: async () => ({ ok: false, reason: "GitHub API unavailable" }),
+      findMarker: async () => null,
+    });
+
+    expect(exit).toBe(1);
+    expect(out()).toBe("missing-required\n");
+    expect(err()).toContain("could not post receipt comment");
+    expect(err()).toContain("rerun this check");
+  });
+
+  it("keeps a same-repo post failure advisory when enforcement is off", async () => {
+    const { ctx, out } = fakeContext(["pr-check"], {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_EVENT_PATH: eventFile("owner/repo", "branch"),
+      GITHUB_TOKEN: "tok",
+    });
+
+    const exit = await runPrCheck(ctx, {
+      makeTempRepo: tempRepoDeps().makeTempRepo,
+      fetchAndRender: () => foundBody(),
+      upsertMarker: async () => ({ ok: false, reason: "GitHub API unavailable" }),
+      findMarker: async () => null,
+    });
+
+    expect(exit).toBe(0);
+    expect(out()).toBe("missing-notice\n");
+  });
+
+  it("accepts an existing marker when updating it fails", async () => {
+    const { ctx, out } = fakeContext(["pr-check", "--require-same-repo"], {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_EVENT_PATH: eventFile("owner/repo", "branch"),
+      GITHUB_TOKEN: "tok",
+    });
+
+    const exit = await runPrCheck(ctx, {
+      makeTempRepo: tempRepoDeps().makeTempRepo,
+      fetchAndRender: () => foundBody(),
+      upsertMarker: async () => ({ ok: false, reason: "GitHub API unavailable" }),
+      findMarker: async () => ({ id: 55 }),
+    });
+
+    expect(exit).toBe(0);
+    expect(out()).toBe("found\n");
   });
 
   it("passes the same sanitized body as fetchAndRenderReceipt/renderPrBody", async () => {

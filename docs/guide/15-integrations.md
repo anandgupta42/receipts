@@ -24,7 +24,7 @@ cache under `~/.aireceipts/`.
 | A weekly habit | `npx aireceipts-cli week` | local | none |
 | PR receipt comments | `npx aireceipts-cli pr --post` | repo/PR | GitHub only when explicitly run |
 | Team PR receipt presence checks | GitHub workflow (npm-native or reusable) | repo | GitHub Actions only |
-| Automatic PR receipt refs | workflow + `.claude/settings.json` hook | repo | GitHub Actions + git push |
+| Automatic PR receipt refs | workflow + the Claude Code and/or Codex producer hook | repo | GitHub Actions + git push |
 
 ## Recipes
 
@@ -67,13 +67,15 @@ for every user. Keep the rollout explicit:
 2. Add assistant snippets or local hooks if they help the workflow.
 3. For PR-producing tasks, run `npx aireceipts-cli pr --post`.
 4. Add the GitHub check when the team wants visibility (two caller variants below).
-5. Add the committed Claude Code hook when the team wants automatic ref production.
+5. Add the committed Claude Code and/or Codex hook when the team wants automatic ref production.
 6. Keep enforcement opt-in; notice-only is the default.
 
 CI checks for marked PR receipt comments and can post from a `refs/aireceipts/*` ref. It
 does not generate receipts and does not read local transcripts. The workflow alone is a
-no-op until the Claude hook, or a manual `npx aireceipts-cli pr --store ref --push-ref`,
-produces that ref. Codex users run the manual command until Codex invokes lifecycle hooks.
+no-op until an agent hook, or a manual `npx aireceipts-cli pr --store ref --push-ref`,
+produces that ref. Codex project hooks require trust and one-time review through `/hooks`;
+keep the `AGENTS.md` finalizer because `PreToolUse` does not intercept every
+`unified_exec` shell path.
 
 ### Two ways to add the CI check
 

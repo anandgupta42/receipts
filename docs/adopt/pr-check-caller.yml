@@ -14,9 +14,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      # Notice-only: never fail the build. continue-on-error keeps the check
-      # green even if npx/the CLI exits non-zero (npm/network hiccup, etc.).
+      # Fail open in notice-only mode and for forks. On same-repo PRs, setting the
+      # repo variable to exactly true makes pr-check exit 1 a real check failure.
       - run: npx -y aireceipts-cli@latest pr-check
-        continue-on-error: true
+        continue-on-error: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT != 'true' || github.event.pull_request.head.repo.full_name != github.repository }}
         env:
           GH_TOKEN: ${{ github.token }}
+          AIRECEIPTS_REQUIRE_PR_RECEIPT: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT }}

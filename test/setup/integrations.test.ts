@@ -40,7 +40,18 @@ describe("SPEC-0050 integration recipes", () => {
     const github = integrationRecipe("github");
     expect(github).toBeDefined();
     const rendered = renderIntegrationRecipe(github!);
+    const codexHook = readFileSync("docs/adopt/codex-hooks.json", "utf8").trimEnd();
+    const claudeHook = readFileSync("docs/adopt/claude-settings.json", "utf8").trimEnd();
+    const codex = integrationRecipe("codex");
+    expect(github?.files).toContain(".codex/hooks.json");
+    expect(JSON.parse(codexHook)).toEqual(JSON.parse(claudeHook));
+    expect(rendered).toContain(["# .codex/hooks.json", "", "```json", codexHook, "```"].join("\n"));
+    expect(renderIntegrationRecipe(codex!)).toContain(["# .codex/hooks.json", "", "```json", codexHook, "```"].join("\n"));
+    expect(rendered).toContain("npx -y aireceipts-cli@latest hook pre-push");
+    expect(rendered).not.toContain("Codex is manual for now");
     const npmNativeWorkflow = readFileSync("docs/adopt/pr-check-caller.yml", "utf8").trimEnd();
+    const reusableWorkflow = readFileSync("docs/adopt/pr-receipt-check-caller.yml", "utf8").trimEnd();
+    expect(rendered).toContain(["```yaml", reusableWorkflow, "```"].join("\n"));
     expect(rendered.indexOf("uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest")).toBeLessThan(
       rendered.indexOf("ALTERNATIVE: self-contained npm-native pr-check"),
     );

@@ -134,8 +134,8 @@ async function missingVerdict(ctx: CommandContext, resolved: ResolvedContext, de
 
   if (resolved.requireSameRepo && resolved.sameRepo) {
     ctx.stdout.write("missing-required\n");
-    ctx.stderr.write("pr-check: receipt ref missing for this same-repo PR.\n");
-    ctx.stderr.write("Run `npx aireceipts-cli pr --store ref --push-ref` locally and push again.\n");
+    ctx.stderr.write("pr-check: receipt comment missing for this same-repo PR.\n");
+    ctx.stderr.write("Run `npx aireceipts-cli pr --post` locally and rerun this check, or run `npx aireceipts-cli pr --store ref --push-ref` and push again.\n");
     return 1;
   }
 
@@ -180,15 +180,13 @@ export async function runPrCheck(ctx: CommandContext, deps: PrCheckDeps = {}): P
 
   if (out.code === 0 && out.body) {
     const post = await upsertMarker({ baseRepo: resolved.value.baseRepo, pr: resolved.value.pr, token: resolved.value.token, body: out.body }, http);
-    ctx.stdout.write("found\n");
     if (post.ok) {
+      ctx.stdout.write("found\n");
       ctx.stderr.write(`pr-check: receipt comment ${post.action}\n`);
-    } else if (post.readOnly) {
-      ctx.stderr.write(`pr-check: ${post.reason}; receipt ref was found, so the check remains green\n`);
-    } else {
-      ctx.stderr.write(`pr-check: could not post receipt comment: ${post.reason}\n`);
+      return 0;
     }
-    return 0;
+    ctx.stderr.write(post.readOnly ? `pr-check: ${post.reason}\n` : `pr-check: could not post receipt comment: ${post.reason}\n`);
+    return missingVerdict(ctx, resolved.value, { findMarker, http });
   }
 
   if (out.code === 3) {

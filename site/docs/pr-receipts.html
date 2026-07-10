@@ -334,7 +334,7 @@ footer{
     <article class="doc-content">
 <h1 id="pr-receipts-attach-the-building-sessions-receipt-to-a-pr">PR receipts — attach the building session's receipt to a PR</h1>
 
-<p><code>aireceipts pr</code> attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment that stays current across pushes. Transcripts live on the developer's machine, never on the CI runner — so generation is local. CI checks for the marked receipt comment and is notice-only by default, with an opt-in setting for maintainers who want same-repo PRs to require a receipt.</p>
+<p><code>aireceipts pr</code> attaches the cost receipt of the AI-agent session that built a branch to that branch's pull request, as a single marked comment refreshed on each push. Transcripts live on the developer's machine, never on the CI runner — so generation is local. CI checks for the marked receipt comment and is notice-only by default, with an opt-in setting for maintainers who want same-repo PRs to require a receipt.</p>
 
 <h2 id="for-contributors-and-coding-assistants-one-command">For contributors and coding assistants (one command)</h2>
 
@@ -385,47 +385,118 @@ git receipt                  # after pushing your branch</code></pre>
 
 <p>The comment link opens the artifact through the <strong>aireceipts viewer</strong> (<code>view.html</code> on the project site): a static page that fetches the raw file from GitHub in the reader's browser and renders it in a fully sandboxed frame — no server, no third party, works for any repo's artifacts with zero setup. Two honest limits: the viewer refuses everything except aireceipts artifact paths on GitHub raw/blob URLs (<code>…/aireceipts/artifacts/pr-&lt;n&gt;.html</code> — it must never become a generic HTML renderer), and <strong>private repos can't render</strong>: anonymous raw fetches 404 there, so the viewer shows its error with a direct GitHub link (readable as source by anyone with access) until the repo is public. Publishing writes nothing to your working tree, index, or current branch, and each PR's file is overwritten in place — other PRs' artifacts are never touched. The viewer page itself carries no analytics or beacons (I4's spirit): nobody, including the aireceipts project, learns who viewed which receipt.</p>
 
-<h2 id="for-maintainers-automatic-repo-integration-2-files">For maintainers (automatic repo integration, 2 files)</h2>
+<h2 id="for-maintainers-workflow-agent-producer">For maintainers (workflow + agent producer)</h2>
 
-<ol>
-  <li>Commit a PR receipt check workflow under <code>.github/workflows/</code>. Two caller variants do the same job — pick one:</li>
-</ol>
+<h3 id="step-1-commit-the-pr-check-workflow">Step 1 — Commit the PR check workflow</h3>
 
-<p><strong>Recommended — self-contained, npm-native</strong> (<a href="adopt/pr-check-caller.yml"><code>adopt/pr-check-caller.yml</code></a>). <em>Use this one if</em> your org restricts third-party reusable workflows, or you'd simply rather not depend on one: it runs the check inside your own workflow with no reusable-workflow <code>uses:</code>, so it never hits an Actions org-policy gate. Commit it as e.g. <code>.github/workflows/aireceipts.yml</code>:</p>
+<p>Put one of these callers under <code>.github/workflows/</code>.</p>
 
-<p><code></code><code>yaml name: aireceipts on: [pull_request] permissions: contents: read pull-requests: write concurrency: group: aireceipts-${{ github.workflow }}-${{ github.ref }} cancel-in-progress: true jobs: check: runs-on: ubuntu-latest steps: - run: npx -y aireceipts-cli@latest pr-check continue-on-error: true env: GH_TOKEN: ${{ github.token }} </code><code></code></p>
+<p><strong>Recommended — self-contained, npm-native</strong> (<a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/pr-check-caller.yml"><code>adopt/pr-check-caller.yml</code></a>). Use this when your org restricts third-party reusable workflows, or when you prefer a self-contained job. Commit it as <code>.github/workflows/aireceipts.yml</code>:</p>
 
-<p><strong>Reusable workflow</strong> (<a href="adopt/pr-receipt-check-caller.yml"><code>adopt/pr-receipt-check-caller.yml</code></a>). <em>Use this one if</em> your org allows third-party reusable workflows and you want the check logic to track upstream automatically via <code>@latest</code>. Commit it as <code>.github/workflows/pr-receipt-check.yml</code>:</p>
+<pre class="doc-code"><code class="language-yaml">name: aireceipts
+on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: aireceipts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: npx -y aireceipts-cli@latest pr-check
+        continue-on-error: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT != 'true' || github.event.pull_request.head.repo.full_name != github.repository }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AIRECEIPTS_REQUIRE_PR_RECEIPT: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT }}</code></pre>
 
-<p><code></code><code>yaml name: pr-receipt-check on: [pull_request] permissions: contents: read pull-requests: write jobs: check: uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest </code><code></code></p>
+<p><strong>Reusable workflow</strong> (<a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/pr-receipt-check-caller.yml"><code>adopt/pr-receipt-check-caller.yml</code></a>). Use this when your org allows third-party reusable workflows and you want the check logic to track upstream via <code>@latest</code>. Commit it as <code>.github/workflows/pr-receipt-check.yml</code>:</p>
 
-<ol>
-  <li>Commit the Claude Code auto-attach hook as <code>.claude/settings.json</code> (<a href="adopt/claude-settings.json">template</a>):</li>
-</ol>
+<pre class="doc-code"><code class="language-yaml">name: pr-receipt-check
+on: [pull_request]
+permissions:
+  contents: read
+  pull-requests: write
+jobs:
+  check:
+    uses: anandgupta42/receipts/.github/workflows/pr-receipt-check.yml@latest</code></pre>
 
-<p><code></code><code>json { &quot;hooks&quot;: { &quot;PreToolUse&quot;: [ { &quot;matcher&quot;: &quot;Bash&quot;, &quot;hooks&quot;: [ { &quot;type&quot;: &quot;command&quot;, &quot;command&quot;: &quot;npx -y aireceipts-cli@latest hook pre-push&quot;, &quot;timeout&quot;: 60 } ] } ] } } </code><code></code></p>
+<h3 id="step-2-commit-the-local-producer-hooks">Step 2 — Commit the local producer hooks</h3>
 
-<ol>
-  <li>Add one line to <code>CONTRIBUTING.md</code>:</li>
-</ol>
+<p>Add the hook for each coding agent the repo uses.</p>
 
-<p>&gt; Before opening a PR, run <code>npx aireceipts-cli pr --post</code> to attach your build receipt.</p>
+<h4 id="claude-code">Claude Code</h4>
 
-<p>The workflow is the reader/poster; the hook is the producer. The workflow alone is a no-op until a branch carries <code>refs/aireceipts/&lt;slug&gt;</code>, produced by the Claude hook above or manually with:</p>
+<p>Commit <code>.claude/settings.json</code> (<a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/claude-settings.json">template</a>):</p>
+
+<pre class="doc-code"><code class="language-json">{
+  &quot;hooks&quot;: {
+    &quot;PreToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Bash&quot;,
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;npx -y aireceipts-cli@latest hook pre-push&quot;,
+            &quot;timeout&quot;: 60
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+
+<h4 id="codex">Codex</h4>
+
+<p>Commit <code>.codex/hooks.json</code> (<a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/codex-hooks.json">template</a>) with the same command:</p>
+
+<pre class="doc-code"><code class="language-json">{
+  &quot;hooks&quot;: {
+    &quot;PreToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Bash&quot;,
+        &quot;hooks&quot;: [
+          {
+            &quot;type&quot;: &quot;command&quot;,
+            &quot;command&quot;: &quot;npx -y aireceipts-cli@latest hook pre-push&quot;,
+            &quot;timeout&quot;: 60
+          }
+        ]
+      }
+    ]
+  }
+}</code></pre>
+
+<p><a href="https://learn.chatgpt.com/docs/hooks">Codex loads project hooks</a> only for trusted projects. Review and trust the exact hook definition once through <code>/hooks</code>; changed definitions require review again.</p>
+
+<h3 id="step-3-keep-the-codex-finalizer-instruction">Step 3 — Keep the Codex finalizer instruction</h3>
+
+<p>Add this second producer path to <code>AGENTS.md</code>:</p>
+
+<blockquote>Before you finish a PR-producing task, run <code>npx aireceipts-cli pr --post</code> from the repo worktree and include any failure message in the handoff.</blockquote>
+
+<h3 id="step-4-tell-contributors">Step 4 — Tell contributors</h3>
+
+<p>Add one line to <code>CONTRIBUTING.md</code>:</p>
+
+<blockquote>After opening or updating a PR, run <code>npx aireceipts-cli pr --post</code> to attach your build receipt.</blockquote>
+
+<p>The workflow is the reader/poster; the local agent hook is the producer. The workflow alone is a no-op until a branch carries <code>refs/aireceipts/&lt;slug&gt;</code>, produced by one of the hooks above or manually with:</p>
 
 <pre class="doc-code"><code class="language-sh">npx aireceipts-cli pr --store ref --push-ref</code></pre>
 
-<p>Codex is manual for now: Codex <code>exec</code> does not currently invoke lifecycle hooks. The hidden <code>hook pre-push</code> subcommand accepts a Codex-shaped payload for forward compatibility, but do not count on Codex auto-attach until Codex hooks exist.</p>
+<p>Codex hooks are best-effort. Current Codex <code>PreToolUse</code> interception does not cover every shell path, including some <code>unified_exec</code> calls, so the <code>AGENTS.md</code> finalizer is a second chance and CI enforcement is the merge-time backstop. For the strongest agent-independent local path, a repo can also wire <code>pr --store ref --push-ref</code> into its own Git pre-push hook; Git requires one-time activation and never auto-runs a fetched hook.</p>
 
 <p>Safe to run alongside another <code>refs/receipts/*</code> producer (e.g. an attestation tool): aireceipts writes and reads only its own <code>refs/aireceipts/*</code> namespace, so the two never fight over the same refs. (Earlier versions shared <code>refs/receipts/*</code>, which left <code>pr-check</code> reading a foreign-schema payload and silently posting nothing; the dedicated namespace removes that collision.)</p>
 
-<p><strong>Footprint (what this actually adds to your repo).</strong> Two committed files for the automatic path (plus, optionally, a one-line note in <code>CONTRIBUTING.md</code>). The check is <strong>notice-only by default</strong> — a neutral <code>::notice</code> when a receipt is missing, nothing otherwise, and a failing build only if you opt into same-repo enforcement. aireceipts <strong>never commits receipt files</strong> to your tree: a receipt is a PR comment or a git ref (<code>refs/aireceipts/…</code>), both invisible in your source and your PR diffs. Remove it anytime by deleting the workflow and the <code>.claude/settings.json</code> hook entry.</p>
+<p><strong>Footprint (what this actually adds to your repo).</strong> One workflow plus the hook files for the coding agents you use. Keep the <code>AGENTS.md</code> fallback for Codex; the one-line <code>CONTRIBUTING.md</code> reminder is optional. The check is <strong>notice-only by default</strong> — a neutral <code>::notice</code> when a receipt is missing, nothing otherwise, and a failing build only if you opt into same-repo enforcement. aireceipts <strong>never commits receipt files</strong> to your tree: a receipt is a PR comment or a git ref (<code>refs/aireceipts/…</code>), both invisible in your source and your PR diffs. Remove it anytime by deleting the workflow and the relevant <code>.claude/settings.json</code> or <code>.codex/hooks.json</code> hook entry.</p>
 
 <p><strong>Turn it up when you want — opt-in and escapable:</strong></p>
 
 <ul>
-  <li><strong>Enforce</strong> — set the repo variable <code>AIRECEIPTS_REQUIRE_PR_RECEIPT=true</code> to make same-repo PRs require a receipt. Fork PRs always stay notice-only (source transcripts live on the contributor's machine, so CI can't generate one).</li>
-  <li><strong>Fully seamless</strong> — two opt-in layers now exist. <strong>CI posts for you:</strong> when a branch carries a <code>refs/aireceipts/&lt;slug&gt;</code> ref, the check renders and posts the receipt comment itself via <code>GITHUB_TOKEN</code>, so a contributor needs no local <code>gh</code>. <strong>Auto-attach on push:</strong> the committed Claude Code hook above writes and pushes that ref before an agent-run <code>git push</code>. For this repo's own contributors, the older <code>.githooks/pre-push</code> path still exists behind <code>npm run setup:hooks</code>. Either way a contributor can still just run <code>npx aireceipts-cli pr --post</code>. Each layer is opt-in and notice-only until turned on.</li>
+  <li><strong>Enforce</strong> — set the repo variable <code>AIRECEIPTS_REQUIRE_PR_RECEIPT=true</code> to make same-repo PRs require an attached receipt. In the npm-native workflow, the variable is forwarded to <code>pr-check</code> and disables <code>continue-on-error</code> for same-repo PRs, so a missing comment really fails the check. If a receipt comment is already attached but a fresh update transiently fails (e.g. a GitHub write error), the check accepts the existing comment and re-syncs it on the next run — a strict PR never flaps red on a transient write, at the cost of the comment briefly lagging the latest push. Fork PRs keep <code>continue-on-error</code> even when the variable is true. Mark the receipt-check job as a required status check in the target branch's ruleset or branch protection; otherwise a red check is visible but does not block a merge. Fork PRs always stay notice-only (source transcripts live on the contributor's machine, so CI can't generate one).</li>
+  <li><strong>Fully seamless</strong> — two opt-in layers now exist. <strong>CI posts for you:</strong> when a branch carries a <code>refs/aireceipts/&lt;slug&gt;</code> ref, the check renders and posts the receipt comment itself via <code>GITHUB_TOKEN</code>, so a contributor needs no local <code>gh</code>. <strong>Auto-attach on push:</strong> the committed Claude Code or Codex hook above writes and pushes that ref before a supported agent-run <code>git push</code>. For this repo's own contributors, the older <code>.githooks/pre-push</code> path still exists behind <code>npm run setup:hooks</code>. Either way a contributor can still just run <code>npx aireceipts-cli pr --post</code>. Each layer is opt-in and notice-only until turned on.</li>
 </ul>
 
 <p>The two workflow variants above (self-contained npm-native, or the reusable workflow) are the reader/poster half of this; the enforcement and seamless tiers apply to either.</p>

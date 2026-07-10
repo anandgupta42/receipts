@@ -58,14 +58,19 @@ on the developer's machine (I1/I4). `pr-check` only *transports* what the local 
   body starting with `DOGFOOD_MARKER`, and **creates** (POST) if absent or **PATCHes** the
   existing one — never a second marker comment. It classifies failures cleanly: a `403`
   (fork read-only token) or `404` degrades to a printed notice + no throw; other errors are
-  reported best-effort. The REST client is injected (a `fetch`-like dep) so tests mock it —
-  **no live network in tests**.
+  reported best-effort. If posting fails, the command checks once more for an existing marker:
+  an existing comment stays `found`, while an absent comment follows the notice/required policy
+  below. The REST client is injected (a `fetch`-like dep) so tests mock it — **no live network
+  in tests**.
 - **R4 — verdict + enforcement + exit codes.** Reuses `receiptCheckVerdict` semantics:
-  `found` → exit 0; missing on default/fork → `missing-notice`, exit 0; missing on a
+  an attached marker comment (`found`) → exit 0; missing on default/fork → `missing-notice`,
+  exit 0; missing on a
   **same-repo** PR with `--require-same-repo` (or `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`) →
   `missing-required`, exit 1. Coarse same-repo-vs-fork only; agent-built vs hand-written stays
   **SPEC-0066 R5 (deferred)**. Fork PRs never fail (read-only token; no transcript on any
-  runner). `pr-check` also runs locally (a dev checks their branch carries a receipt).
+  runner). A valid ref whose comment cannot be attached is therefore required only in strict
+  same-repo mode; it stays advisory for default/fork runs. `pr-check` also runs locally (a dev
+  checks their branch carries a receipt).
 - **R5 — lazy render + honest install cost.** `pr-check` never *loads* `@resvg/resvg-js` at
   runtime (markdown only; no SVG/PNG) and does not need the native binary to be functional.
   It does **not** claim to avoid *installing* it — `@resvg/resvg-js` stays a runtime dependency
@@ -78,7 +83,11 @@ on the developer's machine (I1/I4). `pr-check` only *transports* what the local 
   checkout are not the policy-gated "public reusable workflows"). Also fix
   `docs/adopt/pr-receipt-check-caller.yml` to add `pull-requests: write` — missing today, so a
   reusable-workflow adopter's post job silently cannot comment (a real bug, independent of this
-  spec). **Trust model (honest):** the single-job path renders the untrusted, fork-author-
+  spec). The npm-native caller forwards `vars.AIRECEIPTS_REQUIRE_PR_RECEIPT` and only uses
+  `continue-on-error` while that variable is not exactly `true` or the PR is from a fork,
+  preserving notice-only/fork behavior while making same-repo opt-in enforcement effective.
+  **Trust model (honest):** the single-job
+  path renders the untrusted, fork-author-
   controlled payload in the same job that holds the write token. The sanitizer
   (`src/pr/sanitize.ts`) is a **Markdown-safety** barrier only — it does **not** isolate the
   token from a package/runtime compromise, and does **not** prove the receipt's dollar
@@ -113,6 +122,9 @@ on the developer's machine (I1/I4). `pr-check` only *transports* what the local 
   runs, **then** a `403` on post degrades to a notice, verdict is `missing-notice`, exit 0.
 - **Given** a same-repo PR with no receipt and `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`, **when**
   `pr-check` runs, **then** exit 1, `missing-required`.
+- **Given** a same-repo PR with a valid ref but a failed comment POST/PATCH and no existing
+  marker, **when** enforcement is on, **then** exit 1, `missing-required`; notice-only and fork
+  runs remain advisory.
 
 ## Non-goals
 
@@ -139,9 +151,9 @@ on the developer's machine (I1/I4). `pr-check` only *transports* what the local 
 | R3 | upsert create | no marker comment (paginated) | one marker comment POSTed |
 | R3 | upsert update | existing marker comment | that comment PATCHed; no duplicate |
 | R3 | 403/404 classify | fork read-only token / missing | notice, no throw, no comment |
-| R4 | found / notice / required / fork | ref present/absent × repo relation | exit 0/0/1/0 with matching verdict |
+| R4 | found / notice / required / fork | marker/ref/post result × repo relation | exit 0/0/1/0 with matching verdict; strict post failure fails if no marker remains |
 | R5 | lazy path | `pr-check` invocation | `@resvg/resvg-js` not loaded at runtime |
-| R6 | caller templates | `pr-check-caller.yml` + reusable caller | both declare `pull-requests: write`; pr-check caller has no reusable `uses:` |
+| R6 | caller templates | `pr-check-caller.yml` + reusable caller | both declare `pull-requests: write`; pr-check caller has no reusable `uses:` and forwards conditional enforcement |
 | R7 | hidden command | `--help` output | `pr-check` absent (hidden, like `pr-render-ref`); help golden unchanged |
 | R7 | hostile payload / back-compat | injection corpus; existing tests | sanitized, no throw; comment-marker + two-job paths unchanged |
 

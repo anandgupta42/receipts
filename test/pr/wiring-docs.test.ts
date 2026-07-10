@@ -33,6 +33,15 @@ describe("R4 harness wiring", () => {
     expect(wf).toContain("::notice::");
     expect(wf).toContain("exit 1");
   });
+
+  it("the npm-native adopter workflow only masks failures in notice-only mode", () => {
+    const wf = read("docs/adopt/pr-check-caller.yml");
+    expect(wf).toContain('AIRECEIPTS_REQUIRE_PR_RECEIPT: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT }}');
+    expect(wf).toContain(
+      "continue-on-error: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT != 'true' || github.event.pull_request.head.repo.full_name != github.repository }}",
+    );
+    expect(wf).not.toContain("continue-on-error: true");
+  });
 });
 
 describe("R6 integration doc", () => {
@@ -54,6 +63,18 @@ describe("R6 integration doc", () => {
     expect(doc).toContain("Codex, Claude Code, OpenCode, Cursor");
   });
 
+  it("documents the current Codex producer hook and its trust boundary", () => {
+    expect(doc).toContain(".codex/hooks.json");
+    expect(doc).toContain("/hooks");
+    expect(doc).toContain("unified_exec");
+    expect(doc).not.toContain("Codex is manual for now");
+  });
+
+  it("states the branch-protection step required to make enforcement block merges", () => {
+    expect(doc).toContain("required status check");
+    expect(doc).toContain("ruleset or branch protection");
+  });
+
   it("keeps aliases and hooks optional rather than required for adoption", () => {
     expect(doc).toContain("Optional convenience: git alias");
     expect(doc).toContain("not required for adoption");
@@ -69,9 +90,9 @@ describe("R6 integration doc", () => {
     expect(doc).toContain("npx aireceipts-cli pr --post");
   });
 
-  it("the maintainer integration is at most 5 numbered steps", () => {
+  it("the maintainer integration is at most 5 explicit steps", () => {
     const section = doc.slice(doc.indexOf("For maintainers"));
-    const steps = section.match(/^\d+\.\s/gm) ?? [];
+    const steps = section.match(/^### Step \d+ —/gm) ?? [];
     expect(steps.length).toBeGreaterThan(0);
     expect(steps.length).toBeLessThanOrEqual(5);
   });
