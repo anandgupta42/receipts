@@ -467,9 +467,13 @@ footer{
     <tr><td><code>inputMode</code></td><td>enum</td><td><code>stdin_payload</code> | <code>disk_fallback</code> | <code>none</code></td><td></td></tr>
     <tr><td><code>payloadValid</code></td><td>boolean</td><td></td><td>Whether the stdin payload was usable for the integration.</td></tr>
     <tr><td><code>customFormat</code></td><td>boolean (optional)</td><td></td><td>statusline only (SPEC-0062): an explicit <code>--format</code> was passed. The boolean only — never the format string.</td></tr>
+    <tr><td><code>scoped</code></td><td>boolean (optional)</td><td></td><td>statusline only (SPEC-0075 R6): <code>--cwd</code> was supplied. The boolean only — never the path.</td></tr>
+    <tr><td><code>configFile</code></td><td>boolean (optional)</td><td></td><td>statusline only (SPEC-0075 R6): a valid <code>statusline.json</code> supplied the item order. The boolean only — never the items.</td></tr>
     <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
   </tbody>
 </table></div>
+
+<p><code>statusline --cwd</code> is a polled surface: it still advances the local run counter and records these bounded booleans in-process, but that invocation skips the network flush. A 15-second tmux poll therefore does not become a stream of network events.</p>
 
 <h3 id="activationmilestone-once-per-milestone-per-local-state-file"><code>activation_milestone</code> — once per milestone per local state file</h3>
 
