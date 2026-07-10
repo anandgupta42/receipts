@@ -13,9 +13,7 @@
   <img alt="a real aireceipts receipt comment on a merged pull request of this repo: 3 sessions — a Claude Code orchestrator sliced to just this PR's turns, plus two Codex helpers — $3.13 total" src="docs/assets/pr-receipt-189.png" width="480">
 </a>
 
-<sub>not a mockup — a receipt comment on a merged PR of this repo, posted by
-<code>aireceipts pr --post</code>: three sessions — a Claude orchestrator sliced
-to just this PR's turns, plus two Codex helpers — $3.13 total.
+<sub>not a mockup — a real receipt on a merged PR of this repo: three sessions, $3.13.
 <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live.</a></sub>
 
 **The meter runs while the agent drives · the receipt prints when the ride ends · and rides along with the PR**
