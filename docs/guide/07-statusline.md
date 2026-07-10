@@ -10,7 +10,7 @@ Code's `statusLine` config:
 [aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
 ```
 
-![Terminal recording: piping a Claude Code statusLine payload through aireceipts statusline prints one line — session cost, burn rate, tokens, context fullness, a waste flag, and the 5-hour window countdown; --format trims it to chosen segments.](../../site/assets/statusline.gif)
+![Terminal recording: piping a Claude Code statusLine payload through aireceipts statusline prints the meter line — the model (Opus), session cost, burn rate, tokens, context fullness, a waste flag, and the 5-hour window reset countdown; --format trims it to chosen segments.](../../site/assets/statusline.gif)
 
 ## Set it up
 

@@ -142,8 +142,11 @@ real-time) is cut, not softened.
 - **New telemetry fields.** SPEC-0062 R5 already sends only a boolean custom-format
   flag; the model name is payload/transcript content and never ships (I4). Explicit
   no-op — nothing to add.
-- **Re-recording GIFs** (`site/assets/statusline.gif`, `quickstart.gif`) — VHS
-  re-recording is its own task; alt texts stay truthful to current footage (R6).
+- **Re-recording `quickstart.gif`/`waste-handoff.gif`** — unchanged surfaces keep
+  their footage. (`statusline.gif` WAS re-recorded in a follow-up round — maintainer
+  feedback 2026-07-10: "the images need to be updated" — via the committed `record.sh`
+  rig with `model.display_name` added to its payload, so the R6 alt text now truthfully
+  names the model.)
 - **Auditing the existing `context`/`quota*` segments for the stale-payload seam** —
   they predate this spec; if the same gate is wanted there, that's a separate proposal
   (scope discipline).
@@ -255,6 +258,14 @@ bounded in R4 as a grep-able forbidden-phrase list.
 - **Kill-criterion dry-run:** payload field is documented and `MiniSummary.model` exists
   and is already rendered by the mini receipt — survives; the glanceability demotion
   path (opt-in) remains if the maintainer wants a shorter default.
+
+**2026-07-10 · S6 (maintainer, on the built PR): README wasn't telling the story.**
+Second feedback round: show and explain the meter, update the images. Landed as: an
+exact-bytes meter line + segment legend in the README's meter block (the same treatment
+the receipt gets), `statusline.gif` re-recorded with the model segment visible,
+alt texts updated to match the new footage, and the README trimmed back under the
+SPEC-0029 guard (260 lines, zero emoji) by cutting a duplicated install paragraph —
+independently reviewed (CLEAN).
 
 **Verdict: BUILD NOW.**
 

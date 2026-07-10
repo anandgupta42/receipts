@@ -73,6 +73,7 @@ node -e '
   const now = Date.now();
   const payload = {
     transcript_path: process.argv[1],
+    model: { id: "claude-opus-4-8", display_name: "Opus" },
     context_window: { used_percentage: 41 },
     rate_limits: {
       five_hour: { used_percentage: 63, resets_at: Math.floor((now + 2 * 3600_000 + 13 * 60_000) / 1000) },
