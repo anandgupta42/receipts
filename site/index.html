@@ -313,6 +313,7 @@
 section.statusstrip{padding:0;margin:calc(-1*clamp(28px,5vw,64px)) 0 0}
 .statusstrip .cap{margin:0 0 12px;font-size:16px;line-height:1.55;color:var(--muted)}
 .statusstrip .cap code{font-family:var(--mono);font-size:.9em;color:var(--ledger);white-space:nowrap}
+.stripgif{display:block;width:100%;max-width:880px;height:auto;margin:0 auto 12px;border:1px solid #1c272d;border-radius:11px}
 .statusline{margin:0;background:var(--term-bg);border:1px solid #1c272d;border-radius:11px;padding:13px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--term-fg);white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:0 24px 64px -44px rgba(9,14,18,.9)}
 .statusline .b{color:var(--term-head)}
 .statusline .m{color:var(--term-dim)}
@@ -334,7 +335,8 @@ section.statusstrip{padding:0;margin:calc(-1*clamp(28px,5vw,64px)) 0 0}
   <div class="stage">
     <div class="stage-in">
       <h1 class="display">Your agent works. <span class="soft">You get the receipt.</span></h1>
-      <p class="stage-sub">Every session, itemized and priced — locally. No account. Transcripts never leave your machine.</p>
+      <p class="stage-sub">The meter runs while the agent drives · the receipt prints when the ride ends · and it sticks with the PR.</p>
+      <p class="stage-sub">Local and deterministic. No account; transcripts never leave your machine.</p>
       <div class="cta-hold">
         <div class="copybox">
           <code><span class="p" aria-hidden="true">$</span>npx aireceipts-cli</code>
@@ -346,6 +348,15 @@ section.statusstrip{padding:0;margin:calc(-1*clamp(28px,5vw,64px)) 0 0}
              alt="A dark aireceipts receipt for a real Claude Code session on claude-sonnet-5, run 33m 31s on Jul 02 2026. Itemized: thinking/reply $5.36, Bash $3.93, Read $1.88, Write $0.66, Edit $0.38, TaskList $0.05, SendMessage $0.04. A red line notes $2.68 recoverable by re-pricing 101 trivial turns to claude-haiku-4-5. TOTAL $12.30; the same tokens on claude-haiku-4-5 would be $6.15. Stamped LOCAL · DETERMINISTIC.">
       </figure>
     </div>
+  </div>
+
+  <!-- ============ STATUSLINE STRIP ============ -->
+  <div class="wrap">
+    <section class="statusstrip" aria-label="The statusline while you work">
+      <p class="cap">While the agent works, the meter runs — one settings line pins it under Claude Code's input box; tmux keeps it live for Codex and opencode too (starship/PowerShell refresh per prompt): <code>aireceipts statusline</code></p>
+      <img class="stripgif" src="assets/statusline.gif" width="1040" height="360" loading="lazy" alt="An agent session replayed in a Claude Code-shaped terminal — tool rows scrolling above the input box, the aireceipts meter highlighted beneath it, cost ticking up as the session runs; host-supplied payload fields (context, quota) are simulated.">
+      <pre class="statusline" tabindex="0" aria-label="An aireceipts statusline: model Opus, session cost $23.78, burn rate $14 per hour, 17M tokens, context 41% full, a Bash loop times 5 waste flag, and the 5-hour quota at 63% resetting in 2h 12m."><span class="b">[aireceipts]</span> Opus · $23.78 · $14/hr · 17M · ctx 41% · ⚠ Bash loop ×5 · <span class="m">5h 63% ↺2h12m</span></pre>
+    </section>
   </div>
 
   <!-- ============ THREE SCENARIOS ============ -->
@@ -374,14 +385,6 @@ builder · opus ············ $43.80
 TOTAL ····················· <span class="grnl">$56.10</span></pre></div>
         </div>
       </div>
-    </section>
-  </div>
-
-  <!-- ============ STATUSLINE STRIP ============ -->
-  <div class="wrap">
-    <section class="statusstrip" aria-label="The statusline while you work">
-      <p class="cap">The meter while you work — model, burn rate, context, and quota countdown in your agent's status bar: <code>aireceipts statusline</code></p>
-      <pre class="statusline" tabindex="0" aria-label="An aireceipts statusline: model Opus, session cost $23.78, burn rate $14 per hour, 17M tokens, context 41% full, a Bash loop times 5 waste flag, and the 5-hour quota at 63% resetting in 2h 12m."><span class="b">[aireceipts]</span> Opus · $23.78 · $14/hr · 17M · ctx 41% · ⚠ Bash loop ×5 · <span class="m">5h 63% ↺2h12m</span></pre>
     </section>
   </div>
 
