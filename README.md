@@ -16,7 +16,7 @@
 <sub>not a mockup — a real receipt on a merged PR of this repo: three sessions, $3.13.
 <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live.</a></sub>
 
-**The meter runs while the agent drives · the receipt prints when the ride ends · and rides along with the PR**
+**The meter runs while the agent drives · the receipt prints when the ride ends · and sticks with the PR**
 
 </div>
 
@@ -32,8 +32,8 @@ transcripts never leave your machine, and a shared receipt carries figures, neve
 Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a bundled example if you have no sessions yet). Then let it run like a cab ride:
 
 **1 · While the agent works — the meter.** One settings line ([setup](docs/statusline.md))
-pins `aireceipts statusline` to the bottom of Claude Code's TUI — the bar under the
-input box, ticking up as the session runs:
+pins `aireceipts statusline` under Claude Code's input box — and tmux, starship, or
+PowerShell give Codex and opencode the same bar — ticking up as the session runs:
 
 <p align="center"><img alt="An agent session replayed in a Claude Code-shaped terminal — tool rows and results scrolling above the input box, the aireceipts meter highlighted beneath it: cost climbs $2.67 to $23.78, a Bash loop ×5 waste flag appears mid-session, and the hold frame labels the bar "the meter — aireceipts statusline, one settings line". Cost, tokens, and the waste flag are re-priced by aireceipts from the transcript at each step; host-supplied payload fields are simulated." src="site/assets/statusline.gif" width="640"></p>
 
@@ -50,8 +50,7 @@ The line, segment by segment:
 ```
 
 When money is being wasted — a stuck retry loop, say — a flag appears right on
-the line. tmux, starship, and PowerShell get the same meter
-([recipes](docs/statusline.md)), so Codex and opencode are covered too.
+the line.
 
 
 **2 · When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
@@ -85,7 +84,7 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 
 <sub>`pre-edit` is the share of cost spent before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 
-**3 · When the PR ships — the receipt rides along.** `npx aireceipts-cli pr --post`
+**3 · When the PR ships — the receipt sticks with it.** `npx aireceipts-cli pr --post`
 attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
 drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to
 carry one — a real one, live:
@@ -95,8 +94,21 @@ carry one — a real one, live:
 
 - **Which model is billing you, and what the session costs so far** — on every prompt, before the session is over, with your 5-hour cap countdown next to it.
 - **Where the money went** — every tool priced, waste flagged as it happens: stuck loops, context thrash, trivial turns a cheaper model could have taken.
-- **What a PR cost** — attributed across the sessions that built it, with same-tokens-on-a-cheaper-model arithmetic (never a prediction).
+- **What a PR cost** — attributed across the sessions that built it, with same-tokens-on-a-cheaper-model arithmetic.
 
+## Supported agents
+
+| Agent | Depth |
+|---|---|
+| [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
+| [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
+| [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
+| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; unknown models stay tokens-only |
+| [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
+
+Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
+independent dataset and opens an issue when they disagree; every table change lands
+as a cited price-table PR.
 ## Install — or let your agent do it
 
 ```sh
@@ -182,18 +194,6 @@ If you are an AI agent asked to install aireceipts, do the following:
 
 </div>
 
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
-  <img alt="the same receipt rendered as a shareable SVG, light and dark themes" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
-</picture>
-
-</div>
-
-<sub>The same receipt renders as a shareable SVG (`--svg`, light and dark themes),
-versioned JSON (`--json`), or CSV (`--csv`) — [schema](docs/json-schema.md).</sub>
-
 ## The honesty rules
 
 Every price is cited (vendor URL, date observed, a quoted excerpt — checked by CI). Every
@@ -202,19 +202,6 @@ every commit — including the receipts shown on this page. No model without a c
 row ever shows a dollar figure — tokens-only instead of a guess. Comparisons re-price the identical tokens; they never predict. What a
 receipt proves, and what it can't: [docs/trust.md](docs/trust.md) · `aireceipts --methodology`.
 
-## Supported agents
-
-| Agent | Depth |
-|---|---|
-| [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
-| [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
-| [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
-| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; unknown models stay tokens-only |
-| [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
-
-Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
-independent dataset and opens an issue when they disagree; every table change lands
-as a cited price-table PR.
 
 ## Telemetry
 

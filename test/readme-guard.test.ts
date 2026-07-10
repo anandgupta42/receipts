@@ -55,14 +55,11 @@ describe("SPEC-0029 · README guard", () => {
     expect(lines[tagIdx + 1].trim() === "" || badgeLines.includes(lines[tagIdx + 1])).toBe(true);
   });
 
-  it("R2: hero <picture> sources resolve to committed golden SVGs (light + dark)", () => {
+  it("R2: any golden-SVG receipt shown resolves to a committed golden (maintainer cut the showcase, 2026-07-10 — the rule guards what remains)", () => {
     const srcs = [...readme.matchAll(/(?:srcset|src)="(goldens\/svg\/[^"]+)"/g)].map((m) => m[1]);
-    expect(srcs.length).toBeGreaterThanOrEqual(2);
     for (const s of srcs) {
-      expect(existsSync(s), `hero source missing on disk: ${s}`).toBe(true);
+      expect(existsSync(s), `svg source missing on disk: ${s}`).toBe(true);
     }
-    expect(srcs.some((s) => s.endsWith("-dark.svg"))).toBe(true);
-    expect(srcs.some((s) => s.endsWith("-light.svg"))).toBe(true);
   });
 
   it("R2/R4: every fenced receipt is byte-identical to a committed golden (the README never lies)", () => {
