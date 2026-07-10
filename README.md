@@ -43,7 +43,7 @@ bar ([setup](docs/statusline.md)) and the fare is on every prompt — the exact 
              │      │       │       │      │         └ how much of your 5-hour cap is gone · when it resets
              │      │       │       │      └ how full the context window is
              │      │       │       └ how many tokens the session has used
-             │      │       └ what you're paying the AI per hour (cost ÷ wall-clock)
+             │      │       └ what you're paying the AI per hour
              │      └ cost so far — cited prices, subagents included
              └ which model is billing you right now
 ```
