@@ -77,6 +77,17 @@ wrong inside the wrapper, set `set -g default-terminal "tmux-256color"` in
 `~/.tmux.conf`. Claude Code needs no wrapper — its native `statusLine` hook
 above renders inside the app itself.
 
+**No tmux?** The wrapper deliberately falls back to running the agent
+unwrapped (no bar, no error). Install tmux to get the live bar
+(`brew install tmux` on macOS, `sudo apt install tmux` on Debian/Ubuntu) — or
+use
+any other surface that can run a command and show a line, per the contract
+above. Without a multiplexer, the prompt and terminal-title recipes below
+still work, with one honest limit: they refresh only between commands, so the
+line sits stale while an agent owns the terminal. A live bar *outside* the
+agent needs a host that reserves screen space for it — that is tmux's role
+here (Claude Code's in-app status line is the agent-native exception).
+
 ### Matching rules
 
 `--cwd` selects the newest session attributed to that path (or an ancestor of
