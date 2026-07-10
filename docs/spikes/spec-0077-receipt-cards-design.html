@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shareable receipt cards — design mockup</title>
+<style>
+  /* ---------- chrome tokens (adapt to viewer theme) ---------- */
+  :root{
+    --bg:#ECEEEF; --panel:#F8F9F9; --panel-2:#FFFFFF;
+    --ink:#1A1D1F; --muted:#5C6266; --line:#D7DBDE;
+    --accent:#177A61; --accent-ink:#0c5f4b;
+    --radius:14px;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","JetBrains Mono","Cascadia Code",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0E1012; --panel:#161A1D; --panel-2:#1B2024;
+      --ink:#E7E9EA; --muted:#98A0A4; --line:#272D31;
+      --accent:#43BD98; --accent-ink:#7ad6ba;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg:#ECEEEF; --panel:#F8F9F9; --panel-2:#FFFFFF;
+    --ink:#1A1D1F; --muted:#5C6266; --line:#D7DBDE;
+    --accent:#177A61; --accent-ink:#0c5f4b;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0E1012; --panel:#161A1D; --panel-2:#1B2024;
+    --ink:#E7E9EA; --muted:#98A0A4; --line:#272D31;
+    --accent:#43BD98; --accent-ink:#7ad6ba;
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); line-height:1.55;
+    font-feature-settings:"kern" 1;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px; margin:0 auto; padding:clamp(28px,5vw,72px) clamp(18px,4vw,40px) 96px}
+
+  /* ---------- masthead ---------- */
+  .eyebrow{
+    font-family:var(--mono); font-size:12px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--accent); margin:0 0 14px;
+    display:flex; align-items:center; gap:10px;
+  }
+  .eyebrow::before{content:""; width:26px; height:1px; background:var(--accent); opacity:.7}
+  h1{
+    font-size:clamp(30px,5.2vw,52px); line-height:1.04; margin:0 0 16px;
+    letter-spacing:-.02em; font-weight:660; text-wrap:balance; max-width:16ch;
+  }
+  .dek{font-size:clamp(16px,2vw,19px); color:var(--muted); margin:0 0 30px; max-width:62ch}
+  .dek b{color:var(--ink); font-weight:620}
+  .dek code{font-family:var(--mono); font-size:.9em; background:color-mix(in srgb,var(--accent) 14%,transparent);
+    color:var(--accent-ink); padding:.08em .4em; border-radius:5px}
+
+  /* spec strip */
+  .spec{
+    display:flex; flex-wrap:wrap; gap:8px 10px; margin:0 0 8px; padding:0; list-style:none;
+  }
+  .spec li{
+    font-family:var(--mono); font-size:12.5px; color:var(--muted);
+    border:1px solid var(--line); background:var(--panel);
+    padding:6px 11px; border-radius:999px;
+  }
+  .spec b{color:var(--ink); font-weight:600}
+
+  /* ---------- section headers ---------- */
+  .sec{margin-top:clamp(46px,7vw,78px)}
+  .sec-h{display:flex; align-items:baseline; gap:14px; margin:0 0 6px}
+  .sec-h h2{font-size:22px; margin:0; letter-spacing:-.01em; font-weight:640}
+  .sec-h .tag{font-family:var(--mono); font-size:12px; color:var(--muted); letter-spacing:.04em}
+  .sec-note{color:var(--muted); font-size:15px; margin:0 0 24px; max-width:60ch}
+  .sec-note code{font-family:var(--mono); font-size:.88em; color:var(--ink)}
+
+  /* ---------- card gallery ---------- */
+  .pair{display:grid; grid-template-columns:repeat(2,1fr); gap:22px}
+  @media (max-width:760px){.pair{grid-template-columns:1fr}}
+  .slot{display:flex; flex-direction:column; gap:10px}
+  .slot-label{
+    font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--muted); display:flex; align-items:center; gap:8px;
+  }
+  .swatch{width:10px; height:10px; border-radius:2px; border:1px solid var(--line)}
+
+  /* ============ THE CARD ============ */
+  .card{
+    container-type:inline-size;
+    aspect-ratio:1200/630; width:100%;
+    display:flex; flex-direction:column;
+    padding:4.6cqi 5cqi 4cqi;
+    border:1px solid rgba(0,0,0,.14);
+    box-shadow:0 10px 30px -14px rgba(0,0,0,.4), 0 2px 6px -3px rgba(0,0,0,.25);
+    overflow:hidden; position:relative;
+    /* square corners on purpose — it's paper */
+  }
+  @media (prefers-reduced-motion:no-preference){
+    .card{opacity:0; transform:translateY(10px); animation:rise .6s cubic-bezier(.2,.7,.2,1) forwards}
+    .slot:nth-child(2) .card{animation-delay:.08s}
+  }
+  @keyframes rise{to{opacity:1; transform:none}}
+
+  .card--light{ --paper:#F7F5F0; --cink:#1B1A16; --cmut:#736F64; --cline:#CDCabc;
+    --c-opus:#1B1A16; --c-son:#8B8578; --c-hai:#177A61; --cacc:#177A61;
+    background:var(--paper); color:var(--cink);
+    background-image:linear-gradient(180deg,rgba(0,0,0,.015),transparent 8%);
+  }
+  .card--dark{ --paper:#14181C; --cink:#EBE8DF; --cmut:#8E938F; --cline:#2C3237;
+    --c-opus:#EBE8DF; --c-son:#79837F; --c-hai:#48C6A0; --cacc:#48C6A0;
+    background:var(--paper); color:var(--cink);
+    background-image:radial-gradient(120% 100% at 100% 0,rgba(72,198,160,.06),transparent 55%);
+  }
+
+  .card__head{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-family:var(--mono);
+  }
+  .brand{font-size:2.05cqi; letter-spacing:.34em; font-weight:600}
+  .scope{font-size:1.9cqi; letter-spacing:.1em; color:var(--cmut)}
+  .rule{border:0; border-top:1.5px dashed var(--cline); margin:2.6cqi 0}
+  .rule--tight{margin:2.2cqi 0}
+
+  .card__body{display:grid; grid-template-columns:1fr 1fr; gap:5cqi; flex:1; min-height:0}
+
+  /* left column */
+  .total-lab{font-family:var(--mono); font-size:1.5cqi; letter-spacing:.24em; text-transform:uppercase; color:var(--cmut); margin:0}
+  .total{font-family:var(--mono); font-size:9.4cqi; line-height:.95; font-weight:600; letter-spacing:-.02em; margin:.4cqi 0 0; font-variant-numeric:tabular-nums}
+  .sub{font-family:var(--mono); font-size:1.85cqi; color:var(--cink); margin:2.2cqi 0 0}
+  .sub .dim{color:var(--cmut)}
+  .facts{margin:auto 0 0; display:flex; flex-direction:column; gap:1.1cqi}
+  .fact{font-family:var(--mono); font-size:1.72cqi; display:flex; align-items:center; gap:1cqi}
+  .fact .mk{color:var(--cacc); font-weight:700}
+  .fact .arith{color:var(--cmut); font-size:.86em}
+
+  /* right column */
+  .mixlab{font-family:var(--mono); font-size:1.4cqi; letter-spacing:.22em; text-transform:uppercase; color:var(--cmut); margin:0 0 1.4cqi; display:flex; justify-content:space-between}
+  .mix{display:flex; height:1.9cqi; border-radius:1cqi; overflow:hidden; gap:2px; background:transparent}
+  .mix span{display:block}
+  .mix .s-opus{background:var(--c-opus)}
+  .mix .s-son{background:var(--c-son)}
+  .mix .s-hai{background:var(--c-hai)}
+  .legend{display:flex; gap:2.4cqi; margin:1.4cqi 0 0; font-family:var(--mono); font-size:1.4cqi; color:var(--cmut); flex-wrap:wrap}
+  .legend i{display:inline-block; width:1.2cqi; height:1.2cqi; border-radius:2px; margin-right:.7cqi; vertical-align:baseline}
+  .items{margin:3cqi 0 0; display:flex; flex-direction:column; gap:1.35cqi}
+  .li{display:flex; align-items:baseline; font-family:var(--mono); font-size:1.9cqi}
+  .li .nm{color:var(--cink)}
+  .li .dots{flex:1; margin:0 .6cqi; border-bottom:1.5px dotted var(--cmut); opacity:.5; transform:translateY(-.35em)}
+  .li .vl{color:var(--cink); font-variant-numeric:tabular-nums}
+  .li--faint .nm,.li--faint .vl{color:var(--cmut)}
+
+  .card__foot{display:flex; justify-content:space-between; align-items:baseline; font-family:var(--mono); font-size:1.45cqi; color:var(--cmut)}
+  .card__foot .np{letter-spacing:.02em}
+  .card__foot .np b{color:var(--cink); font-weight:600}
+  .card__foot .eq{color:var(--cacc)}
+
+  /* ---------- share flow terminal ---------- */
+  .term{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:12px;
+    font-family:var(--mono); font-size:14px; line-height:1.85; color:var(--ink);
+    padding:20px 22px; overflow-x:auto; box-shadow:0 6px 20px -14px rgba(0,0,0,.5);
+  }
+  .term .p{color:var(--muted)}
+  .term .ok{color:var(--accent)}
+  .term .k{color:var(--ink); font-weight:600}
+  .term .dim{color:var(--muted)}
+  .term .hint{color:var(--muted); font-style:italic}
+
+  /* ---------- privacy ledger ---------- */
+  .ledger{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+  @media (max-width:680px){.ledger{grid-template-columns:1fr}}
+  .lcol{border:1px solid var(--line); background:var(--panel); border-radius:12px; padding:18px 20px}
+  .lcol h3{margin:0 0 12px; font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-family:var(--mono)}
+  .lcol.on h3{color:var(--accent)}
+  .lcol.off h3{color:var(--muted)}
+  .lcol ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:9px}
+  .lcol li{font-size:14.5px; display:flex; gap:10px; align-items:flex-start; color:var(--ink)}
+  .lcol.off li{color:var(--muted)}
+  .lcol li .g{font-family:var(--mono); flex:none; width:14px; text-align:center}
+  .lcol.on li .g{color:var(--accent)}
+  .lcol.off li .g{color:var(--muted)}
+  .lcol .opt{margin-top:12px; font-size:12.5px; color:var(--muted)}
+  .lcol .opt code{font-family:var(--mono); color:var(--ink)}
+
+  footer.pg{margin-top:70px; padding-top:22px; border-top:1px solid var(--line);
+    font-family:var(--mono); font-size:12px; color:var(--muted); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px}
+</style>
+
+<div class="wrap">
+
+  <p class="eyebrow">Design mockup · v1 · illustrative numbers</p>
+  <h1>Shareable receipt cards</h1>
+  <p class="dek">A <code>--card</code> output flag — folded into the commands you already run
+    (<b>pr</b> and the session default), sitting next to
+    <code>--svg</code> and <code>--png</code>. It re-renders the receipt as a 1200×630 social card
+    and hands you a one-gesture way to post it. v1 ships the <b>unit card</b> (one PR or session);
+    the <b>recap</b> for a window of time is <b>SPEC-0078</b>.</p>
+
+  <ul class="spec">
+    <li><b>flag</b> --card</li>
+    <li><b>scopes</b> session · pr <span style="opacity:.65">· recap → SPEC-0078</span></li>
+    <li><b>export</b> PNG + SVG · 1200×630</li>
+    <li><b>hosted</b> nothing — image travels on its own</li>
+  </ul>
+
+  <!-- ============ UNIT CARD ============ -->
+  <section class="sec">
+    <div class="sec-h"><h2>Unit card</h2><span class="tag">aireceipts pr --card</span></div>
+    <p class="sec-note">One PR or one session. The itemization is the point — same dot-leader
+      breakdown as the terminal receipt, tuned to read at a glance in a feed. The card is the
+      <b>hook</b>: it links out to the <b>full receipt</b> — the sticky PR comment, with every
+      session and expandable detail. The image summarizes; the link carries the depth.
+      <br><b>Note:</b> the <b>session</b> card additionally carries the cheaper-model line
+      (<code>↘ same tokens on haiku…</code>); the <b>PR</b> card omits it — an aggregate
+      repricing can't be made price-safe, so it stays session-only.</p>
+
+    <div class="pair">
+      <div class="slot">
+        <div class="slot-label"><span class="swatch" style="background:#F7F5F0"></span>Light</div>
+        <div class="card card--light" role="img"
+          aria-label="aireceipts unit card for PR 189: 3.13 dollars total across 3 sessions, opus 87 percent, cache served 85 percent, same tokens on haiku about 0.68 dollars, 78 percent less">
+          <div class="card__head"><span class="brand">AIRECEIPTS</span><span class="scope">PR #189</span></div>
+          <hr class="rule rule--tight">
+          <div class="card__body">
+            <div class="col-l">
+              <p class="total-lab">Total</p>
+              <p class="total">$3.13</p>
+              <p class="sub">3 sessions <span class="dim">· 1 orchestrator + 2 helpers</span><br><span class="dim">Jun 18 2026 · 41m</span></p>
+              <div class="facts">
+                <div class="fact"><span class="mk">✓</span> cache served 85% of input</div>
+              </div>
+            </div>
+            <div class="col-r">
+              <div class="mixlab"><span>Model mix</span></div>
+              <div class="mix"><span class="s-opus" style="width:87%"></span><span class="s-hai" style="width:13%"></span></div>
+              <div class="legend"><span><i style="background:var(--c-opus)"></i>opus 87%</span><span><i style="background:var(--c-hai)"></i>sonnet 13%</span></div>
+              <div class="items">
+                <div class="li"><span class="nm">Edit</span><span class="dots"></span><span class="vl">$0.94</span></div>
+                <div class="li"><span class="nm">Bash</span><span class="dots"></span><span class="vl">$0.71</span></div>
+                <div class="li"><span class="nm">Read</span><span class="dots"></span><span class="vl">$0.52</span></div>
+                <div class="li li--faint"><span class="nm">(thinking)</span><span class="dots"></span><span class="vl">$0.48</span></div>
+                <div class="li li--faint"><span class="nm">+ 3 more</span><span class="dots"></span><span class="vl">$0.48</span></div>
+              </div>
+            </div>
+          </div>
+          <hr class="rule">
+          <div class="card__foot"><span class="np">local · <b>npx aireceipts-cli</b></span><span class="eq">proof, not vibes</span></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="slot-label"><span class="swatch" style="background:#14181C"></span>Dark</div>
+        <div class="card card--dark" role="img"
+          aria-label="aireceipts unit card for PR 189, dark theme: 3.13 dollars total across 3 sessions, opus 87 percent, cache served 85 percent, same tokens on haiku about 0.68 dollars, 78 percent less">
+          <div class="card__head"><span class="brand">AIRECEIPTS</span><span class="scope">PR #189</span></div>
+          <hr class="rule rule--tight">
+          <div class="card__body">
+            <div class="col-l">
+              <p class="total-lab">Total</p>
+              <p class="total">$3.13</p>
+              <p class="sub">3 sessions <span class="dim">· 1 orchestrator + 2 helpers</span><br><span class="dim">Jun 18 2026 · 41m</span></p>
+              <div class="facts">
+                <div class="fact"><span class="mk">✓</span> cache served 85% of input</div>
+              </div>
+            </div>
+            <div class="col-r">
+              <div class="mixlab"><span>Model mix</span></div>
+              <div class="mix"><span class="s-opus" style="width:87%"></span><span class="s-hai" style="width:13%"></span></div>
+              <div class="legend"><span><i style="background:var(--c-opus)"></i>opus 87%</span><span><i style="background:var(--c-hai)"></i>sonnet 13%</span></div>
+              <div class="items">
+                <div class="li"><span class="nm">Edit</span><span class="dots"></span><span class="vl">$0.94</span></div>
+                <div class="li"><span class="nm">Bash</span><span class="dots"></span><span class="vl">$0.71</span></div>
+                <div class="li"><span class="nm">Read</span><span class="dots"></span><span class="vl">$0.52</span></div>
+                <div class="li li--faint"><span class="nm">(thinking)</span><span class="dots"></span><span class="vl">$0.48</span></div>
+                <div class="li li--faint"><span class="nm">+ 3 more</span><span class="dots"></span><span class="vl">$0.48</span></div>
+              </div>
+            </div>
+          </div>
+          <hr class="rule">
+          <div class="card__foot"><span class="np">local · <b>npx aireceipts-cli</b></span><span class="eq">proof, not vibes</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ RECAP CARD ============ -->
+  <section class="sec">
+    <div class="sec-h"><h2>Recap card</h2><span class="tag">aireceipts week --card · --since 30d</span></div>
+    <p class="sec-note"><b>Deferred to SPEC-0078</b> (needs an aggregate data model that doesn't
+      exist yet). A window of time. Totals lead; the itemization becomes a top-tools roll-up,
+      with counts, cache rate, and one fun equivalence. Same skeleton, aggregate story.</p>
+
+    <div class="pair">
+      <div class="slot">
+        <div class="slot-label"><span class="swatch" style="background:#F7F5F0"></span>Light</div>
+        <div class="card card--light" role="img"
+          aria-label="aireceipts recap card for July 2026: 47.20 dollars, 9.4 million tokens, 128 sessions, 19 PRs, 22 active days, opus 71 percent, cache 81 percent, roughly 12 times War and Peace in tokens">
+          <div class="card__head"><span class="brand">AIRECEIPTS</span><span class="scope">JULY 2026</span></div>
+          <hr class="rule rule--tight">
+          <div class="card__body">
+            <div class="col-l">
+              <p class="total-lab">Spent this month</p>
+              <p class="total">$47.20</p>
+              <p class="sub">9.4M tokens<br><span class="dim">128 sessions · 19 PRs · 22 active days</span></p>
+              <div class="facts">
+                <div class="fact"><span class="mk">✓</span> cache served 81% of input</div>
+                <div class="fact"><span class="mk">↘</span> same tokens on haiku ≈ $12.60 <span class="arith">(−73%, arithmetic)</span></div>
+              </div>
+            </div>
+            <div class="col-r">
+              <div class="mixlab"><span>Model mix</span></div>
+              <div class="mix"><span class="s-opus" style="width:71%"></span><span class="s-son" style="width:22%"></span><span class="s-hai" style="width:7%"></span></div>
+              <div class="legend"><span><i style="background:var(--c-opus)"></i>opus 71%</span><span><i style="background:var(--c-son)"></i>sonnet 22%</span><span><i style="background:var(--c-hai)"></i>haiku 7%</span></div>
+              <div class="items">
+                <div class="li"><span class="nm">Edit</span><span class="dots"></span><span class="vl">$14.80</span></div>
+                <div class="li"><span class="nm">Bash</span><span class="dots"></span><span class="vl">$11.20</span></div>
+                <div class="li"><span class="nm">Read</span><span class="dots"></span><span class="vl">$8.60</span></div>
+                <div class="li li--faint"><span class="nm">(thinking)</span><span class="dots"></span><span class="vl">$6.90</span></div>
+                <div class="li li--faint"><span class="nm">+ 6 more</span><span class="dots"></span><span class="vl">$5.70</span></div>
+              </div>
+            </div>
+          </div>
+          <hr class="rule">
+          <div class="card__foot"><span class="np">local · <b>npx aireceipts-cli</b></span><span class="eq">≈ 12× War &amp; Peace, in tokens</span></div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="slot-label"><span class="swatch" style="background:#14181C"></span>Dark</div>
+        <div class="card card--dark" role="img"
+          aria-label="aireceipts recap card for July 2026, dark theme: 47.20 dollars, 9.4 million tokens, 128 sessions, 19 PRs, 22 active days, opus 71 percent, cache 81 percent, roughly 12 times War and Peace in tokens">
+          <div class="card__head"><span class="brand">AIRECEIPTS</span><span class="scope">JULY 2026</span></div>
+          <hr class="rule rule--tight">
+          <div class="card__body">
+            <div class="col-l">
+              <p class="total-lab">Spent this month</p>
+              <p class="total">$47.20</p>
+              <p class="sub">9.4M tokens<br><span class="dim">128 sessions · 19 PRs · 22 active days</span></p>
+              <div class="facts">
+                <div class="fact"><span class="mk">✓</span> cache served 81% of input</div>
+                <div class="fact"><span class="mk">↘</span> same tokens on haiku ≈ $12.60 <span class="arith">(−73%, arithmetic)</span></div>
+              </div>
+            </div>
+            <div class="col-r">
+              <div class="mixlab"><span>Model mix</span></div>
+              <div class="mix"><span class="s-opus" style="width:71%"></span><span class="s-son" style="width:22%"></span><span class="s-hai" style="width:7%"></span></div>
+              <div class="legend"><span><i style="background:var(--c-opus)"></i>opus 71%</span><span><i style="background:var(--c-son)"></i>sonnet 22%</span><span><i style="background:var(--c-hai)"></i>haiku 7%</span></div>
+              <div class="items">
+                <div class="li"><span class="nm">Edit</span><span class="dots"></span><span class="vl">$14.80</span></div>
+                <div class="li"><span class="nm">Bash</span><span class="dots"></span><span class="vl">$11.20</span></div>
+                <div class="li"><span class="nm">Read</span><span class="dots"></span><span class="vl">$8.60</span></div>
+                <div class="li li--faint"><span class="nm">(thinking)</span><span class="dots"></span><span class="vl">$6.90</span></div>
+                <div class="li li--faint"><span class="nm">+ 6 more</span><span class="dots"></span><span class="vl">$5.70</span></div>
+              </div>
+            </div>
+          </div>
+          <hr class="rule">
+          <div class="card__foot"><span class="np">local · <b>npx aireceipts-cli</b></span><span class="eq">≈ 12× War &amp; Peace, in tokens</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SHARE FLOW ============ -->
+  <section class="sec">
+    <div class="sec-h"><h2>The share step</h2><span class="tag">one gesture, nothing hosted</span></div>
+    <p class="sec-note">The card lands on disk <em>and</em> on your clipboard, with the caption
+      pre-written and the intent URLs printed for you to click. Web composers can't attach an image for you — so
+      "easy" is: one paste, or one drag. No account, no backend, no upload. At <b>PR level</b> the
+      caption also carries a link to the full receipt; the repo/PR never gets burned into the image
+      (opt in with <code>--link</code>).</p>
+    <div class="term">
+<span class="p">$</span> <span class="k">aireceipts pr 189 --card</span>
+<span class="ok">✓</span> Card saved    <span class="dim">~/Downloads/aireceipts-pr-189.png</span>   (1200×630)
+<span class="ok">✓</span> Caption + image + link copied to clipboard
+     <span class="dim">caption</span>  "PR #189 — $3.13 across 3 sessions. Full receipt ↓"
+     <span class="dim">link</span>     <span class="dim">github.com/…/pull/189#issuecomment-…</span>  <span class="hint">← full receipt, every session</span>
+
+Post it:
+  <span class="k">X</span> / <span class="k">LinkedIn</span>  ·  caption + link prefilled
+  <span class="hint">↳ drag the image in — composers can't attach it for you</span>
+    </div>
+    <p class="sec-note" style="margin-top:16px">Aggregate scopes (<code>week</code>, <code>--since</code>, in <b>SPEC-0078</b>)
+      have no repo to anchor a URL, so they're <b>image-only</b> — the card is the whole shareable unit
+      and the full breakdown stays local in your terminal.</p>
+  </section>
+
+  <!-- ============ PRIVACY ============ -->
+  <section class="sec">
+    <div class="sec-h"><h2>What rides on the card</h2><span class="tag">aggregate-only by default</span></div>
+    <p class="sec-note">Same rule as <code>--no-details</code>: the shareable card carries figures, never
+      the story of what you worked on.</p>
+    <div class="ledger">
+      <div class="lcol on">
+        <h3>On the card</h3>
+        <ul>
+          <li><span class="g">✓</span> Cost, in dollars</li>
+          <li><span class="g">✓</span> Token counts &amp; cache-hit rate</li>
+          <li><span class="g">✓</span> Model mix &amp; tool breakdown</li>
+          <li><span class="g">✓</span> Session / PR counts, active days, dates</li>
+          <li><span class="g">✓</span> Cheaper-model arithmetic &amp; fun equivalence</li>
+        </ul>
+      </div>
+      <div class="lcol off">
+        <h3>Never (by default)</h3>
+        <ul>
+          <li><span class="g">✗</span> Prompts, replies, or transcript</li>
+          <li><span class="g">✗</span> Source code &amp; file contents</li>
+          <li><span class="g">✗</span> Session titles (prompt-derived)</li>
+          <li><span class="g">✗</span> Repo, branch &amp; project names</li>
+          <li><span class="g">✗</span> File paths</li>
+        </ul>
+        <p class="opt">The card is always sanitized: <code>--include-projects</code> / <code>--include-titles</code> are refused with <code>--card</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="pg">
+    <span>aireceipts · shareable receipt cards · design mockup</span>
+    <span>I4 nothing hosted · I3 facts only · I6 no grades</span>
+  </footer>
+
+</div>
+
+</body>
+</html>
