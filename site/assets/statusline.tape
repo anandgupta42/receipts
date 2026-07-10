@@ -27,6 +27,7 @@ Type "clear"
 Enter
 Type "./statusline-demo.sh"
 Enter
+Sleep 1.2s
 Show
 
-Sleep 13.5s
+Sleep 13s
