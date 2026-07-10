@@ -54,6 +54,60 @@
           ]
         }
       ]
+    },
+    "gpt-5.6-sol": {
+      "price_history": [
+        {
+          "input": 5.0,
+          "output": 30.0,
+          "input_cached": 0.5,
+          "from_date": "2026-07-09",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/pricing",
+              "observed_at": "2026-07-10",
+              "excerpt": "gpt-5.6-sol \u2014 Standard (short context): Input $5.00, Cached input $0.50, Output $30.00 per 1M tokens; Standard (long context): Input $10.00, Cached input $1.00, Output $45.00"
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-5.6-terra": {
+      "price_history": [
+        {
+          "input": 2.5,
+          "output": 15.0,
+          "input_cached": 0.25,
+          "from_date": "2026-07-09",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/pricing",
+              "observed_at": "2026-07-10",
+              "excerpt": "gpt-5.6-terra \u2014 Standard (short context): Input $2.50, Cached input $0.25, Output $15.00 per 1M tokens; Standard (long context): Input $5.00, Cached input $0.50, Output $22.50"
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-5.6-luna": {
+      "price_history": [
+        {
+          "input": 1.0,
+          "output": 6.0,
+          "input_cached": 0.1,
+          "from_date": "2026-07-09",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/pricing",
+              "observed_at": "2026-07-10",
+              "excerpt": "gpt-5.6-luna \u2014 Standard (short context): Input $1.00, Cached input $0.10, Output $6.00 per 1M tokens; Standard (long context): Input $2.00, Cached input $0.20, Output $9.00"
+            }
+          ]
+        }
+      ]
     }
   }
 }
