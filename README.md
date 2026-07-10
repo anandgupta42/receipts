@@ -219,9 +219,6 @@ pricing, troubleshooting ([hosted docs](https://anandgupta42.github.io/receipts/
 [What a receipt proves](docs/trust.md) · [PR receipts](docs/pr-receipts.md) ·
 [JSON schema](docs/json-schema.md) · [statusline](docs/statusline.md).
 
-Looking for daily/weekly usage dashboards across agents?
-[ccusage](https://github.com/ryoppippi/ccusage) is the standard — aireceipts answers
-a different question: what a specific session or PR cost, with every number traceable.
 
 ## Versioning & contributing
 
