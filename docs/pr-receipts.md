@@ -1,7 +1,7 @@
 # PR receipts — attach the building session's receipt to a PR
 
 `aireceipts pr` attaches the cost receipt of the AI-agent session that built a branch to
-that branch's pull request, as a single marked comment that stays current across pushes.
+that branch's pull request, as a single marked comment refreshed on each push.
 Transcripts live on the developer's machine, never on the CI runner — so generation is
 local. CI checks for the marked receipt comment and is notice-only by default, with an
 opt-in setting for maintainers who want same-repo PRs to require a receipt.
@@ -255,7 +255,11 @@ or `.codex/hooks.json` hook entry.
 - **Enforce** — set the repo variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true` to make same-repo
   PRs require an attached receipt. In the npm-native workflow, the variable is forwarded
   to `pr-check` and disables `continue-on-error` for same-repo PRs, so a missing comment
-  really fails the check. Fork PRs keep `continue-on-error` even when the variable is true.
+  really fails the check. If a receipt comment is already attached but a fresh update
+  transiently fails (e.g. a GitHub write error), the check accepts the existing comment
+  and re-syncs it on the next run — a strict PR never flaps red on a transient write, at
+  the cost of the comment briefly lagging the latest push. Fork PRs keep
+  `continue-on-error` even when the variable is true.
   Mark the receipt-check job as a required status check in the target branch's
   ruleset or branch protection; otherwise a red check is visible but does not block a
   merge. Fork PRs always stay notice-only (source transcripts live on the contributor's
