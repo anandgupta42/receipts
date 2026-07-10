@@ -211,7 +211,7 @@ describe("SPEC-0061 R1 — the SUBAGENTS row across templates", () => {
 describe("SPEC-0061 R3/R4 — statusline and mini fold the aggregate in", () => {
   it("statusline $ and tokens cover parent + children, format unchanged", () => {
     const model = baseModel({ subagents: { ...AGG, pricedUsd: 9.85, tokensTotal: 1_000_000 } });
-    expect(renderStatusline(model)).toBe("[aireceipts] $10.03 · 1M");
+    expect(renderStatusline(model)).toBe("[aireceipts] claude-opus-4-8 · $10.03 · 1M");
   });
 
   it("statusline stays tokens-only when the parent is unpriced (I2)", () => {

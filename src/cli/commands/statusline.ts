@@ -4,8 +4,9 @@
 // `src/cli/index.js`) so the existing statusline integration tests keep their
 // injectable listSessions/loadSession/stdin entry points. SPEC-0062: the line
 // renders through the segments engine — the default line IS the format
-// `brand,cost,tokens,waste,quota5h`, and `--format` selects any other segment
-// list (unknown names fail fast, exit 1).
+// `brand,model,cost,burn,tokens,context,waste,quota5h` (SPEC-0076 added the
+// model segment), and `--format` selects any other segment list (unknown names
+// fail fast, exit 1).
 import * as os from "node:os";
 import * as path from "node:path";
 import { listSessions, listSessionsForCwd, loadById, loadSession } from "../../index.js";
@@ -255,6 +256,6 @@ export const command: CommandDef = {
   run,
   help: {
     order: 180,
-    lines: ["  aireceipts statusline [--format <s>] [--cwd <path>]  one-line summary for Claude Code's statusLine"],
+    lines: ["  aireceipts statusline [--format <s>] [--cwd <path>]  the meter — model + running cost for Claude Code's statusLine (any bar via --cwd)"],
   },
 };

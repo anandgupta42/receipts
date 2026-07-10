@@ -1,38 +1,33 @@
 # VHS tape (github.com/charmbracelet/vhs) that produced statusline.gif.
 # Reproduce from a repo checkout after `npm ci && npm run build` — see record.sh
-# in this directory for the full sandbox protocol. In short:
-#   1. Put an `aireceipts` shim on PATH that execs `node <repo>/dist/cli.js`.
-#   2. Point HOME at a scratch dir whose .aireceipts/telemetry.json is
-#      {"shown":true} (keeps the first-run notice out of the recording).
-#   3. Write a realistic Claude Code statusLine stdin payload to
-#      $SBOX_HOME/payload.json (context_window + rate_limits, with resets_at
-#      timestamps computed relative to "now" so the countdown is never stale).
-#   4. Export SBOX_HOME / SBOX_BIN, then run: vhs statusline.tape
-# The typed commands are the REAL command a user runs (piping the payload
-# in) — no shell alias shortcuts, since a demo GIF's typed command is a claim
-# about what users actually run.
+# in this directory for the full sandbox protocol (SBOX_HOME / SBOX_BIN).
+#
+# What this shows: an agent session IN PROGRESS with the meter pinned at the
+# bottom — the way `aireceipts statusline` actually appears in Claude Code's
+# status bar. It is driven by statusline-demo.sh, which replays
+# meter-demo-session.jsonl into the sandbox turn by turn; after each chunk the
+# meter line is produced by piping a statusLine payload through the REAL
+# `aireceipts statusline` binary (the same mechanics as Claude Code's hook).
+# Cost, tokens, and the waste flag are genuine renders of the transcript state
+# at each step; the host-supplied payload fields (model, context %, quota,
+# reset) are simulated inputs, as Claude Code would pipe them. The activity
+# rows are replayed from the transcript's own records, through to the
+# session's final turn.
 Output statusline.gif
 Set FontSize 14
 Set Width 1040
-Set Height 260
+Set Height 360
 Set Padding 24
 Set TypingSpeed 55ms
 
 Hide
-Type "export AIRECEIPTS_TELEMETRY=off DO_NOT_TRACK=1 HOME=$SBOX_HOME AIRECEIPTS_HOME=$SBOX_HOME PATH=$SBOX_BIN:$PATH"
-Enter
-Type "cd $SBOX_HOME"
+Type "export AIRECEIPTS_TELEMETRY=off DO_NOT_TRACK=1 HOME=$SBOX_HOME AIRECEIPTS_HOME=$SBOX_HOME"
 Enter
 Type "clear"
 Enter
+Type "./statusline-demo.sh"
+Enter
+Sleep 1.2s
 Show
 
-Sleep 600ms
-Type "cat payload.json | aireceipts statusline"
-Sleep 500ms
-Enter
-Sleep 1.8s
-Type "cat payload.json | aireceipts statusline --format brand,cost,waste"
-Sleep 500ms
-Enter
-Sleep 3.5s
+Sleep 13s

@@ -706,7 +706,8 @@ describe("built CLI e2e", () => {
     const result = await runCli(["statusline"], home, JSON.stringify({ transcript_path: transcriptPath }));
 
     expect(result.code).toBe(0);
-    expect(result.stdout).toContain("[aireceipts] $0.18");
+    // SPEC-0076: default line now carries the dominant model between brand and cost.
+    expect(result.stdout).toContain("[aireceipts] claude-opus-4-8 · $0.18");
     expect(result.stderr).toBe("statusline.json ignored: statusline.json is not valid JSON\n");
   });
 

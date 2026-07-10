@@ -56,23 +56,26 @@ EOF
 chmod +x "$OUT/bin/aireceipts"
 
 make_sbox() {
-  local sbox="$1" fixture="$2"
+  local sbox="$1" fixture="$2"   # fixture: path relative to the repo root
   rm -rf "$sbox"
   mkdir -p "$sbox/.aireceipts" "$sbox/.claude/projects/demo-project"
   echo '{"shown":true}' > "$sbox/.aireceipts/telemetry.json"
-  cp "$REPO/test/fixtures/claude-code/$fixture" "$sbox/.claude/projects/demo-project/session.jsonl"
+  cp "$REPO/$fixture" "$sbox/.claude/projects/demo-project/session.jsonl"
 }
 
 echo "== building sandboxes =="
-make_sbox "$OUT/sbox-quickstart" "clean-multi-tool-2-models.jsonl"
-make_sbox "$OUT/sbox-handoff" "loop-bash-5x.jsonl"
-make_sbox "$OUT/sbox-statusline" "loop-bash-5x.jsonl"
+make_sbox "$OUT/sbox-quickstart" "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl"
+make_sbox "$OUT/sbox-handoff" "test/fixtures/claude-code/loop-bash-5x.jsonl"
+# statusline records against a realistic heavy session (site/assets/meter-demo-session.jsonl,
+# a synthetic ~$24 / 1h44m / 17M-token Opus session) so the demo meter shows real-scale usage.
+make_sbox "$OUT/sbox-statusline" "site/assets/meter-demo-session.jsonl"
 
 echo "== generating statusline payload (resets_at computed relative to now) =="
 node -e '
   const now = Date.now();
   const payload = {
     transcript_path: process.argv[1],
+    model: { id: "claude-opus-4-8", display_name: "Opus" },
     context_window: { used_percentage: 41 },
     rate_limits: {
       five_hour: { used_percentage: 63, resets_at: Math.floor((now + 2 * 3600_000 + 13 * 60_000) / 1000) },

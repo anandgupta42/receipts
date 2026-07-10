@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Show a statusline in your shell — aireceipts docs</title>
+<title>Keep the meter running — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -287,7 +287,7 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>Show a statusline in your shell</h1>
+      <h1>Keep the meter running</h1>
       <p class="sub">Rendered from <code>docs/guide/07-statusline.md</code>.</p>
     </div>
   </header>
@@ -305,7 +305,7 @@ footer{
         <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
         <li><a href="05-compare.html">Compare two sessions</a></li>
         <li><a href="06-week.html">Aggregate the week</a></li>
-        <li><a href="07-statusline.html">Show a statusline in your shell</a></li>
+        <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
@@ -317,7 +317,7 @@ footer{
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
         <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
-        <li><a href="statusline.html">Statusline</a></li>
+        <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
@@ -332,15 +332,15 @@ footer{
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="show-a-statusline-in-your-shell">Show a statusline in your shell</h1>
+<h1 id="keep-the-meter-running">Keep the meter running</h1>
 
-<p>Goal: see the current session's cost on <em>every</em> Claude Code prompt, without running a command yourself.</p>
+<p>Goal: the meter on <em>every</em> Claude Code prompt — model, cost so far, burn rate — without running a command yourself.</p>
 
 <p><code>aireceipts statusline</code> prints exactly one line, meant to be wired into Claude Code's <code>statusLine</code> config:</p>
 
-<pre class="doc-code"><code>[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m</code></pre>
+<pre class="doc-code"><code>[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m</code></pre>
 
-<p><img src="../assets/statusline.gif" alt="Terminal recording: piping a Claude Code statusLine payload through aireceipts statusline prints one line — session cost, burn rate, tokens, context fullness, a waste flag, and the 5-hour window countdown; --format trims it to chosen segments."></p>
+<p><img src="../assets/statusline.gif" alt="An agent session replayed in a Claude Code-shaped terminal — tool rows scrolling above the input box, the aireceipts meter highlighted beneath it, ticking up as the session runs; host-supplied payload fields simulated."></p>
 
 <h2 id="set-it-up">Set it up</h2>
 
@@ -367,9 +367,10 @@ footer{
 
 <h2 id="what-the-line-shows">What the line shows</h2>
 
-<p>The default line is the segment set <code>brand,cost,burn,tokens,context,waste,quota5h</code> — cost, burn rate, tokens, context fullness, a waste flag, and your rate-limit window:</p>
+<p>The default line is the segment set <code>brand,model,cost,burn,tokens,context,waste,quota5h</code> — the model, cost, burn rate, tokens, context fullness, a waste flag, and your rate-limit window:</p>
 
 <ul>
+  <li><code>Opus</code> (after the brand) is the model — in stdin mode, Claude Code's own current model name (a mid-session switch shows on the next render); in disk fallback, the session's dominant model by token share. Omitted when neither is known.</li>
   <li><code>$X.XX</code> is the session's priced cost (<code>Nk</code>/<code>NM</code> tokens alone when it can't be priced — never a fabricated dollar amount), and <code>$X/hr</code> its session-average burn rate.</li>
   <li><code>ctx N%</code> is how full the current context window is; token counts abbreviate to <code>k</code>/<code>M</code> (<code>128k</code>, <code>1.2M</code>).</li>
   <li><code>5h N% ↺Xh Ym</code> is your official 5-hour rate-limit usage plus the time until it resets — subscribers only, on by default, and dropped when Claude Code doesn't provide it.</li>
