@@ -18,15 +18,16 @@
 to just this PR's turns, plus two Codex helpers — $3.13 total.
 <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live.</a></sub>
 
+**The meter runs while the agent drives · the receipt prints at the end of the
+ride · the receipt rides along with the PR**
+
 </div>
 
-**Why this exists.** AI coding agents spend real money invisibly — you see the diff,
-never the bill. aireceipts works the way a cab does: a **meter** ticks in your status
-bar while the agent works, an itemized **receipt** prints when the session ends, and
-the receipt **rides along with the PR** it paid for. Everything is computed locally
-from the transcripts your agent already writes to disk. Sharing is always your call,
-and a shared receipt carries only cost, token, model, and tool figures plus a short
-session title — never your code or the transcript itself ([how](docs/pr-receipts.md)).
+**Why this exists.** Your AI coding agent spends real money invisibly — you see the
+diff, never the bill. aireceipts is the bill: live in your status bar while the agent
+works, itemized when the session ends, attached to the PR. Local and deterministic —
+transcripts never leave your machine, and a shared receipt carries figures, never code
+([how](docs/pr-receipts.md)).
 
 
 ## Start here — the meter, the receipt, the PR
@@ -90,6 +91,15 @@ attaches the cost of the sessions behind a PR as a comment. Generation stays loc
 drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to
 carry one — a real one, live:
 [PR #189](https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222).
+
+## What it tells you
+
+- **Which model is billing you, and what the session costs so far** — on every prompt,
+  before the session is over, with your 5-hour cap countdown next to it.
+- **Where the money went** — every tool priced, waste flagged as it happens: stuck
+  loops, context thrash, trivial turns a cheaper model could have taken.
+- **What a PR cost** — attributed across the sessions that built it, with
+  same-tokens-on-a-cheaper-model arithmetic (never a prediction).
 
 ## Install — or let your agent do it
 

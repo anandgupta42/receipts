@@ -16,7 +16,7 @@
 Output statusline.gif
 Set FontSize 14
 Set Width 1040
-Set Height 330
+Set Height 360
 Set Padding 24
 Set TypingSpeed 55ms
 
