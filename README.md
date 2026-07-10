@@ -18,8 +18,7 @@
 to just this PR's turns, plus two Codex helpers — $3.13 total.
 <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live.</a></sub>
 
-**The meter runs while the agent drives · the receipt prints when the ride
-ends · and rides along with the PR**
+**The meter runs while the agent drives · the receipt prints when the ride ends · and rides along with the PR**
 
 </div>
 
@@ -35,10 +34,15 @@ transcripts never leave your machine, and a shared receipt carries figures, neve
 Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a
 bundled example if you have no sessions yet). Then let it run like a cab ride:
 
-**While the agent works — the meter.** Wire `aireceipts statusline` into your status
-bar ([setup](docs/statusline.md)) and the fare is on every prompt — the exact bytes:
+**While the agent works — the meter.** One settings line ([setup](docs/statusline.md))
+pins `aireceipts statusline` to the bottom of Claude Code's TUI — the bar right under
+the input box, updating with every prompt:
 
 ```
+ ⏺ Bash(npx vitest run test/queue)
+╭─────────────────────────────────────────────────────────────────╮
+│ >                                                               │
+╰─────────────────────────────────────────────────────────────────╯
 [aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
              │      │       │       │      │         └ how much of your 5-hour cap is gone · when it resets
              │      │       │       │      └ how full the context window is
@@ -48,9 +52,9 @@ bar ([setup](docs/statusline.md)) and the fare is on every prompt — the exact 
              └ which model is billing you right now
 ```
 
-A waste flag (`Bash loop ×5`) joins the line only when a detector fired; a segment
-with nothing honest to say is omitted, never zero-filled. With `--cwd`, any terminal
-pane (tmux, starship, PowerShell) shows its own session — Codex and opencode included.
+A waste flag (`Bash loop ×5`) joins only when a detector fired — nothing is
+zero-filled. `--cwd` gives any terminal pane (tmux, starship, PowerShell) its own
+session — Codex and opencode included.
 
 <p align="center"><img alt="An agent session replayed with the aireceipts meter pinned in the status bar: cost climbs $2.67 to $23.78 and tokens 1.5M to 17M as the session runs, a Bash loop ×5 waste flag appears mid-session, and the replay ends on the final reading — cost, tokens, and the waste flag re-priced by aireceipts from the transcript at each step, with the host-supplied payload fields simulated." src="site/assets/statusline.gif" width="640"></p>
 
@@ -83,8 +87,7 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
-<sub>`pre-edit` is the share of cost spent before the first edit-tool call
-([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
+<sub>`pre-edit` is the share of cost spent before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 
 **When the PR ships — the receipt rides along.** `npx aireceipts-cli pr --post`
 attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
@@ -113,8 +116,8 @@ and prefix any command as `npx aireceipts-cli`. Full walkthrough:
 
 ### Easiest: let your agent do it
 
-You already have an AI coding agent (that's why you're here). In Claude Code,
-Codex, or any agent with shell access, paste:
+You already have an AI coding agent. In Claude Code, Codex, or any agent with
+shell access, paste:
 
 ```text
 Read https://raw.githubusercontent.com/anandgupta42/receipts/main/README.md
@@ -122,8 +125,7 @@ and follow the "Instructions for agents" section: install aireceipts globally
 and set up the Claude Code statusline.
 ```
 
-The agent handles the npm install and the settings edit, and shows you a
-receipt when it's done.
+The agent handles the npm install and the settings edit, and shows you a receipt when it's done.
 
 #### Instructions for agents
 
@@ -152,15 +154,13 @@ If you are an AI agent asked to install aireceipts, do the following:
    see, use the absolute path from `which aireceipts` as the `command` value.
 
 3. **Verify.** Run `aireceipts` to print a receipt for the newest session
-   (`aireceipts --demo` if the user has no sessions yet), and `aireceipts setup`
-   for a report of detected agents and suggested integrations. The statusline
-   appears on the next Claude Code prompt; no restart of anything else is
-   needed.
+   (`aireceipts --demo` if the user has none yet) and `aireceipts setup` for
+   detected agents. The statusline appears on the next Claude Code prompt.
 
 4. **Show the user the result.** Print the receipt and tell them the statusline
-   is active. Optional next steps they may want: `aireceipts install-hook`
-   (consent-gated end-of-session mini-receipt) and `aireceipts integrations`
-   (snippets for Codex, opencode, Cursor, and GitHub PR receipts).
+   is active. Optional next steps: `aireceipts install-hook` (consent-gated
+   end-of-session mini-receipt) and `aireceipts integrations` (snippets for
+   Codex, opencode, Cursor, and GitHub PR receipts).
 
 ## Everything else it does
 
