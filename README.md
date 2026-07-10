@@ -102,6 +102,68 @@ Prefer a global install: `npm i -g aireceipts-cli`, then the command is `airecei
 Full walkthrough: [getting started](docs/guide/01-getting-started.md) · a real one, live:
 [PR #189](https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222).
 
+## Install — or let your agent do it
+
+```sh
+npm i -g aireceipts-cli
+```
+
+No account, no API key. The command is then `aireceipts`; or skip the install
+and prefix any command as `npx aireceipts-cli`. Full walkthrough:
+[getting started](docs/guide/01-getting-started.md).
+
+### Easiest: let your agent do it
+
+You already have an AI coding agent (that's why you're here). Point it at this
+README and it can install aireceipts globally and wire up the statusline for
+you. In Claude Code, Codex, or any agent with shell access, paste:
+
+```text
+Read https://raw.githubusercontent.com/anandgupta42/receipts/main/README.md
+and follow the "Instructions for agents" section: install aireceipts globally
+and set up the Claude Code statusline.
+```
+
+That's it. The agent handles the npm install and the settings edit, and shows
+you a receipt when it's done.
+
+#### Instructions for agents
+
+If you are an AI agent asked to install aireceipts, do the following:
+
+1. **Install the CLI globally.** Run `npm install -g aireceipts-cli`, then
+   confirm with `aireceipts --version`. If global installs are not permitted on
+   this machine, fall back to `npx aireceipts-cli` in the steps below and tell
+   the user why.
+
+2. **Set up the Claude Code statusline** (skip if Claude Code is not installed,
+   and say so). Add a `statusLine` entry to `~/.claude/settings.json`:
+
+   ```json
+   {
+     "statusLine": {
+       "type": "command",
+       "command": "aireceipts statusline"
+     }
+   }
+   ```
+
+   Merge into the existing JSON; do not overwrite other settings. If a
+   `statusLine` entry already exists, show it to the user and ask before
+   replacing it. If `aireceipts` is not on the `PATH` that GUI-launched apps
+   see, use the absolute path from `which aireceipts` as the `command` value.
+
+3. **Verify.** Run `aireceipts` to print a receipt for the newest session
+   (`aireceipts --demo` if the user has no sessions yet), and `aireceipts setup`
+   for a report of detected agents and suggested integrations. The statusline
+   appears on the next Claude Code prompt; no restart of anything else is
+   needed.
+
+4. **Show the user the result.** Print the receipt and tell them the statusline
+   is active. Optional next steps they may want: `aireceipts install-hook`
+   (consent-gated end-of-session mini-receipt) and `aireceipts integrations`
+   (snippets for Codex, opencode, Cursor, and GitHub PR receipts).
+
 ## Everything else it does
 
 | Command | What it does |
