@@ -336,6 +336,12 @@ footer{
 
 <p>All notable changes to <code>aireceipts-cli</code>. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
 
+<h2 id="v081-2026-07-10">v0.8.1 — 2026-07-10</h2>
+
+<p>Patch: <strong>OpenAI <code>gpt-5.6</code> family price rows</strong> — <code>gpt-5.6-sol</code> ($5.00 in / $0.50 cached / $30.00 out per 1M), <code>gpt-5.6-terra</code> ($2.50 / $0.25 / $15.00), <code>gpt-5.6-luna</code> ($1.00 / $0.10 / $6.00); Standard short-context tier, effective 2026-07-09, every row cited to the official OpenAI pricing page (PR #223). Codex CLI sessions on these models — which rendered tokens-only under I2's no-fabricated-dollars rule — now price in receipts and the statusline. Additive data change only; no code touched.</p>
+
+<p>Also: the README was restructured around a features-first flow with an agent-assisted install section (&quot;point your agent at this README and it installs + wires the statusline&quot;), contributed in PR #213. Docs-only; ships as the npm package README.</p>
+
 <h2 id="v080-2026-07-10">v0.8.0 — 2026-07-10</h2>
 
 <p>Minor: <strong>the statusline now works at the terminal level — tmux, starship, zsh/bash, PowerShell, terminal titles — so Codex and opencode sessions get a live cost line too, not just Claude Code.</strong> Neither Codex nor opencode exposes a command-backed status hook (openai/codex#17827 and sst/opencode#8619 are open), so the surface moved to the terminal itself (SPEC-0075, PRs #217/#221).</p>
