@@ -33,7 +33,7 @@ Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo`
 
 **1 · While the agent works — the meter.** One settings line ([setup](docs/statusline.md))
 pins `aireceipts statusline` under Claude Code's input box — and tmux, starship, or
-PowerShell give Codex and opencode the same bar — ticking up as the session runs:
+PowerShell give Codex and OpenCode the same bar — ticking up as the session runs:
 
 <p align="center"><img alt="An agent session replayed in a Claude Code-shaped terminal — tool rows and results scrolling above the input box, the aireceipts meter highlighted beneath it: cost climbs $2.67 to $23.78, a Bash loop ×5 waste flag appears mid-session, and the hold frame labels the bar "the meter — aireceipts statusline, one settings line". Cost, tokens, and the waste flag are re-priced by aireceipts from the transcript at each step; host-supplied payload fields are simulated." src="site/assets/statusline.gif" width="640"></p>
 
@@ -103,7 +103,7 @@ carry one — a real one, live:
 | [Claude Code](docs/agents/claude-code.md) | Full: per-turn models, tools, cache tiers |
 | [Codex CLI](docs/agents/codex.md) | Full per-turn parsing |
 | [Gemini CLI](docs/agents/gemini.md) | Full: per-turn models, tools, cache tokens |
-| [opencode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; unknown models stay tokens-only |
+| [OpenCode](docs/agents/opencode.md) | Full: per-message models, tools, cache read/write; unknown models stay tokens-only |
 | [Cursor](docs/agents/cursor.md) | Honest degraded mode: session totals only (its logs carry no per-turn usage) |
 
 Model prices move. A daily advisory tripwire cross-checks `data/prices/` against an
@@ -165,7 +165,7 @@ If you are an AI agent asked to install aireceipts, do the following:
 4. **Show the user the result.** Print the receipt and tell them the statusline
    is active. Optional next steps: `aireceipts install-hook` (consent-gated
    end-of-session mini-receipt) and `aireceipts integrations` (snippets for
-   Codex, opencode, Cursor, and GitHub PR receipts).
+   Codex, OpenCode, Cursor, and GitHub PR receipts).
 
 ## Everything else it does
 
@@ -180,7 +180,7 @@ If you are an AI agent asked to install aireceipts, do the following:
 | `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
 | `aireceipts week` | Trailing-7-day digest: totals, per-agent split, top waste — [guide](docs/guide/06-week.md) |
 | `aireceipts backfill [--out <dir>]` | Bulk receipts across your existing session history; summary by default, one file per session with `--out` — [guide](docs/guide/01-getting-started.md) |
-| `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, opencode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
+| `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, OpenCode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
 | `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time — [guide](docs/guide/09-handoff.md) |
 | `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt — [guide](docs/guide/03-install-hook.md) |
 | `aireceipts statusline` | Live cost line in Claude Code's status bar, or any terminal via `--cwd` (tmux/starship/pwsh) — [setup](docs/statusline.md) |
