@@ -28,7 +28,34 @@ from the transcripts your agent already writes to disk. Sharing is always your c
 and a shared receipt carries only cost, token, model, and tool figures plus a short
 session title — never your code or the transcript itself ([how](docs/pr-receipts.md)).
 
-Here's what one looks like — the exact bytes your terminal prints:
+
+## Start here — the meter, the receipt, the PR
+
+Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a
+bundled example if you have no sessions yet). Then let it run like a cab ride:
+
+**While the agent works — the meter.** Wire `aireceipts statusline` into your status
+bar ([setup](docs/statusline.md)) and the fare is on every prompt — the exact bytes:
+
+```
+[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+             │      │       │       │      │         └ how much of your 5-hour cap is gone · when it resets
+             │      │       │       │      └ how full the context window is
+             │      │       │       └ how many tokens the session has used
+             │      │       └ what you're paying the AI per hour (cost ÷ wall-clock)
+             │      └ cost so far — cited prices, subagents included
+             └ which model is billing you right now
+```
+
+A waste flag (`Bash loop ×5`) joins the line only when a detector fired; a segment
+with nothing honest to say is omitted, never zero-filled. With `--cwd`, any terminal
+pane (tmux, starship, PowerShell) shows its own session — Codex and opencode included.
+
+<p align="center"><img alt="An agent session replayed with the aireceipts meter pinned in the status bar: cost climbs $2.67 to $23.78 and tokens 1.5M to 17M as the session runs, a Bash loop ×5 waste flag appears mid-session, and the replay ends on the final reading — cost, tokens, and the waste flag re-priced by aireceipts from the transcript at each step, with the host-supplied payload fields simulated." src="site/assets/statusline.gif" width="640"></p>
+
+**When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
+receipt — every tool priced, waste flagged (loops, context thrash, trivial spans),
+the cheaper-model line as arithmetic, not a prediction. The exact bytes:
 
 ```
 - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -56,48 +83,7 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 ```
 
 <sub>`pre-edit` is the share of cost spent before the first edit-tool call
-([reading a receipt](docs/guide/04-read-a-receipt.md)).
-The same receipt renders as a shareable SVG (`--svg`, light and dark themes),
-versioned JSON (`--json`), or CSV (`--csv`).</sub>
-
-<div align="center">
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
-  <img alt="the same receipt rendered as a shareable SVG, light and dark themes" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
-</picture>
-
-</div>
-
-## Start here — the meter, the receipt, the PR
-
-Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a
-bundled example if you have no sessions yet). Then let it run like a cab ride:
-
-**While the agent works — the meter.** Wire `aireceipts statusline` into your status
-bar ([setup](docs/statusline.md)) and the fare is on every prompt — the exact bytes:
-
-```
-[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
-             │      │       │       │      │         └ how much of your 5-hour cap is gone · when it resets
-             │      │       │       │      └ how full the context window is
-             │      │       │       └ how many tokens the session has used
-             │      │       └ what you're paying the AI per hour (cost ÷ wall-clock)
-             │      └ cost so far — cited prices, subagents included
-             └ which model is billing you right now
-```
-
-A waste flag (`Bash loop ×5`) joins the line only when a detector fired; a segment
-with nothing honest to say is omitted, never zero-filled. With `--cwd`, any terminal
-pane (tmux, starship, PowerShell) shows its own session — Codex and opencode included.
-
-<p align="center"><img alt="An agent session replayed with the aireceipts meter pinned in the status bar: cost climbs $2.67 to $23.78 and tokens 1.5M to 17M as the session runs, a Bash loop ×5 waste flag appears mid-session, and the replay ends on the final reading — cost, tokens, and the waste flag re-priced by aireceipts from the transcript at each step, with the host-supplied payload fields simulated." src="site/assets/statusline.gif" width="640"></p>
-
-**When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
-receipt: every tool priced, waste flagged (loops, context thrash, trivial spans), and
-the cheaper-model line — arithmetic, not a prediction.
-
-<p align="center"><img alt="Terminal recording of a synthetic Claude Code session: running aireceipts prints an itemized receipt — each tool priced, TOTAL $0.18, and the arithmetic line: same tokens on claude-haiku-4-5 $0.04 (78% less)." src="site/assets/quickstart.gif" width="640"></p>
+([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 
 **When the PR ships — the receipt rides along.** `npx aireceipts-cli pr --post`
 attaches the cost of the sessions behind a PR as a comment. Generation stays local; a
@@ -192,6 +178,18 @@ If you are an AI agent asked to install aireceipts, do the following:
 <img alt="Terminal recording of a synthetic session: aireceipts --handoff prints COULD HAVE SAVED ≤ $0.08 (81%, arithmetic not a prediction), the flagged Bash loop ×5 waste line with its fix, and the coverage line." src="site/assets/waste-handoff.gif" width="640">
 
 </div>
+
+<div align="center">
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="goldens/svg/claude-code-clean-multi-tool-2-models-dark.svg">
+  <img alt="the same receipt rendered as a shareable SVG, light and dark themes" src="goldens/svg/claude-code-clean-multi-tool-2-models-light.svg" width="520">
+</picture>
+
+</div>
+
+<sub>The same receipt renders as a shareable SVG (`--svg`, light and dark themes),
+versioned JSON (`--json`), or CSV (`--csv`) — [schema](docs/json-schema.md).</sub>
 
 ## The honesty rules
 
