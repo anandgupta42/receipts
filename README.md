@@ -84,12 +84,12 @@ bar ([setup](docs/statusline.md)) and the fare is on every prompt — the exact 
 
 ```
 [aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
-             │      │       │       │      │         └ 5-hour rate-limit used · resets in
-             │      │       │       │      └ context-window fullness
-             │      │       │       └ session tokens
-             │      │       └ burn rate (cost ÷ wall-clock)
-             │      └ cost so far (cited prices; subagents included)
-             └ the model running right now
+             │      │       │       │      │         └ how much of your 5-hour cap is gone · when it resets
+             │      │       │       │      └ how full the context window is
+             │      │       │       └ the volume behind the fare, in tokens
+             │      │       └ what you're paying the AI per hour (cost ÷ wall-clock)
+             │      └ the fare so far — cited prices, subagents included
+             └ which model is billing you right now
 ```
 
 A waste flag (`Bash loop ×5`) joins the line only when a detector fired; a segment
