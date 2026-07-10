@@ -31,15 +31,17 @@ transcripts never leave your machine, and a shared receipt carries figures, neve
 
 ## Start here — the meter, the receipt, the PR
 
-Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a
-bundled example if you have no sessions yet). Then let it run like a cab ride:
+Try it in ten seconds: `npx aireceipts-cli` — no install, no account (`--demo` shows a bundled example if you have no sessions yet). Then let it run like a cab ride:
 
 **While the agent works — the meter.** One settings line ([setup](docs/statusline.md))
 pins `aireceipts statusline` to the bottom of Claude Code's TUI — the bar right under
 the input box, updating with every prompt:
 
 ```
- ⏺ Bash(npx vitest run test/queue)
+> fix the payment retry race, then get the queue suite green
+
+⏺ Bash(npx vitest run test/queue)
+  ⎿  PASS  12 files, 214 tests
 ╭─────────────────────────────────────────────────────────────────╮
 │ >                                                               │
 ╰─────────────────────────────────────────────────────────────────╯
@@ -97,12 +99,9 @@ carry one — a real one, live:
 
 ## What it tells you
 
-- **Which model is billing you, and what the session costs so far** — on every prompt,
-  before the session is over, with your 5-hour cap countdown next to it.
-- **Where the money went** — every tool priced, waste flagged as it happens: stuck
-  loops, context thrash, trivial turns a cheaper model could have taken.
-- **What a PR cost** — attributed across the sessions that built it, with
-  same-tokens-on-a-cheaper-model arithmetic (never a prediction).
+- **Which model is billing you, and what the session costs so far** — on every prompt, before the session is over, with your 5-hour cap countdown next to it.
+- **Where the money went** — every tool priced, waste flagged as it happens: stuck loops, context thrash, trivial turns a cheaper model could have taken.
+- **What a PR cost** — attributed across the sessions that built it, with same-tokens-on-a-cheaper-model arithmetic (never a prediction).
 
 ## Install — or let your agent do it
 
