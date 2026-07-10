@@ -18,8 +18,8 @@
 to just this PR's turns, plus two Codex helpers — $3.13 total.
 <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live.</a></sub>
 
-**The meter runs while the agent drives · the receipt prints at the end of the
-ride · the receipt rides along with the PR**
+**The meter runs while the agent drives · the receipt prints when the ride
+ends · and rides along with the PR**
 
 </div>
 
