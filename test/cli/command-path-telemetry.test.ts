@@ -12,6 +12,7 @@
 import { copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { Readable } from "node:stream";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const savedEnv = vi.hoisted(() => {
@@ -43,6 +44,25 @@ function opencodeRoot(home: string): string {
   return process.platform === "win32" ? join(home, "AppData", "Local", "opencode") : join(home, ".local", "share", "opencode");
 }
 
+async function withStdinPayload<T>(payload: string, fn: () => Promise<T>): Promise<T> {
+  const stream = process.stdin;
+  const ttyDescriptor = Object.getOwnPropertyDescriptor(stream, "isTTY");
+  const iteratorDescriptor = Object.getOwnPropertyDescriptor(stream, Symbol.asyncIterator);
+  Object.defineProperty(stream, "isTTY", { configurable: true, value: false });
+  Object.defineProperty(stream, Symbol.asyncIterator, {
+    configurable: true,
+    value: () => Readable.from([Buffer.from(payload, "utf8")])[Symbol.asyncIterator](),
+  });
+  try {
+    return await fn();
+  } finally {
+    if (ttyDescriptor) Object.defineProperty(stream, "isTTY", ttyDescriptor);
+    else delete (stream as { isTTY?: boolean }).isTTY;
+    if (iteratorDescriptor) Object.defineProperty(stream, Symbol.asyncIterator, iteratorDescriptor);
+    else delete (stream as unknown as Record<symbol, unknown>)[Symbol.asyncIterator];
+  }
+}
+
 describe("SPEC-0043 command-path telemetry", () => {
   const home = homedir(); // the mocked, factory-created temp home
   // Captured ONCE at module scope: a beforeEach save would capture the previous
@@ -51,6 +71,7 @@ describe("SPEC-0043 command-path telemetry", () => {
   const origErr = process.stderr.write.bind(process.stderr);
 
   beforeEach(() => {
+    vi.restoreAllMocks();
     mkdirSync(join(home, ".aireceipts"), { recursive: true });
     writeFileSync(join(home, ".aireceipts", "telemetry.json"), JSON.stringify({ shown: true }));
     mkdirSync(opencodeRoot(home), { recursive: true });
@@ -105,6 +126,32 @@ describe("SPEC-0043 command-path telemetry", () => {
     const runs = events.filter((e) => e.name === "cli_run");
     expect(runs).toHaveLength(1);
     expect((runs[0].properties as Record<string, unknown>).commandClass).toBe("receipt");
+  });
+
+  it("SPEC-0075 R6: scoped statusline advances the local counter but skips the network flush", async () => {
+    const transcriptPath = join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl");
+    const before = await telemetry.readState(home);
+
+    const code = await withStdinPayload(JSON.stringify({ transcript_path: transcriptPath }), () =>
+      main(["statusline", "--cwd", home]),
+    );
+
+    expect(code).toBe(0);
+    expect((await telemetry.readState(home)).runCount).toBe(before.runCount + 1);
+    expect(telemetry.flushTelemetry).not.toHaveBeenCalled();
+    const integration = peekQueuedEvents().find((event) => event.name === "integration_surface_rendered");
+    expect(integration?.properties).toEqual(
+      expect.objectContaining({ customFormat: false, scoped: true, configFile: false }),
+    );
+  });
+
+  it("SPEC-0075 R6: unscoped statusline keeps the existing network flush", async () => {
+    const transcriptPath = join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl");
+
+    const code = await withStdinPayload(JSON.stringify({ transcript_path: transcriptPath }), () => main(["statusline"]));
+
+    expect(code).toBe(0);
+    expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(1);
   });
 
   // SPEC-0054 R8 — detailsView is true only for renders that carry the DETAILS

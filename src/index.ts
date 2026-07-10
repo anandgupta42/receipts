@@ -19,7 +19,17 @@ export { GeminiAdapter } from "./parse/gemini.js";
 export { OpenCodeAdapter } from "./parse/opencode.js";
 
 export { adapterFor, adapters, agentIds, detectedAdapters } from "./parse/registry.js";
-export { anyDetected, listSessions, listFullSessions, loadById, loadSession, newestSession, rootsHint, selectSummary } from "./parse/load.js";
+export {
+  anyDetected,
+  listSessions,
+  listSessionsForCwd,
+  listFullSessions,
+  loadById,
+  loadSession,
+  newestSession,
+  rootsHint,
+  selectSummary,
+} from "./parse/load.js";
 
 export type { PriceRow, PriceSource, PriceTable, ResolvedPrice } from "./pricing/types.js";
 export { defaultDataDir, loadPriceTable } from "./pricing/priceTable.js";

@@ -185,6 +185,11 @@ export interface ListSessionsOptions {
    * `listFullSessions()` so unchanged files hit the summary cache first.
    */
   full?: boolean;
+  /**
+   * SPEC-0075 R1 — optional discovery roots for adapters that can scope at the
+   * filesystem layer (Claude Code). Other adapters ignore this narrow seam.
+   */
+  roots?: readonly string[];
 }
 
 /** One fidelity failure: which named check tripped and the one-line evidence (SPEC-0028 R2). */

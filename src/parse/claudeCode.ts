@@ -405,7 +405,12 @@ export class ClaudeCodeAdapter implements SessionAdapter {
   }
 
   async listSessions(options: ListSessionsOptions = {}): Promise<SessionSummary[]> {
-    const all = await listFiles(this.root, (name) => name.endsWith(".jsonl"));
+    // SPEC-0075 R1 — scoped callers provide exact encoded project directories;
+    // the default remains the single adapter root, preserving global discovery.
+    const discoveryRoots = options.roots ?? [this.root];
+    const all = (
+      await Promise.all([...new Set(discoveryRoots)].map((root) => listFiles(root, (name) => name.endsWith(".jsonl"))))
+    ).flat();
     // R1c: subagent transcripts are excluded from top-level selection — they roll
     // up into their parent's receipt, never appear as standalone sessions.
     // SPEC-0041 R1: the exclusion covers ANY `.jsonl` under `subagents/`, not

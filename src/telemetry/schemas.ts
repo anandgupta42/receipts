@@ -254,6 +254,10 @@ export const integrationSurfaceRenderedPropertiesSchema = z
     result: z.enum(RESULT_VALUES),
     /** SPEC-0062 R5 — statusline only: the invocation carried an explicit `--format` (boolean, never the format string). */
     customFormat: z.boolean().optional(),
+    /** SPEC-0075 R6 — boolean only; the raw `--cwd` path must never enter a telemetry payload. */
+    scoped: z.boolean().optional(),
+    /** SPEC-0075 R6 — boolean only; config contents must never enter a telemetry payload. */
+    configFile: z.boolean().optional(),
   })
   .strict();
 export type IntegrationSurfaceRenderedProperties = z.infer<typeof integrationSurfaceRenderedPropertiesSchema>;

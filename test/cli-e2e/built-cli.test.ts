@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { spawn, spawnSync } from "node:child_process";
+import { copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,14 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
 const cliPath = path.join(repoRoot, "dist", "cli.js");
 const tempDirs: string[] = [];
+
+// Probe whether THIS runtime loads node:sqlite unflagged (22.13+/23.4+, and
+// not disabled via NODE_OPTIONS) by asking a child process that runs exactly
+// like the spawned CLI does. Runtimes without it legitimately use the
+// sqlite3-CLI fallback, so the in-process regression test below skips there
+// instead of failing — a version gate would misclassify 23.0–23.3.
+const hasNodeSqlite =
+  spawnSync(process.execPath, ["-e", 'require("node:sqlite")'], { encoding: "utf8" }).status === 0;
 
 interface RunOptions {
   cwd?: string;
@@ -92,6 +100,9 @@ function runProcess(command: string, args: string[], options: RunOptions = {}): 
       cwd: options.cwd ?? repoRoot,
       env: { ...process.env, ...options.env },
       stdio: ["pipe", "pipe", "pipe"],
+      // Node throws EINVAL spawning .cmd shims (npm.cmd) without a shell since
+      // the CVE-2024-27980 hardening — windows-latest hits this in beforeAll.
+      shell: command.endsWith(".cmd"),
     });
     let stdout = "";
     let stderr = "";
@@ -539,6 +550,40 @@ describe("built CLI e2e", () => {
     expect(textResult.stdout).not.toContain("$");
   });
 
+  // Regression pair for tsup's removeNodeProtocol default: it rewrote
+  // `import("node:sqlite")` to `import("sqlite")` in dist (ERR_MODULE_NOT_FOUND
+  // at runtime), silently forcing every sqlite read onto a per-query
+  // sqlite3-CLI spawn (~4x slower end-to-end on sqlite-heavy machines). Unit
+  // tests import src and can never catch this — only the built artifact shows it.
+  it("keeps the node:sqlite import specifier intact in the built artifact", async () => {
+    const distFiles = await readdir(path.join(repoRoot, "dist"), { recursive: true });
+    const sources = await Promise.all(
+      distFiles
+        .filter((file) => file.endsWith(".js"))
+        .map((file) => readFile(path.join(repoRoot, "dist", file), "utf8")),
+    );
+    expect(sources.some((source) => /import\(["']node:sqlite["']\)/.test(source))).toBe(true);
+    expect(sources.some((source) => /import\(["']sqlite["']\)/.test(source))).toBe(false);
+  });
+
+  it.skipIf(!hasNodeSqlite)("reads opencode sessions in-process with no sqlite3 binary on PATH", async () => {
+    const home = await makeHome();
+    await stageOpenCodeDb(home, "clean-multi-vendor.db");
+    // An empty PATH dir makes the sqlite3-CLI fallback unreachable, so this
+    // passes only when the built CLI's node:sqlite import actually resolves.
+    const emptyPathDir = path.join(home, "empty-path-dir");
+    await mkdir(emptyPathDir, { recursive: true });
+
+    const listed = readJson<ListRowJson[]>(
+      await runProcess(process.execPath, [cliPath, "--list", "--json"], {
+        env: { ...cliEnv(home), PATH: emptyPathDir },
+      }),
+    );
+
+    expect(listed).toHaveLength(1);
+    expect(listed[0]?.source).toBe("opencode");
+  });
+
   it("keeps output flag precedence stable: SVG beats CSV/JSON, and CSV beats JSON", async () => {
     const home = await makeHome();
     await stageClaudeSession(home, "clean-multi-tool-2-models.jsonl");
@@ -639,6 +684,75 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("$0.18");
     expect(result.stdout).toContain("147k");
     expect(result.stdout.endsWith("\n")).toBe(true);
+  });
+
+  it("SPEC-0075 R2: sandbox-home statusline config changes the built CLI line", async () => {
+    const home = await makeHome();
+    await writeFile(path.join(home, ".aireceipts", "statusline.json"), JSON.stringify({ items: ["tokens"] }), "utf8");
+    const transcriptPath = path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl");
+
+    const result = await runCli(["statusline"], home, JSON.stringify({ transcript_path: transcriptPath }));
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toBe("147k\n");
+  });
+
+  it("SPEC-0075 R2: corrupt sandbox-home config falls back with one stderr note", async () => {
+    const home = await makeHome();
+    await writeFile(path.join(home, ".aireceipts", "statusline.json"), "{bad json", "utf8");
+    const transcriptPath = path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl");
+
+    const result = await runCli(["statusline"], home, JSON.stringify({ transcript_path: transcriptPath }));
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("[aireceipts] $0.18");
+    expect(result.stderr).toBe("statusline.json ignored: statusline.json is not valid JSON\n");
+  });
+
+  it("scopes statusline disk discovery to --cwd instead of a newer foreign session", async () => {
+    const home = await makeHome();
+    const sessionCwd = "/home/dev/webapp";
+    const projectsRoot = path.join(home, ".claude", "projects");
+    // The literal encoded name, NOT encodeClaudeProjectCwd(sessionCwd): the
+    // fixture layout must pin Claude Code's real on-disk convention, so an
+    // encoder regression cannot silently reshape the fixture to keep matching.
+    const projectDir = path.join(projectsRoot, "-home-dev-webapp");
+    const foreignProjectDir = path.join(projectsRoot, "-home-dev-app5");
+    await Promise.all([mkdir(projectDir, { recursive: true }), mkdir(foreignProjectDir, { recursive: true })]);
+    const matchingPath = path.join(projectDir, "session.jsonl");
+    const foreignPath = path.join(foreignProjectDir, "newer-foreign.jsonl");
+    await copyFile(path.join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl"), matchingPath);
+    await copyFile(path.join(fixturesDir, "claude-code", "trivial-spans-quick-qa.jsonl"), foreignPath);
+    await utimes(matchingPath, 1_700_000_000, 1_700_000_000);
+    await utimes(foreignPath, 1_700_000_100, 1_700_000_100);
+
+    const result = await runCli(["statusline", "--cwd", `${sessionCwd}/src`], home);
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("[aireceipts · Claude Code]");
+    expect(result.stdout).toContain("147k");
+  });
+
+  it("fails fast when statusline --cwd has no value", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["statusline", "--cwd"], home);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("--cwd requires a non-empty path\n");
+  });
+
+  it("does not consume a following flag as the --cwd value", async () => {
+    const home = await makeHome();
+
+    const result = await runCli(["statusline", "--cwd", "--format", "brand"], home);
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(result.stderr).toBe("--cwd requires a non-empty path\n");
   });
 
   it("statusline falls back to the neutral empty state for malformed stdin and no fixture home", async () => {

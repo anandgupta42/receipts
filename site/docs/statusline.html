@@ -351,6 +351,144 @@ footer{
 
 <p>If <code>aireceipts</code> isn't on your <code>PATH</code>, use an absolute path to the binary instead of <code>aireceipts</code> in the <code>command</code> field (for example, the output of <code>which aireceipts</code>).</p>
 
+<h2 id="terminal-surfaces">Terminal surfaces</h2>
+
+<p>Any terminal surface that can run a command and display one line of stdout can show an aireceipts statusline. Pass that surface's pane or prompt working directory to <code>--cwd</code>; aireceipts selects the newest session attributed to that path (or an ancestor of it) and prints the neutral placeholder when none match. It never falls back to another project's newest session, and a session launched from your home directory (or above it) only ever matches that exact path — it is not treated as an ancestor of everything, so one <code>~</code>-launched session can't shadow every pane on the machine. Relative <code>--cwd</code> paths resolve against the directory where <code>aireceipts</code> is invoked; a path beginning with <code>-</code> must use the <code>--cwd=&lt;path&gt;</code> form. Matching intentionally folds only a Windows drive letter's case: the rest of every path remains case-sensitive because over-matching on a case-sensitive filesystem is the worse failure. Cursor is excluded from scoped discovery entirely because its session data carries no cwd.</p>
+
+<p>Path matching is lexical rather than filesystem-canonical. If <code>$PWD</code> uses a symlinked spelling while a session records the physical path, they do not match. tmux's <code>#{pane_current_path}</code> is resolved, so the tmux recipe below is unaffected.</p>
+
+<p>For tmux, add this to <code>~/.tmux.conf</code>:</p>
+
+<pre class="doc-code"><code class="language-tmux">set -g status-right '#(aireceipts statusline --cwd &quot;#{pane_current_path}&quot;)'</code></pre>
+
+<p>tmux refreshes <code>#(...)</code> commands on <code>status-interval</code>; lower that setting if you want a fresher line, keeping in mind that each refresh runs the command again.</p>
+
+<p>tmux is the recommended live terminal surface because it keeps polling while a command or agent owns the pane. The prompt and title recipes below refresh only <strong>between commands</strong>: while an agent owns the terminal they sit stale, and the cached line you see is one prompt behind. Each refresh is a per-prompt fire-and-forget process that exits after its atomic cache write — there is no resident daemon.</p>
+
+<h3 id="starship-zshbash">Starship (zsh/bash)</h3>
+
+<p>Starship's default <code>command_timeout</code> is 500ms, below Node's roughly one-second startup floor. This custom module therefore prints the last cwd-keyed cache and starts the next refresh in the background. Add it to <code>~/.config/starship.toml</code>:</p>
+
+<pre class="doc-code"><code class="language-toml">[custom.aireceipts]
+command = '''
+key=$(printf '%s' &quot;$PWD&quot; | shasum | cut -c1-12)
+cache=&quot;${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/aireceipts-statusline-$key&quot;
+[ -r &quot;$cache&quot; ] &amp;&amp; cat &quot;$cache&quot;
+(
+  tmp=&quot;${cache}.$$.tmp&quot;
+  if aireceipts statusline --cwd &quot;$PWD&quot; &gt;&quot;$tmp&quot; 2&gt;/dev/null; then
+    mv -f &quot;$tmp&quot; &quot;$cache&quot;
+  else
+    rm -f &quot;$tmp&quot;
+  fi
+) &gt;/dev/null 2&gt;&amp;1 &amp;
+'''
+when = true
+shell = [&quot;sh&quot;]
+format = &quot;$output &quot;</code></pre>
+
+<p>The hash keeps panes in different repositories from reading each other's line; the temp-file-plus-<code>mv</code> keeps readers from seeing a partial line.</p>
+
+<h3 id="raw-zsh-or-bash">Raw zsh or bash</h3>
+
+<p>Without a prompt engine, use the same cache-first pattern. For zsh, add this to <code>~/.zshrc</code>:</p>
+
+<pre class="doc-code"><code class="language-zsh">_aireceipts_precmd() {
+  local key cache
+  key=$(printf '%s' &quot;$PWD&quot; | shasum | cut -c1-12)
+  cache=&quot;${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/aireceipts-statusline-$key&quot;
+  [[ -r &quot;$cache&quot; ]] &amp;&amp; command cat &quot;$cache&quot;
+  (
+    local tmp=&quot;${cache}.$$.tmp&quot;
+    if aireceipts statusline --cwd &quot;$PWD&quot; &gt;&quot;$tmp&quot; 2&gt;/dev/null; then
+      mv -f &quot;$tmp&quot; &quot;$cache&quot;
+    else
+      rm -f &quot;$tmp&quot;
+    fi
+  ) &gt;/dev/null 2&gt;&amp;1 &amp;!
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _aireceipts_precmd</code></pre>
+
+<p>For bash, add this to <code>~/.bashrc</code>:</p>
+
+<pre class="doc-code"><code class="language-bash">_aireceipts_prompt_command() {
+  local key cache
+  key=$(printf '%s' &quot;$PWD&quot; | shasum | cut -c1-12)
+  cache=&quot;${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/aireceipts-statusline-$key&quot;
+  [[ -r &quot;$cache&quot; ]] &amp;&amp; command cat &quot;$cache&quot;
+  (
+    local tmp=&quot;${cache}.$$.tmp&quot;
+    if aireceipts statusline --cwd &quot;$PWD&quot; &gt;&quot;$tmp&quot; 2&gt;/dev/null; then
+      mv -f &quot;$tmp&quot; &quot;$cache&quot;
+    else
+      rm -f &quot;$tmp&quot;
+    fi
+  ) &gt;/dev/null 2&gt;&amp;1 &amp;
+}
+PROMPT_COMMAND=&quot;_aireceipts_prompt_command${PROMPT_COMMAND:+;$PROMPT_COMMAND}&quot;</code></pre>
+
+<h3 id="osc-terminal-title">OSC terminal title</h3>
+
+<p>An OSC title is independent of the prompt engine and works in any OSC-capable terminal emulator. This zsh <code>precmd</code> emits <code>ESC]0;&lt;line&gt;BEL</code>, then refreshes the cwd-keyed cache for the next prompt:</p>
+
+<pre class="doc-code"><code class="language-zsh">_aireceipts_title_precmd() {
+  local key cache line
+  key=$(printf '%s' &quot;$PWD&quot; | shasum | cut -c1-12)
+  cache=&quot;${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/aireceipts-statusline-$key&quot;
+  if [[ -r &quot;$cache&quot; ]]; then
+    IFS= read -r line &lt; &quot;$cache&quot;
+    printf '\033]0;%s\007' &quot;$line&quot;
+  fi
+  (
+    local tmp=&quot;${cache}.$$.tmp&quot;
+    if aireceipts statusline --cwd &quot;$PWD&quot; &gt;&quot;$tmp&quot; 2&gt;/dev/null; then
+      mv -f &quot;$tmp&quot; &quot;$cache&quot;
+    else
+      rm -f &quot;$tmp&quot;
+    fi
+  ) &gt;/dev/null 2&gt;&amp;1 &amp;!
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _aireceipts_title_precmd</code></pre>
+
+<h3 id="windows-powershell">Windows PowerShell</h3>
+
+<p>Starship and Oh My Posh both work in PowerShell. Put this wrapper <strong>after</strong> the prompt engine's initialization line in <code>$PROFILE</code>; it preserves that engine's prompt, prints the last cwd-keyed line, and starts an atomic refresh job. Completed jobs are removed on the next prompt, so the refresh never becomes a daemon.</p>
+
+<pre class="doc-code"><code class="language-powershell">$global:AireceiptsBasePrompt = (Get-Command prompt).ScriptBlock
+function global:prompt {
+  $cwd = (Get-Location).Path
+  $runtime = if ($env:XDG_RUNTIME_DIR) { $env:XDG_RUNTIME_DIR } elseif ($env:TEMP) { $env:TEMP } else { [IO.Path]::GetTempPath() }
+  $bytes = [Text.Encoding]::UTF8.GetBytes($cwd)
+  $key = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).Substring(0, 12).ToLowerInvariant()
+  $cache = Join-Path $runtime &quot;aireceipts-statusline-$key&quot;
+
+  Get-Job -Name &quot;aireceipts-statusline-*&quot; -State Completed -ErrorAction SilentlyContinue | Remove-Job
+  if (Test-Path -LiteralPath $cache) {
+    $line = Get-Content -LiteralPath $cache -Raw
+    if ($line) { Write-Host -NoNewline &quot;$($line.TrimEnd()) &quot; }
+  }
+
+  Start-Job -Name &quot;aireceipts-statusline-$key&quot; -ArgumentList $cache, $cwd -ScriptBlock {
+    param($cache, $cwd)
+    $tmp = &quot;$cache.$PID.tmp&quot;
+    $line = &amp; aireceipts statusline --cwd $cwd 2&gt;$null
+    if ($LASTEXITCODE -eq 0) {
+      [IO.File]::WriteAllText($tmp, ($line -join [Environment]::NewLine) + [Environment]::NewLine)
+      Move-Item -LiteralPath $tmp -Destination $cache -Force
+    } else {
+      Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    }
+  } | Out-Null
+
+  &amp; $global:AireceiptsBasePrompt
+}</code></pre>
+
+<p>On Windows, the tmux recipe is WSL-only. Use the PowerShell pattern above for native Starship or Oh My Posh sessions.</p>
+
+<p>For Claude Code, its native <code>statusLine</code> stdin hook above remains the recommended surface. It is faster because the payload points directly at the active transcript, and it is richer: <code>context</code>, <code>quota5h</code>, <code>quota7d</code>, and <code>quotaEta</code> depend on stdin data. Terminal surfaces are additive when you also want a line in tmux or another shell UI.</p>
+
 <h2 id="output">Output</h2>
 
 <pre class="doc-code"><code>[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
@@ -377,6 +515,14 @@ footer{
     &quot;command&quot;: &quot;aireceipts statusline --format brand,cost,quota5h,quotaEta&quot;
   }
 }</code></pre>
+
+<p>For a persistent format shared by every statusline surface, create <code>~/.aireceipts/statusline.json</code> (under <code>AIRECEIPTS_HOME</code> when set):</p>
+
+<pre class="doc-code"><code class="language-json">{
+  &quot;items&quot;: [&quot;brand&quot;, &quot;cost&quot;, &quot;tokens&quot;, &quot;quota5h&quot;]
+}</code></pre>
+
+<p>The array uses the same vocabulary and literal ordering as <code>--format</code>, including duplicate items. Precedence is explicit <code>--format</code>, then <code>statusline.json</code>, then the default above. A missing file is silent. An unreadable file, bad JSON, wrong shape, empty <code>items</code>, or unknown item prints one stderr note and safely renders the default; a broken dotfile never blanks a polling status bar. Config can only select known segments — it cannot inject text, colors, paths, or values.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Segment</th><th>Renders</th><th>Source</th></tr></thead>

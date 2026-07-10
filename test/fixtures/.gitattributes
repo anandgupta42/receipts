@@ -1,0 +1,2 @@
+# Fixtures are parsed byte streams — no platform git may rewrite line endings.
+* -text

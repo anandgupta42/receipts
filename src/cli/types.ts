@@ -65,6 +65,8 @@ export interface CommandDef {
   /** Higher `priority` is checked first; the first `matches` hit wins. receipt = 0 (default). */
   readonly priority: number;
   matches(options: CliOptions): boolean;
+  /** SPEC-0075 R6 — invocation-level network flush policy; local recording still runs. */
+  shouldFlushTelemetry?(options: CliOptions): boolean;
   run(ctx: CommandContext): number | Promise<number>;
   readonly help?: HelpEntry;
 }

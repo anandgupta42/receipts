@@ -10,7 +10,7 @@ import { parseOptions } from "./options.js";
 import { loadCommands, selectCommand } from "./registry.js";
 import { createContext } from "./context.js";
 
-export { readStdin, loadFromStdinPayload, loadFromDisk, runStatusline } from "./commands/statusline.js";
+export { readStdin, loadFromStdinPayload, loadFromDisk, loadFromCwd, MAX_SCOPED_LOAD_ATTEMPTS, runStatusline } from "./commands/statusline.js";
 export { recentWasteAggregates } from "./commands/handoff.js";
 
 /** CLI entrypoint: parse → discover/select → first-run notice → run → telemetry record → bounded flush (SPEC-0002 wiring). */
@@ -27,6 +27,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
   const isTelemetryShow = command.name === "telemetry-show";
   const isSilentHook = command.name === "hook-pre-push";
   const skipTelemetry = isTelemetryShow || isSilentHook;
+  const shouldFlushTelemetry = command.shouldFlushTelemetry?.(options) ?? true;
   if (!skipTelemetry) {
     await ensureFirstRunNotice((text) => process.stderr.write(text + "\n"), undefined);
   }
@@ -56,7 +57,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     }
     return isSilentHook ? 0 : 1;
   } finally {
-    if (!skipTelemetry) {
+    if (!skipTelemetry && shouldFlushTelemetry) {
       await flushTelemetry();
     }
   }
