@@ -61,9 +61,6 @@
   .cmd-btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);border:0;border-radius:8px;padding:12px 18px;font:600 13.5px var(--mono);cursor:pointer}
   .cmd-btn .p{color:var(--faint)}
   .cta-link{font-size:12.5px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
-  .chips{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{font-size:10.5px;letter-spacing:.1em;padding:4px 9px;border:1px solid var(--rule-strong);border-radius:4px;color:var(--muted)}
-  .chip.red{border-color:var(--seal);color:var(--seal)}
 
   /* the paper receipt */
   .paper{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;box-shadow:0 30px 60px -38px rgba(23,24,26,.35), 0 2px 6px rgba(23,24,26,.05);padding:30px 30px 26px;max-width:420px;margin-left:auto}
@@ -178,11 +175,6 @@
       <div class="cta-row">
         <button type="button" class="cmd-btn copy-btn" data-cmd="npx aireceipts-cli"><span class="p">$</span>npx aireceipts-cli</button>
         <a class="cta-link" href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">See a real receipt on a real PR &rarr;</a>
-      </div>
-      <div class="chips" aria-label="Guarantees">
-        <span class="chip">LOCAL</span>
-        <span class="chip">DETERMINISTIC</span>
-        <span class="chip red">NO FABRICATED DOLLARS</span>
       </div>
     </div>
     <figure class="paper" aria-label="A real aireceipts receipt for a Claude Code session that cost $12.30">
