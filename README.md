@@ -240,4 +240,7 @@ welcome and run the same gates: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Apache-2.0.
 
-Support the project: [buy me a samosa](https://anandgupta42.github.io/receipts/samosa.html).
+## Buy me a samosa
+
+Every open-source project asks you to buy the maintainer a coffee. Not this one —
+[buy me a samosa](https://anandgupta42.github.io/receipts/samosa.html), and I'll explain.

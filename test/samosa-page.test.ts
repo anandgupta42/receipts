@@ -62,11 +62,13 @@ describe("SPEC-0079 R1 · the story page contract", () => {
   });
 });
 
-describe("SPEC-0079 R3 · FUNDING.yml offers the tip jar", () => {
-  it("carries the ko_fi row alongside the samosa-page custom entry", () => {
+describe("SPEC-0079 R3 (amended) · the Sponsor block offers only the story page", () => {
+  it("carries the samosa-page custom entry and no direct payment row", () => {
     const funding = readFileSync(".github/FUNDING.yml", "utf8");
-    expect(funding).toContain("ko_fi: anandgupta42");
     expect(funding).toContain('custom: ["https://anandgupta42.github.io/receipts/samosa.html"]');
+    // Maintainer directive (2026-07-10): one Sponsor-block entry — the page
+    // mediates the tip jar; no ko_fi/github/etc. platform rows.
+    expect(funding).not.toMatch(/^\s*(ko_fi|github|patreon|open_collective|tidelift|liberapay|buy_me_a_coffee):/m);
   });
 });
 
