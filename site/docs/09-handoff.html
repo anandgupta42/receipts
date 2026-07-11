@@ -350,33 +350,35 @@ FLAGGED PATTERN COST.......................≈ $0.07
   at turns 1-5
   → change or stop after two identical failures
 
-covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line</code></pre>
+covers: 6 turns · 5 tool calls · 0 compactions · 1 flagged-pattern line</code></pre>
 
 <p><img src="../assets/waste-handoff.gif" alt="Historical terminal recording of a synthetic handoff. It predates the current flagged-pattern-cost and lower-bound notation."></p>
 
-<p>The block opens with the session's state — agent, when, how long, which models, its observable Standard-API floor, how many turns and tool calls (plus a compaction count when any fired). Then comes <code>FLAGGED PATTERN COST ≈ $X</code>: the largest priced subtotal among the stuck-loop and context-thrash detector classes. The approximation is intentional. A detector identifies a pattern to inspect; it does not prove the pattern was avoidable, so this subtotal is not a savings floor, savings ceiling, or percentage of total. It never adds classes that may overlap, and it excludes trivial-span dollars because those are counterfactual re-pricing rather than observed cost. Each waste line is evidence with the same <code>⚠</code>/<code>≈</code> glyphs the receipt prints, and under each class a one-line <code>→</code> rule your agent can follow next time. The rules are fixed strings keyed to the waste class — extracted evidence plus a static instruction, never generated prose. It closes with a <code>covers:</code> line stating exactly what the packet accounts for. Paste the whole block into your next prompt so the agent knows what to avoid — here, a Bash command it re-ran five times over nearly four minutes.</p>
+<p>The block opens with the session's state — agent, when, how long, which models, its observable Standard-API floor, how many turns and tool calls (plus a compaction count when any fired). Then comes <code>FLAGGED PATTERN COST ≈ $X</code>: the largest priced subtotal among the stuck-loop and context-thrash detector classes. The approximation is intentional. A detector identifies a pattern to inspect; it does not prove the pattern was avoidable, so this subtotal is not a savings floor, savings ceiling, or percentage of total. It never adds classes that may overlap, and it excludes trivial-span dollars because those are counterfactual re-pricing rather than observed cost. Each flagged-pattern line is evidence with the same <code>⚠</code>/<code>≈</code> glyphs the receipt prints, and under each class a one-line <code>→</code> rule your agent can follow next time. The rules are fixed strings keyed to the detector class — extracted evidence plus a static instruction, never generated prose. It closes with a <code>covers:</code> line stating exactly what the packet accounts for. Paste the whole block into your next prompt so the agent knows what to avoid — here, a Bash command it re-ran five times over nearly four minutes.</p>
 
-<p>The same slip rides the PR comment: <code>aireceipts pr</code> adds a collapsed <code>handoff — flagged pattern cost ≈ $X</code> section after the full receipts whenever a counted session fired a waste line (and adds nothing at all on a clean PR).</p>
+<p>When pricing coverage is mixed, the state header does not call the observed floor a total. It prints <code>known priced subtotal ≥ $X · known unpriced N tok</code>, and the closing line adds <code>pricing coverage partial</code>. This includes readable subagent components; unreadable child usage remains an explicit unknown.</p>
+
+<p>The same slip rides the PR comment: <code>aireceipts pr</code> adds a collapsed <code>handoff — flagged pattern cost ≈ $X</code> section after the full receipts whenever a counted session produced a flagged-pattern line (and adds nothing at all when no supported detector fires).</p>
 
 <h2 id="machine-readable-form">Machine-readable form</h2>
 
-<p>Pass <code>--json</code> for the same packet as versioned JSON (schema in <a href="json-schema.html">docs/json-schema.md</a>) — for hooks, CI gates, or another agent's harness. It also carries <code>aggregates</code>: every waste class that fired in your trailing week with its distinct-session count, including classes still below the suggestion threshold — a near-miss is a fact, not a secret. The historical <code>couldHaveSaved</code> JSON field remains present for schema compatibility. Its <code>usd</code> is the same overlap-safe flagged-pattern subtotal, not proven savings, and <code>pctOfTotal</code> is always <code>null</code>: a ratio of lower bounds has no reliable direction.</p>
+<p>Pass <code>--json</code> for the same packet as versioned JSON (schema in <a href="json-schema.html">docs/json-schema.md</a>) — for hooks, CI gates, or another agent's harness. It also carries <code>aggregates</code>: every detector class that fired in your trailing week with its distinct-session count, including classes still below the suggestion threshold — a near-miss is a fact, not a secret. The historical <code>couldHaveSaved</code> JSON field remains present for schema compatibility. Its <code>usd</code> is the same overlap-safe flagged-pattern subtotal, not proven savings, and <code>pctOfTotal</code> is always <code>null</code>: a ratio of lower bounds has no reliable direction.</p>
 
 <pre class="doc-code"><code class="language-sh">aireceipts --handoff &quot;intermittently&quot; --json</code></pre>
 
 <h2 id="when-theres-nothing-to-say">When there's nothing to say</h2>
 
-<p>If no waste detector fired on the session, there's nothing to hand off, and it says so plainly rather than inventing advice:</p>
+<p>If no supported detector fired on the session, there's nothing to hand off, and it says so plainly rather than inventing advice:</p>
 
 <pre class="doc-code"><code class="language-sh">aireceipts --handoff &quot;email format&quot;</code></pre>
 
 <pre class="doc-code"><code>nothing to hand off</code></pre>
 
-<p>An empty handoff is a good sign, not a missing feature.</p>
+<p>An empty handoff means no supported detector fired; it is not proof that the session contained no avoidable work.</p>
 
-<h2 id="recurring-waste-a-standing-rule">Recurring waste → a standing rule</h2>
+<h2 id="recurring-flagged-patterns-a-standing-rule">Recurring flagged patterns → a standing rule</h2>
 
-<p>Some waste shows up run after run. Pass <code>--handoff-threshold N</code> and, for any waste class that recurs across <code>N</code> or more of your recent sessions, the handoff also suggests a <code>CLAUDE.md</code> rule to prevent it — a durable fix instead of a one-off note. The default threshold is <code>3</code>:</p>
+<p>Some detector patterns show up run after run. Pass <code>--handoff-threshold N</code> and, for any detector class that recurs across <code>N</code> or more of your recent sessions, the handoff also suggests a <code>CLAUDE.md</code> rule to prevent it — a durable fix instead of a one-off note. The default threshold is <code>3</code>:</p>
 
 <pre class="doc-code"><code class="language-sh">aireceipts --handoff --handoff-threshold 3</code></pre>
 

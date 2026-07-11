@@ -53,12 +53,13 @@ lower-bound semantics.
 
 A few lines appear only when they have something to say:
 
-- a **pre-edit line** — `pre-edit: 11% of cost (1/10 turns)` — the share of
-  the session's cost spent *before the first named edit-tool call*, and how
+- a **pre-edit line** — `pre-edit: 11% of priced floor (1/10 turns)` — the
+  share of the session's observable priced floor *before the first named
+  edit-tool call*, and how
   many turns that covered. It's a shape fact, not a verdict: a hard bug can
   deserve a high share, and a routine edit usually doesn't — a share that
   surprises you is worth a look;
-- a **stuck-loop waste line** names where to look — `at turns 1-5` — so you
+- a **stuck-loop pattern line** names where to look — `at turns 1-5` — so you
   can jump straight to the loop in your own transcript;
 - a **coverage caveat** — `caveat: 2 of 3 usage turns include unpriced tokens — TOTAL excludes
   those tokens` — whenever a session mixed a priced model with one that has no
@@ -71,6 +72,14 @@ A few lines appear only when they have something to say:
   opencode aggregate/itemized vectors keep the itemized total and report the
   positive conflict as excluded evidence;
 - time-integrity caveats (inconsistent timestamps, skipped records) as before.
+
+If the parent session has no matching price row but a readable subagent does,
+aireceipts does not throw away either fact. The child keeps its `SUBAGENTS (N)
+≥ $X` row, while the tail shows `KNOWN PRICED SUBTOTAL ≥ $X` and `KNOWN
+UNPRICED TOKENS N tok` on separate lines, followed by `partial pricing
+coverage; invoice total unknown`. The token line is the exact observable usage
+excluded from the dollar subtotal; unreadable or missing transcripts remain a
+separate unknown caveat.
 
 ## The `--details` section
 

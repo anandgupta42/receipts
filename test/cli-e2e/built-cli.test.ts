@@ -63,9 +63,19 @@ interface ReceiptJson {
   sessionTotalTokens: ReceiptTokenJson;
   pricingCoverage: "full" | "partial" | "unpriced";
   unpricedTokens: ReceiptTokenJson;
+  unpricedTokensScope: "parent-session";
+  combinedUnpricedTokens: ReceiptTokenJson;
+  combinedUnpricedTokensScope: "parent-session-plus-readable-subagents";
+  combinedPricingCoverage: "full" | "partial" | "unpriced";
   combinedPricedUsd?: number | null;
   combinedTotalTokens?: number;
-  subagents?: { count: number; pricedUsd: number | null; tokensTotal: number };
+  subagents?: {
+    count: number;
+    pricedUsd: number | null;
+    tokensTotal: number;
+    unpricedTokens: ReceiptTokenJson;
+    unpricedTokensScope: "readable-subagents";
+  };
   caveats: Array<{ kind: string; text: string }>;
   priceRowsUsed: Array<{
     vendor: string;
@@ -95,6 +105,7 @@ interface SetupJson {
     label: string;
     model: string | null;
     totalUsd: number | null;
+    pricingCoverage: "full" | "partial" | "unpriced";
     totalTokens: ReceiptTokenJson;
     parentUnpricedTokens: ReceiptTokenJson;
     combinedUnpricedTokens: ReceiptTokenJson;
@@ -820,6 +831,11 @@ describe("built CLI e2e", () => {
     expect(compared.b.subagents?.count).toBe(2);
     expect(compared.a.combinedPricedUsd).toBeGreaterThan(compared.a.totalUsd ?? 0);
     expect(compared.a.combinedTotalTokens).toBeGreaterThan(compared.a.totalTokens.total);
+    expect(compared.a.subagents?.unpricedTokens.total).toBe(0);
+    expect(compared.a.subagents?.unpricedTokensScope).toBe("readable-subagents");
+    expect(compared.a.combinedUnpricedTokens.total).toBe(compared.a.unpricedTokens.total);
+    expect(compared.a.combinedUnpricedTokensScope).toBe("parent-session-plus-readable-subagents");
+    expect(compared.a.combinedPricingCoverage).toBe("full");
     expect(compared.b.combinedPricedUsd).toBeGreaterThan(compared.b.totalUsd ?? 0);
 
     const setup = readJson<SetupJson>(await runCli(["setup", "--json"], home));
@@ -828,6 +844,7 @@ describe("built CLI e2e", () => {
       subagentUnpricedCount: 0,
       subagentUnreadableCount: 0,
       subagentRollupStatus: "complete",
+      pricingCoverage: "full",
       costScope: "parent-session-plus-readable-subagents",
       tokenScope: "parent-session-plus-readable-subagents",
       totalScope: "parent-session-plus-readable-subagents",
@@ -843,10 +860,11 @@ describe("built CLI e2e", () => {
     expect(handoff.stdout).toContain("parent turns");
     expect(handoff.stdout.match(/2 subagents/gu)).toHaveLength(2);
 
-    const benchmark = readJson<{ properties: { costPerTurnBucket: string } }>(
+    const benchmark = readJson<{ properties: { costPerTurnBucket: string; pricingCoverage: string } }>(
       await runCli(["benchmark", cleanParent, "--dry-run"], home),
     );
     expect(benchmark.properties.costPerTurnBucket).not.toBe("unpriced");
+    expect(benchmark.properties.pricingCoverage).toBe("full");
   });
 
   it("SPEC-0042: --handoff --json emits the schema-valid resume packet; text form carries header + coverage", async () => {
@@ -875,6 +893,10 @@ describe("built CLI e2e", () => {
       "totals",
       "pricingCoverage",
       "unpricedTokens",
+      "unpricedTokensScope",
+      "combinedUnpricedTokens",
+      "combinedUnpricedTokensScope",
+      "combinedPricingCoverage",
       "totalUsd",
       "totalCostEstimate",
       "totalUsdScope",
@@ -900,7 +922,7 @@ describe("built CLI e2e", () => {
     // SPEC-0059 R1/R3 — the slip headline and the class's rule line ride the packet.
     expect(textRun.stdout).toContain("FLAGGED PATTERN COST");
     expect(textRun.stdout).toContain("→ change or stop after two identical failures");
-    expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
+    expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 flagged-pattern line");
   });
 
   it("treats malformed budget config as stderr-only advisory and still renders the receipt", async () => {

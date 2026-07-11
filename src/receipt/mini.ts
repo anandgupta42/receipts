@@ -7,7 +7,12 @@
 // context is not guaranteed to interpret it), deterministic and golden-gated
 // (I5), obeying the same $-honesty rules as the full receipt (I2).
 import { formatDuration, formatInt, formatUsdFloor, formatUsdLowerBound } from "./format.js";
-import type { ReceiptModel, ToolRow, WasteLine } from "./model.js";
+import { combinedPricedUsd, type ReceiptModel, type ToolRow, type WasteLine } from "./model.js";
+import {
+  combinedPricingCoverageOf,
+  knownCombinedUnpricedTokens,
+  type PricingCoverage,
+} from "./pricingCoverage.js";
 
 export interface MiniTopTool {
   tool: string;
@@ -30,6 +35,10 @@ export interface MiniSummary {
   durationMs: number | undefined;
   /** `null` → render tokens-only, zero `$` bytes (I2). */
   totalUsd: number | null;
+  /** Combined parent + readable-child price-join coverage. */
+  pricingCoverage: PricingCoverage;
+  /** Exact observable tokens excluded from the combined priced subtotal. */
+  knownUnpricedTokens: number;
   totalTokens: number;
   /** `null` when the session recorded no tool calls. */
   topTool: MiniTopTool | null;
@@ -49,7 +58,7 @@ function topToolOf(toolRows: ToolRow[]): MiniTopTool | null {
   return { tool: row.tool, usd: row.usd, tokens: row.tokens.total, callCount: row.callCount };
 }
 
-/** Reduce a full `ReceiptModel` to the shared mini-summary. Pure; no I/O, no recompute. SPEC-0061 R3/R4: the totals fold in the subagent aggregate — priced children join `$` (only on a priced parent, I2), child tokens always join the token count. */
+/** Reduce a full `ReceiptModel` to the shared mini-summary. Pure; no I/O, no recompute. SPEC-0061 R3/R4: priced child atoms stay visible even when the parent is unpriced; their floor and exact known-unpriced usage remain separate. */
 export function buildMiniSummary(model: ReceiptModel): MiniSummary {
   const agg = model.subagents;
   const parentTokens = model.unpriceable ? model.sessionTotalTokens.total : model.totalTokens.total;
@@ -57,7 +66,9 @@ export function buildMiniSummary(model: ReceiptModel): MiniSummary {
     agentLabel: model.agentLabel,
     model: model.modelMix[0]?.model ?? null,
     durationMs: model.durationMs,
-    totalUsd: model.totalUsd !== null ? model.totalUsd + (agg?.pricedUsd ?? 0) : null,
+    totalUsd: combinedPricedUsd(model),
+    pricingCoverage: combinedPricingCoverageOf(model),
+    knownUnpricedTokens: knownCombinedUnpricedTokens(model).total,
     totalTokens: parentTokens + (agg?.tokensTotal ?? 0),
     topTool: topToolOf(model.toolRows),
     topWaste: model.wasteLines[0] ?? null,
@@ -74,7 +85,13 @@ function callLabel(callCount: number, tool: string): string {
 function totalLine(s: MiniSummary): string {
   // SPEC-0061 R4 — say when the total covers more than the parent transcript.
   const suffix = s.subagentCount > 0 ? ` (incl. ${formatInt(s.subagentCount)} subagent${s.subagentCount === 1 ? "" : "s"})` : "";
-  if (!s.unpriceable && s.totalUsd !== null) {
+  if (s.totalUsd !== null && s.pricingCoverage === "partial") {
+    const gap = s.knownUnpricedTokens > 0
+      ? `${formatInt(s.knownUnpricedTokens)} tok known unpriced · coverage partial`
+      : "coverage partial";
+    return `total  known priced ${formatUsdLowerBound(s.totalUsd)} · ${gap}${suffix}`;
+  }
+  if (s.totalUsd !== null) {
     return `total  ${formatUsdLowerBound(s.totalUsd)}${suffix}`;
   }
   return `total  ${formatInt(s.totalTokens)} tok${suffix}`;
@@ -142,7 +159,7 @@ export function renderMiniSummary(s: MiniSummary): string {
 // --- SPEC-0007: one-line statusline rendering over the same shared summary ---
 
 /**
- * Terse, factual waste flag for the one-line statusline (I6: never a
+ * Terse, factual detector-pattern flag for the one-line statusline (I6: never a
  * good/bad framing, just what fired). Deliberately shorter than the 6-line
  * receipt's `wasteLine` — no `$`/token value, since the total is already on
  * the same line. SPEC-0062 moved the one-line renderer itself to the segments

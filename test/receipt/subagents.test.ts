@@ -92,7 +92,14 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
   };
 }
 
-const AGG: SubagentAggregate = { count: 2, pricedUsd: 0.1, tokensTotal: 4000, unpricedCount: 0, unreadableCount: 0 };
+const AGG: SubagentAggregate = {
+  count: 2,
+  pricedUsd: 0.1,
+  tokensTotal: 4000,
+  unpricedTokens: usage(0),
+  unpricedCount: 0,
+  unreadableCount: 0,
+};
 
 /** Every fixed-precision dollar amount on receipt lines that end in one (rows + TOTAL). */
 function dollarAmounts(text: string): number[] {
@@ -110,7 +117,14 @@ describe("SPEC-0061 foldSubagentRows", () => {
       childRow({ usd: null, tokens: usage(700) }),
       childRow({ unreadable: true, usd: null, tokens: usage(0) }),
     ]);
-    expect(agg).toEqual({ count: 3, pricedUsd: 0.25, tokensTotal: 1700, unpricedCount: 1, unreadableCount: 1 });
+    expect(agg).toEqual({
+      count: 3,
+      pricedUsd: 0.25,
+      tokensTotal: 1700,
+      unpricedTokens: usage(700),
+      unpricedCount: 1,
+      unreadableCount: 1,
+    });
   });
 
   it("pricedUsd stays null when no child priced (I2)", () => {
@@ -120,7 +134,14 @@ describe("SPEC-0061 foldSubagentRows", () => {
 
   it("counts a partially-priced child in both the dollar and unpriced ledgers", () => {
     const agg = foldSubagentRows([childRow({ usd: 0.25, tokens: usage(1000), unpricedTokens: usage(300) })]);
-    expect(agg).toEqual({ count: 1, pricedUsd: 0.25, tokensTotal: 1000, unpricedCount: 1, unreadableCount: 0 });
+    expect(agg).toEqual({
+      count: 1,
+      pricedUsd: 0.25,
+      tokensTotal: 1000,
+      unpricedTokens: usage(300),
+      unpricedCount: 1,
+      unreadableCount: 0,
+    });
   });
 });
 
@@ -147,7 +168,15 @@ describe("SPEC-0061 R2 caveats — floors, dollars and tokens never blended", ()
     ]);
   });
 
-  it("unpriced parent + priced children: whole receipt tokens-only, caveat carries the child $, --json keeps pricedUsd", () => {
+  it("a child cache-rate gap stays visible in the combined floor caveats", () => {
+    const rows = [childRow({ costLowerBoundCacheTier: true })];
+    expect(subagentCaveats(rows, foldSubagentRows(rows)!, true)).toContainEqual({
+      kind: "cost-lower-bound-cache-tier",
+      text: "1 subagent had observed cache tokens with no cited applicable rate — floor excludes them",
+    });
+  });
+
+  it("unpriced parent + priced child: receipt separates the child floor from exact known-unpriced tokens", () => {
     const rows = [childRow({ usd: 9.85 })];
     const agg = foldSubagentRows(rows)!;
     const model = baseModel({
@@ -158,13 +187,29 @@ describe("SPEC-0061 R2 caveats — floors, dollars and tokens never blended", ()
     });
     const receipt = renderReceipt(model);
     const rendered = receipt.split("\n");
-    // one unit per receipt: no drawn row carries a $ — the caveat is the only $ bytes
-    expect(rendered.find((l) => l.includes("SUBAGENTS"))).toContain("tok");
-    expect(rendered.find((l) => l.includes("SUBAGENTS"))).not.toContain("$");
-    expect(rendered.find((l) => l.includes("TOTAL"))).not.toContain("$");
-    expect(receipt).toContain("1 subagent priced (≥ $9.85) — shown as tokens above; the session itself is unpriced");
-    expect(renderStatusline(model)).not.toContain("$");
+    expect(rendered.find((l) => l.includes("SUBAGENTS"))).toContain("≥ $9.85");
+    expect(rendered.find((l) => l.includes("KNOWN PRICED SUBTOTAL"))).toContain("≥ $9.85");
+    expect(rendered.find((l) => l.includes("KNOWN UNPRICED TOKENS"))).toContain("12,000 tok");
+    expect(receipt).toContain("partial pricing coverage; invoice total unknown");
+    expect(receipt).toContain("1 subagent priced (≥ $9.85) — child floor shown separately; parent session unpriced");
+    expect(renderStatusline(model)).toContain("≥$9.85 subtotal (12k known unpriced; partial)");
+    expect(renderMiniReceipt(model).split("\n")[2]).toBe(
+      "total  known priced ≥ $9.85 · 12,000 tok known unpriced · coverage partial (incl. 1 subagent)",
+    );
+    const datavis = renderReceipt(model, { template: "datavis" });
+    expect(datavis).toContain("[##########] = most tokens; others in proportion");
+    expect(datavis.split("\n").find((line) => line.includes("SUBAGENTS (1)"))).toContain("≥ $9.85");
     expect(toJsonModel(model).subagents?.pricedUsd).toBe(9.85);
+  });
+
+  it("omits a misleading zero-token row when the partial gap is unmeasured", () => {
+    const model = baseModel({ unobservedCacheWriteTokens: true });
+    const receipt = renderReceipt(model);
+    expect(receipt).toContain("KNOWN PRICED SUBTOTAL");
+    expect(receipt).toContain("partial pricing coverage; invoice total unknown");
+    expect(receipt).not.toContain("KNOWN UNPRICED TOKENS");
+    expect(renderStatusline(model)).toContain("≥$0.18 subtotal (coverage partial)");
+    expect(renderMiniReceipt(model)).toContain("known priced ≥ $0.18 · coverage partial");
   });
 
   it("a child with dropped records adds the floor caveat (SPEC-0044 B3 parity)", () => {
@@ -257,9 +302,9 @@ describe("SPEC-0061 R3/R4 — statusline and mini fold the aggregate in", () => 
     expect(renderStatusline(model)).toBe("[aireceipts] claude-opus-4-8 · ≥$10.03 · 1M");
   });
 
-  it("statusline stays tokens-only when the parent is unpriced (I2)", () => {
+  it("statusline keeps the priced-child floor and labels the unpriced parent coverage", () => {
     const model = baseModel({ totalUsd: null, subagents: { ...AGG, pricedUsd: 9.85 } });
-    expect(renderStatusline(model)).not.toContain("$");
+    expect(renderStatusline(model)).toContain("≥$9.85 subtotal (12k known unpriced; partial)");
   });
 
   it("mini total line carries the (incl. N subagents) marker only when children exist", () => {
@@ -273,6 +318,20 @@ describe("SPEC-0061 R3/R4 — statusline and mini fold the aggregate in", () => 
     const a = baseModel({ totalUsd: 0.1, subagents: { ...AGG, pricedUsd: 0.2 } });
     const b = baseModel({ totalUsd: 0.05, subagents: { ...AGG, pricedUsd: 0.05 } });
     expect(compareDeltaLine(a, b)).toContain("(≥ $0.30 vs ≥ $0.10)");
+  });
+
+  it("compare refuses a ratio when either combined floor has partial coverage", () => {
+    const partial = baseModel({
+      sessionId: "partial",
+      totalUsd: null,
+      subagents: { ...AGG, pricedUsd: 9.85 },
+    });
+    const full = baseModel({ sessionId: "full", totalUsd: 0.5 });
+    const delta = compareDeltaLine(partial, full);
+    expect(delta).toContain("not directly comparable");
+    expect(delta).toContain("partial known priced ≥ $9.85 + 12,000 known-unpriced tok (partial)");
+    expect(delta).toContain("full known priced ≥ $0.50 + 0 known-unpriced tok (full)");
+    expect(delta).not.toContain("×");
   });
 });
 

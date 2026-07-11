@@ -33,7 +33,7 @@ introduced.
 | `unreadable-subagent` | A subagent transcript that couldn't be parsed. | Total floors `≥`; "N unreadable subagent(s) not priced". Always listed, never dropped. |
 | `cost-lower-bound-cache-tier` | A priced request carries cached reads or writes for which the selected price row cites no applicable rate. That component contributes **$0** to the floor; it is never silently priced at the plain input rate. **Row-aware, not usage-only:** an unsplit write may use the documented 5m assumption only when the row actually cites a 5m or generic write rate. The historical event name covers both cached reads and writes. | The universal total already renders `≥`; the receipt also says "some observed cache tokens have no cited applicable rate — floor excludes them," and the PR confidence summary counts affected sessions. Fires only when a priced request actually contains an uncited cache component. |
 | `unreadable-session` (B4) | An in-window candidate we couldn't **read** (its transcript failed to load/parse) and which is outside the current worktree, so the classic "excluded" count never saw it. "Couldn't read" ≠ "read and found no anchor" — the two are epistemically different, and the load-failure used to vanish silently. | Total floors `≥`; a distinct note "N session(s) touched this branch but couldn't be read". Counted, never silent. A load failure *inside* the current worktree stays in the classic excluded count; a read-but-no-own-SHA session stays a correct silent skip (genuinely not ours). |
-| `dropped-transcript-records` (B3) | A **credited** session whose transcript had one or more malformed/truncated records skipped at parse time (a crash-torn JSONL line, a corrupt opencode DB row). The dropped records carried real token usage, so the session's total is a lower bound. | The single-session receipt carries a muted "N unreadable transcript record(s) skipped — total may be incomplete" caveat; the PR body counts affected credited sessions and floors the total `≥`. A clean transcript (zero skips) never trips it; a session that fails to load *entirely* is `unreadable-session`, not this. |
+| `dropped-transcript-records` (B3) | A **credited** session whose transcript had malformed/truncated evidence (a crash-torn JSONL line, an invalid token bucket, or a corrupt opencode DB row). Safe sibling token components may remain visible, but malformed components never price and wholly unreadable records contribute nothing. | The single-session receipt carries a muted "N transcript record(s) unreadable or malformed — omitted components may make total incomplete" caveat; the PR body counts affected credited sessions and floors the total `≥`. A clean transcript never trips it; a session that fails to load *entirely* is `unreadable-session`, not this. |
 | `partial-priced-coverage` | A credited contributor or subagent contains both turns with cited prices and turns that cannot be priced. The known `$` used to classify the whole atom as priced and hide its unpriced tokens from the PR token subtotal. | The PR renders both the known-dollar floor and the exact unpriced-token subtotal, plus a counted "partial price coverage" note. Fully priced and fully unpriced sessions remain unchanged. |
 
 `unobserved-cache-write-tokens` is a receipt-level observability caveat rather
@@ -151,6 +151,13 @@ not prove whether the user paid through an API key, subscription, cloud account,
 gateway, credits, or a negotiated contract.
 
 ## Nested subagent rollups — dedup by subtree, not by file
+
+Session surfaces retain two combined ledgers. Readable priced parent/child atoms
+form the visible Standard-API `≥ $` subtotal; exact observable usage with no
+matching rate forms a separate known-unpriced token subtotal. A priced child is
+therefore still visible when its parent is unpriced. Unreadable children and a
+failed child-directory scan keep coverage partial and remain explicit unknowns;
+they are never folded into the known-unpriced count as a fabricated zero.
 
 A PR contributor's rollup walks its own `subagents/` directory recursively
 (`discoverChildFiles`), so a subagent's subagent (a grandchild) is found and

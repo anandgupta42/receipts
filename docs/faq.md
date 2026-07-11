@@ -9,7 +9,8 @@ question-first. (SPEC-0048.)
 Those are usage dashboards: [ccusage](https://github.com/ryoppippi/ccusage) and
 your agent's built-ins aggregate what you spent over time — today, this week,
 this billing window. aireceipts prints a receipt
-for a **unit of work** — one session or one pull request — with cost attributed per
+for a **unit of work** — one session or one pull request — with observable
+Standard-API floor attributed per
 tool call, prices taken from cited and dated tables, and byte-deterministic output.
 Use a dashboard to watch a trend; use a receipt to answer "what did *this* cost,
 and can I check the number?" What a receipt can and can't prove:
@@ -21,7 +22,7 @@ They are **Standard API list-price-equivalent lower bounds** on the token usage
 the transcript exposes — never a claim about your bill or the marginal cost of a
 subscription session. That is why computed dollars render as `≥ $X`. On a
 subscription, the receipt's plan-independent lines are the useful ones: per-tool
-anatomy, cache economics, and waste lines. `aireceipts --quota` shows the official
+anatomy, cache economics, and detector-flagged patterns. `aireceipts --quota` shows the official
 rate-limit window state, which is the ceiling that actually constrains a
 subscriber. How every dollar is computed: [pricing](guide/13-pricing.md).
 

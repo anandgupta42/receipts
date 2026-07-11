@@ -1,6 +1,6 @@
 # aireceipts
 
-> Local, deterministic cost receipts for AI coding agents. One command, no account, no server — it reads the transcripts already on your disk, and they stay there. Covers Claude Code, Codex, Cursor, Gemini, and opencode; prints a per-tool cost breakdown, waste lines, and a PR-ready receipt. Apache-2.0.
+> Local, deterministic observable-cost-floor receipts for AI coding agents. One command, no account, no server — it reads the transcripts already on your disk, and they stay there. Covers Claude Code, Codex, Cursor, Gemini, and opencode; prints per-tool `≥` floors, tokens-only gaps, heuristic pattern flags, and a PR-ready receipt. Apache-2.0.
 
 ## Docs
 

@@ -9,7 +9,7 @@
 import type { SessionSummary, TokenUsage } from "../parse/types.js";
 import { compareDeltaLine } from "./compare.js";
 import { SCHEMA_VERSION } from "./exportSchema.js";
-import { combinedPricedUsd, combinedTokenTotal, type ModelMixEntry, type PriceRowUsed, type ReceiptModel, type ToolRow, type WasteLine } from "./model.js";
+import { combinedPricedUsd, combinedTokenTotal, parentPricedUsd, type ModelMixEntry, type PriceRowUsed, type ReceiptModel, type ToolRow, type WasteLine } from "./model.js";
 import type { WasteClassAggregate } from "../aggregate/waste.js";
 import { SLIP_RULE_LINES, couldHaveSavedOf, type HandoffCounts } from "./handoff.js";
 import {
@@ -17,7 +17,12 @@ import {
   lowerBoundCostEstimate,
   SAME_TOKENS_REPRICING_INTERPRETATION,
 } from "./costEstimate.js";
-import { knownUnpricedTokens, pricingCoverageOf } from "./pricingCoverage.js";
+import {
+  combinedPricingCoverageOf,
+  knownCombinedUnpricedTokens,
+  knownUnpricedTokens,
+  pricingCoverageOf,
+} from "./pricingCoverage.js";
 
 function tokenUsageJson(t: TokenUsage) {
   return {
@@ -123,6 +128,8 @@ function subagentAggregateJson(model: ReceiptModel) {
     pricedUsd: model.subagents.pricedUsd,
     pricedCostEstimate: lowerBoundCostEstimate(model.subagents.pricedUsd),
     tokensTotal: model.subagents.tokensTotal,
+    unpricedTokens: tokenUsageJson(model.subagents.unpricedTokens),
+    unpricedTokensScope: "readable-subagents" as const,
     unpricedCount: model.subagents.unpricedCount,
     unreadableCount: model.subagents.unreadableCount,
   };
@@ -130,7 +137,10 @@ function subagentAggregateJson(model: ReceiptModel) {
 
 /** The receipt body — every field of a single-session receipt, minus the `schemaVersion` envelope. Reused verbatim as `compare`'s `a`/`b` so both surfaces share one shape (single-source-of-truth). */
 function receiptBody(model: ReceiptModel) {
+  const parentUsd = parentPricedUsd(model);
   const combinedUsd = combinedPricedUsd(model);
+  const parentUnpricedTokens = knownUnpricedTokens(model);
+  const combinedUnpricedTokens = knownCombinedUnpricedTokens(model);
   return {
     agentLabel: model.agentLabel,
     source: model.source,
@@ -141,8 +151,8 @@ function receiptBody(model: ReceiptModel) {
     unpriceable: model.unpriceable,
     modelMix: modelMixJson(model.modelMix),
     toolRows: model.toolRows.map(toolRowJson),
-    totalUsd: model.totalUsd,
-    totalCostEstimate: lowerBoundCostEstimate(model.totalUsd),
+    totalUsd: parentUsd,
+    totalCostEstimate: lowerBoundCostEstimate(parentUsd),
     totalUsdScope: "parent-session" as const,
     combinedPricedUsd: combinedUsd,
     combinedPricedCostEstimate: lowerBoundCostEstimate(combinedUsd),
@@ -151,7 +161,11 @@ function receiptBody(model: ReceiptModel) {
     totalTokens: tokenUsageJson(model.totalTokens),
     sessionTotalTokens: tokenUsageJson(model.sessionTotalTokens),
     pricingCoverage: pricingCoverageOf(model),
-    unpricedTokens: tokenUsageJson(knownUnpricedTokens(model)),
+    unpricedTokens: tokenUsageJson(parentUnpricedTokens),
+    unpricedTokensScope: "parent-session" as const,
+    combinedUnpricedTokens: tokenUsageJson(combinedUnpricedTokens),
+    combinedUnpricedTokensScope: "parent-session-plus-readable-subagents" as const,
+    combinedPricingCoverage: combinedPricingCoverageOf(model),
     wasteLines: model.wasteLines.map(wasteLineJson),
     caveats: model.caveats.map((c) => ({ kind: c.kind, text: c.text })),
     priceDelta: model.priceDelta
@@ -253,7 +267,10 @@ export function toHandoffJson(
   aggregates: WasteClassAggregate[],
 ) {
   const couldHaveSaved = couldHaveSavedOf(model.wasteLines, model.totalUsd);
+  const parentUsd = parentPricedUsd(model);
   const combinedUsd = combinedPricedUsd(model);
+  const parentUnpricedTokens = knownUnpricedTokens(model);
+  const combinedUnpricedTokens = knownCombinedUnpricedTokens(model);
   return {
     schemaVersion: SCHEMA_VERSION,
     source: model.source,
@@ -268,9 +285,13 @@ export function toHandoffJson(
       scope: "parent-session" as const,
     },
     pricingCoverage: pricingCoverageOf(model),
-    unpricedTokens: tokenUsageJson(knownUnpricedTokens(model)),
-    totalUsd: model.totalUsd,
-    totalCostEstimate: lowerBoundCostEstimate(model.totalUsd),
+    unpricedTokens: tokenUsageJson(parentUnpricedTokens),
+    unpricedTokensScope: "parent-session" as const,
+    combinedUnpricedTokens: tokenUsageJson(combinedUnpricedTokens),
+    combinedUnpricedTokensScope: "parent-session-plus-readable-subagents" as const,
+    combinedPricingCoverage: combinedPricingCoverageOf(model),
+    totalUsd: parentUsd,
+    totalCostEstimate: lowerBoundCostEstimate(parentUsd),
     totalUsdScope: "parent-session" as const,
     combinedPricedUsd: combinedUsd,
     combinedPricedCostEstimate: lowerBoundCostEstimate(combinedUsd),

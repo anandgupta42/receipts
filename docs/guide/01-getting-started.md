@@ -83,7 +83,7 @@ npx aireceipts-cli setup
 The setup report only reports — it changes nothing about your agents, repos, or
 settings (its only writes are aireceipts' own local cache and state under
 `~/.aireceipts/`). It shows supported-agent session counts, the latest session's
-priced-or-token total, the trailing-week total, and local integration options.
+priced-floor-or-token total, the trailing-week floor, and local integration options.
 It does not post to GitHub, install hooks, or upload transcripts. If no sessions are found, it exits 0, lists the searched roots, and
 tells you to run a supported agent session first.
 

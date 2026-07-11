@@ -1,4 +1,4 @@
-// R6 `--handoff`: a paste-ready block built ONLY from fired waste lines — a
+// R6 `--handoff`: a paste-ready block built ONLY from detector-flagged pattern lines — a
 // terse "here's what to check" note, not a second receipt. SPEC-0059 shapes
 // that body as the savings slip. Cost arithmetic is now universally a
 // Standard-API-equivalent lower bound, but detector membership is heuristic:
@@ -18,6 +18,7 @@ import { combinedPricedUsd, combinedTokenTotal, type ReceiptModel, type WasteLin
 import { wasteRowBlock } from "./present.js";
 import { RECEIPT_WIDTH } from "./render.js";
 import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "./costEstimate.js";
+import { combinedPricingCoverageOf, knownCombinedUnpricedTokens } from "./pricingCoverage.js";
 
 /** SPEC-0013 R1: distinct-session recurrence needed before a class is eligible; `--handoff-threshold` overrides. */
 export const DEFAULT_HANDOFF_THRESHOLD = 3;
@@ -195,9 +196,13 @@ function stateHeaderLines(model: ReceiptModel, counts: HandoffCounts): string[] 
   if (model.modelMix.length > 0) {
     lines.push(model.modelMix.map((m) => `${m.model} ${formatSharePercent(m.tokenShare)}`).join(" · "));
   }
-  const totalPart = model.totalUsd !== null
-    ? `total ${formatUsdLowerBound(combinedPricedUsd(model) ?? model.totalUsd)}`
-    : `total ${formatInt(combinedTokenTotal(model))} tok`;
+  const combinedUsd = combinedPricedUsd(model);
+  const pricingCoverage = combinedPricingCoverageOf(model);
+  const totalPart = combinedUsd !== null && pricingCoverage === "partial"
+    ? `known priced subtotal ${formatUsdLowerBound(combinedUsd)} · known unpriced ${formatInt(knownCombinedUnpricedTokens(model).total)} tok`
+    : combinedUsd !== null
+      ? `total ${formatUsdLowerBound(combinedUsd)}`
+      : `total ${formatInt(combinedTokenTotal(model))} tok`;
   const childCount = model.subagents?.count ?? 0;
   lines.push(
     childCount > 0
@@ -210,22 +215,22 @@ function stateHeaderLines(model: ReceiptModel, counts: HandoffCounts): string[] 
   return lines;
 }
 
-/** Pluralize a count with its noun (`1 waste line`, `2 waste lines`) — matches the receipt's row-label singular/plural discipline. */
+/** Pluralize a count with its noun — matches the receipt's row-label singular/plural discipline. */
 function countNoun(n: number, singular: string): string {
   return `${formatInt(n)} ${singular}${n === 1 ? "" : "s"}`;
 }
 
 /** SPEC-0042 R2 — the packet states what it covers, checkably (fixed format, counts only). */
 function coverageLine(model: ReceiptModel, counts: HandoffCounts): string {
-  if (model.subagents !== undefined) {
-    return `covers: ${countNoun(counts.turns, "parent turn")} · ${countNoun(counts.toolCalls, "parent tool call")} · ${countNoun(model.subagents.count, "subagent")} · ${countNoun(counts.compactions, "parent compaction")} · ${countNoun(model.wasteLines.length, "parent waste line")}`;
-  }
-  return `covers: ${countNoun(counts.turns, "turn")} · ${countNoun(counts.toolCalls, "tool call")} · ${countNoun(counts.compactions, "compaction")} · ${countNoun(model.wasteLines.length, "waste line")}`;
+  const base = model.subagents !== undefined
+    ? `covers: ${countNoun(counts.turns, "parent turn")} · ${countNoun(counts.toolCalls, "parent tool call")} · ${countNoun(model.subagents.count, "subagent")} · ${countNoun(counts.compactions, "parent compaction")} · ${countNoun(model.wasteLines.length, "parent flagged-pattern line")}`
+    : `covers: ${countNoun(counts.turns, "turn")} · ${countNoun(counts.toolCalls, "tool call")} · ${countNoun(counts.compactions, "compaction")} · ${countNoun(model.wasteLines.length, "flagged-pattern line")}`;
+  return combinedPricingCoverageOf(model) === "partial" ? `${base} · pricing coverage partial` : base;
 }
 
 /** SPEC-0059 R5 — the PR slip's covers line: session count first, then facts summed across the counted sessions. */
 export function prCoverageLine(sessionCount: number, turnCount: number, wasteLineCount: number): string {
-  return `covers: ${countNoun(sessionCount, "session")} · ${countNoun(turnCount, "turn")} · ${countNoun(wasteLineCount, "waste line")}`;
+  return `covers: ${countNoun(sessionCount, "session")} · ${countNoun(turnCount, "turn")} · ${countNoun(wasteLineCount, "flagged-pattern line")}`;
 }
 
 /**

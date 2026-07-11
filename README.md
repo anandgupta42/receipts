@@ -50,13 +50,13 @@ The line, segment by segment:
              └ which model is active right now
 ```
 
-When money is being wasted — a stuck retry loop, say — a flag appears right on
-the line.
+When a detector finds a stuck retry loop, a heuristic pattern flag appears right
+on the line; it is evidence to inspect, not a proven savings claim.
 
 
 **2 · When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
 receipt — cited floors on priceable tool rows, tokens-only buckets where evidence
-is insufficient, waste flagged (loops, context thrash, trivial spans), and the
+is insufficient, heuristic patterns flagged (loops, context thrash, trivial spans), and the
 cheaper-model line as arithmetic, not a prediction. The exact bytes:
 
 ```
@@ -67,7 +67,7 @@ cheaper-model line as arithmetic, not a prediction. The exact bytes:
     claude-opus-4-8 87% · claude-sonnet-5 13%     
          cache served 85% of input tokens         
 
-pre-edit: 11% of cost (1/10 turns)
+pre-edit: 11% of priced floor (1/10 turns)
   (share before the first named edit tool)
 
 Bash..........................≥ $0.0517  (3 calls)
@@ -93,7 +93,7 @@ source-and-install destination clickable.
 
 Every human `≥ $X` is rounded down independently. Exact-cent values use two decimals; fractional-cent values retain four. No cents are redistributed, so rows need not visibly sum to TOTAL; `--json`/`--csv` retain raw precision and lower-bound semantics.
 
-<sub>`pre-edit` is the share of cost spent before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
+<sub>`pre-edit` is the share of the observable priced floor before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 
 **3 · When the PR ships — the receipt sticks with it.** `npx aireceipts-cli pr --post`
 attaches the observable cost floor of the sessions behind a PR as a comment. Generation stays local; a
@@ -104,7 +104,7 @@ carry one — a real one, live:
 ## What it tells you
 
 - **Which model is active, and the observable Standard-API floor so far** — on every prompt, before the session is over, with your 5-hour cap countdown next to it.
-- **Where the observable usage went** — priceable rows carry cited `≥` floors; unmatched or unattributed components stay as tokens. Waste flags stuck loops, context thrash, and trivial turns.
+- **Where the observable usage went** — priceable rows carry cited `≥` floors; unmatched or unattributed components stay as tokens. Heuristic flags identify stuck loops, context thrash, and trivial turns without claiming avoidability.
 - **The observable floor behind a PR** — attributed across the sessions that built it, with same-tokens-on-a-cheaper-model arithmetic.
 
 ## Supported agents
@@ -186,15 +186,15 @@ If you are an AI agent asked to install aireceipts, do the following:
 | `aireceipts --mini` | Six-line mini-receipt for the newest session |
 | `aireceipts --details` | Adds a DETAILS section — token composition, session shape, per-model split (classic template) |
 | `aireceipts --template <name>` / `templates` | Render a receipt style (`classic`, `grocery`, `datavis`); `templates` previews each — [guide](docs/guide/10-templates.md) |
-| `aireceipts setup` | Found sessions, latest cost, week total, and the integrations that fit your machine — [guide](docs/guide/01-getting-started.md) |
+| `aireceipts setup` | Found sessions, latest observable floor, week floor, and the integrations that fit your machine — [guide](docs/guide/01-getting-started.md) |
 | `aireceipts pr --post [--artifact]` | Attach the receipt of the sessions behind a PR as a comment; `--artifact` also publishes a durable receipt page — [guide](docs/pr-receipts.md) |
-| `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, waste, ratio — [guide](docs/guide/05-compare.md) |
+| `aireceipts compare <a> <b>` | Two sessions side by side — models, tools, flagged patterns, ratio when coverage is complete — [guide](docs/guide/05-compare.md) |
 | `aireceipts week` | Trailing-7-day digest: totals, per-agent split, flagged patterns — [guide](docs/guide/06-week.md) |
 | `aireceipts backfill [--out <dir>]` | Bulk receipts across your existing session history; summary by default, one file per session with `--out` — [guide](docs/guide/01-getting-started.md) |
 | `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, OpenCode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
 | `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time — [guide](docs/guide/09-handoff.md) |
 | `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt — [guide](docs/guide/03-install-hook.md) |
-| `aireceipts statusline` | Live cost line in Claude Code's status bar, or any terminal via `--cwd` (tmux/starship/pwsh) — [setup](docs/statusline.md) |
+| `aireceipts statusline` | Live observable-floor line in Claude Code's status bar, or any terminal via `--cwd` (tmux/starship/pwsh) — [setup](docs/statusline.md) |
 | `aireceipts --quota` / `--check-budget` | Claude Code rate-limit window, read from the statusline stdin payload (silent otherwise); `--check-budget` exits 1 when your local budget cap is exceeded |
 | `aireceipts --json` / `--csv` / `--svg` / `--png` | Versioned schema, RFC 4180 rows, shareable SVG/PNG image — [schema](docs/json-schema.md) |
 | `aireceipts stats` | Local usage counters — receipts generated on this machine |

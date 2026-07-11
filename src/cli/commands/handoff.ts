@@ -1,5 +1,5 @@
-// SPEC-0018: `--handoff` — paste-ready block of fired waste lines, plus standing
-// -rule suggestions for waste classes recurring across recent sessions. priority
+// SPEC-0018: `--handoff` — paste-ready block of detector-flagged patterns, plus
+// standing-rule suggestions for pattern classes recurring across recent sessions. priority
 // 40 (above the default receipt, below every subcommand), matches `--handoff`.
 import { loadSession } from "../../index.js";
 import type { Session } from "../../parse/types.js";
@@ -71,8 +71,8 @@ export const command: CommandDef = {
     order: 40,
     lines: [
       "  aireceipts --handoff [selector] [--handoff-threshold N] [--json]",
-      "                                        paste-ready block of fired waste lines;",
-      "                                         suggests CLAUDE.md rules for waste classes",
+      "                                        paste-ready block of detector-flagged patterns;",
+      "                                         suggests CLAUDE.md rules for detector classes",
       "                                         recurring in N+ recent sessions (default 3)",
     ],
   },

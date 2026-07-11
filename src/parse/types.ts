@@ -213,10 +213,11 @@ export interface Session extends SessionSummary {
   /** SPEC-0017 — raw compaction events, ordered by `turnIndex`. Absent when the adapter records none. */
   compactions?: Compaction[];
   /**
-   * SPEC-0044 B3 — count of transcript records the adapter skipped because they
-   * were malformed/truncated (a crash-torn JSONL line, a corrupt DB row). `> 0`
-   * means this session's totals under-report by the dropped records' usage, so
-   * a receipt that credits it must floor `≥` and say so. Absent/0 → clean.
+   * SPEC-0044 B3 — count of malformed/truncated transcript records or usage
+   * payloads. Adapters retain independently valid token components when safe,
+   * but none of that record's malformed usage can produce a dollar. `> 0`
+   * means totals may under-report unknown components, so a credited receipt
+   * must floor `≥` and say so. Absent/0 → clean.
    */
   droppedRecords?: number;
 }

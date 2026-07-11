@@ -4,6 +4,7 @@
 import { formatRatio, formatUsdLowerBound, formatInt } from "./format.js";
 import { colorEnabled, makeColorizer } from "./color.js";
 import { combinedPricedUsd, combinedTokenTotal, type ReceiptModel } from "./model.js";
+import { combinedPricingCoverageOf, knownCombinedUnpricedTokens } from "./pricingCoverage.js";
 import { renderReceiptLines, RECEIPT_WIDTH } from "./render.js";
 
 const SIDE_BY_SIDE_MIN_TERM_WIDTH = 110;
@@ -13,17 +14,31 @@ function labelFor(model: ReceiptModel): string {
   return model.title ?? model.sessionId;
 }
 
+function coverageFacts(model: ReceiptModel): string {
+  const coverage = combinedPricingCoverageOf(model);
+  const usd = combinedPricedUsd(model);
+  const knownUnpriced = knownCombinedUnpricedTokens(model).total;
+  const priced = usd === null ? "no known priced subtotal" : `known priced ${formatUsdLowerBound(usd)}`;
+  return `${priced} + ${formatInt(knownUnpriced)} known-unpriced tok (${coverage})`;
+}
+
 /** Factual-only delta line: a cost ratio when both sides priced, a token ratio when neither is, and a plain "unpriced" note when the two are mixed (a $/token ratio wouldn't be a real number). No better/worse wording (I6). */
 export function compareDeltaLine(a: ReceiptModel, b: ReceiptModel): string {
   const labelA = labelFor(a);
   const labelB = labelFor(b);
-  // Match the TOTAL each receipt actually renders. A priced parent includes
-  // readable priced children; an unpriced parent remains tokens-only even if a
-  // child priced, per the receipt's one-unit display contract.
-  const usdA = a.totalUsd !== null ? combinedPricedUsd(a) : null;
-  const usdB = b.totalUsd !== null ? combinedPricedUsd(b) : null;
+  const usdA = combinedPricedUsd(a);
+  const usdB = combinedPricedUsd(b);
+  const coverageA = combinedPricingCoverageOf(a);
+  const coverageB = combinedPricingCoverageOf(b);
 
-  if (usdA !== null && usdB !== null) {
+  // A ratio of incomplete lower bounds has no sound direction: omitted usage
+  // can change either side by an unknown amount. State each observed subtotal
+  // and exact known-unpriced token count instead (I2/I3).
+  if (coverageA === "partial" || coverageB === "partial") {
+    return `${labelA} and ${labelB} are not directly comparable: ${labelA} ${coverageFacts(a)}; ${labelB} ${coverageFacts(b)}`;
+  }
+
+  if (coverageA === "full" && coverageB === "full" && usdA !== null && usdB !== null) {
     if (usdB === 0) {
       return usdA === 0
         ? `${labelA} and ${labelB} both have a ${formatUsdLowerBound(0)} standard-API floor`

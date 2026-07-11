@@ -77,6 +77,8 @@ export interface SubagentAggregate {
   pricedUsd: number | null;
   /** Total tokens across readable children; unreadable children contribute nothing (counted, never guessed). */
   tokensTotal: number;
+  /** Exact known tokens excluded from readable children's priced floors. */
+  unpricedTokens: TokenUsage;
   /** Readable children with no matching price row. */
   unpricedCount: number;
   unreadableCount: number;
@@ -128,13 +130,19 @@ export interface ReceiptModel {
   subagents?: SubagentAggregate;
 }
 
+/** Attributed parent floor, hardened against an impossible stale dollar on an unpriceable adapter. */
+export function parentPricedUsd(model: ReceiptModel): number | null {
+  return model.unpriceable ? null : model.totalUsd;
+}
+
 /** Priced lower-bound atoms across the parent and every readable priced child. */
 export function combinedPricedUsd(model: ReceiptModel): number | null {
+  const parentUsd = parentPricedUsd(model);
   const childUsd = model.subagents?.pricedUsd ?? null;
-  if (model.totalUsd === null && childUsd === null) {
+  if (parentUsd === null && childUsd === null) {
     return null;
   }
-  return (model.totalUsd ?? 0) + (childUsd ?? 0);
+  return (parentUsd ?? 0) + (childUsd ?? 0);
 }
 
 /** Observable parent tokens plus every readable child's token total. */
@@ -402,14 +410,15 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
       text: `caveat: ${session.conflictingAggregateUsage.total.toLocaleString("en-US")} session-aggregate tokens conflict with itemized components — excluded from totals and floor`,
     });
   }
-  // SPEC-0044 B3 — the parse layer skipped malformed/truncated transcript
-  // records (a crash-torn JSONL line, a corrupt DB row); their token usage is
-  // lost, so this session's total is a lower bound, not exact.
+  // SPEC-0044 B3 — the parse layer found malformed/truncated transcript
+  // evidence (a crash-torn JSONL line, a corrupt usage bucket/DB row). Safe
+  // sibling components may remain tokens-only, but omitted components mean
+  // the session total can still be incomplete.
   if ((session.droppedRecords ?? 0) > 0) {
     const n = session.droppedRecords as number;
     caveats.push({
       kind: "dropped-transcript-records",
-      text: `caveat: ${n} unreadable transcript record${n === 1 ? "" : "s"} skipped — total may be incomplete`,
+      text: `caveat: ${n} transcript record${n === 1 ? "" : "s"} unreadable or malformed — omitted components may make total incomplete`,
     });
   }
   // SPEC-0054 R3 — a session that priced but left some usage-carrying turns

@@ -38,13 +38,10 @@ import { addUsage, emptyUsage, parseTimestamp, pathExists, truncate, withTotal, 
 const ID_SEP = "#";
 
 interface RawTokens {
-  input?: number;
-  output?: number;
-  reasoning?: number;
-  cache?: {
-    read?: number;
-    write?: number;
-  };
+  input?: unknown;
+  output?: unknown;
+  reasoning?: unknown;
+  cache?: unknown;
 }
 
 interface RawMessageData {
@@ -53,7 +50,7 @@ interface RawMessageData {
   model?: string | { id?: unknown; providerID?: unknown; variant?: unknown };
   modelID?: string;
   providerID?: unknown;
-  tokens?: RawTokens;
+  tokens?: unknown;
   content?: unknown;
   time?: {
     created?: number | string;
@@ -92,18 +89,18 @@ interface SessionRow {
   path?: string;
   time_created?: number;
   time_updated?: number;
-  tokens_input?: number;
-  tokens_output?: number;
-  tokens_reasoning?: number;
-  tokens_cache_read?: number;
-  tokens_cache_write?: number;
+  tokens_input?: unknown;
+  tokens_output?: unknown;
+  tokens_reasoning?: unknown;
+  tokens_cache_read?: unknown;
+  tokens_cache_write?: unknown;
   turn_count?: number;
   tool_count?: number;
-  message_input?: number;
-  message_output?: number;
-  message_reasoning?: number;
-  message_cache_read?: number;
-  message_cache_write?: number;
+  message_input?: unknown;
+  message_output?: unknown;
+  message_reasoning?: unknown;
+  message_cache_read?: unknown;
+  message_cache_write?: unknown;
   first_model?: string;
 }
 
@@ -129,6 +126,12 @@ function defaultRoot(): string {
 
 function sqlString(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+/** node:sqlite throws when reading an INTEGER outside JS's safe range. Return
+ * only those values as text so the parser can reject them explicitly. */
+function safeSqlInteger(expression: string): string {
+  return `CASE WHEN typeof(${expression}) = 'integer' AND (${expression} > 9007199254740991 OR ${expression} < -9007199254740991) THEN CAST(${expression} AS TEXT) ELSE ${expression} END`;
 }
 
 function parseJsonObject<T>(value: unknown): T | null {
@@ -175,39 +178,161 @@ function timestampOf(...values: unknown[]): number | undefined {
   return undefined;
 }
 
-function mapTokens(tokens: RawTokens | undefined): TokenUsage | undefined {
-  if (!tokens) {
-    return undefined;
-  }
-  return withTotal({
-    input: numberOrZero(tokens.input),
-    output: numberOrZero(tokens.output) + numberOrZero(tokens.reasoning),
-    cacheRead: numberOrZero(tokens.cache?.read),
-    cacheCreation: numberOrZero(tokens.cache?.write),
-    total: 0,
-  });
+interface ParsedTokenValue {
+  value: number;
+  valid: boolean;
 }
 
-function usageFromSessionColumns(row: SessionRow): TokenUsage {
-  const sessionProjection = withTotal({
-    input: numberOrZero(row.tokens_input),
-    output: numberOrZero(row.tokens_output) + numberOrZero(row.tokens_reasoning),
-    cacheRead: numberOrZero(row.tokens_cache_read),
-    cacheCreation: numberOrZero(row.tokens_cache_write),
-    total: 0,
-  });
-  const messageProjection = withTotal({
-    input: numberOrZero(row.message_input),
-    output: numberOrZero(row.message_output) + numberOrZero(row.message_reasoning),
-    cacheRead: numberOrZero(row.message_cache_read),
-    cacheCreation: numberOrZero(row.message_cache_write),
-    total: 0,
-  });
+interface MappedOpenCodeUsage {
+  usage?: TokenUsage;
+  malformed: boolean;
+}
+
+function parseTokenValue(value: unknown, allowNumericString: boolean): ParsedTokenValue {
+  if (value === undefined) {
+    return { value: 0, valid: true };
+  }
+  if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
+    return { value, valid: true };
+  }
+  if (allowNumericString && typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isSafeInteger(parsed) && parsed >= 0) {
+      return { value: parsed, valid: true };
+    }
+  }
+  return { value: 0, valid: false };
+}
+
+function safeTokenSum(values: readonly number[]): number | undefined {
+  let total = 0;
+  for (const value of values) {
+    if (total > Number.MAX_SAFE_INTEGER - value) {
+      return undefined;
+    }
+    total += value;
+  }
+  return total;
+}
+
+/** Preserve valid buckets from malformed message usage, but never price it. */
+function mapTokens(raw: unknown, present: boolean): MappedOpenCodeUsage {
+  if (!present) {
+    return { malformed: false };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { usage: emptyUsage(), malformed: true };
+  }
+  const tokens = raw as RawTokens & Record<string, unknown>;
+  const input = parseTokenValue(tokens.input, false);
+  const output = parseTokenValue(tokens.output, false);
+  const reasoning = parseTokenValue(tokens.reasoning, false);
+
+  let cacheMalformed = false;
+  let cacheRead: ParsedTokenValue = { value: 0, valid: true };
+  let cacheWrite: ParsedTokenValue = { value: 0, valid: true };
+  if (Object.prototype.hasOwnProperty.call(tokens, "cache")) {
+    const cache = tokens.cache;
+    if (!cache || typeof cache !== "object" || Array.isArray(cache)) {
+      cacheMalformed = true;
+    } else {
+      const cacheRecord = cache as Record<string, unknown>;
+      cacheRead = parseTokenValue(cacheRecord.read, false);
+      cacheWrite = parseTokenValue(cacheRecord.write, false);
+    }
+  }
+
+  const mappedOutput = safeTokenSum([output.value, reasoning.value]);
+  const mappedTotal = mappedOutput === undefined
+    ? undefined
+    : safeTokenSum([input.value, mappedOutput, cacheRead.value, cacheWrite.value]);
+  if (mappedOutput === undefined || mappedTotal === undefined) {
+    return { usage: emptyUsage(), malformed: true };
+  }
+
+  return {
+    malformed:
+      !input.valid ||
+      !output.valid ||
+      !reasoning.valid ||
+      cacheMalformed ||
+      !cacheRead.valid ||
+      !cacheWrite.valid,
+    usage: withTotal({
+      input: input.value,
+      output: mappedOutput,
+      cacheRead: cacheRead.value,
+      cacheCreation: cacheWrite.value,
+      total: 0,
+    }),
+  };
+}
+
+interface UsageProjection {
+  usage: TokenUsage;
+  valid: boolean;
+}
+
+function usageProjection(values: readonly unknown[]): UsageProjection {
+  const [rawInput, rawOutput, rawReasoning, rawCacheRead, rawCacheWrite] = values;
+  const input = parseTokenValue(rawInput, true);
+  const output = parseTokenValue(rawOutput, true);
+  const reasoning = parseTokenValue(rawReasoning, true);
+  const cacheRead = parseTokenValue(rawCacheRead, true);
+  const cacheWrite = parseTokenValue(rawCacheWrite, true);
+  const outputTotal = safeTokenSum([output.value, reasoning.value]);
+  const componentTotal = outputTotal === undefined
+    ? undefined
+    : safeTokenSum([input.value, outputTotal, cacheRead.value, cacheWrite.value]);
+  if (outputTotal === undefined || componentTotal === undefined) {
+    return { valid: false, usage: emptyUsage() };
+  }
+  return {
+    valid: input.valid && output.valid && reasoning.valid && cacheRead.valid && cacheWrite.valid,
+    usage: withTotal({
+      input: input.value,
+      output: outputTotal,
+      cacheRead: cacheRead.value,
+      cacheCreation: cacheWrite.value,
+      total: 0,
+    }),
+  };
+}
+
+interface AggregateUsageEvidence {
+  usage: TokenUsage;
+  sessionMalformed: boolean;
+}
+
+function usageFromSessionColumns(row: SessionRow, trustMessageProjection = true): AggregateUsageEvidence {
+  const sessionProjection = usageProjection([
+    row.tokens_input,
+    row.tokens_output,
+    row.tokens_reasoning,
+    row.tokens_cache_read,
+    row.tokens_cache_write,
+  ]);
+  const messageProjection = usageProjection([
+    row.message_input,
+    row.message_output,
+    row.message_reasoning,
+    row.message_cache_read,
+    row.message_cache_write,
+  ]);
+  const candidates = [
+    ...(sessionProjection.valid ? [sessionProjection.usage] : []),
+    ...(trustMessageProjection && messageProjection.valid ? [messageProjection.usage] : []),
+  ];
+  const usage = candidates.reduce<TokenUsage>(
+    (largest, candidate) => candidate.total > largest.total ? candidate : largest,
+    emptyUsage(),
+  );
   // Keep each projection coherent and retain the larger observed envelope;
   // independently maximizing its buckets could create a vector no row ever
-  // reported. Per-component reconciliation with itemized turns happens below
-  // and any excess remains explicitly unattributed.
-  return sessionProjection.total >= messageProjection.total ? sessionProjection : messageProjection;
+  // reported. A malformed projection is excluded wholesale; its valid-looking
+  // components cannot dominate or manufacture a residual. Per-component
+  // reconciliation with itemized turns happens below.
+  return { usage, sessionMalformed: !sessionProjection.valid };
 }
 
 /** Usage present in the reconciled session envelope but absent from itemized messages. */
@@ -311,7 +436,7 @@ function summaryFromRow(dbPath: string, row: SessionRow): SessionSummary {
     startedAt,
     endedAt,
     totals: {
-      tokens: usageFromSessionColumns(row),
+      tokens: usageFromSessionColumns(row).usage,
       durationMs: startedAt !== undefined && endedAt !== undefined ? Math.max(0, endedAt - startedAt) : undefined,
       turnCount: numberOrZero(row.turn_count),
       toolCallCount: numberOrZero(row.tool_count),
@@ -416,11 +541,11 @@ function currentSummarySql(where = ""): string {
       s.path,
       s.time_created,
       s.time_updated,
-      s.tokens_input,
-      s.tokens_output,
-      s.tokens_reasoning,
-      s.tokens_cache_read,
-      s.tokens_cache_write,
+      ${safeSqlInteger("s.tokens_input")} AS tokens_input,
+      ${safeSqlInteger("s.tokens_output")} AS tokens_output,
+      ${safeSqlInteger("s.tokens_reasoning")} AS tokens_reasoning,
+      ${safeSqlInteger("s.tokens_cache_read")} AS tokens_cache_read,
+      ${safeSqlInteger("s.tokens_cache_write")} AS tokens_cache_write,
       (
         SELECT COUNT(*)
         FROM session_message m
@@ -432,27 +557,27 @@ function currentSummarySql(where = ""): string {
         WHERE m.session_id = s.id AND m.type = 'assistant' AND json_extract(c.value, '$.type') = 'tool'
       ) AS tool_count,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.input'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.input'), 0))")}
         FROM session_message m
         WHERE m.session_id = s.id AND m.type = 'assistant'
       ) AS message_input,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.output'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.output'), 0))")}
         FROM session_message m
         WHERE m.session_id = s.id AND m.type = 'assistant'
       ) AS message_output,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.reasoning'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.reasoning'), 0))")}
         FROM session_message m
         WHERE m.session_id = s.id AND m.type = 'assistant'
       ) AS message_reasoning,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.cache.read'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.cache.read'), 0))")}
         FROM session_message m
         WHERE m.session_id = s.id AND m.type = 'assistant'
       ) AS message_cache_read,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.cache.write'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.cache.write'), 0))")}
         FROM session_message m
         WHERE m.session_id = s.id AND m.type = 'assistant'
       ) AS message_cache_write,
@@ -482,11 +607,11 @@ function summarySql(where = ""): string {
       s.path,
       s.time_created,
       s.time_updated,
-      s.tokens_input,
-      s.tokens_output,
-      s.tokens_reasoning,
-      s.tokens_cache_read,
-      s.tokens_cache_write,
+      ${safeSqlInteger("s.tokens_input")} AS tokens_input,
+      ${safeSqlInteger("s.tokens_output")} AS tokens_output,
+      ${safeSqlInteger("s.tokens_reasoning")} AS tokens_reasoning,
+      ${safeSqlInteger("s.tokens_cache_read")} AS tokens_cache_read,
+      ${safeSqlInteger("s.tokens_cache_write")} AS tokens_cache_write,
       (
         SELECT COUNT(*)
         FROM message m
@@ -498,27 +623,27 @@ function summarySql(where = ""): string {
         WHERE p.session_id = s.id AND json_extract(p.data, '$.type') = 'tool'
       ) AS tool_count,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.input'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.input'), 0))")}
         FROM message m
         WHERE m.session_id = s.id AND json_extract(m.data, '$.role') = 'assistant'
       ) AS message_input,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.output'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.output'), 0))")}
         FROM message m
         WHERE m.session_id = s.id AND json_extract(m.data, '$.role') = 'assistant'
       ) AS message_output,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.reasoning'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.reasoning'), 0))")}
         FROM message m
         WHERE m.session_id = s.id AND json_extract(m.data, '$.role') = 'assistant'
       ) AS message_reasoning,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.cache.read'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.cache.read'), 0))")}
         FROM message m
         WHERE m.session_id = s.id AND json_extract(m.data, '$.role') = 'assistant'
       ) AS message_cache_read,
       (
-        SELECT SUM(COALESCE(json_extract(m.data, '$.tokens.cache.write'), 0))
+        SELECT ${safeSqlInteger("SUM(COALESCE(json_extract(m.data, '$.tokens.cache.write'), 0))")}
         FROM message m
         WHERE m.session_id = s.id AND json_extract(m.data, '$.role') = 'assistant'
       ) AS message_cache_write,
@@ -641,6 +766,7 @@ export class OpenCodeAdapter implements SessionAdapter {
     let startedAt: number | undefined;
     let endedAt: number | undefined;
     let droppedRecords = 0;
+    let malformedMessageUsage = false;
 
     for (const row of messages) {
       const msg = parseJsonObject<RawMessageData>(row.data);
@@ -667,7 +793,12 @@ export class OpenCodeAdapter implements SessionAdapter {
       if (done !== undefined) {
         endedAt = endedAt === undefined ? done : Math.max(endedAt, done);
       }
-      const usage = mapTokens(msg.tokens);
+      const mappedUsage = mapTokens(msg.tokens, Object.prototype.hasOwnProperty.call(msg, "tokens"));
+      const usage = mappedUsage.usage;
+      if (mappedUsage.malformed) {
+        droppedRecords++;
+        malformedMessageUsage = true;
+      }
       if (usage) {
         totalUsage = addUsage(totalUsage, usage);
       }
@@ -679,6 +810,7 @@ export class OpenCodeAdapter implements SessionAdapter {
         ...(pricingProvider !== undefined ? { pricingProvider } : {}),
         usage,
         outputTokens: usage?.output,
+        ...(mappedUsage.malformed ? { pricingUnits: [] } : {}),
         toolCalls: toolsFromContent(msg.content),
       });
     }
@@ -686,14 +818,18 @@ export class OpenCodeAdapter implements SessionAdapter {
     const sessionStarted = startedAt ?? summary.startedAt;
     const sessionEnded = endedAt ?? summary.endedAt ?? sessionStarted;
     const toolCallCount = turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0);
-    const reconciled = reconcileAggregateResidual(totalUsage, summary.totals.tokens);
+    const aggregateEvidence = usageFromSessionColumns(summaryRow, !malformedMessageUsage);
+    if (aggregateEvidence.sessionMalformed) {
+      droppedRecords++;
+    }
+    const reconciled = reconcileAggregateResidual(totalUsage, aggregateEvidence.usage);
     return {
       ...summary,
       title: summary.title ?? (firstUserText ? truncate(firstUserText) : undefined),
       startedAt: sessionStarted,
       endedAt: sessionEnded,
       totals: {
-        tokens: reconciled.total.total > 0 ? reconciled.total : summary.totals.tokens,
+        tokens: reconciled.total,
         durationMs:
           sessionStarted !== undefined && sessionEnded !== undefined ? Math.max(0, sessionEnded - sessionStarted) : undefined,
         turnCount: summary.totals.turnCount,
@@ -739,6 +875,7 @@ export class OpenCodeAdapter implements SessionAdapter {
     let startedAt: number | undefined;
     let endedAt: number | undefined;
     let droppedRecords = 0;
+    let malformedMessageUsage = false;
 
     for (const row of messages) {
       const msg = parseJsonObject<RawMessageData>(row.data);
@@ -759,7 +896,12 @@ export class OpenCodeAdapter implements SessionAdapter {
       if (done !== undefined) {
         endedAt = endedAt === undefined ? done : Math.max(endedAt, done);
       }
-      const usage = mapTokens(msg.tokens);
+      const mappedUsage = mapTokens(msg.tokens, Object.prototype.hasOwnProperty.call(msg, "tokens"));
+      const usage = mappedUsage.usage;
+      if (mappedUsage.malformed) {
+        droppedRecords++;
+        malformedMessageUsage = true;
+      }
       if (usage) {
         totalUsage = addUsage(totalUsage, usage);
       }
@@ -771,6 +913,7 @@ export class OpenCodeAdapter implements SessionAdapter {
         ...(pricingProvider !== undefined ? { pricingProvider } : {}),
         usage,
         outputTokens: usage?.output,
+        ...(mappedUsage.malformed ? { pricingUnits: [] } : {}),
         toolCalls: partsByMessage.get(row.id) ?? [],
       });
     }
@@ -778,13 +921,17 @@ export class OpenCodeAdapter implements SessionAdapter {
     const sessionStarted = startedAt ?? summary.startedAt;
     const sessionEnded = endedAt ?? summary.endedAt ?? sessionStarted;
     const toolCallCount = turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0);
-    const reconciled = reconcileAggregateResidual(totalUsage, summary.totals.tokens);
+    const aggregateEvidence = usageFromSessionColumns(summaryRow, !malformedMessageUsage);
+    if (aggregateEvidence.sessionMalformed) {
+      droppedRecords++;
+    }
+    const reconciled = reconcileAggregateResidual(totalUsage, aggregateEvidence.usage);
     return {
       ...summary,
       startedAt: sessionStarted,
       endedAt: sessionEnded,
       totals: {
-        tokens: reconciled.total.total > 0 ? reconciled.total : summary.totals.tokens,
+        tokens: reconciled.total,
         durationMs:
           sessionStarted !== undefined && sessionEnded !== undefined ? Math.max(0, sessionEnded - sessionStarted) : undefined,
         turnCount: summary.totals.turnCount,

@@ -24,6 +24,7 @@ function report(overrides: Partial<SetupReport> = {}): SetupReport {
       label: "Claude Code",
       model: "claude-opus-4-8",
       totalUsd: 0.18,
+      pricingCoverage: "full",
       totalTokens: usage(100),
       parentUnpricedTokens: usage(0),
       combinedUnpricedTokens: usage(0),
@@ -81,6 +82,7 @@ describe("SPEC-0050 setup render", () => {
           label: "opencode",
           model: "local-provider",
           totalUsd: null,
+          pricingCoverage: "unpriced",
           totalTokens: usage(1234),
           parentUnpricedTokens: usage(1234),
           combinedUnpricedTokens: usage(1234),
@@ -105,6 +107,7 @@ describe("SPEC-0050 setup render", () => {
         label: "Claude Code",
         model: "claude-opus-4-8",
         totalUsd: 1.18,
+        pricingCoverage: "partial",
         totalTokens: usage(100),
         combinedTotalTokens: 4_100,
         subagentCount: 2,
@@ -119,7 +122,9 @@ describe("SPEC-0050 setup render", () => {
         unpriceable: false,
       },
     });
-    expect(renderSetupReport(withChildren)).toContain("Total (incl. 2 subagents)");
+    expect(renderSetupReport(withChildren)).toContain("Known priced subtotal (incl. 2 subagents)");
+    expect(renderSetupReport(withChildren)).toContain("Pricing coverage");
+    expect(renderSetupReport(withChildren)).toContain("partial");
     expect(renderSetupReport(withChildren)).toContain("Parent unpriced tokens");
     expect(renderSetupReport(withChildren)).toContain("125 tok");
     expect(renderSetupReport(withChildren)).toContain("Known unpriced (combined)");
@@ -128,6 +133,7 @@ describe("SPEC-0050 setup render", () => {
     expect(renderSetupReport(withChildren)).toContain("parent + readable subagents");
     expect(setupReportToJson(withChildren).latest).toMatchObject({
       totalUsd: 1.18,
+      pricingCoverage: "partial",
       combinedTotalTokens: 4_100,
       subagentCount: 2,
       parentUnpricedTokens: usage(125),
@@ -147,6 +153,7 @@ describe("SPEC-0050 setup render", () => {
         subagentUnpricedCount: null,
         subagentUnreadableCount: null,
         subagentRollupStatus: "unavailable",
+        pricingCoverage: "partial",
       },
     });
     expect(renderSetupReport(unavailable)).toContain("unavailable · child counts/tokens unknown");

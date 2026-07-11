@@ -367,14 +367,14 @@ footer{
 
 <h2 id="what-the-line-shows">What the line shows</h2>
 
-<p>The default line is the segment set <code>brand,model,cost,burn,tokens,context,waste,quota5h</code> — the model, cost, burn rate, tokens, context fullness, a waste flag, and your rate-limit window:</p>
+<p>The default line is the segment set <code>brand,model,cost,burn,tokens,context,waste,quota5h</code> — the model, observable floor, floor rate, tokens, context fullness, a heuristic-pattern flag, and your rate-limit window:</p>
 
 <ul>
   <li><code>Opus</code> (after the brand) is the model — in stdin mode, Claude Code's own current model name (a mid-session switch shows on the next render); in disk fallback, the session's dominant model by token share. Omitted when neither is known.</li>
   <li><code>≥$X.XX</code> is the session's observable Standard-API list-price-equivalent floor (<code>Nk</code>/<code>NM</code> tokens alone when no cited row matches), and <code>≥$X/hr</code> is that floor divided by elapsed session time. Neither is an invoice or exact charge; both are rounded down for display.</li>
   <li><code>ctx N%</code> is how full the current context window is; token counts abbreviate to <code>k</code>/<code>M</code> (<code>128k</code>, <code>1.2M</code>).</li>
   <li><code>5h N% ↺Xh Ym</code> is your official 5-hour rate-limit usage plus the time until it resets — subscribers only, on by default, and dropped when Claude Code doesn't provide it.</li>
-  <li>A waste flag (<code>⚠ Bash loop ×5</code>) appears only when a detector actually fired.</li>
+  <li>A heuristic-pattern flag (<code>⚠ Bash loop ×5</code>) appears only when a detector fired; it is evidence to inspect, not proven waste or savings.</li>
   <li>Outside a piped call, or when the payload carries no session, it falls back to the newest session on disk, and prints a neutral placeholder rather than an error if there are none — so your statusline layout never breaks.</li>
 </ul>
 

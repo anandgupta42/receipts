@@ -178,12 +178,14 @@ that tells you exactly what it knows.
     a note reads "N session(s) touched this branch but couldn't be read". (A
     read-but-unproven session is still a correct silent skip; only a genuine
     read *failure* trips this.)
-17. **A transcript with records skipped at parse time**
+17. **A transcript with unreadable or malformed record evidence**
     (`dropped-transcript-records`, SPEC-0044 B3). A
-    malformed or crash-truncated record (a torn JSONL line, a corrupt DB row)
-    is skipped while the rest of the session parses fine. When such a session is
-    credited, its total is a lower bound: the receipt says "N unreadable
-    transcript record(s) skipped — total may be incomplete" and the PR total
+    malformed or crash-truncated record (a torn JSONL line, an invalid token
+    bucket, or a corrupt DB row) cannot be used completely while the rest of
+    the session parses. Safe sibling token components remain tokens-only where
+    representable. When such a session is credited, its total is a lower bound:
+    the receipt says "N transcript record(s) unreadable or malformed — omitted
+    components may make total incomplete" and the PR total
     floors `≥`. A clean transcript never trips it.
 18. **A session that failed to parse before it was even a candidate**
     (SPEC-0045). B4 (#16) catches a candidate whose full transcript won't load;

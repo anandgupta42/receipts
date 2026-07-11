@@ -233,11 +233,11 @@ function makeSessionMessageDb(dbPath: string): void {
       title TEXT NOT NULL,
       version TEXT NOT NULL,
       cost REAL DEFAULT 0 NOT NULL,
-      tokens_input INTEGER DEFAULT 0 NOT NULL,
-      tokens_output INTEGER DEFAULT 0 NOT NULL,
-      tokens_reasoning INTEGER DEFAULT 0 NOT NULL,
-      tokens_cache_read INTEGER DEFAULT 0 NOT NULL,
-      tokens_cache_write INTEGER DEFAULT 0 NOT NULL,
+      tokens_input INTEGER DEFAULT 0,
+      tokens_output INTEGER DEFAULT 0,
+      tokens_reasoning INTEGER DEFAULT 0,
+      tokens_cache_read INTEGER DEFAULT 0,
+      tokens_cache_write INTEGER DEFAULT 0,
       model TEXT,
       time_created INTEGER NOT NULL,
       time_updated INTEGER NOT NULL
@@ -305,9 +305,11 @@ function makeSessionMessageDb(dbPath: string): void {
   db.close();
 }
 
+type SqlTokenValue = number | string | null;
+
 function setCurrentSessionAggregate(
   dbPath: string,
-  tokens: { input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number },
+  tokens: { input: SqlTokenValue; output: SqlTokenValue; reasoning: SqlTokenValue; cacheRead: SqlTokenValue; cacheWrite: SqlTokenValue },
 ): void {
   const db = new DatabaseSync(dbPath);
   db.prepare(`
@@ -316,6 +318,15 @@ function setCurrentSessionAggregate(
         tokens_cache_read = ?, tokens_cache_write = ?
     WHERE id = 'ses_current_shape'
   `).run(tokens.input, tokens.output, tokens.reasoning, tokens.cacheRead, tokens.cacheWrite);
+  db.close();
+}
+
+function setCurrentMessageTokens(dbPath: string, tokens: unknown): void {
+  const db = new DatabaseSync(dbPath);
+  const row = db.prepare("SELECT data FROM session_message WHERE id = 'msg_asst_1'").get() as { data: string };
+  const data = JSON.parse(row.data) as Record<string, unknown>;
+  data.tokens = tokens;
+  db.prepare("UPDATE session_message SET data = ? WHERE id = 'msg_asst_1'").run(JSON.stringify(data));
   db.close();
 }
 
@@ -517,6 +528,115 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       output: "ok",
       status: "ok",
     });
+  });
+
+  it.each([
+    ["null", { input: null, output: 100, reasoning: 25, cache: { read: 50, write: 10 } }, 185],
+    ["string", { input: 500, output: "100", reasoning: 25, cache: { read: 50, write: 10 } }, 585],
+    ["negative", { input: 500, output: 100, reasoning: -1, cache: { read: 50, write: 10 } }, 660],
+    ["fractional", { input: 500, output: 100, reasoning: 25, cache: { read: 1.5, write: 10 } }, 635],
+    ["non-safe", { input: 500, output: 100, reasoning: 25, cache: { read: 50, write: Number.MAX_SAFE_INTEGER + 1 } }, 675],
+  ] as const)("keeps valid components but suppresses dollars for %s OpenCode message usage", async (_label, tokens, safeTotal) => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-malformed-message.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentMessageTokens(dbPath, tokens);
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.turns[0].usage?.total).toBe(safeTotal);
+    expect(session!.turns[0].pricingUnits).toEqual([]);
+    expect(session!.droppedRecords).toBe(1);
+    const receipt = await buildReceiptModel(session!, dataDir);
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.caveats).toContainEqual(expect.objectContaining({ kind: "dropped-transcript-records" }));
+  });
+
+  it("fails closed when individually safe OpenCode message counters overflow a sum", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-message-sum-overflow.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentMessageTokens(dbPath, {
+      input: 0,
+      output: Number.MAX_SAFE_INTEGER,
+      reasoning: 1,
+      cache: { read: 0, write: 0 },
+    });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.turns[0].usage).toEqual(expect.objectContaining({ total: 0 }));
+    expect(session!.turns[0].pricingUnits).toEqual([]);
+    expect(session!.droppedRecords).toBe(1);
+    expect((await buildReceiptModel(session!, dataDir)).totalUsd).toBeNull();
+  });
+
+  it.each([null, "not-a-number", -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "excludes a malformed OpenCode session aggregate field (%s) instead of creating a residual",
+    async (invalidInput) => {
+      const dir = tempDir();
+      dirs.push(dir);
+      const dbPath = path.join(dir, "opencode-malformed-aggregate.db");
+      makeSessionMessageDb(dbPath);
+      // Even with large valid-looking sibling components, one malformed field
+      // invalidates this whole projection. The valid itemized message remains.
+      setCurrentSessionAggregate(dbPath, {
+        input: invalidInput,
+        output: 1_000,
+        reasoning: 100,
+        cacheRead: 100,
+        cacheWrite: 100,
+      });
+
+      const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+      expect(session).not.toBeNull();
+      expect(session!.totals.tokens).toMatchObject({ input: 500, output: 125, cacheRead: 50, cacheCreation: 10, total: 685 });
+      expect(session!.unattributedUsage).toBeUndefined();
+      expect(session!.droppedRecords).toBe(1);
+      expect((await buildReceiptModel(session!, dataDir)).totalUsd).not.toBeNull();
+    },
+  );
+
+  it("excludes an OpenCode aggregate whose individually safe fields overflow when summed", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-aggregate-sum-overflow.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentSessionAggregate(dbPath, {
+      input: 0,
+      output: Number.MAX_SAFE_INTEGER,
+      reasoning: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens.total).toBe(685);
+    expect(session!.unattributedUsage).toBeUndefined();
+    expect(session!.droppedRecords).toBe(1);
+  });
+
+  it("accepts legitimate numeric SQLite strings in a coherent OpenCode aggregate", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-numeric-string-aggregate.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentSessionAggregate(dbPath, {
+      input: "650",
+      output: "150",
+      reasoning: "25",
+      cacheRead: "90",
+      cacheWrite: "30",
+    });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens.total).toBe(945);
+    expect(session!.unattributedUsage?.total).toBe(260);
+    expect(session!.droppedRecords).toBeUndefined();
   });
 
   it("preserves a larger session aggregate as explicit unpriced residual usage", async () => {

@@ -14,7 +14,10 @@ a session-end hook and a statusline. (SPEC-0058; depth facts match
   `message.id` remain one observable response group. The complete usage record
   with the highest output count is retained (later record wins a tie), rather
   than fabricating a vector from independent bucket maxima; repeated
-  `tool_use.id` blocks count once.
+  `tool_use.id` blocks count once. A malformed duplicate cannot replace a
+  coherent valid snapshot. If no valid snapshot exists, valid token components
+  remain visible but the response stays tokens-only with an incomplete-record
+  caveat.
 - **Id-less usage fails closed.** Without `message.id`, repeated snapshots
   cannot be separated from distinct provider responses. Their tool evidence
   remains visible, but all id-less usage is reduced to one coherent
@@ -23,8 +26,9 @@ a session-end hook and a statusline. (SPEC-0058; depth facts match
   cache-tier pricing come straight from the transcript's usage records.
 - **Subagents counted.** Sessions spawned via the Agent tool are discovered
   under the parent transcript and rolled into its receipt and PR attribution.
-- **Waste lines.** Stuck tool loops, trivial spans, and context-thrash
-  detection run at full precision on per-turn data.
+- **Heuristic pattern flags.** Stuck tool loops, trivial spans, and
+  context-thrash detectors run on per-turn data. A flag is evidence to inspect,
+  not proof of avoidable work or savings.
 
 ## Where transcripts live
 

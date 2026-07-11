@@ -26,6 +26,8 @@ export interface SubagentRow {
   droppedRecords?: number;
   /** Child priced GPT-5.6 Codex usage whose trace omitted cache-write tokens. */
   unobservedCacheWriteTokens?: boolean;
+  /** Child priced cached usage whose applicable read/write rate is uncited. */
+  costLowerBoundCacheTier?: boolean;
   filePath: string;
 }
 
@@ -107,6 +109,7 @@ export async function rollupChildren(
       unreadable: false,
       ...(((session.droppedRecords ?? 0) > 0) ? { droppedRecords: session.droppedRecords } : {}),
       ...(model.unobservedCacheWriteTokens ? { unobservedCacheWriteTokens: true } : {}),
+      ...(model.costLowerBoundCacheTier ? { costLowerBoundCacheTier: true } : {}),
       filePath: childFile,
     });
   }

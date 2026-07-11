@@ -5,6 +5,7 @@ import type { AgentSource, TokenUsage } from "../parse/types.js";
 import { SOURCE_LABELS } from "../parse/types.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
 import { combinedPricedUsd } from "../receipt/model.js";
+import { combinedPricingCoverageOf, type PricingCoverage } from "../receipt/pricingCoverage.js";
 import {
   buildFullSessionReceiptWithCoverage,
   type FullSessionScope,
@@ -27,6 +28,7 @@ export interface SetupLatest {
   label: string;
   model: string | null;
   totalUsd: number | null;
+  pricingCoverage: PricingCoverage;
   totalTokens: TokenUsage;
   /** Observable parent-session tokens + readable-child tokens; unreadable children remain count-only. */
   combinedTotalTokens?: number;
@@ -134,7 +136,8 @@ export async function buildSetupReport(now: number = Date.now()): Promise<SetupR
           source: latestSession.source,
           label: SOURCE_LABELS[latestSession.source],
           model: latestSession.model ?? null,
-          totalUsd: latestReceipt.model.totalUsd !== null ? combinedPricedUsd(latestReceipt.model) : null,
+          totalUsd: combinedPricedUsd(latestReceipt.model),
+          pricingCoverage: combinedPricingCoverageOf(latestReceipt.model),
           totalTokens: latestReceipt.model.sessionTotalTokens,
           ...(latestReceipt.model.subagents
             ? {
@@ -194,6 +197,7 @@ export function setupReportToJson(report: SetupReport) {
           label: report.latest.label,
           model: report.latest.model,
           totalUsd: report.latest.totalUsd,
+          pricingCoverage: report.latest.pricingCoverage,
           totalTokens: usageJson(report.latest.totalTokens),
           parentUnpricedTokens: usageJson(report.latest.parentUnpricedTokens),
           combinedUnpricedTokens: usageJson(report.latest.combinedUnpricedTokens),

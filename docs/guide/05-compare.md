@@ -63,7 +63,11 @@ Add email format validation…'s standard-API floor is 1.9× Can you fix the fla
 
 The closing line is the whole point: the first observable floor is **1.9×** the second
 (`≥ $0.1767` vs `≥ $0.0945`). This is a ratio of cited floor arithmetic, not a ratio
-of invoices. Note the second receipt also surfaces a `⚠ Bash loop ×5`
+of invoices, and aireceipts emits it only when both parent-plus-subagent ledgers
+have full pricing coverage. If either side is partial, the closing line says the
+sessions are not directly comparable and lists each side's known `≥ $` subtotal
+plus exact known-unpriced tokens; it never gives an unsupported directional
+ratio. Note the second receipt also surfaces a `⚠ Bash loop ×5`
 flagged-pattern line — comparison shows where the detector found a repeated loop;
 it does not prove that the subtotal was avoidable savings.
 
@@ -83,4 +87,4 @@ See [Share and export](11-share-and-export.md) for themes and formats.
 ## Next
 
 - **[Aggregate the week](06-week.md)** — compare against a whole week, not one session.
-- **[Fix it next time](09-handoff.md)** — turn a waste line into a rule for your agent.
+- **[Fix it next time](09-handoff.md)** — turn a detector-flagged pattern into a rule for your agent.

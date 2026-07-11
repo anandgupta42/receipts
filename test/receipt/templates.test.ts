@@ -25,6 +25,7 @@ import { renderReceiptSvg } from "../../src/receipt/svg.js";
 import { previewModel } from "../../src/receipt/preview.js";
 import { main } from "../../src/cli/index.js";
 import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "../../src/receipt/branding.js";
+import { emptyUsage } from "../../src/parse/util.js";
 
 const PRICED = { source: "claude-code", path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
 const UNPRICED = { source: "claude-code", path: "test/fixtures/claude-code/unpriced-unknown-model.jsonl" };
@@ -139,17 +140,31 @@ describe("SPEC-0020 R3 — exact-wording honesty battery holds in every template
 
   it.each([...TEMPLATE_NAMES])("accepts the traced parent+subagent TOTAL on %s", async (template) => {
     const model = await modelFor(PRICED.source, PRICED.path);
-    model.subagents = { count: 1, pricedUsd: 0.03, tokensTotal: 100, unpricedCount: 0, unreadableCount: 0 };
+    model.subagents = {
+      count: 1,
+      pricedUsd: 0.03,
+      tokensTotal: 100,
+      unpricedTokens: emptyUsage(),
+      unpricedCount: 0,
+      unreadableCount: 0,
+    };
     model.priceDelta = null;
     expect(validateReceiptBlocks(buildReceiptView(model, template).blocks, model)).toEqual([]);
   });
 
   it.each([...TEMPLATE_NAMES])("accepts a qualified child floor caveat on an unpriced-parent %s receipt", async (template) => {
     const model = await modelFor(UNPRICED.source, UNPRICED.path);
-    model.subagents = { count: 1, pricedUsd: 0.03, tokensTotal: 100, unpricedCount: 0, unreadableCount: 0 };
+    model.subagents = {
+      count: 1,
+      pricedUsd: 0.03,
+      tokensTotal: 100,
+      unpricedTokens: emptyUsage(),
+      unpricedCount: 0,
+      unreadableCount: 0,
+    };
     model.caveats.push({
       kind: "subagents-priced-tokens-only",
-      text: "1 subagent priced (≥ $0.03) — shown as tokens above; the session itself is unpriced",
+      text: "1 subagent priced (≥ $0.03) — child floor shown separately; parent session unpriced",
     });
     expect(validateReceiptBlocks(buildReceiptView(model, template).blocks, model)).toEqual([]);
   });

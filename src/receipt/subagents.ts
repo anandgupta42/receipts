@@ -42,6 +42,7 @@ export function foldSubagentRows(rows: SubagentRow[]): SubagentAggregate | undef
   }
   let pricedUsd: number | null = null;
   let tokensTotal = 0;
+  let unpricedTokens = emptyUsage();
   let unpricedCount = 0;
   let unreadableCount = 0;
   for (const row of rows) {
@@ -50,6 +51,7 @@ export function foldSubagentRows(rows: SubagentRow[]): SubagentAggregate | undef
       continue;
     }
     tokensTotal += row.tokens.total;
+    unpricedTokens = addUsage(unpricedTokens, row.usd === null ? row.tokens : (row.unpricedTokens ?? emptyUsage()));
     if (row.usd !== null) {
       pricedUsd = (pricedUsd ?? 0) + row.usd;
       if ((row.unpricedTokens?.total ?? 0) > 0) {
@@ -59,7 +61,7 @@ export function foldSubagentRows(rows: SubagentRow[]): SubagentAggregate | undef
       unpricedCount += 1;
     }
   }
-  return { count: rows.length, pricedUsd, tokensTotal, unpricedCount, unreadableCount };
+  return { count: rows.length, pricedUsd, tokensTotal, unpricedTokens, unpricedCount, unreadableCount };
 }
 
 function plural(n: number): string {
@@ -69,9 +71,9 @@ function plural(n: number): string {
 /**
  * R2 — the floor caveats the aggregate adds: children the total could not
  * include are named, with dollars and tokens never blended into one number.
- * `parentPriced` selects the one-unit-per-receipt edge: on a tokens-only
- * receipt, priced child dollars can't join the drawn rows, so the caveat
- * carries them instead (traceable, never silent).
+ * `parentPriced` selects the mixed-coverage caveat: when the parent is
+ * unpriced, the child floor stays drawn separately and the caveat explains
+ * that split (traceable, never silent).
  */
 export function subagentCaveats(rows: SubagentRow[], agg: SubagentAggregate, parentPriced: boolean): CaveatFinding[] {
   const findings: CaveatFinding[] = [];
@@ -100,7 +102,7 @@ export function subagentCaveats(rows: SubagentRow[], agg: SubagentAggregate, par
     const pricedCount = rows.filter((r) => !r.unreadable && r.usd !== null).length;
     findings.push({
       kind: "subagents-priced-tokens-only",
-      text: `${formatInt(pricedCount)} subagent${plural(pricedCount)} priced (≥ $${formatUsdFloor(agg.pricedUsd)}) — shown as tokens above; the session itself is unpriced`,
+      text: `${formatInt(pricedCount)} subagent${plural(pricedCount)} priced (≥ $${formatUsdFloor(agg.pricedUsd)}) — child floor shown separately; parent session unpriced`,
     });
   }
   // SPEC-0044 B3 parity — a child whose transcript dropped malformed records
@@ -117,6 +119,13 @@ export function subagentCaveats(rows: SubagentRow[], agg: SubagentAggregate, par
     findings.push({
       kind: "unobserved-cache-write-tokens",
       text: `${formatInt(missingCacheWrites)} GPT-5.6 Codex subagent${plural(missingCacheWrites)} omitted cache-write tokens — floor excludes any write premium`,
+    });
+  }
+  const missingCacheRates = rows.filter((r) => r.costLowerBoundCacheTier).length;
+  if (missingCacheRates > 0) {
+    findings.push({
+      kind: "cost-lower-bound-cache-tier",
+      text: `${formatInt(missingCacheRates)} subagent${plural(missingCacheRates)} had observed cache tokens with no cited applicable rate — floor excludes them`,
     });
   }
   return findings;
@@ -136,15 +145,6 @@ function parentUnpricedTokens(model: ReceiptModel): TokenUsage {
     return model.sessionTotalTokens;
   }
   return model.unpricedTokens ?? emptyUsage();
-}
-
-function childUnpricedTokens(rows: SubagentRow[]): TokenUsage {
-  return rows.reduce((sum, row) => {
-    if (row.unreadable) {
-      return sum;
-    }
-    return addUsage(sum, row.usd === null ? row.tokens : (row.unpricedTokens ?? emptyUsage()));
-  }, emptyUsage());
 }
 
 async function attachSubagentRollupWithRows(
@@ -216,7 +216,7 @@ export async function buildFullSessionReceiptWithCoverage(
   const parentModel = await buildReceiptModel(session);
   const attached = await attachSubagentRollupWithRows(parentModel, session.filePath, deps);
   const parentUnpriced = parentUnpricedTokens(parentModel);
-  const combinedUnpriced = addUsage(parentUnpriced, childUnpricedTokens(attached.rows));
+  const combinedUnpriced = addUsage(parentUnpriced, attached.model.subagents?.unpricedTokens ?? emptyUsage());
   const hasChildren = attached.model.subagents !== undefined;
   const scope: FullSessionScope = hasChildren ? "parent-session-plus-readable-subagents" : "parent-session";
   return {

@@ -214,7 +214,7 @@ describe("SPEC-0059 R5 — PR comment section", () => {
     });
     expect(body).toContain("<details><summary>handoff — flagged pattern cost ≈ $0.41</summary>");
     expect(body).toContain("FLAGGED PATTERN COST.......................≈ $0.41");
-    expect(body).toContain("covers: 2 sessions · 18 turns · 2 waste lines");
+    expect(body).toContain("covers: 2 sessions · 18 turns · 2 flagged-pattern lines");
     // Sibling AFTER the full-receipts section.
     expect(body.indexOf("full receipts (1 session)")).toBeLessThan(body.indexOf("handoff — flagged pattern cost"));
   });
@@ -317,7 +317,7 @@ describe("SPEC-0059 R7 — JSON surface", () => {
 
 describe("SPEC-0059 — covers line wording", () => {
   it("pluralizes each fact independently", () => {
-    expect(prCoverageLine(1, 1, 1)).toBe("covers: 1 session · 1 turn · 1 waste line");
-    expect(prCoverageLine(2, 18, 2)).toBe("covers: 2 sessions · 18 turns · 2 waste lines");
+    expect(prCoverageLine(1, 1, 1)).toBe("covers: 1 session · 1 turn · 1 flagged-pattern line");
+    expect(prCoverageLine(2, 18, 2)).toBe("covers: 2 sessions · 18 turns · 2 flagged-pattern lines");
   });
 });

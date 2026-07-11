@@ -16,14 +16,19 @@ facts match `src/parse/opencode.ts`.)
   identity-incomplete messages stay tokens-only — never a guessed dollar (I2).
 - **Schema resilience.** Both opencode's current `session_message` schema and
   the legacy message/part rows are parsed; mixed-schema databases resolve per
-  session.
+  session. Null, string, negative, fractional, or unsafe message counters never
+  become priceable zeroes: valid sibling components remain tokens-only and the
+  receipt counts the malformed record. Numeric SQLite strings are accepted only
+  when they represent non-negative safe integers.
 - **Aggregate residuals never fabricate a vector.** A session aggregate adds a
   separate tokens-only `(unattributed usage)` bucket only when it is at least
   the itemized sum in every token component; a partial slice excludes that
   residual with a counted caveat. If aggregate and itemized vectors cross, the
   receipt keeps itemized totals and reports the positive aggregate-only
   components as conflicting/excluded evidence. They enter neither totals nor
-  dollars, and neither case creates a fake turn/model/tool.
+  dollars, and neither case creates a fake turn/model/tool. One malformed
+  aggregate field excludes that entire projection, so valid-looking sibling
+  fields cannot dominate or manufacture a residual.
 
 ## Where transcripts live
 
@@ -44,8 +49,9 @@ npx aireceipts-cli --list     # opencode sessions appear alongside other agents
 ## Integration
 
 - **Exact snippets:** `npx aireceipts-cli integrations opencode`.
-- No hook/statusline surface exists for opencode; the CLI and the PR command
-  are the integration points.
+- opencode has no native in-app hook/statusline API. The CLI and PR command are
+  the primary integration points; a terminal host such as tmux can poll
+  `aireceipts statusline --cwd <repo>` for the same local session data.
 
 ## Receipts on your PRs
 

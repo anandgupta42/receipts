@@ -61,7 +61,11 @@ legacy dollar scalars.
 | `sessionTotalTokens` | TokenUsage | Adapter-reported session totals (the only real number for Cursor). |
 | `pricingCoverage` | enum | Parent-session price coverage: `full`, `partial`, or `unpriced`. `partial` includes exact known unpriced usage, an uncited applicable cache rate, unobserved GPT-5.6 cache writes, or dropped transcript records. |
 | `unpricedTokens` | TokenUsage | Exact known parent-session tokens excluded from `totalUsd`. It is the whole observable token vector when the parent is unpriced and all zeroes when coverage is full. Unknown/unrecorded components are never invented; their caveats make `pricingCoverage` partial. |
-| `wasteLines` | array | Fired waste findings; see WasteLine. |
+| `unpricedTokensScope` | literal `parent-session` | Explicit scope of the adjacent parent unpriced-token vector. |
+| `combinedUnpricedTokens` | TokenUsage | Exact known parent plus readable-child tokens excluded from `combinedPricedUsd`; unreadable or unrecorded child usage is never guessed. |
+| `combinedUnpricedTokensScope` | literal `parent-session-plus-readable-subagents` | Explicit scope of `combinedUnpricedTokens`. |
+| `combinedPricingCoverage` | enum | Coverage of `combinedPricedUsd`: `full`, `partial`, or `unpriced`. Parent gaps, exact child unpriced usage, unreadable children, failed child discovery, dropped child records, and child cache-rate/write omissions make a priced combination `partial`. |
+| `wasteLines` | array | Legacy field name for detector-flagged heuristic patterns; a row is evidence to inspect, not proven waste or savings. See WasteLine. |
 | `caveats` | array | Confidence facts, never a ranking: `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier` \| `unobserved-cache-write-tokens` \| `unattributed-aggregate-usage` \| `dropped-transcript-records` \| `partial-priced-coverage` \| `subagents-unreadable` \| `subagents-unpriced` \| `subagents-priced-tokens-only` \| `subagents-dropped-records` \| `subagent-rollup-unavailable`) + `text`. Never changes the arithmetic itself. Empty when nothing extra is known. |
 | `budget` | array (optional) | Advisory budget lines (SPEC-0009); present only when `~/.aireceipts/budget.json` is configured. |
 | `priceDelta` | PriceDelta \| null | Cheapest-current-model arithmetic, or null in tokens-only mode. |
@@ -79,6 +83,8 @@ legacy dollar scalars.
 | `pricedUsd` | number \| null | Compatibility scalar containing the lower-bound sum over priced children; null when no child priced. |
 | `pricedCostEstimate` | CostEstimate \| null | Structured lower-bound semantics for `pricedUsd`, or null when no child priced. |
 | `tokensTotal` | number | Total tokens across readable children; unreadable children contribute nothing (counted, never guessed). |
+| `unpricedTokens` | TokenUsage | Exact known usage excluded from readable children's priced floors. |
+| `unpricedTokensScope` | literal `readable-subagents` | Explicit scope of the adjacent child unpriced-token vector. |
 | `unpricedCount` | number | Readable children with wholly or partially unpriced usage. |
 | `unreadableCount` | number | Children whose transcripts failed to parse — the rendered TOTAL is a floor. |
 
@@ -246,6 +252,10 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 | `toolCallCount` | number | (totals) Tool calls in the session. |
 | `pricingCoverage` | enum | Coverage of the parent-session `totalUsd`, with the same `full`/`partial`/`unpriced` semantics as a receipt. |
 | `unpricedTokens` | TokenUsage | Exact known parent-session usage excluded from the parent floor. |
+| `unpricedTokensScope` | literal `parent-session` | Explicit scope of the parent unpriced-token vector. |
+| `combinedUnpricedTokens` | TokenUsage | Exact known parent plus readable-child usage excluded from the combined floor. |
+| `combinedUnpricedTokensScope` | literal `parent-session-plus-readable-subagents` | Explicit scope of the combined unpriced-token vector. |
+| `combinedPricingCoverage` | enum | Coverage of the combined parent-plus-readable-child floor; any known or structural gap makes a priced result `partial`. |
 | `totalUsd` | number \| null | Parent-session lower-bound scalar, retained separately from the combined child rollup. |
 | `totalCostEstimate` | CostEstimate \| null | Structured semantics for the handoff's parent `totalUsd`. |
 | `totalUsdScope` | literal `parent-session` | Scope of `totalUsd` and `unpricedTokens`. |
@@ -266,7 +276,7 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 | `turns` | number | (coverage) Turn count the packet covers. |
 | `toolCalls` | number | (coverage) Tool-call count the packet covers. |
 | `compactions` | number | (coverage) Compaction events in the session. |
-| `aggregates` | array | `{class, distinctSessionCount}` — exactly the waste classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent). |
+| `aggregates` | array | `{class, distinctSessionCount}` — exactly the detector classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent). |
 | `class` | string | (aggregates) Waste class name. |
 | `distinctSessionCount` | number | (aggregates) Distinct recent sessions the class fired in. |
 
@@ -310,16 +320,28 @@ costBasis, totalUsdScope, subagentsPricedUsd, combinedPricedUsd, combinedCostKin
 combinedCostBasis, subagentsTokens, combinedTotalTokens, subagentCount,
 subagentUnpricedCount, subagentUnreadableCount, pricingCoverage,
 unpricedInputTokens, unpricedOutputTokens, unpricedCacheReadTokens,
-unpricedCacheCreationTokens, unpricedTotalTokens, unpricedTokensScope`
+unpricedCacheCreationTokens, unpricedTotalTokens, unpricedTokensScope,
+subagentsCostKind, subagentsCostBasis, subagentsUsdScope,
+subagentsUnpricedInputTokens, subagentsUnpricedOutputTokens,
+subagentsUnpricedCacheReadTokens, subagentsUnpricedCacheCreationTokens,
+subagentsUnpricedTotalTokens, subagentsUnpricedTokensScope,
+combinedUnpricedInputTokens, combinedUnpricedOutputTokens,
+combinedUnpricedCacheReadTokens, combinedUnpricedCacheCreationTokens,
+combinedUnpricedTotalTokens, combinedUnpricedTokensScope, combinedPricingCoverage`
 
 `costKind` is `lower-bound` and `costBasis` is
 `standard-api-list-price-equivalent` when `totalUsd` is populated; both cells are empty when unpriced.
-`totalUsdScope` is always `parent-session`. The appended combined columns expose the
-parent + readable-subagent floor and token total without changing the legacy scalar.
-`pricingCoverage` describes the parent as `full`, `partial`, or `unpriced`.
+`totalUsdScope` is always `parent-session`. `subagentsCostKind`/`subagentsCostBasis`
+label `subagentsPricedUsd`, and `subagentsUsdScope` is always `readable-subagents`;
+the two metadata cells are empty when no child priced. The combined columns expose
+the parent + readable-subagent floor and token total without changing the legacy scalar.
+`pricingCoverage` describes the parent as `full`, `partial`, or `unpriced`, while
+`combinedPricingCoverage` applies the same vocabulary to parent + readable children.
 The five appended unpriced-token columns are exact parent-session components;
-`unpricedTokensScope` is always `parent-session`. Unknown/unrecorded components
-stay absent from those counts and instead force partial coverage plus a caveat.
+`unpricedTokensScope` is always `parent-session`. The matching five-column child and
+combined vectors use `readable-subagents` and
+`parent-session-plus-readable-subagents` scopes. Unknown/unrecorded components stay
+absent from those counts and instead force partial coverage plus a caveat.
 
 `compare --csv` emits exactly two such rows plus a trailing `delta` column carrying the
 factual delta line on the first row (empty on the second) — `compare` accepts
@@ -364,8 +386,9 @@ export envelope.
 
 `week --json` (SPEC-0008's weekly digest) **is** implemented (`weekToJson` in
 `src/receipt/week.ts`) and emits a `{costSemantics, scope, window, priorWindow,
-sinceOverride, byProject, current, prior, delta, topWaste}` digest (waste lines
-are under `topWaste`). `scope.childSessionsIncluded` is `false`: week is
+sinceOverride, byProject, current, prior, delta, topWaste}` digest. Detector-
+pattern lines live under the legacy `topWaste` field name.
+`scope.childSessionsIncluded` is `false`: week is
 top-level-only. Each current/prior window has a `pricingCoverage` object with
 full, partial, cache-rate-partial, unpriced, and unreadable session counts plus
 the exact known `unpricedTokenTotal`. `costSemantics` labels every non-null

@@ -111,17 +111,36 @@ describe("R2: --csv=session", () => {
 
   it("exports parent, subagent, and combined floors as distinct scoped columns", async () => {
     const model = await modelFor("claude-code", "claude-code/clean-multi-tool-2-models.jsonl");
-    model.subagents = { count: 2, pricedUsd: 0.03, tokensTotal: 500, unpricedCount: 1, unreadableCount: 1 };
+    model.subagents = {
+      count: 2,
+      pricedUsd: 0.03,
+      tokensTotal: 500,
+      unpricedTokens: { input: 40, output: 5, cacheRead: 100, cacheCreation: 2, total: 147 },
+      unpricedCount: 1,
+      unreadableCount: 1,
+    };
     const [header, data] = parseCsv(toSessionCsv(model));
     expect(Number(data[header.indexOf("subagentsPricedUsd")])).toBeCloseTo(0.03, 12);
     expect(Number(data[header.indexOf("combinedPricedUsd")])).toBeCloseTo((model.totalUsd as number) + 0.03, 12);
     expect(data[header.indexOf("combinedCostKind")]).toBe("lower-bound");
     expect(data[header.indexOf("combinedCostBasis")]).toBe(STANDARD_API_LIST_PRICE_EQUIVALENT);
+    expect(data[header.indexOf("subagentsCostKind")]).toBe("lower-bound");
+    expect(data[header.indexOf("subagentsCostBasis")]).toBe(STANDARD_API_LIST_PRICE_EQUIVALENT);
+    expect(data[header.indexOf("subagentsUsdScope")]).toBe("readable-subagents");
     expect(data[header.indexOf("subagentsTokens")]).toBe("500");
     expect(data[header.indexOf("combinedTotalTokens")]).toBe(String(model.totalTokens.total + 500));
     expect(data[header.indexOf("subagentCount")]).toBe("2");
     expect(data[header.indexOf("subagentUnpricedCount")]).toBe("1");
     expect(data[header.indexOf("subagentUnreadableCount")]).toBe("1");
+    expect(data[header.indexOf("subagentsUnpricedInputTokens")]).toBe("40");
+    expect(data[header.indexOf("subagentsUnpricedOutputTokens")]).toBe("5");
+    expect(data[header.indexOf("subagentsUnpricedCacheReadTokens")]).toBe("100");
+    expect(data[header.indexOf("subagentsUnpricedCacheCreationTokens")]).toBe("2");
+    expect(data[header.indexOf("subagentsUnpricedTotalTokens")]).toBe("147");
+    expect(data[header.indexOf("subagentsUnpricedTokensScope")]).toBe("readable-subagents");
+    expect(data[header.indexOf("combinedUnpricedTotalTokens")]).toBe("147");
+    expect(data[header.indexOf("combinedUnpricedTokensScope")]).toBe("parent-session-plus-readable-subagents");
+    expect(data[header.indexOf("combinedPricingCoverage")]).toBe("partial");
   });
 
   it("an unpriced session leaves the $ cell empty but populates token cells (I2)", () => {
@@ -133,10 +152,26 @@ describe("R2: --csv=session", () => {
     expect(data[header.indexOf("costBasis")]).toBe("");
     expect(data[header.indexOf("totalUsdScope")]).toBe("parent-session");
     expect(data[header.indexOf("combinedPricedUsd")]).toBe("");
+    expect(data[header.indexOf("subagentsCostKind")]).toBe("");
+    expect(data[header.indexOf("subagentsCostBasis")]).toBe("");
+    expect(data[header.indexOf("subagentsUsdScope")]).toBe("readable-subagents");
     expect(data[header.indexOf("pricingCoverage")]).toBe("unpriced");
     expect(data[header.indexOf("unpricedInputTokens")]).toBe("1900");
     expect(data[header.indexOf("unpricedOutputTokens")]).toBe("268");
     expect(data[header.indexOf("unpricedTotalTokens")]).toBe("2168");
+    expect(data[header.indexOf("subagentsUnpricedTotalTokens")]).toBe("0");
+    expect(data[header.indexOf("combinedUnpricedTotalTokens")]).toBe("2168");
+    expect(data[header.indexOf("combinedPricingCoverage")]).toBe("unpriced");
+  });
+
+  it("drops an impossible stale parent dollar from an explicitly unpriceable row", () => {
+    const model = unpricedModel();
+    model.totalUsd = 9.99;
+    const [header, data] = parseCsv(toSessionCsv(model));
+    expect(data[header.indexOf("totalUsd")]).toBe("");
+    expect(data[header.indexOf("costKind")]).toBe("");
+    expect(data[header.indexOf("combinedPricedUsd")]).toBe("");
+    expect(data[header.indexOf("combinedPricingCoverage")]).toBe("unpriced");
   });
 
   it("appends exact parent unpriced-token components and partial coverage", async () => {
@@ -144,7 +179,7 @@ describe("R2: --csv=session", () => {
     const [header, data] = parseCsv(toSessionCsv(model));
     const unpriced = model.unpricedTokens;
     expect(unpriced?.total).toBeGreaterThan(0);
-    expect(header.slice(-7)).toEqual([
+    expect(header.slice(header.indexOf("pricingCoverage"), header.indexOf("unpricedTokensScope") + 1)).toEqual([
       "pricingCoverage",
       "unpricedInputTokens",
       "unpricedOutputTokens",

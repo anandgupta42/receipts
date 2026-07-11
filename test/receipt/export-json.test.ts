@@ -78,7 +78,22 @@ describe("R1: --json validates against the current schema", () => {
     expect(json.combinedTotalTokens).toBe(2168);
     expect(json.pricingCoverage).toBe("unpriced");
     expect(json.unpricedTokens).toMatchObject({ input: 1900, output: 268, total: 2168 });
+    expect(json.unpricedTokensScope).toBe("parent-session");
+    expect(json.combinedUnpricedTokens).toMatchObject({ input: 1900, output: 268, total: 2168 });
+    expect(json.combinedUnpricedTokensScope).toBe("parent-session-plus-readable-subagents");
+    expect(json.combinedPricingCoverage).toBe("unpriced");
     expect(json.toolRows[0]?.costEstimate).toBeNull();
+    expect(receiptJsonSchema.safeParse(json).success).toBe(true);
+  });
+
+  it("drops an impossible stale parent dollar from an explicitly unpriceable export", () => {
+    const model = unpricedModel();
+    model.totalUsd = 9.99;
+    const json = toJsonModel(model);
+    expect(json.totalUsd).toBeNull();
+    expect(json.totalCostEstimate).toBeNull();
+    expect(json.combinedPricedUsd).toBeNull();
+    expect(json.combinedPricingCoverage).toBe("unpriced");
     expect(receiptJsonSchema.safeParse(json).success).toBe(true);
   });
 
@@ -89,11 +104,15 @@ describe("R1: --json validates against the current schema", () => {
     const keys = Object.keys(receipt);
     const tokenStart = keys.indexOf("totalTokens");
 
-    expect(keys.slice(tokenStart, tokenStart + 5)).toEqual([
+    expect(keys.slice(tokenStart, tokenStart + 9)).toEqual([
       "totalTokens",
       "sessionTotalTokens",
       "pricingCoverage",
       "unpricedTokens",
+      "unpricedTokensScope",
+      "combinedUnpricedTokens",
+      "combinedUnpricedTokensScope",
+      "combinedPricingCoverage",
       "wasteLines",
     ]);
     expect(receipt.pricingCoverage).toBe("partial");
@@ -129,7 +148,14 @@ describe("R1: --json validates against the current schema", () => {
       usd: 0.02,
       confidence: "low",
     };
-    model.subagents = { count: 1, pricedUsd: 0.03, tokensTotal: 100, unpricedCount: 0, unreadableCount: 0 };
+    model.subagents = {
+      count: 1,
+      pricedUsd: 0.03,
+      tokensTotal: 100,
+      unpricedTokens: { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 },
+      unpricedCount: 0,
+      unreadableCount: 0,
+    };
     model.wasteLines = [
       {
         kind: "stuck-loop",
@@ -171,6 +197,33 @@ describe("R1: --json validates against the current schema", () => {
     expect(json.costShape.preEdit.postEditCostEstimate).toEqual(estimate(0.24));
     expect(json.sameFileReReads?.costEstimate).toEqual(estimate(0.02));
     expect(json.subagents?.pricedCostEstimate).toEqual(estimate(0.03));
+    expect(receiptJsonSchema.safeParse(json).success).toBe(true);
+  });
+
+  it("exports exact parent, child, and combined known-unpriced vectors with explicit scopes", async () => {
+    const model = await modelFor("claude-code", "claude-code/mixed-priced-coverage.jsonl");
+    model.subagents = {
+      count: 2,
+      pricedUsd: 0.03,
+      tokensTotal: 500,
+      unpricedTokens: { input: 40, output: 5, cacheRead: 100, cacheCreation: 2, total: 147 },
+      unpricedCount: 1,
+      unreadableCount: 1,
+    };
+
+    const json = toJsonModel(model);
+    expect(json.unpricedTokensScope).toBe("parent-session");
+    expect(json.subagents?.unpricedTokens).toMatchObject({ input: 40, output: 5, cacheRead: 100, total: 147 });
+    expect(json.subagents?.unpricedTokensScope).toBe("readable-subagents");
+    expect(json.combinedUnpricedTokens).toMatchObject({
+      input: json.unpricedTokens.input + 40,
+      output: json.unpricedTokens.output + 5,
+      cacheRead: json.unpricedTokens.cacheRead + 100,
+      cacheCreation: json.unpricedTokens.cacheCreation + 2,
+      total: json.unpricedTokens.total + 147,
+    });
+    expect(json.combinedUnpricedTokensScope).toBe("parent-session-plus-readable-subagents");
+    expect(json.combinedPricingCoverage).toBe("partial");
     expect(receiptJsonSchema.safeParse(json).success).toBe(true);
   });
 

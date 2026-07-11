@@ -55,7 +55,7 @@ Code itself, the native stdin hook above stays the richer, recommended setup.
 ## What the line shows
 
 The default line is the segment set `brand,model,cost,burn,tokens,context,waste,quota5h`
-— the model, cost, burn rate, tokens, context fullness, a waste flag, and your
+— the model, observable floor, floor rate, tokens, context fullness, a heuristic-pattern flag, and your
 rate-limit window:
 
 - `Opus` (after the brand) is the model — in stdin mode, Claude Code's own current
@@ -70,7 +70,8 @@ rate-limit window:
 - `5h N% ↺Xh Ym` is your official 5-hour rate-limit usage plus the time until it
   resets — subscribers only, on by default, and dropped when Claude Code doesn't
   provide it.
-- A waste flag (`⚠ Bash loop ×5`) appears only when a detector actually fired.
+- A heuristic-pattern flag (`⚠ Bash loop ×5`) appears only when a detector
+  fired; it is evidence to inspect, not proven waste or savings.
 - Outside a piped call, or when the payload carries no session, it falls back to
   the newest session on disk, and prints a neutral placeholder rather than an
   error if there are none — so your statusline layout never breaks.

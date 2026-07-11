@@ -64,7 +64,10 @@ aireceipts --json "email format"
 (Truncated after the first model — the full object continues with every model, a
 per-tool breakdown, and totals.) Every non-null legacy dollar scalar has an
 adjacent `CostEstimate` with `kind: "lower-bound"`, basis
-`standard-api-list-price-equivalent`, and the raw `minUsd`. `sessionId` is the transcript's absolute path.
+`standard-api-list-price-equivalent`, and a four-decimal downward-floored
+`minUsd`; the legacy scalar retains raw arithmetic precision. Parent, readable-child,
+and combined known-unpriced token vectors carry explicit scopes. `sessionId` is
+the transcript's absolute path.
 The complete, field-by-field schema — kept in lockstep with the code by a parity
 test — is [docs/json-schema.md](../json-schema.md).
 
@@ -75,8 +78,8 @@ aireceipts --csv "email format"
 ```
 
 ```
-schemaVersion,sessionId,agent,title,startedAt,durationMs,primaryModel,totalUsd,inputTokens,outputTokens,cacheReadTokens,cacheCreationTokens,totalTokens,costKind,costBasis
-2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Add email format validation to the signup form and add a unit test for it. The signup form is in src/components/SignupF…,2026-06-18T09:30:30.000Z,630000,claude-opus-4-8,0.17670000000000002,19680,897,124200,2100,146877,lower-bound,standard-api-list-price-equivalent
+schemaVersion,sessionId,agent,title,startedAt,durationMs,primaryModel,totalUsd,inputTokens,outputTokens,cacheReadTokens,cacheCreationTokens,totalTokens,costKind,costBasis,totalUsdScope,subagentsPricedUsd,combinedPricedUsd,combinedCostKind,combinedCostBasis,subagentsTokens,combinedTotalTokens,subagentCount,subagentUnpricedCount,subagentUnreadableCount,pricingCoverage,unpricedInputTokens,unpricedOutputTokens,unpricedCacheReadTokens,unpricedCacheCreationTokens,unpricedTotalTokens,unpricedTokensScope,subagentsCostKind,subagentsCostBasis,subagentsUsdScope,subagentsUnpricedInputTokens,subagentsUnpricedOutputTokens,subagentsUnpricedCacheReadTokens,subagentsUnpricedCacheCreationTokens,subagentsUnpricedTotalTokens,subagentsUnpricedTokensScope,combinedUnpricedInputTokens,combinedUnpricedOutputTokens,combinedUnpricedCacheReadTokens,combinedUnpricedCacheCreationTokens,combinedUnpricedTotalTokens,combinedUnpricedTokensScope,combinedPricingCoverage
+2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Add email format validation to the signup form and add a unit test for it. The signup form is in src/components/SignupF…,2026-06-18T09:30:30.000Z,630000,claude-opus-4-8,0.17670000000000002,19680,897,124200,2100,146877,lower-bound,standard-api-list-price-equivalent,parent-session,,0.17670000000000002,lower-bound,standard-api-list-price-equivalent,0,146877,0,0,0,full,0,0,0,0,0,parent-session,,,readable-subagents,0,0,0,0,0,readable-subagents,0,0,0,0,0,parent-session-plus-readable-subagents,full
 ```
 
 `--csv=tool` gives one row per tool instead:
@@ -86,18 +89,20 @@ aireceipts --csv=tool "email format"
 ```
 
 ```
-schemaVersion,sessionId,agent,tool,usd,inputTokens,outputTokens,cacheReadTokens,cacheCreationTokens,totalTokens,callCount,costKind,costBasis
-2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Bash,0.05177,6230,134,46000,0,52364,3,lower-bound,standard-api-list-price-equivalent
-2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Edit,0.045575000000000004,4800,159,35200,0,40159,2,lower-bound,standard-api-list-price-equivalent
-2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,(thinking/reply),0.031004999999999998,3650,277,26600,0,30527,2,lower-bound,standard-api-list-price-equivalent
-2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Write,0.02905,3200,265,16400,700,20565,2,lower-bound,standard-api-list-price-equivalent
-2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Read,0.019299999999999998,1800,62,0,1400,3262,1,lower-bound,standard-api-list-price-equivalent
+schemaVersion,sessionId,agent,tool,usd,inputTokens,outputTokens,cacheReadTokens,cacheCreationTokens,totalTokens,callCount,costKind,costBasis,costScope,pricingCoverage,pricingCoverageLimitation
+2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Bash,0.05177,6230,134,46000,0,52364,3,lower-bound,standard-api-list-price-equivalent,parent-session-tool,full,
+2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Edit,0.045575000000000004,4800,159,35200,0,40159,2,lower-bound,standard-api-list-price-equivalent,parent-session-tool,full,
+2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,(thinking/reply),0.031004999999999998,3650,277,26600,0,30527,2,lower-bound,standard-api-list-price-equivalent,parent-session-tool,full,
+2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Write,0.02905,3200,265,16400,700,20565,2,lower-bound,standard-api-list-price-equivalent,parent-session-tool,full,
+2,/Users/you/.claude/projects/-Users-dev-signup-form/sess-signup-a1b2c3.jsonl,claude-code,Read,0.019299999999999998,1800,62,0,1400,3262,1,lower-bound,standard-api-list-price-equivalent,parent-session-tool,full,
 ```
 
-CSV carries full floating-point precision (`0.05177`); `costKind` and `costBasis`
-say that the raw scalar is a lower bound. Downstream tools choose their own
-display rounding. Budget advisory lines never ride along in `--csv` output —
-it's a clean data contract.
+CSV carries full floating-point precision (`0.05177`); the parent, subagent, and
+combined cost metadata say which raw scalars are lower bounds. Scoped parent,
+readable-child, and combined unpriced-token columns keep partial coverage visible;
+`combinedPricingCoverage` summarizes the combined floor. Downstream tools choose
+their own display rounding. Budget advisory lines never ride along in `--csv`
+output — it's a clean data contract.
 
 ## As a PR comment (`pr`)
 

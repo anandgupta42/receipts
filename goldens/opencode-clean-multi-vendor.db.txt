@@ -13,8 +13,9 @@ read...........................≥ $0.0030  (1 call)
 
 caveat: some observed cache tokens have no cited applicable rate — floor excludes them
 --------------------------------------------------
-TOTAL....................................≥ $0.0096
+KNOWN PRICED SUBTOTAL....................≥ $0.0096
 standard API-equivalent floor; not an invoice
+partial pricing coverage; invoice total unknown
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                
          github.com/anandgupta42/receipts         

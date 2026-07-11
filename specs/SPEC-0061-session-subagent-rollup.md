@@ -40,11 +40,11 @@ golden-gated). Fixes issue #154.
   analogous `unpriced` caveat when a readable child has no price row), mirroring
   SPEC-0060's atom-counting semantics. A child whose transcript dropped malformed
   records adds a `dropped-records` floor caveat (SPEC-0044/B3 parity). Mixed pricing
-  never blends dollars and tokens into one number. **One unit per receipt** (the
-  existing datavis rule generalized): an unpriced parent renders the whole receipt
-  tokens-only — priced child dollars never appear as drawn rows there; instead a
-  caveat states them (`N subagents priced ($X) — shown as tokens above`), and `--json`
-  carries `pricedUsd` regardless, so the spend stays traceable, never silent.
+  never blends dollars and tokens into one number: if the parent is unpriced but a
+  readable child prices, the child `≥ $` row remains visible and the tail renders a
+  `KNOWN PRICED SUBTOTAL` separately from exact `KNOWN UNPRICED TOKENS`. The caveat
+  names why the split exists, and `--json` carries the same priced and unpriced
+  components, so neither side disappears or poses as an invoice total.
 - **R3 — Statusline includes children.** The SPEC-0007 one-liner's `$` and token
   segments cover parent + children (same aggregate as R1; tokens always include
   children, `$` covers the priced subset per I2). Format is unchanged — no new segment.
@@ -133,7 +133,7 @@ its own terms.
 | R1 svg parity | children fixture rendered via `--svg` | row present in SVG; zero-children SVG goldens byte-identical |
 | R2 unreadable floor | 1 readable + 1 unreadable child | caveat line, floor `TOTAL`, count includes both |
 | R2 mixed pricing | 1 priced + 1 readable-unpriced child | row shows priced `$` sum; caveat states the unpriced child's tokens separately — no blended number |
-| R2 unpriced parent + priced children | tokens-only parent, children priced | whole receipt tokens-only (one unit per receipt); caveat carries the child `$`; `--json` keeps `pricedUsd` |
+| R2 unpriced parent + priced children | tokens-only parent, children priced | child `≥ $` row + `KNOWN PRICED SUBTOTAL`; exact parent/child unpriced tokens on a separate row; `--json` keeps both ledgers |
 | R2 dropped records | child with `droppedRecords > 0` | `subagents-dropped-records` floor caveat renders |
 | R1 delta suppression | priced parent + priced children, delta available | no `same tokens on` line renders; `--json` keeps `priceDelta` |
 | R3 statusline totals | parent ($0.18) + children ($9.85) | one-liner `$` = combined reconciled total; tokens combined |
@@ -201,3 +201,17 @@ and TOTAL round down independently so each `≥` claim is true. A GPT-5.6 Codex
 child also propagates `unobserved-cache-write-tokens` into the parent receipt and
 PR confidence summary; the combined floor explicitly excludes any unpersisted
 cache-write premium.
+
+## 2026-07-10 mixed-coverage surface amendment
+
+Supersedes the former tokens-only-parent display rule. Every human session
+surface preserves a readable child's observable Standard-API floor even when
+the parent has no matching price row. Full/mini/statusline/handoff/setup output
+labels the known priced subtotal and the exact known-unpriced parent + readable-
+child tokens separately, with partial coverage explicit; no line calls the
+subtotal an invoice total. Benchmark sends the same distinction only as coarse
+allowlisted bucket + coverage enum. `compare` computes a dollar ratio only when
+both combined parent/child ledgers have full coverage; a partial side instead
+lists its known `≥ $` subtotal and exact known-unpriced tokens without a
+directional ratio. Unreadable children and failed rollup discovery keep coverage
+partial rather than silently restoring comparability.

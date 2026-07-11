@@ -13,8 +13,10 @@ Bash...........................2,160 tok  (1 call)
 
 caveat: 2 of 3 usage turns include unpriced tokens — TOTAL excludes those tokens
 --------------------------------------------------
-TOTAL....................................≥ $0.0071
+KNOWN PRICED SUBTOTAL....................≥ $0.0071
+KNOWN UNPRICED TOKENS....................4,495 tok
 standard API-equivalent floor; not an invoice
+partial pricing coverage; invoice total unknown
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                
          github.com/anandgupta42/receipts         

@@ -45,15 +45,20 @@ export function renderSetupReport(report: SetupReport, noSessionMessage?: string
   lines.push("Latest session");
   lines.push(`  ${row("Agent", report.latest.label)}`);
   lines.push(`  ${row("Model", report.latest.model ?? "unknown")}`);
-  const latestTotalLabel = report.latest.subagentCount !== undefined
-    ? `Total (incl. ${formatInt(report.latest.subagentCount)} subagents)`
-    : "Total";
+  const latestTotalLabel = report.latest.pricingCoverage === "partial"
+    ? report.latest.subagentCount !== undefined
+      ? `Known priced subtotal (incl. ${formatInt(report.latest.subagentCount)} subagents)`
+      : "Known priced subtotal"
+    : report.latest.subagentCount !== undefined
+      ? `Total (incl. ${formatInt(report.latest.subagentCount)} subagents)`
+      : "Total";
   lines.push(
     `  ${row(
       latestTotalLabel,
       costOrTokens(report.latest.totalUsd, report.latest.combinedTotalTokens ?? report.latest.totalTokens.total),
     )}`,
   );
+  lines.push(`  ${row("Pricing coverage", report.latest.pricingCoverage)}`);
   lines.push(`  ${row("Cost scope", scopeLabel(report.latest.costScope))}`);
   lines.push(`  ${row("Token scope", scopeLabel(report.latest.tokenScope))}`);
   lines.push(`  ${row("Parent unpriced tokens", `${formatInt(report.latest.parentUnpricedTokens.total)} tok`)}`);
@@ -71,7 +76,7 @@ export function renderSetupReport(report: SetupReport, noSessionMessage?: string
       )}`,
     );
   }
-  lines.push(`  ${row("Waste lines", String(report.latest.wasteLineCount))}`);
+  lines.push(`  ${row("Flagged patterns", String(report.latest.wasteLineCount))}`);
 
   if (report.week) {
     lines.push("");

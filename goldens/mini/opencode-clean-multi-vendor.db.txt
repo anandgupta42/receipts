@@ -1,6 +1,6 @@
 aireceipts · session receipt
 opencode · claude-haiku-4-5 · 50s
-total  ≥ $0.0096
+total  known priced ≥ $0.0096 · coverage partial
 top    bash · ≥ $0.0066 (1 call)
 no flagged pattern detected
 run  aireceipts  for the full receipt

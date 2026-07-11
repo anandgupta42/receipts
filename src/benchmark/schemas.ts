@@ -28,11 +28,16 @@ export type ModelFamilyValue = (typeof MODEL_FAMILY_VALUES)[number];
 export const COST_PER_TURN_BUCKET_VALUES = ["unpriced", "<$0.01", "$0.01-$0.05", "$0.05-$0.25", "$0.25-$1", ">$1"] as const;
 export type CostPerTurnBucketValue = (typeof COST_PER_TURN_BUCKET_VALUES)[number];
 
+/** Coverage of the observable Standard-API floor; enum-only, never a raw token or dollar amount. */
+export const PRICING_COVERAGE_VALUES = ["full", "partial", "unpriced"] as const;
+export type PricingCoverageValue = (typeof PRICING_COVERAGE_VALUES)[number];
+
 export const benchmarkRunPropertiesSchema = z
   .object({
     agentType: z.enum(BENCHMARK_AGENT_TYPE_VALUES),
     modelFamily: z.enum(MODEL_FAMILY_VALUES),
     costPerTurnBucket: z.enum(COST_PER_TURN_BUCKET_VALUES),
+    pricingCoverage: z.enum(PRICING_COVERAGE_VALUES),
     hasStuckLoopWaste: z.boolean(),
     hasTrivialSpanWaste: z.boolean(),
   })

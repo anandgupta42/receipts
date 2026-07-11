@@ -372,12 +372,14 @@ same tokens on claude-haiku-4-5..........≥ $0.0392
 <p>A few lines appear only when they have something to say:</p>
 
 <ul>
-  <li>a <strong>pre-edit line</strong> — <code>pre-edit: 11% of cost (1/10 turns)</code> — the share of the session's cost spent <em>before the first named edit-tool call</em>, and how many turns that covered. It's a shape fact, not a verdict: a hard bug can deserve a high share, and a routine edit usually doesn't — a share that surprises you is worth a look;</li>
-  <li>a <strong>stuck-loop waste line</strong> names where to look — <code>at turns 1-5</code> — so you can jump straight to the loop in your own transcript;</li>
+  <li>a <strong>pre-edit line</strong> — <code>pre-edit: 11% of priced floor (1/10 turns)</code> — the share of the session's observable priced floor <em>before the first named edit-tool call</em>, and how many turns that covered. It's a shape fact, not a verdict: a hard bug can deserve a high share, and a routine edit usually doesn't — a share that surprises you is worth a look;</li>
+  <li>a <strong>stuck-loop pattern line</strong> names where to look — <code>at turns 1-5</code> — so you can jump straight to the loop in your own transcript;</li>
   <li>a <strong>coverage caveat</strong> — <code>caveat: 2 of 3 usage turns include unpriced tokens — TOTAL excludes those tokens</code> — whenever a session mixed a priced model with one that has no cited price row, so a partial TOTAL never poses as a complete one;</li>
   <li>an <strong>unattributed-usage caveat</strong> — Claude id-less response snapshots, Codex request streams that fail reconciliation, and componentwise-dominating opencode session aggregates can expose tokens without a trustworthy request/model join. They remain tokens-only instead of being assigned a fake dollar. A partial turn slice excludes session-level residuals; crossed opencode aggregate/itemized vectors keep the itemized total and report the positive conflict as excluded evidence;</li>
   <li>time-integrity caveats (inconsistent timestamps, skipped records) as before.</li>
 </ul>
+
+<p>If the parent session has no matching price row but a readable subagent does, aireceipts does not throw away either fact. The child keeps its <code>SUBAGENTS (N) ≥ $X</code> row, while the tail shows <code>KNOWN PRICED SUBTOTAL ≥ $X</code> and <code>KNOWN UNPRICED TOKENS N tok</code> on separate lines, followed by <code>partial pricing coverage; invoice total unknown</code>. The token line is the exact observable usage excluded from the dollar subtotal; unreadable or missing transcripts remain a separate unknown caveat.</p>
 
 <h2 id="the-details-section">The <code>--details</code> section</h2>
 

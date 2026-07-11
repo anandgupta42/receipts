@@ -302,9 +302,13 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
             }
             cumulativeBaseline = subtractUsage(total, reportedDelta);
           } else {
-            // A baseline-only first snapshot establishes no local request. It
-            // is safe to exclude it and price only later proven deltas.
-            cumulativeBaseline = total;
+            // A non-zero first total without a non-zero local delta is
+            // ambiguous: it may be an inherited baseline, or it may be the
+            // root rollout's first request. Never infer which. Fail the whole
+            // request stream closed and retain the final cumulative envelope
+            // once as unattributed usage.
+            requestEvidenceValid = false;
+            cumulativeBaseline = emptyUsage();
           }
         }
         cumulativeUsage = total;

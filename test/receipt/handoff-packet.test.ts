@@ -56,7 +56,7 @@ describe("SPEC-0042 R1 — state header", () => {
       "  at turns 2-6",
       "  → change or stop after two identical failures",
       "",
-      "covers: 6 turns · 5 tool calls · 2 compactions · 1 waste line",
+      "covers: 6 turns · 5 tool calls · 2 compactions · 1 flagged-pattern line",
     ]);
   });
 
@@ -64,13 +64,35 @@ describe("SPEC-0042 R1 — state header", () => {
     const out = renderHandoff(model({ modelMix: [] }), [], { ...counts, compactions: 0 });
     expect(out).not.toContain("claude-opus-4-8");
     expect(out).not.toContain("compactions:");
-    expect(out).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
+    expect(out).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 flagged-pattern line");
   });
 
   it("shows tokens, never `$`, when the session is unpriced (I2)", () => {
     const out = renderHandoff(model({ totalUsd: null, unpriceable: true }), [], counts);
     expect(out).toContain("total 9,000 tok · 6 turns · 5 tool calls");
     expect(out).not.toContain("total $");
+  });
+
+  it("separates a priced-child floor from the unpriced parent and marks partial coverage", () => {
+    const out = renderHandoff(
+      model({
+        totalUsd: null,
+        subagents: {
+          count: 1,
+          pricedUsd: 0.03,
+          tokensTotal: 500,
+          unpricedTokens: usage(0),
+          unpricedCount: 0,
+          unreadableCount: 0,
+        },
+      }),
+      [],
+      counts,
+    );
+    expect(out).toContain(
+      "known priced subtotal ≥ $0.03 · known unpriced 9,000 tok · 6 parent turns · 5 parent tool calls · 1 subagent",
+    );
+    expect(out).toContain("1 parent flagged-pattern line · pricing coverage partial");
   });
 });
 
@@ -132,6 +154,10 @@ describe("SPEC-0042 R3/R4 — machine-readable packet", () => {
       "totals",
       "pricingCoverage",
       "unpricedTokens",
+      "unpricedTokensScope",
+      "combinedUnpricedTokens",
+      "combinedUnpricedTokensScope",
+      "combinedPricingCoverage",
       "totalUsd",
       "totalCostEstimate",
       "totalUsdScope",
@@ -153,12 +179,25 @@ describe("SPEC-0042 R3/R4 — machine-readable packet", () => {
   it("exports parent and combined pricing as separate scoped fields", () => {
     const withChildren = model({
       unpricedTokens: usage(250),
-      subagents: { count: 2, pricedUsd: 0.03, tokensTotal: 500, unpricedCount: 1, unreadableCount: 1 },
+      subagents: {
+        count: 2,
+        pricedUsd: 0.03,
+        tokensTotal: 500,
+        unpricedTokens: usage(75),
+        unpricedCount: 1,
+        unreadableCount: 1,
+      },
     });
     const json = toHandoffJson(withChildren, [], 3, counts, aggregates);
 
     expect(json.pricingCoverage).toBe("partial");
     expect(json.unpricedTokens.total).toBe(250);
+    expect(json.unpricedTokensScope).toBe("parent-session");
+    expect(json.subagents?.unpricedTokens.total).toBe(75);
+    expect(json.subagents?.unpricedTokensScope).toBe("readable-subagents");
+    expect(json.combinedUnpricedTokens.total).toBe(325);
+    expect(json.combinedUnpricedTokensScope).toBe("parent-session-plus-readable-subagents");
+    expect(json.combinedPricingCoverage).toBe("partial");
     expect(json.totalUsd).toBe(0.09);
     expect(json.totalCostEstimate).toMatchObject({ minUsd: 0.09 });
     expect(json.totalUsdScope).toBe("parent-session");

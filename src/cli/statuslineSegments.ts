@@ -199,18 +199,31 @@ const SEGMENTS: Record<SegmentName, (ctx: SegmentContext) => string | null> = {
     ctx.inputMode === "stdin_payload"
       ? (payloadModelName(ctx.payload) ?? cleanModelName(ctx.summary.model))
       : cleanModelName(ctx.summary.model),
-  cost: (ctx) =>
-    !ctx.summary.unpriceable && ctx.summary.totalUsd !== null ? formatUsdLowerBoundCompact(ctx.summary.totalUsd) : null,
+  cost: (ctx) => {
+    const { totalUsd, pricingCoverage, knownUnpricedTokens } = ctx.summary;
+    if (totalUsd === null) {
+      return null;
+    }
+    const floor = formatUsdLowerBoundCompact(totalUsd);
+    if (pricingCoverage !== "partial") {
+      return floor;
+    }
+    return knownUnpricedTokens > 0
+      ? `${floor} subtotal (${formatShortTokens(knownUnpricedTokens)} known unpriced; partial)`
+      : `${floor} subtotal (coverage partial)`;
+  },
   tokens: (ctx) => formatShortTokens(ctx.summary.totalTokens),
   // R2 — Claude Code's pre-calculated context-window fullness; omitted when absent (I2/I3).
   context: (ctx) => {
     const p = contextPct(ctx.payload);
     return p === null ? null : `ctx ${Math.round(p)}%`;
   },
-  // R3 — session-average burn rate from aireceipts' OWN priced ledger (I2 — no fabricated $/hr).
+  // R3 — session-average burn rate from aireceipts' OWN priced ledger. Mixed
+  // coverage has no complete denominator, so the cost segment carries its
+  // priced floor + unpriced usage and the rate is omitted (I2/I3).
   burn: (ctx) => {
-    const { totalUsd, durationMs, unpriceable } = ctx.summary;
-    if (unpriceable || totalUsd === null || !Number.isFinite(totalUsd) || totalUsd < 0 || durationMs === undefined || !Number.isFinite(durationMs) || durationMs <= 0) {
+    const { totalUsd, durationMs, pricingCoverage } = ctx.summary;
+    if (pricingCoverage !== "full" || totalUsd === null || !Number.isFinite(totalUsd) || totalUsd < 0 || durationMs === undefined || !Number.isFinite(durationMs) || durationMs <= 0) {
       return null;
     }
     const perHr = totalUsd / (durationMs / 3_600_000);

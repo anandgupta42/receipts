@@ -15,6 +15,7 @@ describe("R2: a valid event passes its schema", () => {
         agentType: "claude-code",
         modelFamily: "anthropic",
         costPerTurnBucket: "$0.01-$0.05",
+        pricingCoverage: "full",
         hasStuckLoopWaste: false,
         hasTrivialSpanWaste: true,
       },
@@ -32,6 +33,7 @@ describe("R2/R6: leakage fixtures — banned content is structurally rejected", 
     agentType: "claude-code" as const,
     modelFamily: "anthropic" as const,
     costPerTurnBucket: "$0.01-$0.05" as const,
+    pricingCoverage: "full" as const,
     hasStuckLoopWaste: false,
     hasTrivialSpanWaste: false,
   };
@@ -63,6 +65,10 @@ describe("R2/R6: leakage fixtures — banned content is structurally rejected", 
 
   it("rejects a costPerTurnBucket outside the closed enum (never a raw dollar figure)", () => {
     expect(benchmarkRunPropertiesSchema.safeParse({ ...validRun, costPerTurnBucket: "$12.34" }).success).toBe(false);
+  });
+
+  it("rejects pricing coverage outside the closed enum", () => {
+    expect(benchmarkRunPropertiesSchema.safeParse({ ...validRun, pricingCoverage: "mostly" }).success).toBe(false);
   });
 
   it("rejects a non-boolean waste flag", () => {

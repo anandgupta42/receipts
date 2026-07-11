@@ -34,8 +34,10 @@ verified case, kill before any server work.
 - **R2 — Allowlisted payload.** One bucketed event, built via a new zod schema separate
   from SPEC-0002's three diagnostics events (this is not a fourth diagnostics event —
   kept out of the I4 contract per SPEC-0002 Non-goals). Coarse buckets only (cost-per-
-  turn bucket, waste-class-present booleans, agent type, model family) — never raw
-  dollar amounts, transcript content, or file paths.
+  turn bucket, `full|partial|unpriced` coverage, waste-class-present booleans, agent
+  type, model family) — never raw dollar amounts, token counts, transcript content,
+  or file paths. A priced child contributes to the bucket even when its parent is
+  unpriced; the coverage enum prevents that lower-bound bucket from posing as complete.
 - **R3 — `--dry-run`.** Builds and prints the exact payload that would be sent, sends
   nothing, works without the `[y/N]` prompt (mirrors SPEC-0002 R5's `--telemetry-show`).
 - **R4 — Cohort suppression.** The client renders "not enough data yet" when the server

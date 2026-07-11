@@ -6,9 +6,15 @@
 // are additive-only within a schema major version — never reorder or remove.
 import type { TokenUsage } from "../parse/types.js";
 import { SCHEMA_VERSION } from "./exportSchema.js";
-import { combinedPricedUsd, combinedTokenTotal, type ReceiptModel } from "./model.js";
+import { combinedPricedUsd, combinedTokenTotal, parentPricedUsd, type ReceiptModel } from "./model.js";
 import { lowerBoundCostEstimate } from "./costEstimate.js";
-import { knownUnpricedTokens, pricingCoverageOf } from "./pricingCoverage.js";
+import {
+  combinedPricingCoverageOf,
+  knownCombinedUnpricedTokens,
+  knownSubagentUnpricedTokens,
+  knownUnpricedTokens,
+  pricingCoverageOf,
+} from "./pricingCoverage.js";
 
 /** RFC 4180 §2: quote a field iff it contains `"`, `,`, CR, or LF; escape embedded quotes by doubling. */
 function csvField(value: string): string {
@@ -27,6 +33,16 @@ function usdCell(usd: number | null): string {
 function costMetadataCells(usd: number | null): [string, string] {
   const estimate = lowerBoundCostEstimate(usd);
   return estimate === null ? ["", ""] : [estimate.kind, estimate.basis];
+}
+
+function unpricedUsageCells(tokens: TokenUsage): [string, string, string, string, string] {
+  return [
+    String(tokens.input),
+    String(tokens.output),
+    String(tokens.cacheRead),
+    String(tokens.cacheCreation),
+    String(tokens.total),
+  ];
 }
 
 /** Session-level tokens: the adapter's session totals for unpriceable sources (Cursor's only real number), else the attributed per-turn sum — the same choice `compareDeltaLine` makes. */
@@ -67,6 +83,22 @@ const SESSION_COLUMNS = [
   "unpricedCacheCreationTokens",
   "unpricedTotalTokens",
   "unpricedTokensScope",
+  "subagentsCostKind",
+  "subagentsCostBasis",
+  "subagentsUsdScope",
+  "subagentsUnpricedInputTokens",
+  "subagentsUnpricedOutputTokens",
+  "subagentsUnpricedCacheReadTokens",
+  "subagentsUnpricedCacheCreationTokens",
+  "subagentsUnpricedTotalTokens",
+  "subagentsUnpricedTokensScope",
+  "combinedUnpricedInputTokens",
+  "combinedUnpricedOutputTokens",
+  "combinedUnpricedCacheReadTokens",
+  "combinedUnpricedCacheCreationTokens",
+  "combinedUnpricedTotalTokens",
+  "combinedUnpricedTokensScope",
+  "combinedPricingCoverage",
 ] as const;
 
 const TOOL_COLUMNS = [
@@ -90,9 +122,13 @@ const TOOL_COLUMNS = [
 
 function sessionCells(model: ReceiptModel): string[] {
   const tokens = effectiveTokens(model);
-  const costMetadata = costMetadataCells(model.totalUsd);
+  const parentUsd = parentPricedUsd(model);
+  const costMetadata = costMetadataCells(parentUsd);
+  const subagentsUsd = model.subagents?.pricedUsd ?? null;
   const combinedUsd = combinedPricedUsd(model);
   const unpricedTokens = knownUnpricedTokens(model);
+  const subagentsUnpricedTokens = knownSubagentUnpricedTokens(model);
+  const combinedUnpricedTokens = knownCombinedUnpricedTokens(model);
   return [
     String(SCHEMA_VERSION),
     model.sessionId,
@@ -101,7 +137,7 @@ function sessionCells(model: ReceiptModel): string[] {
     model.startedAtMs !== undefined ? new Date(model.startedAtMs).toISOString() : "",
     model.durationMs !== undefined ? String(model.durationMs) : "",
     model.modelMix[0]?.model ?? "",
-    usdCell(model.totalUsd),
+    usdCell(parentUsd),
     String(tokens.input),
     String(tokens.output),
     String(tokens.cacheRead),
@@ -109,7 +145,7 @@ function sessionCells(model: ReceiptModel): string[] {
     String(tokens.total),
     ...costMetadata,
     "parent-session",
-    usdCell(model.subagents?.pricedUsd ?? null),
+    usdCell(subagentsUsd),
     usdCell(combinedUsd),
     ...costMetadataCells(combinedUsd),
     String(model.subagents?.tokensTotal ?? 0),
@@ -118,12 +154,15 @@ function sessionCells(model: ReceiptModel): string[] {
     String(model.subagents?.unpricedCount ?? 0),
     String(model.subagents?.unreadableCount ?? 0),
     pricingCoverageOf(model),
-    String(unpricedTokens.input),
-    String(unpricedTokens.output),
-    String(unpricedTokens.cacheRead),
-    String(unpricedTokens.cacheCreation),
-    String(unpricedTokens.total),
+    ...unpricedUsageCells(unpricedTokens),
     "parent-session",
+    ...costMetadataCells(subagentsUsd),
+    "readable-subagents",
+    ...unpricedUsageCells(subagentsUnpricedTokens),
+    "readable-subagents",
+    ...unpricedUsageCells(combinedUnpricedTokens),
+    "parent-session-plus-readable-subagents",
+    combinedPricingCoverageOf(model),
   ];
 }
 

@@ -37,11 +37,14 @@ function raw(input: number, cached: number, output: number): RawUsage {
   };
 }
 
-function envelope(total: RawUsage, last: RawUsage, second: number): unknown {
+function envelope(total: RawUsage, last: RawUsage | undefined, second: number): unknown {
   return {
     timestamp: `2026-07-10T12:00:${second.toString().padStart(2, "0")}.000Z`,
     type: "event_msg",
-    payload: { type: "token_count", info: { total_token_usage: total, last_token_usage: last } },
+    payload: {
+      type: "token_count",
+      info: { total_token_usage: total, ...(last === undefined ? {} : { last_token_usage: last }) },
+    },
   };
 }
 
@@ -100,6 +103,40 @@ describe("Codex cumulative usage envelopes", () => {
     expect(summedTurns(session)).toMatchObject({ input: 200, output: 70, cacheRead: 300, cacheCreation: 0, total: 570 });
     expect(session.totals.tokens).toEqual(summedTurns(session));
     expect(codexFidelity.validate(session)).toEqual([]);
+  });
+
+  it.each([
+    ["missing", undefined],
+    ["zero", raw(0, 0, 0)],
+  ] as const)("safe-stops when the first non-zero cumulative snapshot has a %s last_token_usage", async (_label, last) => {
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(200, 50, 20), last, 1),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.totals.tokens).toMatchObject({ input: 150, output: 20, cacheRead: 50, total: 220 });
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined)).toBe(true);
+    const receipt = await buildReceiptModel(session);
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("pricing disabled") }),
+    );
+  });
+
+  it("keeps the full final envelope unattributed when a missing first delta is followed by a valid one", async () => {
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(200, 50, 20), undefined, 1),
+      envelope(raw(300, 70, 30), raw(100, 20, 10), 2),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.totals.tokens).toMatchObject({ input: 230, output: 30, cacheRead: 70, total: 330 });
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined)).toBe(true);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
   });
 
   it("safe-stops request pricing when a changed snapshot's last_token_usage disagrees", async () => {

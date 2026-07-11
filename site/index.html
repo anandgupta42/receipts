@@ -235,7 +235,7 @@ SendMessage.............≥ $0.04
       <div class="legend">
         <b>Opus</b> — the model active right now<br>
         <b>≥$23.78 · ≥$14/hr</b> — observable floor so far and per hour<br>
-        <b>⚠ Bash loop ×5</b> — waste, flagged the moment it happens
+        <b>⚠ Bash loop ×5</b> — heuristic pattern, flagged the moment it happens
       </div>
     </div>
     <div>
@@ -243,8 +243,8 @@ SendMessage.............≥ $0.04
         <img src="assets/statusline.gif" width="1040" height="360" loading="lazy"
              alt="Historical agent-session replay with the aireceipts meter highlighted; it predates the current lower-bound glyph. Host-supplied context and quota fields are simulated.">
       </div>
-      <div class="pill" role="img" aria-label="The statusline: model Opus, Standard-API floor at least 23 dollars 78 cents, floor rate at least 14 dollars per hour, 17 million tokens, context 41 percent, Bash loop times 5 waste flag, 5-hour window 63 percent, resets in 2 hours 12 minutes"><span class="b">[aireceipts]</span> Opus · ≥$23.78 · ≥$14/hr · 17M · ctx 41% · <span class="w">⚠ Bash loop ×5</span> · <span class="m">5h 63% ↺2h12m</span></div>
-      <p class="cap">A replayed session — the floor, tokens, and waste flag computed by the real CLI
+      <div class="pill" role="img" aria-label="The statusline: model Opus, Standard-API floor at least 23 dollars 78 cents, floor rate at least 14 dollars per hour, 17 million tokens, context 41 percent, Bash loop times 5 heuristic pattern flag, 5-hour window 63 percent, resets in 2 hours 12 minutes"><span class="b">[aireceipts]</span> Opus · ≥$23.78 · ≥$14/hr · 17M · ctx 41% · <span class="w">⚠ Bash loop ×5</span> · <span class="m">5h 63% ↺2h12m</span></div>
+      <p class="cap">A replayed session — the floor, tokens, and pattern flag computed by the real CLI
       at each step; host payload fields simulated. <a href="docs/statusline.html">Set it up &rarr;</a></p>
     </div>
   </div>
@@ -258,7 +258,7 @@ SendMessage.............≥ $0.04
       <h2 class="head">The receipt prints.</h2>
       <p class="lede">One command. No install, no account, no upload. aireceipts reads the
       transcripts your agent already writes to disk and computes a cited floor tool by tool —
-      waste flagged, and the cheaper-model line is arithmetic on the same tokens, never a
+      heuristic patterns flagged, and the cheaper-model line is arithmetic on the same tokens, never a
       prediction. New machine? <code>--demo</code> prints a bundled example.</p>
     </div>
     <div>
@@ -314,13 +314,13 @@ same tokens on claude-haiku-4-5..≥ $0.0392
       <p class="eyebrow"><span class="red">//</span> the handoff</p>
       <h2 class="head">Tomorrow doesn&rsquo;t repeat today.</h2>
       <p class="lede">Every receipt ends with flags a machine can act on. <code>--handoff</code>
-      turns them into a paste-ready block for your agent&rsquo;s memory file — the Bash loop
-      that burned money today becomes a standing rule tonight.</p>
+      turns them into a paste-ready block for your agent&rsquo;s memory file — a repeated Bash
+      loop can become a standing rule tonight without claiming proven savings.</p>
     </div>
     <div class="hands">
       <div class="hand">
         <h4>TODAY</h4>
-        <pre><span class="red">⚠ Bash loop ×5 · ≥ $0.08</span>
+        <pre><span class="red">⚠ Bash loop ×5 · ≈ $0.08</span>
 # paste into CLAUDE.md:
 - Bash loop ×5: change the input
   before a 3rd retry.</pre>
@@ -328,7 +328,7 @@ same tokens on claude-haiku-4-5..≥ $0.0392
       <div class="hand">
         <h4>TOMORROW</h4>
         <pre>Bash loop ............. none
-observed waste ........ none</pre>
+flagged pattern ....... none</pre>
       </div>
     </div>
   </div>

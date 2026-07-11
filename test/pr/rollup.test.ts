@@ -138,4 +138,23 @@ describe("R1c rollup (window overlap + honest count)", () => {
     expect(rows[0].usd).not.toBeNull();
     expect(rows[0].unpricedTokens).toEqual(unpricedUsage);
   });
+
+  it("propagates a readable child's cache-rate lower-bound evidence", async () => {
+    const startedAt = Date.UTC(2026, 6, 10, 10, 0, 0);
+    const child = childSession("cache-gap", startedAt, startedAt + 1);
+    child.source = "codex";
+    child.model = "gpt-5.4-mini";
+    child.turns[0].model = "gpt-5.4-mini";
+    child.turns[0].usage = withTotal({ ...emptyUsage(), input: 500, output: 100, cacheCreation: 25 });
+    child.totals.tokens = child.turns[0].usage;
+
+    const rows = await rollupChildren(PARENT, { kind: "full" }, {
+      discover: async () => ["cache-gap"],
+      load: async () => child,
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].usd).not.toBeNull();
+    expect(rows[0].costLowerBoundCacheTier).toBe(true);
+  });
 });

@@ -142,9 +142,10 @@ directive is not advisory.
   denominator/corpus definition yet, easy to dodge by editing timestamps,
   and it does not improve capture accuracy. Revisit only with a labeled
   corpus that defines the ceiling honestly.
-- **Duplicate raw-record detection for Claude Code.** The normalized
-  `Session` cannot prove it; requires a raw-reading validator — revisit
-  when a real double-count is observed.
+- **Authoritative Claude invoice reconciliation.** The raw adapter now groups
+  same-`message.id` snapshots coherently and fails malformed/id-less evidence
+  closed, but the local transcript still cannot prove auth route, discounts,
+  credits, or an invoice join.
 - **Cross-vendor billing reconciliation** (console invoices, OTEL). External
   systems, not local transcripts; out of scope for a deterministic gate.
 - **CI enforcement of the harness.** Transcripts are local-only (I4); like
@@ -283,7 +284,7 @@ baselines. `node scripts/cost-reconcile.mjs` then reconciled 40/40 recent Codex
 sessions with zero drift (previous run: 30 reconciled, 10 failed).
 
 **2026-07-10 · billing-observability correction (amends R1).** A larger
-content-free audit of 789 recent Codex rollouts found 49,320 changed cumulative
+content-free audit of 792 recent Codex rollouts found 51,465 changed cumulative
 envelopes; every later changed delta matched `last_token_usage`, so the local
 stream can select the `>272K` context tier per response. It found zero persisted
 cache-write counts, request ids, explicit dollar costs, or session-local auth
@@ -322,12 +323,15 @@ pricing is no longer justified by final-sum reconciliation alone. After the
 inherited baseline, cumulative vectors must remain componentwise monotone and
 every changed delta must equal a present non-zero `last_token_usage`; a file may
 not mix legacy and cumulative usage, drop a JSONL record, or disagree with the
-final local envelope. Any failure removes usage/pricing units from every turn,
-preserves the final local envelope once as unattributed tokens, and renders the
-request-reconciliation caveat. A reset is therefore a safe stop, not an inferred
-normalization. Every surviving pricing unit uses only its own model, provider
-field, timestamp, and usage; no enclosing turn/session fallback may supply
-identity or date.
+final local envelope. A first non-zero total with missing or zero
+`last_token_usage` cannot distinguish inherited usage from the root rollout's
+first request, so it invalidates the stream without inferring a baseline; the
+full final cumulative envelope is retained once as unattributed usage. Any
+failure removes usage/pricing units from every turn and renders the
+request-reconciliation caveat. A reset is therefore a safe stop, not an
+inferred normalization. Every surviving pricing unit uses only its own model,
+provider field, timestamp, and usage; no enclosing turn/session fallback may
+supply identity or date.
 
 Claude assistant records without `message.id` likewise cannot establish
 response boundaries. Their tools remain observable, but their usage is reduced
@@ -335,3 +339,13 @@ to one coherent highest-output envelope and carried as unattributed tokens,
 never as independently priced turns. Trivial-span repricing consumes the same
 strict units and fires only when every unit has complete direct-vendor
 model/date/provider evidence and a cited eligible row.
+
+Claude and OpenCode usage fields are valid only when every present counter is a
+non-negative safe integer; missing fields may represent zero, but present null,
+string, negative, fractional, or unsafe values may not be coerced to zero for
+pricing. The adapters retain independently valid components as tokens-only and
+increment the incomplete-record signal. A malformed Claude snapshot cannot
+replace a coherent valid snapshot for the same `message.id`. OpenCode accepts
+numeric SQLite strings only when they parse to non-negative safe integers, and
+one malformed session/message aggregate field excludes that whole projection
+from dominance and residual reconciliation.

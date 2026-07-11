@@ -10,4 +10,4 @@ FLAGGED PATTERN COST.....................≈ $0.0767
   at turns 1-5
   → change or stop after two identical failures
 
-covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line
+covers: 6 turns · 5 tool calls · 0 compactions · 1 flagged-pattern line

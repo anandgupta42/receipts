@@ -109,6 +109,18 @@ describe("SPEC-0062 R3 — renderSegments", () => {
     expect(renderSegments(segs("cost,tokens"), unpriced)).toBe("1k");
   });
 
+  it("labels known-token and unmeasured partial floors without implying a complete total", () => {
+    const knownGap = buildMiniSummary(model({ unpricedTokens: usage(250) }));
+    expect(renderSegments(segs("cost"), ctx({ summary: knownGap }))).toBe(
+      "≥$0.50 subtotal (250 known unpriced; partial)",
+    );
+
+    const unmeasuredGap = buildMiniSummary(model({ unobservedCacheWriteTokens: true }));
+    expect(renderSegments(segs("cost,burn"), ctx({ summary: unmeasuredGap }))).toBe(
+      "≥$0.50 subtotal (coverage partial)",
+    );
+  });
+
   it("the default format constant matches the spec-pinned list", () => {
     expect(DEFAULT_FORMAT).toBe("brand,model,cost,burn,tokens,context,waste,quota5h");
     expect(SEGMENT_NAMES).toContain("model");

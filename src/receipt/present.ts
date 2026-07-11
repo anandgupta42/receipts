@@ -19,9 +19,10 @@ import {
 } from "./blocks.js";
 import type { Block, ReceiptView, TemplateName } from "./blocks.js";
 import { formatAbsoluteUtc, formatDuration, formatInt, formatSharePercent, formatShortTokens, formatUsdFloor, formatUsdLowerBound, STANDARD_API_LOWER_BOUND_NOTE, usdFloorDecimals } from "./format.js";
-import type { ModelMixEntry, ReceiptModel, ToolRow, WasteLine } from "./model.js";
+import { combinedPricedUsd, type ModelMixEntry, type ReceiptModel, type ToolRow, type WasteLine } from "./model.js";
 import type { TokenUsage } from "../parse/types.js";
 import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "./branding.js";
+import { combinedPricingCoverageOf, knownCombinedUnpricedTokens } from "./pricingCoverage.js";
 
 export type { ReceiptView } from "./blocks.js";
 export { PRICE_DELTA_NOTE, TRIVIAL_SPANS_LABEL } from "./blocks.js";
@@ -153,7 +154,7 @@ function preEditLine(model: ReceiptModel): string | undefined {
   }
   const range = `${formatInt(pe.preEditTurnCount)}/${formatInt(pe.totalTurnCount)} turns`;
   return pe.preEditPct !== null
-    ? `pre-edit: ${pe.preEditPct}% of cost (${range})`
+    ? `pre-edit: ${pe.preEditPct}% of priced floor (${range})`
     : `pre-edit: ${pe.preEditTokenPct}% of tokens (${range})`;
 }
 
@@ -172,7 +173,7 @@ interface FloorAmounts {
 }
 
 function receiptFloorPrecision(model: ReceiptModel) {
-  const combinedTotal = model.totalUsd !== null ? model.totalUsd + (model.subagents?.pricedUsd ?? 0) : null;
+  const combinedTotal = combinedPricedUsd(model);
   return usdFloorDecimals([
     ...model.toolRows.map((row) => row.usd),
     ...model.modelMix.map((entry) => entry.usd),
@@ -184,14 +185,14 @@ function receiptFloorPrecision(model: ReceiptModel) {
 function floorRowText(model: ReceiptModel): FloorAmounts {
   const priced = model.toolRows.filter((r) => r.usd !== null);
   const agg = model.subagents;
-  const aggPriced = agg !== undefined && agg.pricedUsd !== null && model.totalUsd !== null;
+  const aggPriced = agg !== undefined && agg.pricedUsd !== null;
   const precision = receiptFloorPrecision(model);
   const rows = new Map<ToolRow, string>();
   priced.forEach((row) => rows.set(row, formatUsdFloor(row.usd as number, precision)));
   return { rows, ...(aggPriced ? { subagents: formatUsdFloor(agg.pricedUsd as number, precision) } : {}) };
 }
 
-/** SPEC-0061 R1 — the one `SUBAGENTS (N)` spend row: `$` only when the aggregate joined the reconciled universe; tokens otherwise (I2). `undefined` when the session has no children, keeping every existing render byte-identical (I5). */
+/** SPEC-0061 R1 — the one `SUBAGENTS (N)` spend row: a readable priced child keeps its visible `$` floor even when the parent is unpriced; otherwise the row renders tokens (I2). */
 function subagentRowParts(model: ReceiptModel, reconciled: FloorAmounts): { label: string; amount: string } | undefined {
   const agg = model.subagents;
   if (!agg) {
@@ -217,11 +218,11 @@ function classicRowValue(row: ToolRow, model: ReceiptModel, reconciled: FloorAmo
 }
 
 /**
- * The metric a datavis bar normalizes on. One unit per receipt, never mixed: a
- * priced receipt scales every bar on dollars (an unpriced row in an otherwise
- * priced session gets an empty bar — its tokens are not comparable to dollars),
- * and a fully-unpriced receipt scales on token totals. This is what stops a
- * large token count from rendering a full bar next to a real dollar row.
+ * The metric a datavis bar normalizes on. A parent-priced receipt scales rows
+ * on dollars (an unpriced row gets an empty bar); a parent-unpriced receipt,
+ * including one with a separately priced child, scales bars on token totals.
+ * The child amount still carries `≥`, so bar length never mixes dollars and
+ * tokens while the observable floor remains visible.
  */
 function rowMetric(row: ToolRow, model: ReceiptModel): number {
   if (model.totalUsd !== null) {
@@ -231,30 +232,58 @@ function rowMetric(row: ToolRow, model: ReceiptModel): number {
 }
 
 interface TotalParts {
+  label: string;
   value: string;
+  knownUnpriced?: { label: string; value: string };
   note?: string;
+  coverageNote?: string;
 }
 
 function totalParts(model: ReceiptModel): TotalParts {
-  if (model.unpriceable) {
-    return { value: `${formatInt(model.sessionTotalTokens.total)} tok`, note: CURSOR_DEGRADED_NOTE };
-  }
-  // SPEC-0061 R1 — TOTAL covers parent + subagent aggregate: priced children join
-  // the `$` sum; on an unpriced receipt children join the token count. Unpriced
-  // children under a priced total stay out of the `$` (their floor caveat says so).
+  // SPEC-0061's mixed-coverage amendment: a priced child remains visible even
+  // when the parent has no matching price row. Dollars and unpriced tokens are
+  // separate facts; neither is allowed to masquerade as an invoice total.
   const agg = model.subagents;
-  if (model.totalUsd !== null) {
-    const total = model.totalUsd + (agg?.pricedUsd ?? 0);
+  const combinedUsd = combinedPricedUsd(model);
+  if (combinedUsd !== null) {
     const precision = receiptFloorPrecision(model);
-    return { value: formatUsdLowerBound(total, precision), note: STANDARD_API_LOWER_BOUND_NOTE };
+    if (combinedPricingCoverageOf(model) === "partial") {
+      const knownUnpriced = knownCombinedUnpricedTokens(model);
+      return {
+        label: "KNOWN PRICED SUBTOTAL",
+        value: formatUsdLowerBound(combinedUsd, precision),
+        ...(knownUnpriced.total > 0
+          ? {
+              knownUnpriced: {
+                label: "KNOWN UNPRICED TOKENS",
+                value: `${formatInt(knownUnpriced.total)} tok`,
+              },
+            }
+          : {}),
+        note: STANDARD_API_LOWER_BOUND_NOTE,
+        coverageNote: "partial pricing coverage; invoice total unknown",
+      };
+    }
+    return { label: "TOTAL", value: formatUsdLowerBound(combinedUsd, precision), note: STANDARD_API_LOWER_BOUND_NOTE };
   }
-  return { value: `${formatInt(model.totalTokens.total + (agg?.tokensTotal ?? 0))} tok`, note: NO_PRICE_MATCH_NOTE };
+  if (model.unpriceable) {
+    return {
+      label: "TOTAL",
+      value: `${formatInt(model.sessionTotalTokens.total + (agg?.tokensTotal ?? 0))} tok`,
+      note: CURSOR_DEGRADED_NOTE,
+    };
+  }
+  return {
+    label: "TOTAL",
+    value: `${formatInt(model.totalTokens.total + (agg?.tokensTotal ?? 0))} tok`,
+    note: NO_PRICE_MATCH_NOTE,
+  };
 }
 
 /**
  * The `same tokens on <model>` price-delta value, or `undefined` when the
- * session did not price. SPEC-0054 R1: when the delta is real savings
- * (`actualUsd > 0` and `usd < actualUsd`), a separate percentage note keeps
+ * session did not price. SPEC-0054 R1: when the observable-floor delta is
+ * positive (`actualUsd > 0` and `usd < actualUsd`), a separate percentage note keeps
  * the full model id visible inside the 50-column receipt. The percentage is
  * arithmetic on the already-traced observable floors, not a new dollar.
  */
@@ -435,9 +464,15 @@ function tailBlocks(model: ReceiptModel, footer: Block, extra?: Block[]): Block[
   blocks.push(...caveatBlocks(model));
   const total = totalParts(model);
   blocks.push({ kind: "rule" });
-  blocks.push({ kind: "total", label: "TOTAL", value: total.value });
+  blocks.push({ kind: "total", label: total.label, value: total.value });
+  if (total.knownUnpriced !== undefined) {
+    blocks.push({ kind: "total", label: total.knownUnpriced.label, value: total.knownUnpriced.value });
+  }
   if (total.note !== undefined) {
     blocks.push({ kind: "note", text: total.note });
+  }
+  if (total.coverageNote !== undefined) {
+    blocks.push({ kind: "note", text: total.coverageNote });
   }
   const delta = priceDeltaParts(model);
   if (delta) {
@@ -517,9 +552,20 @@ function buildGrocery(model: ReceiptModel): Block[] {
   blocks.push(...caveatBlocks(model));
   const total = totalParts(model);
   blocks.push({ kind: "rule" });
-  blocks.push({ kind: "total", label: "TOTAL", value: total.value, columns: { qty: "", amt: total.value } });
+  blocks.push({ kind: "total", label: total.label, value: total.value, columns: { qty: "", amt: total.value } });
+  if (total.knownUnpriced !== undefined) {
+    blocks.push({
+      kind: "total",
+      label: total.knownUnpriced.label,
+      value: total.knownUnpriced.value,
+      columns: { qty: "", amt: total.knownUnpriced.value },
+    });
+  }
   if (total.note !== undefined) {
     blocks.push({ kind: "note", text: total.note });
+  }
+  if (total.coverageNote !== undefined) {
+    blocks.push({ kind: "note", text: total.coverageNote });
   }
   const delta = priceDeltaParts(model);
   if (delta) {
@@ -539,7 +585,8 @@ function buildGrocery(model: ReceiptModel): Block[] {
 
 // --- datavis (Susie Lu's heirs; bars yes, bubbles no) ------------------------
 
-const DATAVIS_LEGEND = "[##########] = priciest line; others in proportion";
+const DATAVIS_PRICE_LEGEND = "[##########] = priciest line; others in proportion";
+const DATAVIS_TOKEN_LEGEND = "[##########] = most tokens; others in proportion";
 
 function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number, reconciled: FloorAmounts): Block {
   const amt = rowAmount(row, model, reconciled);
@@ -548,7 +595,7 @@ function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number, reconci
   return { kind: "row", label: row.tool, value };
 }
 
-/** SPEC-0061 — the datavis metric for the subagent aggregate, on the same one-unit-per-receipt rule as {@link rowMetric}. */
+/** SPEC-0061 — the datavis metric for the subagent aggregate. A mixed parent/child receipt uses token-length bars while keeping the child's priced amount as separate text. */
 function subagentMetric(model: ReceiptModel): number {
   const agg = model.subagents;
   if (!agg) {
@@ -569,7 +616,13 @@ function buildDatavis(model: ReceiptModel): Block[] {
   const blocks: Block[] = [
     { kind: "masthead", text: WORDMARK },
     { kind: "meta", lines: metaLines(model) },
-    { kind: "note", text: DATAVIS_LEGEND, spaceBefore: true },
+    {
+      kind: "note",
+      text: model.totalUsd === null && model.subagents?.pricedUsd !== null && model.subagents?.pricedUsd !== undefined
+        ? DATAVIS_TOKEN_LEGEND
+        : DATAVIS_PRICE_LEGEND,
+      spaceBefore: true,
+    },
   ];
   if (modelOutput.length > 0) {
     blocks.push({ kind: "note", text: "--- MODEL OUTPUT ---", spaceBefore: true });

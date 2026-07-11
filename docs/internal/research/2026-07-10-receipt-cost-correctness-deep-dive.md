@@ -99,6 +99,7 @@ contents, or transcript text.
 |---|---:|---|---|
 | Identical cumulative replay | 535 events in 114 files, among 47,944 `token_count` events | Re-added stale `last_token_usage`; over-count | An unchanged cumulative vector is not a new request-usage event. |
 | Inherited fork baseline | 5 subagent/fork files | Raw final cumulative included parent usage; over-count and fidelity drift | Local total = final cumulative − (first total − first local delta). |
+| First non-zero total missing a non-zero `last` | Ambiguous by construction | Could silently discard the root rollout's first request as an inherited baseline | Do not infer a baseline; fail the stream closed and retain the full final cumulative envelope once as unattributed usage. |
 | Mid-session model switch | 5 files | `model ??=` froze the first model; four Terra→Sol floor calculations differed by about $3.45–$4.36, with the reverse direction in one file | Stamp each usage delta with the current `turn_context` model. |
 | Changed total / `last` disagreement | No unexplained case in the sampled corpus | Could emit a wrongly bounded request dollar | Derive the delta from the cumulative difference, require the non-zero `last` to match it exactly, and fail the whole stream closed on disagreement. |
 | Cumulative reset | None in 47,944 events | Unverified | Do not invent reset normalization; a decreasing envelope fails the normal-path request-evidence gate and remains unattributed tokens. |
@@ -189,6 +190,9 @@ not prove whether two such records are repeated snapshots or two requests. The
 adapter therefore preserves their tools but merges their usage into one
 coherent highest-output envelope across the id-less records and labels it
 unattributed. It does not attach that envelope to a turn/model or emit a dollar.
+Present null, string, negative, fractional, or unsafe counters invalidate that
+snapshot for pricing. Valid components remain tokens-only if no valid snapshot
+exists; a malformed duplicate can never displace a coherent valid snapshot.
 
 ### OpenCode upstream and local metadata
 
@@ -286,9 +290,14 @@ model/provider/date evidence. A non-monotone cumulative vector, missing or
 disagreeing non-zero `last_token_usage`, mixed legacy+cumulative records,
 dropped JSONL record, or final request-sum mismatch fails the whole request
 stream closed: no individual delta is priced, and the one final local envelope
-remains as unattributed tokens. Fast-check generates arbitrary replay counts
-and arbitrary inherited/local usage components; regressions pin each fail-closed
-shape, including a false long-tier crossing created by an omitted request.
+remains as unattributed tokens. The first non-zero cumulative total also needs
+a non-zero `last_token_usage`; otherwise the trace cannot distinguish an
+inherited baseline from the root rollout's first local request, so no baseline
+is inferred and the full final cumulative envelope remains unattributed.
+Fast-check generates arbitrary replay counts and arbitrary inherited/local
+usage components; regressions pin each fail-closed shape, including first-only
+and later-valid missing-first-delta streams and a false long-tier crossing
+created by an omitted request.
 
 ### Claude duplicate-snapshot normalization
 
@@ -321,6 +330,15 @@ totals and floor. This avoids the tempting but invalid componentwise-max vector.
 Neither path invents request/model/provider/tool attribution.
 OpenCode's stored `cost` is not used as an invoice oracle because upstream
 computes it client-side from models.dev catalog rates.
+
+Malformed OpenCode message counters retain their independently valid sibling
+components but force the message tokens-only and increment the visible
+incomplete-record count. Session/message aggregate projections are stricter:
+one malformed field excludes the entire projection, preventing its other
+fields from dominating itemized usage or manufacturing a residual. Legitimate
+numeric SQLite strings remain supported only when they parse to non-negative
+safe integers; oversized SQLite integers are read as rejectable text instead
+of crashing the adapter.
 
 ### Three-agent lower-bound arithmetic E2E oracles
 
@@ -377,11 +395,19 @@ Attribution now carries the exact usage of unpriced request units and turns
 separately from the session's all-turn token total. Within one user-facing turn,
 known direct units contribute a cited subtotal while routed, identity-incomplete,
 or row-missing units contribute exact unpriced tokens. Complete-turn waste and
-cost-shape arithmetic rejects that partial result. A mixed contributor or subagent enters both
-ledgers: its known dollars appear under `TOTAL priced`, and only its unpriced
-turns appear under `TOTAL unpriced`. A typed `partial-priced-coverage` event
+cost-shape arithmetic rejects that partial result. A mixed contributor or
+subagent enters both ledgers: its known dollars appear as a `KNOWN PRICED
+SUBTOTAL ≥`, and only exact observable usage excluded from that subtotal appears
+as `KNOWN UNPRICED TOKENS`. A typed `partial-priced-coverage` event
 floors the dollar line and renders a counted explanation. Fully priced and fully
 unpriced output remains unchanged.
+
+An unmeasured gap is not displayed as `0 tok unpriced`. For example, a Codex
+GPT-5.6 cache-write omission yields the priced subtotal plus `coverage partial`
+and the cache-write caveat, because the trace proves that a component is absent
+but contains no exact token count for it. JSON/CSV still expose an exact zero
+known-unpriced vector alongside partial coverage, preserving the distinction
+between "known zero" and "no measurable amount."
 
 The same metadata now reaches per-commit artifact rows (`≥ $X + N unpriced
 tokens`) and standalone subagent aggregation, closing two secondary surfaces
@@ -401,6 +427,15 @@ Codex rejects those shapes before normalization as well. In particular,
 clamp, and every raw counter must be a nonnegative safe integer. One malformed
 usage record invalidates request evidence for the local stream; no request unit
 from that stream can select a price or context tier.
+
+Claude and OpenCode now reject malformed raw counters before pricing too.
+Missing fields may mean zero, but present null/string/negative/fractional/unsafe
+values never do. Individually safe counters whose component or overall sum
+would exceed `Number.MAX_SAFE_INTEGER` fail closed to an empty tokens-only
+usage vector rather than retaining an inexact number. Otherwise, valid sibling
+components remain observable tokens-only, the existing incomplete-record
+caveat counts the malformed payload, and OpenCode excludes malformed aggregate
+projections wholesale.
 
 The byte-golden pass exposed a second-order case: rebuilding a session total
 from three equal per-tool shares can leave IEEE-754 residue even though every
@@ -475,7 +510,7 @@ switch cases across attribution, waste, receipt, and price-row consumers.
 | Dimension | Covered now | Visible safe state | Remaining gap |
 |---|---|---|---|
 | Direct/recovered/foreign commit order | Direct, same-diff amend, foreign-before-amend, multi-own-amend, per-commit dedup | Unresolved git write floors | Content-changing squash/amend remains unprovable by design. |
-| Codex cumulative stream | First delta, repeated identical total, inherited baseline, inconsistent/missing `last`, non-monotone/reset, mixed schema, dropped record, model switch, request-unit context tier inside a user-facing turn | Any stream defect disables every request dollar and preserves one unattributed local envelope | Cache-write/auth/request-to-invoice join remain absent. |
+| Codex cumulative stream | First delta, repeated identical total, inherited baseline, first missing/zero `last`, later inconsistent/missing `last`, non-monotone/reset, mixed schema, dropped record, model switch, request-unit context tier inside a user-facing turn | Any stream defect disables every request dollar; an ambiguous first delta preserves the full final cumulative envelope once as unattributed usage | Cache-write/auth/request-to-invoice join remain absent. |
 | Token components | Claude coherent highest-output record + id-less unattributed envelope + split writes; Codex input/read/output request units; OpenCode itemized plus dominating residual or crossed-vector conflict; finite/integer/nonnegative/subset validation | Unknown/malformed → tokens-only; dominating excess → unattributed bucket; crossed positive excess → conflicting/excluded evidence | Some provider-side dimensions never reach local storage. |
 | Price selection | unit-local model/provider/date; dated model row; GPT-5.6 request context tiers; explicit direct/routed provider identity | Every dollar is a Standard API lower bound; identity-incomplete, GPT-5.5, routed, and custom usage remain tokens-only | Auth/service/region/credits/contracts and invoice joins are not represented. |
 | Tool attribution | no-tool and multi-tool; raw rows remain additive while human rows floor independently; mixed request units/PR atoms carry exact unpriced usage; provider gate threaded through every pricing consumer; trivial-span/all complete-turn gates | Partial coverage renders both ledgers plus a floor/event; a partial turn emits no complete-turn detector or cost-shape dollar | New provider spellings default safely to tokens-only until reviewed as direct. |
@@ -540,18 +575,20 @@ changes. Final integration snapshot:
 
 - TypeScript: exit 0.
 - ESLint (`--max-warnings 0`): exit 0.
-- Vitest: 144 files, 2,071 tests passed; exit 0.
+- Vitest: 145 files, 2,115 tests passed; exit 0.
 - Goldens: 102 artifacts byte-identical; exit 0.
 - Determinism: 10/10 golden runs byte-identical; exit 0.
 - Spec lint: 77 specs OK; exit 0.
 - Hygiene: OK; exit 0.
-- Pricing mutation gate: 67.86% score against a 60% threshold; exit 0.
+- Pricing/PR mutation gate: 68.24% score across 5,812 mutants against a 60% threshold; exit 0.
 - Built CLI E2E: Claude Code JSONL, Codex JSONL (including GPT-5.6 request
   tiers), and opencode SQLite independent token×rate oracles; exit 0.
 - Live, content-free Codex fidelity: 40/40 recent sessions reconciled, zero
   drift; exit 0.
 - OpenAI price citation/liveness check: every remaining row cited and the cited
   URL live; exit 0.
+- `ship-check`: 10 quick preflight checks and PR-title lint passed; the measured
+  npm tarball is 72 files / 564 KB under a 580 KB ceiling (581 KB remains red).
 
 The report is also synchronized to the work Obsidian vault under `Research/Receipt
 Cost Correctness/`.
