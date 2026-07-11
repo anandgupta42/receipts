@@ -41,7 +41,7 @@ TOTAL........................................$0.18
 same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
@@ -122,7 +122,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
   Tokens Δ......................+93,700 tok (more)
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts
 ```
 

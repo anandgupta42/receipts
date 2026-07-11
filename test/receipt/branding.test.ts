@@ -8,7 +8,7 @@ describe("SPEC-0078 R2 canonical receipt identity", () => {
     const normalized = new URL(pkg.repository.url.replace(/^git\+/, "").replace(/\.git$/, "")).href.replace(/\/$/, "");
     expect(normalized).toBe(REPOSITORY_URL);
     expect(REPOSITORY_DISPLAY).toBe("github.com/anandgupta42/receipts");
-    expect(INSTALL_FOOTER_TEXT).toBe("aireceipts · local · npx aireceipts-cli");
+    expect(INSTALL_FOOTER_TEXT).toBe("npx aireceipts-cli");
     expect(PR_ATTRIBUTION_LINE).toContain(REPOSITORY_URL);
   });
 });

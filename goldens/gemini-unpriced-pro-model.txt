@@ -12,6 +12,6 @@ read_file.....................31,600 tok  (1 call)
 TOTAL...................................31,600 tok
 no price table matched
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

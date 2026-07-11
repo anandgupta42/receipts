@@ -17,6 +17,6 @@ TOTAL........................................$0.23
 same tokens on gpt-5.4-mini.......$0.10 (59% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

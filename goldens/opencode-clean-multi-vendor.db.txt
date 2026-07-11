@@ -15,6 +15,6 @@ caveat: cache-write cost is a lower bound for this session (no published cache-w
 --------------------------------------------------
 TOTAL........................................$0.01
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

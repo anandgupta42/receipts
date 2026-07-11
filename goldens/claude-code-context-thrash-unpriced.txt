@@ -16,6 +16,6 @@ pre-edit: no named edit tool observed
 TOTAL................................1,354,000 tok
 no price table matched
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

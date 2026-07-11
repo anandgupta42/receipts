@@ -30,7 +30,7 @@ TOTAL........................................$0.18
 same tokens on claude-haiku-4-5..............$0.04
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -51,7 +51,7 @@ TOTAL........................................$0.09
 same tokens on claude-haiku-4-5..............$0.02
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts
 - - - - - - - - - - - - - - - - - - - - - - - - -
 

@@ -18,6 +18,6 @@ CARDHOLDER: claude-sonnet-5
       THANK YOU FOR VIBING WITH Claude Code       
               || || | | | ||| | ||||              
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
          github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -
