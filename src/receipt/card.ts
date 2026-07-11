@@ -13,7 +13,7 @@
 import { formatDateUtc, formatInt, formatShortTokens, formatUsd } from "./format.js";
 import type { ReceiptModel } from "./model.js";
 import { cacheServedPct, priceDeltaParts } from "./present.js";
-import { FONT_STACK, THEMES, charW, esc, leaderEl, n, textEl } from "./svg.js";
+import { FONT_STACK, THEMES, charW, escAttr, leaderEl, n, textEl } from "./svg.js";
 import type { Theme, ThemeName } from "./svg.js";
 
 // --- View-model (R2) ---------------------------------------------------------
@@ -395,7 +395,7 @@ export function renderCardSvg(model: CardModel, opts: { theme?: ThemeName } = {}
 
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_W}" height="${CARD_H}" viewBox="0 0 ${CARD_W} ${CARD_H}" ` +
-    `font-family='${FONT_STACK}' role="img" aria-label="${esc(ariaLabel(model))}">` +
+    `font-family='${FONT_STACK}' role="img" aria-label="${escAttr(ariaLabel(model))}">` +
     els.join("") +
     `</svg>`
   );

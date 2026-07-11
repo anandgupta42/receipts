@@ -121,6 +121,17 @@ export function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
+/**
+ * Escape a string destined for a double-quoted XML attribute value. Extends
+ * `esc` with `"` → `&quot;`: element-text `esc` may leave a literal double quote
+ * (legal in text), but inside `attr="…"` an unescaped `"` breaks out of the
+ * attribute (CodeQL: incomplete HTML attribute sanitization). Use for any
+ * transcript-derived value that lands in an attribute (e.g. `aria-label`).
+ */
+export function escAttr(s: string): string {
+  return esc(s).replace(/"/g, "&quot;");
+}
+
 /** Monospace advance for one glyph at `size` (+10% safety margin when `safe`). Exported for the card's font-safe column math. */
 export function charW(size: number, safe = false): number {
   return size * CHAR_RATIO * (safe ? GLYPH_SAFETY : 1);
@@ -402,7 +413,7 @@ function cardGroup(els: string[], height: number, xOffset: number, idSuffix: str
 
 function svgDocument(width: number, height: number, body: string, label: string): string {
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(width)}" height="${n(height)}" viewBox="0 0 ${n(width)} ${n(height)}" font-family='${FONT_STACK}' role="img" aria-label="${esc(label)}">` +
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${n(width)}" height="${n(height)}" viewBox="0 0 ${n(width)} ${n(height)}" font-family='${FONT_STACK}' role="img" aria-label="${escAttr(label)}">` +
     body +
     `</svg>`
   );

@@ -102,6 +102,21 @@ describe("renderCardSvg — R3 determinism + fixed viewbox", () => {
     expect(svg).toContain(`fill="${CARD_THEMES.light.ink}"`);
     expect(svg).toContain(`fill="${CARD_THEMES.light.accent}"`);
   });
+
+  it("escapes a double quote in a value bound to the aria-label attribute (CodeQL: no attribute break-out)", async () => {
+    // scopeLabel derives from the agent label — transcript-derived, so it can
+    // carry a `"`. Inside aria-label="…" it must be escaped to `&quot;`, never a
+    // raw `"` that closes the attribute early. (A raw `"` in element *text*
+    // content is legal XML and stays unescaped — that is not this concern.)
+    const model: ReceiptModel = { ...(await modelFor(PRICED.source, PRICED.path)), agentLabel: 'Ag"ent onmouseover=x' };
+    const svg = renderCardSvg(buildSessionCardModel(model), { theme: "light" });
+    // Capture the aria-label value up to the first *unescaped* quote: if the raw
+    // `"` had broken out, the capture would stop mid-label and miss the tail.
+    const aria = svg.match(/aria-label="([^"]*)"/);
+    expect(aria).not.toBeNull();
+    expect(aria![1]).toContain("&quot;"); // the injected quote was escaped
+    expect(aria![1]).toContain("onmouseover=x · Jun 18 2026"); // whole label stayed inside the attribute
+  });
 });
 
 describe("renderCardSvg — I2 honesty", () => {
