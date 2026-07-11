@@ -19,8 +19,17 @@ export const PNG_SCALE = 2;
 /** Fixed pixel width every `--png` receipt renders at (R3; single-receipt only — compare is deferred, R5). */
 export const PNG_WIDTH = WIDTH * PNG_SCALE;
 
-/** Rasterize an SVG string (from `renderReceiptSvg`) to PNG bytes at the fixed R3 width. */
-export function rasterizeSvgToPng(svg: string): Buffer {
-  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: PNG_WIDTH } });
+/** SPEC-0077 R3 — the shareable card's logical width (1200×630, the OG/Twitter ratio) scaled by the same `PNG_SCALE`. Distinct from the tall receipt's `PNG_WIDTH`. */
+export const CARD_PNG_WIDTH = 1200 * PNG_SCALE;
+
+/**
+ * Rasterize an SVG string to PNG bytes. Defaults to the receipt's fixed R3
+ * width; SPEC-0077 R3 lets the card pass its own logical width so a 1200-wide
+ * landscape rasterizes at the card scale instead of the tall-receipt width.
+ * Height stays proportional (`fitTo` mode "width"), so a 1200×630 card lands at
+ * `width × PNG_SCALE` by `630 × PNG_SCALE`.
+ */
+export function rasterizeSvgToPng(svg: string, logicalWidth: number = WIDTH): Buffer {
+  const resvg = new Resvg(svg, { fitTo: { mode: "width", value: logicalWidth * PNG_SCALE } });
   return resvg.render().asPng();
 }

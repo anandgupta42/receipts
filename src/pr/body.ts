@@ -172,13 +172,14 @@ function contributorBlocks(view: ContributorView, spaceBefore: boolean, showRole
   return blocks;
 }
 
-interface Atom {
+export interface Atom {
   usd: number | null;
   tokens: TokenUsage;
   unreadable: boolean;
 }
 
-function collectAtoms(contributors: ContributorView[]): { atoms: Atom[]; childCount: number } {
+/** SPEC-0077 R2 — lifted for reuse by `buildPrCardModel`: every contributor + its subagents as priced atoms, plus the subagent count. */
+export function collectAtoms(contributors: ContributorView[]): { atoms: Atom[]; childCount: number } {
   const atoms: Atom[] = [];
   let childCount = 0;
   for (const c of contributors) {
@@ -191,7 +192,7 @@ function collectAtoms(contributors: ContributorView[]): { atoms: Atom[]; childCo
   return { atoms, childCount };
 }
 
-interface Totals {
+export interface Totals {
   pricedSubtotal: number;
   pricedCount: number;
   tokenSubtotal: number;
@@ -200,7 +201,8 @@ interface Totals {
   childCount: number;
 }
 
-function totalsFor(contributors: ContributorView[]): Totals {
+/** SPEC-0077 R2 — lifted for reuse by `buildPrCardModel`: the priced subtotal + the floor-driving counts over the atom universe. */
+export function totalsFor(contributors: ContributorView[]): Totals {
   const { atoms, childCount } = collectAtoms(contributors);
   const priced = atoms.filter((a) => a.usd !== null);
   const tokensOnly = atoms.filter((a) => a.usd === null && !a.unreadable);

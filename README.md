@@ -191,6 +191,7 @@ If you are an AI agent asked to install aireceipts, do the following:
 | `aireceipts statusline` | Live cost line in Claude Code's status bar, or any terminal via `--cwd` (tmux/starship/pwsh) — [setup](docs/statusline.md) |
 | `aireceipts --quota` / `--check-budget` | Claude Code rate-limit window, read from the statusline stdin payload (silent otherwise); `--check-budget` exits 1 when your local budget cap is exceeded |
 | `aireceipts --json` / `--csv` / `--svg` / `--png` | Versioned schema, RFC 4180 rows, shareable SVG/PNG image — [schema](docs/json-schema.md) |
+| `aireceipts --card` / `pr <n> --card` | A 1200×630 social card (session or PR), always sanitized, copied to your clipboard with the caption + share links printed — [share and export](docs/guide/11-share-and-export.md#as-a-shareable-card---card) |
 | `aireceipts stats` | Local usage counters — receipts generated on this machine |
 
 <div align="center">

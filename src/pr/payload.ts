@@ -8,6 +8,31 @@ import type { PrBodyExtras, PrBodyInput } from "./body.js";
 import { PR_RECEIPT_SCHEMA_VERSION, type PrReceiptPayload } from "./payloadTypes.js";
 
 /**
+ * SPEC-0077 R2a — the payload is defined as EXACTLY the renderer's input, and
+ * the renderer never reads a subagent's `modelMix`/`toolRows`/`partialPriced`
+ * (those exist only to feed `buildPrCardModel`). Drop them so the stored ref
+ * bytes stay identical to a pre-card ref and pass SPEC-0066's strict
+ * (`.strict()`) validator, which rejects unknown keys on `SubagentRow`. Clones
+ * only — the caller's `bodyInput` (still feeding the live card build) is never
+ * mutated.
+ */
+function stripCardOnlyFields(bodyInput: PrBodyInput): PrBodyInput {
+  return {
+    ...bodyInput,
+    contributors: bodyInput.contributors.map((c) => ({
+      ...c,
+      subagents: c.subagents.map((s) => {
+        const row = { ...s };
+        delete row.modelMix;
+        delete row.toolRows;
+        delete row.partialPriced;
+        return row;
+      }),
+    })),
+  };
+}
+
+/**
  * Assemble the schema-versioned payload stored on the receipt ref — exactly
  * the renderer's own input (`bodyInput`/`extras`), so reading it back and
  * feeding it to `renderPrBody` reproduces the comment byte-for-byte.
@@ -15,7 +40,7 @@ import { PR_RECEIPT_SCHEMA_VERSION, type PrReceiptPayload } from "./payloadTypes
 export function buildPrReceiptPayload(bodyInput: PrBodyInput, extras: PrBodyExtras): PrReceiptPayload {
   return {
     schemaVersion: PR_RECEIPT_SCHEMA_VERSION,
-    bodyInput,
+    bodyInput: stripCardOnlyFields(bodyInput),
     extras,
   };
 }

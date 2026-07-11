@@ -15,6 +15,8 @@ export interface CliOptions {
   readonly svg: boolean;
   /** SPEC-0012: rasterize the receipt SVG to PNG (receipt only). */
   readonly png: boolean;
+  /** SPEC-0077 R1: render a 1200×630 shareable card (`--card` → PNG, `--card --svg` → card SVG). */
+  readonly card: boolean;
   /** SPEC-0003: SVG/PNG palette. */
   readonly theme: "light" | "dark";
   /** SPEC-0003: output file for `--svg`/`--png`. */
@@ -41,6 +43,8 @@ export interface CliOptions {
   readonly noDetails: boolean;
   /** SPEC-0035 R5: `aireceipts pr --post --artifact --share` prints share intent URLs to stderr. */
   readonly share: boolean;
+  /** SPEC-0077 R5: `aireceipts pr <n> --post --card --link` puts the full-receipt permalink in the card caption (opt-in, requires --post, public repos only). */
+  readonly link: boolean;
   /** SPEC-0065 R1: `aireceipts pr --store <comment|ref>` — where the receipt is persisted; default `comment`. */
   readonly store?: "comment" | "ref";
   /** SPEC-0065 R2: `aireceipts pr --store ref --push-ref` also pushes the written ref to `origin`. */
@@ -102,6 +106,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let since: string | undefined;
   let svg = false;
   let png = false;
+  let card = false;
   let theme: "light" | "dark" = "light";
   let output: string | undefined;
   let post = false;
@@ -109,6 +114,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let artifact = false;
   let noDetails = false;
   let share = false;
+  let link = false;
   let store: "comment" | "ref" | undefined;
   let pushRef = false;
   let prBaseRepo: string | undefined;
@@ -169,6 +175,8 @@ export function parseOptions(argv: string[]): CliOptions {
       noDetails = true;
     } else if (arg === "--share") {
       share = true;
+    } else if (arg === "--link") {
+      link = true;
     } else if (arg === "--store") {
       const value = argv[++i];
       if (value !== "comment" && value !== "ref") {
@@ -232,6 +240,8 @@ export function parseOptions(argv: string[]): CliOptions {
       svg = true;
     } else if (arg === "--png") {
       png = true;
+    } else if (arg === "--card") {
+      card = true;
     } else if (arg === "--theme") {
       theme = argv[++i] === "dark" ? "dark" : "light";
     } else if (arg === "-o" || arg === "--output") {
@@ -256,6 +266,7 @@ export function parseOptions(argv: string[]): CliOptions {
     json,
     svg,
     png,
+    card,
     theme,
     output,
     csvMode,
@@ -269,6 +280,7 @@ export function parseOptions(argv: string[]): CliOptions {
     artifact,
     noDetails,
     share,
+    link,
     store,
     pushRef,
     prBaseRepo,

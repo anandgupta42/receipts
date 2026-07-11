@@ -8,7 +8,8 @@ import { discoverChildFiles, parseChildPath } from "../parse/children.js";
 import { loadById } from "../parse/load.js";
 import type { Session, TokenUsage } from "../parse/types.js";
 import { emptyUsage } from "../parse/util.js";
-import { buildReceiptModel } from "../receipt/model.js";
+import { buildReceiptModel, isPartiallyPriced } from "../receipt/model.js";
+import type { ModelMixEntry, ToolRow } from "../receipt/model.js";
 
 export interface SubagentRow {
   /** Display name — the child's title if present, else its agent id. */
@@ -22,6 +23,24 @@ export interface SubagentRow {
   /** SPEC-0044 B3 — malformed records skipped in this child's transcript; `> 0` → its cost is a lower bound. */
   droppedRecords?: number;
   filePath: string;
+  /**
+   * SPEC-0077 R2a — retained from the child's `buildReceiptModel` so a readable
+   * subagent contributes to the PR card's aggregate model-mix (`buildPrCardModel`).
+   * Present only on readable rows; unreadable children stay counted-only (I2/I3).
+   * NOT read by the comment/fence/artifact rendering (those use count/usd/tokens),
+   * and stripped from the SPEC-0065 ref payload so its bytes stay unchanged.
+   */
+  modelMix?: ModelMixEntry[];
+  /** SPEC-0077 R2a — retained per-tool rows for the PR card's tool roll-up; readable rows only (see `modelMix`). */
+  toolRows?: ToolRow[];
+  /**
+   * SPEC-0077 R2 — true when this readable child priced but left some
+   * usage-carrying turns unpriced (its `usd` is a lower bound). Folds into the
+   * PR card's `≥` floor (`buildPrCardModel`) so a partially-priced subagent
+   * can't make the card's headline look exact. Card-only, like `modelMix`/
+   * `toolRows`: not read by the comment/fence, stripped from the ref payload.
+   */
+  partialPriced?: boolean;
 }
 
 /** The inclusion window for a child: the rendered parent slice's time span, or `null` for a full-session render (include every child). */
@@ -92,6 +111,11 @@ export async function rollupChildren(
       unreadable: false,
       ...(((session.droppedRecords ?? 0) > 0) ? { droppedRecords: session.droppedRecords } : {}),
       filePath: childFile,
+      // SPEC-0077 R2a — retain the breakdown already computed above (was discarded).
+      modelMix: model.modelMix,
+      toolRows: model.toolRows,
+      // SPEC-0077 R2 — a partially-priced child floors the PR card headline.
+      ...(isPartiallyPriced(model) ? { partialPriced: true } : {}),
     });
   }
   return rows;

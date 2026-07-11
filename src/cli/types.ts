@@ -6,6 +6,7 @@
 // side-effecting seams.
 import type { CliOptions } from "./options.js";
 import type {
+  RecordCardGeneratedInput,
   RecordExportGeneratedInput,
   RecordHookConfiguredInput,
   RecordIntegrationSurfaceRenderedInput,
@@ -38,6 +39,8 @@ export interface CommandContext {
     noteReceiptGenerated(input: Omit<RecordReceiptGeneratedInput, "receiptOrdinal">, command?: string): Promise<void>;
     recordExportGenerated(input: RecordExportGeneratedInput): void;
     recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void;
+    /** SPEC-0077 R8 — one content-free `card_generated` event per rendered card. */
+    recordCardGenerated(input: RecordCardGeneratedInput): void;
     recordHookConfigured(input: RecordHookConfiguredInput): void;
     recordIntegrationSurfaceRendered(input: RecordIntegrationSurfaceRenderedInput): void;
     noteMilestone(milestone: MilestoneValue, command: string): Promise<void>;

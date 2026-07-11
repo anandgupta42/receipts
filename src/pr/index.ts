@@ -36,6 +36,8 @@ import {
   type PrBodyInput,
 } from "./body.js";
 import { summarizeConfidence, type ConfidenceEvent } from "./confidence.js";
+import { buildPrCardModel } from "./cardModel.js";
+import type { CardModel } from "../receipt/card.js";
 import { repoVisibility, resolvePr, upsertPrComment } from "./comment.js";
 import { artifactFileName, renderPrArtifactHtml, type ArtifactSession } from "./html.js";
 import { ARTIFACT_BRANCH, artifactViewUrl, publishArtifact } from "./publish.js";
@@ -61,6 +63,12 @@ export interface PrOptions {
   pushRef?: boolean;
   /** SPEC-0070 R1: opt the `buy me a samosa` tip link back onto the comment + artifact (off by default). */
   samosa?: boolean;
+  /** SPEC-0077 R1: also build the shareable PR card model (the CLI renders it to PNG/SVG). */
+  card?: boolean;
+  /** SPEC-0077 R2 — the PR number for the card's fixed `PR #<n>` scope label; supplied locally (I1 — no network to resolve it). */
+  prNumber?: number;
+  /** SPEC-0077 R5 — opt the sticky-comment permalink into the card caption (requires `--post`; public repos only; never fetched). */
+  link?: boolean;
 }
 
 export interface PrDeps {
@@ -90,6 +98,10 @@ export interface PrRunResult {
   shareResult: StepResultValue;
   /** SPEC-0059 R8 — the rendered body carried the handoff section (the kill criterion's observable denominator). */
   handoffSectionIncluded: boolean;
+  /** SPEC-0077 R2 — the aggregated PR card model, present only when `opts.card` and a PR number were supplied; the CLI renders it to a file. */
+  cardModel?: CardModel;
+  /** SPEC-0077 R5 — the sticky-comment permalink for the card caption, present only after a successful `--post --card --link` on a public repo (never fetched). */
+  cardLink?: string;
   result: ResultValue;
 }
 
@@ -418,6 +430,12 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     deps.err("--share requires --artifact");
     return prResult({ code: 1, result: "invalid_args" });
   }
+  // SPEC-0077 R5: the card link is the post's own sticky-comment permalink, never
+  // fetched — so `--link` is meaningless without `--post` (dry-run is linkless).
+  if (opts.link && !opts.post) {
+    deps.err("--link requires --post (dry-run cards are always linkless)");
+    return prResult({ code: 1, result: "invalid_args" });
+  }
 
   // Branch SHAs + commit dates: SHAs anchor/slice (R1/R1e), commit dates filter candidates (R1d).
   const branchInfo = branchCommits(deps.runGit, deps.cwd);
@@ -518,7 +536,21 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
   // size-cap's drop-from-END sheds helpers before authors.
   const fenceOrdered = [...entries.filter((e) => e.view.basis !== "helper"), ...entries.filter((e) => e.view.basis === "helper")];
   const views = entries.map((e) => e.view);
-  const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount, confidence: summarizeConfidence(allEvents) };
+  const confidence = summarizeConfidence(allEvents);
+  const bodyInput: PrBodyInput = { contributors: views, excludedCount: resolved.excludedCount, confidence };
+  // SPEC-0077 R2 — the aggregated PR card, from the same atoms the comment
+  // counts (contributors + readable subagents). Built only when requested and a
+  // local PR number was supplied (the card render never touches the network, I1);
+  // the CLI writes it to a PNG/SVG. `entries` retain the per-contributor models
+  // and the R2a-widened subagent detail the roll-up needs.
+  const cardModel: CardModel | undefined =
+    opts.card && opts.prNumber !== undefined
+      ? buildPrCardModel(
+          entries.map((e) => ({ view: e.view, model: e.model })),
+          opts.prNumber,
+          { excludedCount: resolved.excludedCount, confidence },
+        )
+      : undefined;
   const receipt: PrReceiptTelemetry = {
     models: entries.map((e) => e.model),
     turnCount: entries.reduce((sum, e) => sum + countedTurns(e.raw), 0),
@@ -647,6 +679,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       receipt,
       artifactResult,
       handoffSectionIncluded,
+      cardModel,
       result: "success",
     });
   }
@@ -662,10 +695,32 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       commentResult: "failed",
       artifactResult,
       handoffSectionIncluded,
+      cardModel,
       result: comment.missing ? "external_missing" : "external_failed",
     });
   }
   deps.err(`posted receipt (${comment.action}) to PR #${comment.prNumber}`);
+  // SPEC-0077 R5 — the opt-in card link is the post's OWN sticky-comment
+  // permalink (surfaced from this upsert, never fetched, I1). It rides the card
+  // caption only, never the image (R4). Refused on private/unknown-visibility
+  // repos — the SPEC-0035 public viewer 404s there — reusing the same
+  // `repoVisibility` gh call the --share path uses, on this already-networked
+  // --post flow. Falls back linkless when html_url wasn't captured.
+  let cardLink: string | undefined;
+  if (opts.card && opts.link) {
+    if (comment.htmlUrl === undefined) {
+      deps.err("card link skipped: GitHub did not return the comment permalink — sharing linkless");
+    } else {
+      const visibility = repoVisibility(comment.ownerRepo, deps.runGh);
+      if (visibility === "public") {
+        cardLink = comment.htmlUrl;
+      } else if (visibility === "private") {
+        deps.err("card link skipped: repo is private — the full-receipt viewer 404s for readers; sharing linkless");
+      } else {
+        deps.err("card link skipped: could not verify repo visibility — sharing linkless");
+      }
+    }
+  }
   // SPEC-0035 R5: only after BOTH the push (link !== null) AND the upsert
   // (result.ok, just confirmed above) succeed — never advertise a receipt
   // whose comment failed to post. Text only; no network from this branch.
@@ -705,6 +760,8 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     artifactResult,
     shareResult,
     handoffSectionIncluded,
+    cardModel,
+    cardLink,
     result: artifactFailed ? "external_failed" : "success",
   });
 }

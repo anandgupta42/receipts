@@ -23,10 +23,11 @@ import { promisify } from "node:util";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const r = (p) => join(ROOT, p);
 
-// Ceilings: the lean tarball is ~48 files / ~294 KB. Headroom so a real
-// regression (sourcemaps back, a stray dir) trips it, not normal growth.
+// Ceilings: the lean tarball is ~76 files / ~525 KB (SPEC-0077 added the card
+// renderer, PR aggregate, and share step). Headroom so a real regression
+// (sourcemaps back — hundreds of KB — or a stray dir) trips it, not normal growth.
 export const MAX_TARBALL_FILES = 80;
-export const MAX_UNPACKED_KB = 500;
+export const MAX_UNPACKED_KB = 600;
 // NOTICE ships because Apache-2.0 §4(d) requires redistributions to include it.
 export const FILES_ALLOWLIST = ["dist", "data/prices", "data/demo", "README.md", "LICENSE", "NOTICE"];
 

@@ -22,6 +22,69 @@ aireceipts compare "email format" "intermittently" --svg -o compare.svg
 
 (PNG is receipt-only; compare exports to SVG.)
 
+## As a shareable card (`--card`)
+
+`--card` re-renders a receipt as a 1200×630 social card — the OG/Twitter ratio —
+built to leave the terminal and travel on social media. It covers two scopes:
+
+```sh
+aireceipts --card                 # this session, as a PNG card (default)
+aireceipts --card --svg           # the deterministic card SVG
+aireceipts --card --theme dark    # dark palette
+aireceipts pr 189 --card          # the PR, aggregated across every session
+```
+
+Two layouts, same idiom:
+
+- **Session card** — total, agent + date, model-mix bar, per-tool line-items,
+  cache line, and the labeled cheaper-model arithmetic.
+- **PR card** — the same rich breakdown, aggregated across every contributor and
+  readable subagent the PR receipt counts: a token-weighted model mix, summed
+  per-tool costs, aggregate cache, and the session/role counts. (The
+  cheaper-model line is session-only — an aggregate repricing can't keep the
+  per-model price provenance the honesty rules require.)
+
+### The share step (local, one gesture)
+
+After writing the image, `--card` runs a fully-local share step:
+
+- copies the **image** onto your OS clipboard (best-effort; if your platform's
+  clipboard tool is missing it prints one line and the image is still on disk);
+- prints the **caption** — a fixed template, e.g. `$0.18 · Claude Code · 12 tools`
+  or `PR #189 — $3.13 across 3 sessions`;
+- prints **X** and **LinkedIn** web-intent URLs with the caption prefilled;
+- prints the honest note: `drag the image in — composers can't attach it for you`.
+
+Nothing is uploaded, fetched, or hosted, and no browser is launched — the only
+subprocess is your local clipboard tool. Web composers can't attach an image for
+you, so "easy" is one paste, or one drag.
+
+### Always sanitized (`--card` privacy defaults)
+
+There is exactly one card image, and it is always sanitized — the same contract
+as `--no-details`. It carries figures only: cost, tokens, cache-hit rate, model
+mix, tool breakdown, session/agent counts, dates, and the cheaper-model line. It
+**never** carries prompts or replies, source or file contents, **session
+titles**, or **repo / branch / project names**. Because there is one shared
+image, `--include-titles`, `--include-projects`, and `--by-project` are a usage
+error with `--card` (the card is always sanitized, not a toggle).
+
+### The opt-in PR link (`--link`)
+
+A single image can't carry a full multi-session PR receipt, so the card is the
+hook and the full receipt lives on a surface you own. The full-receipt URL
+contains `owner/repo/pull` (a "never" field on the image), so linking is opt-in
+and lands in the editable **caption only, never the image**:
+
+```sh
+aireceipts pr 189 --post --card --link   # public repo, after the post lands
+```
+
+`--link` requires `--post` (a dry-run card is always linkless), reuses the
+sticky-comment permalink the same `--post` just created — never a separate fetch
+— and is refused on private or unknown-visibility repos (the public viewer 404s
+there). Card render itself never touches the network; only your `--post` does.
+
 ## As data (JSON / CSV)
 
 For FinOps tooling, dashboards, and spreadsheets, emit structured data instead of

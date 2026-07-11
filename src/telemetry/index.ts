@@ -24,6 +24,9 @@ import {
 import { peekQueuedEvents, recordEvent, flushTelemetry } from "./sender.js";
 import { hashSignature } from "./signature.js";
 import type {
+  CardFormatValue,
+  CardScopeValue,
+  CardThemeValue,
   ExportFormatValue,
   ExportSurfaceValue,
   HookOperationValue,
@@ -217,6 +220,19 @@ export function recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void {
       result: input.result,
     },
   });
+}
+
+export interface RecordCardGeneratedInput {
+  scope: CardScopeValue;
+  theme: CardThemeValue;
+  format: CardFormatValue;
+  linkIncluded: boolean;
+  clipboardImageCopied: boolean;
+}
+
+/** SPEC-0077 R8 — one content-free `card_generated` event per rendered card. Enum/boolean only; no repo/title/project/dollar/token. */
+export function recordCardGenerated(input: RecordCardGeneratedInput): void {
+  recordEvent({ name: "card_generated", properties: input });
 }
 
 export interface RecordHookConfiguredInput {

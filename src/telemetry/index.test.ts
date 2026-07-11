@@ -6,6 +6,7 @@ import {
   noteReceiptGenerated,
   noteMilestone,
   noteRunStart,
+  recordCardGenerated,
   recordCliError,
   recordCliRun,
   recordExportGenerated,
@@ -172,6 +173,7 @@ describe("SPEC-0043 recorders", () => {
       scoped: true,
       configFile: true,
     });
+    recordCardGenerated({ scope: "session", theme: "light", format: "png", linkIncluded: false, clipboardImageCopied: true });
 
     const names = peekQueuedEvents().map((e) => e.name);
     expect(new Set(names)).toEqual(new Set(EVENT_NAMES));
