@@ -540,10 +540,10 @@ changes. Final integration snapshot:
 
 - TypeScript: exit 0.
 - ESLint (`--max-warnings 0`): exit 0.
-- Vitest: 143 files, 2,059 tests passed; exit 0.
+- Vitest: 144 files, 2,071 tests passed; exit 0.
 - Goldens: 102 artifacts byte-identical; exit 0.
 - Determinism: 10/10 golden runs byte-identical; exit 0.
-- Spec lint: 76 specs OK; exit 0.
+- Spec lint: 77 specs OK; exit 0.
 - Hygiene: OK; exit 0.
 - Pricing mutation gate: 67.86% score against a 60% threshold; exit 0.
 - Built CLI E2E: Claude Code JSONL, Codex JSONL (including GPT-5.6 request
