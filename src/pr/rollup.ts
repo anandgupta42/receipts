@@ -1,9 +1,10 @@
 // SPEC-0019 R1c — roll subagent (child) sessions up into the parent's PR
 // receipt. A child is included iff its own window overlaps the rendered parent
-// slice (launch OR result inside — the straddle case: launched in-slice,
-// finished after, still counts). A child that fails to parse is listed as
+// slice (their time intervals intersect; an overlapping child is attributed
+// whole). A child that fails to parse is listed as
 // `(unreadable)` and counted, never silently dropped. Children of a full-session
-// fallback are all included (the window is the whole session).
+// fallback are all included. A sliced parent with no observable time window
+// cannot safely claim any readable child's usage.
 import { discoverChildFiles, parseChildPath } from "../parse/children.js";
 import { loadById } from "../parse/load.js";
 import type { Session, TokenUsage } from "../parse/types.js";
@@ -23,11 +24,16 @@ export interface SubagentRow {
   unreadable: boolean;
   /** SPEC-0044 B3 — malformed records skipped in this child's transcript; `> 0` → its cost is a lower bound. */
   droppedRecords?: number;
+  /** Child priced GPT-5.6 Codex usage whose trace omitted cache-write tokens. */
+  unobservedCacheWriteTokens?: boolean;
   filePath: string;
 }
 
-/** The inclusion window for a child: the rendered parent slice's time span, or `null` for a full-session render (include every child). */
-export type RollupWindow = { start: number; end: number } | null;
+/** How much of the parent is rendered, kept explicit so a timeless slice never masquerades as the whole session. */
+export type RollupWindow =
+  | { kind: "full" }
+  | { kind: "range"; start: number; end: number }
+  | { kind: "unknown" };
 
 interface RollupDeps {
   discover: (parentFilePath: string) => Promise<string[]>;
@@ -39,13 +45,19 @@ const defaultDeps: RollupDeps = {
   load: (childFilePath) => loadById("claude-code", childFilePath),
 };
 
-/** True if the child's launch (startedAt) OR result (endedAt) falls inside the window. */
+/** True when the child's observable interval intersects the parent range. */
 function childOverlaps(session: Session, window: RollupWindow): boolean {
-  if (window === null) {
+  if (window.kind === "full") {
     return true;
   }
-  const inWindow = (t?: number) => t !== undefined && t >= window.start && t <= window.end;
-  return inWindow(session.startedAt) || inWindow(session.endedAt);
+  if (window.kind === "unknown") {
+    return false;
+  }
+  if (session.startedAt !== undefined && session.endedAt !== undefined) {
+    return session.startedAt <= window.end && session.endedAt >= window.start;
+  }
+  const observed = session.startedAt ?? session.endedAt;
+  return observed !== undefined && observed >= window.start && observed <= window.end;
 }
 
 /**
@@ -94,6 +106,7 @@ export async function rollupChildren(
       ...(model.unpricedTokens ? { unpricedTokens: model.unpricedTokens } : {}),
       unreadable: false,
       ...(((session.droppedRecords ?? 0) > 0) ? { droppedRecords: session.droppedRecords } : {}),
+      ...(model.unobservedCacheWriteTokens ? { unobservedCacheWriteTokens: true } : {}),
       filePath: childFile,
     });
   }

@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { aggregateWaste } from "../../src/aggregate/waste.js";
+import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "../../src/receipt/costEstimate.js";
 import { detectStuckLoops } from "../../src/pricing/waste.js";
 import type { Session, SessionTotals, TokenUsage, ToolCall, Turn } from "../../src/parse/types.js";
 
@@ -103,6 +104,7 @@ describe("aggregateWaste (R5)", () => {
 
     const agg = await aggregateWaste([trivialSession, loopSession, cleanSession], dataDir);
     expect(agg.map((a) => a.class)).toEqual(["stuck-loop", "trivial-spans"]);
+    expect(agg.every((a) => a.costInterpretation === HEURISTIC_PATTERN_PRICING_INTERPRETATION)).toBe(true);
     expect(agg[0].cost).toBeGreaterThan(agg[1].cost);
   });
 

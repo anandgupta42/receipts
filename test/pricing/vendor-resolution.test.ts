@@ -113,28 +113,42 @@ describe("vendorForModel — landed families and unknowns", () => {
   });
 });
 
-describe("OpenAI tiered-model safety (I2)", () => {
+describe("OpenAI context-tier resolution (I2)", () => {
   const openai = loadTable("openai.json");
   const tieredModels = [
-    ["gpt-5.5", "https://developers.openai.com/api/docs/models/gpt-5.5"],
     ["gpt-5.6-sol", "https://developers.openai.com/api/docs/models/gpt-5.6-sol"],
     ["gpt-5.6-terra", "https://developers.openai.com/api/docs/models/gpt-5.6-terra"],
     ["gpt-5.6-luna", "https://developers.openai.com/api/docs/models/gpt-5.6-luna"],
   ] as const;
 
-  it.each(tieredModels)("keeps %s tokens-only while the flat schema cannot select its exact rate", async (model, source) => {
-    expect(openai.models[model]).toBeUndefined();
-    expect(openai.omitted).toContainEqual(expect.objectContaining({ model, source }));
+  it.each(tieredModels)("resolves and selects %s's cited Standard context tier", async (model, source) => {
+    const row = openai.models[model]?.price_history[0];
+    expect(row).toBeDefined();
+    expect(openai.omitted ?? []).not.toContainEqual(expect.objectContaining({ model }));
+    expect(row!.sources).toContainEqual(expect.objectContaining({ url: source }));
     expect(vendorForModel(model)).toBe("openai");
-    expect(await resolvePrice("openai", model, "2026-07-10", dataDir)).toBeNull();
-    expect(
-      await priceTurn(
-        "openai",
-        model,
-        "2026-07-10",
-        { input: 300_000, output: 1_000, cacheRead: 250_000, cacheCreation: 0, total: 551_000 },
-        dataDir,
-      ),
-    ).toBeNull();
+    expect(await resolvePrice("openai", model, "2026-07-10", dataDir)).not.toBeNull();
+
+    const atBoundary = { input: 100_000, output: 1_000_000, cacheRead: 172_000, cacheCreation: 0, total: 1_272_000 };
+    const aboveBoundary = { ...atBoundary, input: 100_001, total: 1_272_001 };
+    const baseUsd = row!.input * 0.1 + (row!.input_cached ?? row!.input) * 0.172 + row!.output;
+    const long = row!.context_tiers![0];
+    const longUsd = long.input * 0.100001 + (long.input_cached ?? long.input) * 0.172 + long.output;
+    expect((await priceTurn("openai", model, "2026-07-10", atBoundary, dataDir))?.usd).toBeCloseTo(baseUsd, 12);
+    expect((await priceTurn("openai", model, "2026-07-10", aboveBoundary, dataDir))?.usd).toBeCloseTo(longUsd, 12);
+
+    const writeUsage = { input: 100_000, output: 0, cacheRead: 0, cacheCreation: 100_000, total: 200_000 };
+    const priced = await priceTurn("openai", model, "2026-07-10", writeUsage, dataDir);
+    expect(priced?.usd).toBeCloseTo((row!.input + row!.input_cache_write!) * 0.1, 12);
+    expect(priced?.cacheWriteLowerBound).toBe(false);
+  });
+
+  it("keeps gpt-5.5 unpriced because its long-context multiplier has full-session scope", async () => {
+    expect(openai.models["gpt-5.5"]).toBeUndefined();
+    expect(openai.omitted).toContainEqual(expect.objectContaining({
+      model: "gpt-5.5",
+      source: "https://developers.openai.com/api/docs/models/gpt-5.5",
+    }));
+    expect(await resolvePrice("openai", "gpt-5.5", "2026-07-10", dataDir)).toBeNull();
   });
 });

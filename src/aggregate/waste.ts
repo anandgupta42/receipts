@@ -7,10 +7,13 @@ import type { Session, TokenUsage } from "../parse/types.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
 import { detectContextThrash, detectStuckLoops, detectTrivialSpans } from "../pricing/waste.js";
+import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "../receipt/costEstimate.js";
 
 export interface WasteClassAggregate {
   /** Waste-class id, matching the receipt's `WasteLine.kind` ("stuck-loop" | "trivial-spans"). */
   class: string;
+  /** Additive runtime label: detector pricing is heuristic evidence, never proven savings. */
+  costInterpretation?: typeof HEURISTIC_PATTERN_PRICING_INTERPRETATION;
   /**
    * Priced-subset cost: the sum of the *priced* firings' `usd` only. An
    * unpriced firing (unknown model, unpriceable session) contributes its
@@ -109,6 +112,7 @@ export async function aggregateWaste(
       const overlapSet = overlaps.get(cls);
       const base: WasteClassAggregate = {
         class: cls,
+        costInterpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION,
         cost: e.cost,
         tokens: e.tokens,
         distinctSessionCount: e.sessions.size,

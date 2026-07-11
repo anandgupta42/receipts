@@ -1,6 +1,9 @@
 // R6 `--handoff`: a paste-ready block built ONLY from fired waste lines — a
 // terse "here's what to check" note, not a second receipt. SPEC-0059 shapes
-// that body as the savings slip: a COULD HAVE SAVED headline, a hedge, and
+// that body as the savings slip. Cost arithmetic is now universally a
+// Standard-API-equivalent lower bound, but detector membership is heuristic:
+// the headline reports the cost inside a flagged pattern, never guaranteed
+// waste or savings.
 // per-class evidence + fixed rule lines. Evidence rows reuse the receipt's own
 // `wasteRowBlock` so the two surfaces never drift apart on phrasing.
 //
@@ -10,10 +13,11 @@
 // data (I1 — never model-generated); no line judges the agent or names a
 // model (I6).
 import type { WasteClassAggregate } from "../aggregate/waste.js";
-import { dottedLine, formatAbsoluteUtc, formatDuration, formatInt, formatUsd } from "./format.js";
-import type { ReceiptModel, WasteLine } from "./model.js";
+import { dottedLine, formatAbsoluteUtc, formatDuration, formatInt, formatSharePercent, formatUsdFloor, formatUsdLowerBound } from "./format.js";
+import { combinedPricedUsd, combinedTokenTotal, type ReceiptModel, type WasteLine } from "./model.js";
 import { wasteRowBlock } from "./present.js";
 import { RECEIPT_WIDTH } from "./render.js";
+import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "./costEstimate.js";
 
 /** SPEC-0013 R1: distinct-session recurrence needed before a class is eligible; `--handoff-threshold` overrides. */
 export const DEFAULT_HANDOFF_THRESHOLD = 3;
@@ -48,27 +52,43 @@ export const SLIP_RULE_LINES: Record<string, string> = {
   "context-thrash": "clear or split context at task boundaries",
 };
 
-/** SPEC-0059 R2/R7 — the could-have-saved ceiling: extracted sums, never a prediction. */
+const FLAGGED_PATTERN_COST_KINDS = new Set(["stuck-loop", "context-thrash"]);
+
+/** SPEC-0059 R2/R7 — overlap-safe flagged-pattern arithmetic, never a savings claim. */
 export interface CouldHaveSaved {
-  /** Sum of `usd` over priced waste lines; `null` when no fired line priced (I2). */
+  /** Explicit meaning for this legacy-named object: detector pricing, not proven savings. */
+  interpretation: typeof HEURISTIC_PATTERN_PRICING_INTERPRETATION;
+  /** Legacy field: largest flagged-class cost subtotal. It does not establish avoidability. */
   usd: number | null;
-  /** Sum of `tokens.total` over all fired waste lines — the checkable token-side count. */
+  /** Largest one-class token subtotal. It does not establish avoidability. */
   tokens: number;
-  /** `round(100 · usd / totalUsd)`; `null` without both dollar sides. */
+  /** Retained for schema compatibility; null because a ratio of two lower bounds has no valid direction. */
   pctOfTotal: number | null;
 }
 
 export function couldHaveSavedOf(wasteLines: WasteLine[], totalUsd: number | null): CouldHaveSaved {
-  const priced = wasteLines.filter((w) => w.usd !== null);
-  const usd = priced.length > 0 ? priced.reduce((sum, w) => sum + (w.usd as number), 0) : null;
-  const tokens = wasteLines.reduce((sum, w) => sum + w.tokens.total, 0);
-  const pctOfTotal = usd !== null && totalUsd !== null && totalUsd > 0 ? Math.round((100 * usd) / totalUsd) : null;
-  return { usd, tokens, pctOfTotal };
+  void totalUsd; // Compatibility parameter; ratios of lower bounds are intentionally not computed.
+  const byKind = new Map<string, { usd: number; hasPriced: boolean; tokens: number }>();
+  for (const waste of wasteLines) {
+    const subtotal = byKind.get(waste.kind) ?? { usd: 0, hasPriced: false, tokens: 0 };
+    if (waste.usd !== null && FLAGGED_PATTERN_COST_KINDS.has(waste.kind)) {
+      subtotal.usd += waste.usd;
+      subtotal.hasPriced = true;
+    }
+    subtotal.tokens += waste.tokens.total;
+    byKind.set(waste.kind, subtotal);
+  }
+  const flaggedSubtotals = [...byKind.entries()]
+    .filter(([kind, subtotal]) => FLAGGED_PATTERN_COST_KINDS.has(kind) && subtotal.hasPriced)
+    .map(([, subtotal]) => subtotal.usd);
+  const usd = flaggedSubtotals.length > 0 ? Math.max(...flaggedSubtotals) : null;
+  const tokens = Math.max(0, ...[...byKind.values()].map((subtotal) => subtotal.tokens));
+  return { interpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION, usd, tokens, pctOfTotal: null };
 }
 
-/** The headline's right-aligned value: `≤ $X` when any line priced, else `≤ N tok` (I2). */
+/** The headline's explicitly heuristic pattern subtotal. */
 export function couldHaveSavedValue(saved: CouldHaveSaved): string {
-  return saved.usd !== null ? `≤ $${formatUsd(saved.usd)}` : `≤ ${formatInt(saved.tokens)} tok`;
+  return saved.usd !== null ? `≈ $${formatUsdFloor(saved.usd)}` : `≈ ${formatInt(saved.tokens)} tok`;
 }
 
 /**
@@ -82,18 +102,8 @@ export function couldHaveSavedValue(saved: CouldHaveSaved): string {
  */
 export function savingsSlipLines(wasteLines: WasteLine[], totalUsd: number | null): string[] {
   const saved = couldHaveSavedOf(wasteLines, totalUsd);
-  const lines: string[] = [dottedLine("COULD HAVE SAVED", couldHaveSavedValue(saved), RECEIPT_WIDTH)];
-  // R2 hedge: `≈` when an estimate-tier class contributes (a sum containing an
-  // estimate is itself estimate-tier — I3); the `$` sum is only a ceiling over
-  // ALL waste when nothing was token-only, so the mixed case must say less.
-  const approx = wasteLines.some((w) => w.kind !== "stuck-loop") ? "≈ " : "";
-  const mixed = saved.usd !== null && wasteLines.some((w) => w.usd === null);
-  const core = mixed ? "priced waste only, not a prediction" : "arithmetic, not a prediction";
-  lines.push(
-    saved.pctOfTotal !== null && totalUsd !== null
-      ? `  ${approx}${saved.pctOfTotal}% of $${formatUsd(totalUsd)} · ${core}`
-      : `  ${approx}${core}`,
-  );
+  const lines: string[] = [dottedLine("FLAGGED PATTERN COST", couldHaveSavedValue(saved), RECEIPT_WIDTH)];
+  lines.push("  heuristic pattern subtotal · not proven savings");
   lines.push("");
   const order: string[] = [];
   const groups = new Map<string, WasteLine[]>();
@@ -183,10 +193,17 @@ function stateHeaderLines(model: ReceiptModel, counts: HandoffCounts): string[] 
   }
   const lines: string[] = [agentParts.join(" · ")];
   if (model.modelMix.length > 0) {
-    lines.push(model.modelMix.map((m) => `${m.model} ${Math.round(m.tokenShare * 100)}%`).join(" · "));
+    lines.push(model.modelMix.map((m) => `${m.model} ${formatSharePercent(m.tokenShare)}`).join(" · "));
   }
-  const totalPart = model.totalUsd !== null ? `total $${formatUsd(model.totalUsd)}` : `total ${formatInt(model.sessionTotalTokens.total)} tok`;
-  lines.push(`${totalPart} · ${formatInt(counts.turns)} turns · ${formatInt(counts.toolCalls)} tool calls`);
+  const totalPart = model.totalUsd !== null
+    ? `total ${formatUsdLowerBound(combinedPricedUsd(model) ?? model.totalUsd)}`
+    : `total ${formatInt(combinedTokenTotal(model))} tok`;
+  const childCount = model.subagents?.count ?? 0;
+  lines.push(
+    childCount > 0
+      ? `${totalPart} · ${formatInt(counts.turns)} parent turns · ${formatInt(counts.toolCalls)} parent tool calls · ${formatInt(childCount)} subagents`
+      : `${totalPart} · ${formatInt(counts.turns)} turns · ${formatInt(counts.toolCalls)} tool calls`,
+  );
   if (counts.compactions > 0) {
     lines.push(`compactions: ${formatInt(counts.compactions)}`);
   }
@@ -200,6 +217,9 @@ function countNoun(n: number, singular: string): string {
 
 /** SPEC-0042 R2 — the packet states what it covers, checkably (fixed format, counts only). */
 function coverageLine(model: ReceiptModel, counts: HandoffCounts): string {
+  if (model.subagents !== undefined) {
+    return `covers: ${countNoun(counts.turns, "parent turn")} · ${countNoun(counts.toolCalls, "parent tool call")} · ${countNoun(model.subagents.count, "subagent")} · ${countNoun(counts.compactions, "parent compaction")} · ${countNoun(model.wasteLines.length, "parent waste line")}`;
+  }
   return `covers: ${countNoun(counts.turns, "turn")} · ${countNoun(counts.toolCalls, "tool call")} · ${countNoun(counts.compactions, "compaction")} · ${countNoun(model.wasteLines.length, "waste line")}`;
 }
 

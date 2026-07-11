@@ -11,7 +11,7 @@ const DatabaseSync = sqliteMod?.DatabaseSync as typeof import("node:sqlite").Dat
 const hasNodeSqlite = sqliteMod !== null;
 import { afterEach, describe, expect, it } from "vitest";
 import { OpenCodeAdapter } from "../../src/parse/opencode.js";
-import { buildReceiptModel } from "../../src/receipt/model.js";
+import { buildReceiptModel, sliceSessionForReceipt } from "../../src/receipt/model.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/opencode");
@@ -305,6 +305,20 @@ function makeSessionMessageDb(dbPath: string): void {
   db.close();
 }
 
+function setCurrentSessionAggregate(
+  dbPath: string,
+  tokens: { input: number; output: number; reasoning: number; cacheRead: number; cacheWrite: number },
+): void {
+  const db = new DatabaseSync(dbPath);
+  db.prepare(`
+    UPDATE session
+    SET tokens_input = ?, tokens_output = ?, tokens_reasoning = ?,
+        tokens_cache_read = ?, tokens_cache_write = ?
+    WHERE id = 'ses_current_shape'
+  `).run(tokens.input, tokens.output, tokens.reasoning, tokens.cacheRead, tokens.cacheWrite);
+  db.close();
+}
+
 function addProviderRoutingMessages(dbPath: string): void {
   const db = new DatabaseSync(dbPath);
   const insert = db.prepare(
@@ -457,7 +471,9 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     });
 
     const model = await buildReceiptModel(session!, dataDir);
-    expect(model.totalUsd).toBeCloseTo(0.00975625, 12);
+    // OpenAI cache components without a cited applicable rate contribute zero
+    // to the floor; Claude's cited cache rates remain included.
+    expect(model.totalUsd).toBeCloseTo(0.00966875, 12);
     expect(model.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`).sort()).toEqual([
       "anthropic:claude-haiku-4-5",
       "openai:gpt-5.3-codex",
@@ -503,6 +519,129 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     });
   });
 
+  it("preserves a larger session aggregate as explicit unpriced residual usage", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-aggregate-residual.db");
+    makeSessionMessageDb(dbPath);
+    // Itemized assistant usage is 500 input, 125 output+reasoning, 50 read,
+    // 10 write. The projector knows more than the message row in every bucket.
+    setCurrentSessionAggregate(dbPath, { input: 650, output: 150, reasoning: 25, cacheRead: 90, cacheWrite: 30 });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens).toMatchObject({
+      input: 650,
+      output: 175,
+      cacheRead: 90,
+      cacheCreation: 30,
+      total: 945,
+    });
+    // Aggregate-only usage stays outside the turn/model domain: no synthetic
+    // request is invented merely to make downstream arithmetic reconcile.
+    expect(session!.totals.turnCount).toBe(1);
+    expect(session!.turns).toHaveLength(1);
+    expect(session!.unattributedUsage).toMatchObject({
+      input: 150,
+      output: 50,
+      cacheRead: 40,
+      cacheCreation: 20,
+      total: 260,
+    });
+
+    const receipt = await buildReceiptModel(session!, dataDir);
+    expect(receipt.totalTokens.total).toBe(945);
+    expect(receipt.unpricedTokens?.total).toBe(260);
+    expect(receipt.totalUsd).not.toBeNull();
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("260 unattributed tokens") }),
+    );
+    expect(receipt.caveats.some((c) => c.kind === "partial-priced-coverage")).toBe(false);
+    expect(receipt.toolRows).toContainEqual(expect.objectContaining({ tool: "(unattributed usage)", usd: null, callCount: 0 }));
+    expect(receipt.modelMix).toContainEqual(expect.objectContaining({ model: "(unattributed usage)", usd: null }));
+
+    const twoTurnSession = {
+      ...session!,
+      turns: [...session!.turns, { index: 1, toolCalls: [] }],
+      totals: { ...session!.totals, turnCount: 2 },
+    };
+    const slice = sliceSessionForReceipt(twoTurnSession, { startTurn: 0, endTurn: 0 });
+    expect(slice.unattributedUsage).toBeUndefined();
+    expect(slice.excludedUnattributedUsage?.total).toBe(260);
+    expect(slice.totals.tokens.total).toBe(685);
+    const slicedReceipt = await buildReceiptModel(slice, dataDir);
+    expect(slicedReceipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("cannot be assigned to this slice") }),
+    );
+  });
+
+  it("does not splice crossed aggregate and itemized vectors into a fabricated total", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-conflicting-aggregate.db");
+    makeSessionMessageDb(dbPath);
+    // Itemized = 500 input, 125 output, 50 read, 10 write. The aggregate is
+    // larger overall and in output/read/write, but smaller in input. Adding
+    // only its positive deltas would create a vector reported by neither side.
+    setCurrentSessionAggregate(dbPath, { input: 400, output: 300, reasoning: 25, cacheRead: 90, cacheWrite: 30 });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens).toMatchObject({
+      input: 500,
+      output: 125,
+      cacheRead: 50,
+      cacheCreation: 10,
+      total: 685,
+    });
+    expect(session!.unattributedUsage).toBeUndefined();
+    expect(session!.conflictingAggregateUsage).toMatchObject({
+      input: 0,
+      output: 200,
+      cacheRead: 40,
+      cacheCreation: 20,
+      total: 260,
+    });
+
+    const receipt = await buildReceiptModel(session!, dataDir);
+    expect(receipt.totalTokens.total).toBe(685);
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({
+        kind: "unattributed-aggregate-usage",
+        text: expect.stringContaining("conflict with itemized components"),
+      }),
+    );
+  });
+
+  it("does not inherit missing request identity from OpenCode session metadata", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-missing-request-identity.db");
+    makeSessionMessageDb(dbPath);
+    const db = new DatabaseSync(dbPath);
+    db.prepare("UPDATE session SET model = ? WHERE id = 'ses_current_shape'").run(
+      JSON.stringify({ id: "gpt-5.3-codex", providerID: "openai" }),
+    );
+    const t0 = Date.parse("2026-06-30T12:00:00.000Z");
+    db.prepare("UPDATE session_message SET data = ? WHERE id = 'msg_asst_1'").run(
+      JSON.stringify({
+        // Deliberately no message-level modelID/model/providerID. A later or
+        // session-wide direct identity cannot prove this request's route.
+        tokens: { input: 500, output: 100, reasoning: 25, cache: { read: 50, write: 10 } },
+        time: { created: t0 + 5_000, completed: t0 + 20_000 },
+        content: [{ type: "text", text: "identity omitted" }],
+      }),
+    );
+    db.close();
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.model).toBe("gpt-5.3-codex");
+    expect(session!.turns[0].model).toBeUndefined();
+    expect(session!.turns[0].pricingProvider).toBeNull();
+    expect((await buildReceiptModel(session!, dataDir)).totalUsd).toBeNull();
+  });
+
   it("prices only explicit direct providers and blocks routed/custom provider IDs", async () => {
     const dir = tempDir();
     dirs.push(dir);
@@ -540,7 +679,7 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       "openai:gpt-5.3-codex",
     ]);
     expect(receipt.caveats).toContainEqual(
-      expect.objectContaining({ kind: "partial-priced-coverage", text: expect.stringContaining("4 of 6 turns unpriced") }),
+      expect.objectContaining({ kind: "partial-priced-coverage", text: expect.stringContaining("4 of 6 usage turns include unpriced tokens") }),
     );
   });
 

@@ -58,7 +58,14 @@ describe("computeBudgetSum — token mode", () => {
 
     const result = await computeBudgetSum("daily", { tokens: 10_000 }, NOW, dataDir);
 
-    expect(result).toEqual({ kind: "tokens", spentTokens: 1500 + 2000, cap: 10_000, sessionCount: 2 });
+    expect(result).toEqual({
+      kind: "tokens",
+      spentTokens: 1500 + 2000,
+      cap: 10_000,
+      sessionCount: 2,
+      excludedUnreadableCount: 0,
+      childSessionsIncluded: false,
+    });
     expect(loadSessionMock).not.toHaveBeenCalled(); // token mode never needs pricing attribution
   });
 
@@ -106,7 +113,12 @@ describe("computeBudgetSum — usd mode", () => {
       expect(result.spent).toBeCloseTo(0.005 + 0.0125, 10);
       expect(result.cap).toBe(50);
       expect(result.sessionCount).toBe(1);
+      expect(result.inWindowSessionCount).toBe(2);
+      expect(result.fullyPricedSessionCount).toBe(1);
+      expect(result.partiallyPricedSessionCount).toBe(0);
       expect(result.excludedUnpricedCount).toBe(1);
+      expect(result.unpricedTokenCount).toBe(2_000);
+      expect(result.childSessionsIncluded).toBe(false);
     }
   });
 
@@ -138,5 +150,94 @@ describe("computeBudgetSum — usd mode", () => {
     listSessionsMock.mockResolvedValue([]);
     const result = await computeBudgetSum("weekly", {}, NOW, dataDir);
     expect(result).toMatchObject({ kind: "usd", spent: 0, cap: 0, sessionCount: 0, excludedUnpricedCount: 0 });
+  });
+
+  it("counts a mixed priced/unpriced-turn session as partial and exposes the excluded token subtotal", async () => {
+    const pricedUsage = usage({ input: 1_000, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const unpricedUsage = usage({ input: 250, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const mixed = summary({ id: "mixed", endedAt: NOW - 1_000, totals: totals(usage({ input: 1_250, output: 0, cacheRead: 0, cacheCreation: 0 })) });
+    listSessionsMock.mockResolvedValue([mixed]);
+    loadSessionMock.mockResolvedValue({
+      ...mixed,
+      turns: [
+        { index: 0, timestamp: NOW - 1_000, model: "claude-opus-4-8", usage: pricedUsage, toolCalls: [] },
+        { index: 1, timestamp: NOW - 900, model: "unknown-model", usage: unpricedUsage, toolCalls: [] },
+      ],
+    });
+
+    const result = await computeBudgetSum("daily", { usd: 50 }, NOW, dataDir);
+
+    expect(result.kind).toBe("usd");
+    if (result.kind === "usd") {
+      expect(result.sessionCount).toBe(1);
+      expect(result.fullyPricedSessionCount).toBe(0);
+      expect(result.partiallyPricedSessionCount).toBe(1);
+      expect(result.excludedUnpricedCount).toBe(0);
+      expect(result.unpricedTokenCount).toBe(250);
+    }
+  });
+
+  it("counts null/degraded full loads as unreadable exclusions instead of dropping them", async () => {
+    const reloadFailed = summary({
+      id: "reload-failed",
+      endedAt: NOW - 1_000,
+      totals: totals(usage({ input: 300, output: 0, cacheRead: 0, cacheCreation: 0 })),
+    });
+    const degraded = summary({
+      id: "degraded",
+      endedAt: NOW - 2_000,
+      totals: totals(usage({ input: 999, output: 0, cacheRead: 0, cacheCreation: 0 })),
+      degraded: "unreadable",
+    });
+    listSessionsMock.mockResolvedValue([reloadFailed, degraded]);
+    loadSessionMock.mockResolvedValue(null);
+
+    const result = await computeBudgetSum("daily", { usd: 50 }, NOW, dataDir);
+
+    expect(listSessionsMock).toHaveBeenCalledWith(undefined, { includeDegraded: true });
+    expect(result.kind).toBe("usd");
+    if (result.kind === "usd") {
+      expect(result.inWindowSessionCount).toBe(2);
+      expect(result.sessionCount).toBe(0);
+      expect(result.excludedUnpricedCount).toBe(2);
+      expect(result.unreadableSessionCount).toBe(2);
+      expect(result.unpricedTokenCount).toBe(300);
+    }
+  });
+
+  it("counts a priced session with an uncited cache rate as partial, not full", async () => {
+    const cacheUsage = usage({ input: 900, output: 0, cacheRead: 0, cacheCreation: 100 });
+    const cachedWrite = summary({
+      id: "cache-gap",
+      source: "codex",
+      endedAt: NOW - 1_000,
+      model: "gpt-5.3-codex",
+      totals: totals(cacheUsage),
+    });
+    listSessionsMock.mockResolvedValue([cachedWrite]);
+    loadSessionMock.mockResolvedValue({
+      ...cachedWrite,
+      turns: [{ index: 0, timestamp: NOW - 1_000, model: "gpt-5.3-codex", usage: cacheUsage, toolCalls: [] }],
+    });
+
+    const result = await computeBudgetSum("daily", { usd: 50 }, NOW, dataDir);
+
+    expect(result.kind).toBe("usd");
+    if (result.kind === "usd") {
+      expect(result.fullyPricedSessionCount).toBe(0);
+      expect(result.partiallyPricedSessionCount).toBe(1);
+      expect(result.cacheRatePartialSessionCount).toBe(1);
+      expect(result.unpricedTokenCount).toBe(0);
+    }
+  });
+
+  it("excludes child/subagent summaries from the budget scope", async () => {
+    const child = summary({ id: "child", endedAt: NOW - 1_000, totals: totals(usage({ input: 500, output: 0, cacheRead: 0, cacheCreation: 0 })), isSidechain: true });
+    listSessionsMock.mockResolvedValue([child]);
+
+    const result = await computeBudgetSum("daily", { usd: 50 }, NOW, dataDir);
+
+    expect(loadSessionMock).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ kind: "usd", inWindowSessionCount: 0, sessionCount: 0 });
   });
 });

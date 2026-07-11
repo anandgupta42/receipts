@@ -1,7 +1,7 @@
 // SPEC-0019 R1c — child discovery + rollup: children are found under the parent's
 // subagents/ tree and excluded from the top-level list; a child rolls up on
-// launch- OR result-in-window overlap (straddle); an unreadable child is listed
-// and counted, never dropped.
+// interval overlap (including a child spanning the whole parent range); an
+// unreadable child is listed and counted, never dropped.
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -50,7 +50,7 @@ describe("R1c discovery (path layout)", () => {
 describe("R1c rollup (window overlap + honest count)", () => {
   const start = 1_000_000;
   const end = 2_000_000;
-  const window = { start, end };
+  const window = { kind: "range", start, end } as const;
 
   it("includes a straddling child (launched in-slice, finished after)", async () => {
     const straddle = childSession("straddle", start + 10, end + 5_000);
@@ -73,6 +73,16 @@ describe("R1c rollup (window overlap + honest count)", () => {
     expect(rows.map((r) => r.name)).toEqual(["child resultIn"]);
   });
 
+  it("includes a child whose interval spans the entire parent range", async () => {
+    const spanning = childSession("spanning", start - 500, end + 500);
+    const rows = await rollupChildren(PARENT, window, {
+      discover: async () => ["spanning"],
+      load: async () => spanning,
+    });
+    expect(rows.map((r) => r.name)).toEqual(["child spanning"]);
+    expect(rows[0].tokens).toEqual(spanning.totals.tokens);
+  });
+
   it("lists an unreadable child and keeps the count honest", async () => {
     const good = childSession("good", start + 1, start + 2);
     const rows = await rollupChildren(PARENT, window, {
@@ -85,13 +95,24 @@ describe("R1c rollup (window overlap + honest count)", () => {
     expect(broken!.usd).toBeNull();
   });
 
-  it("full-session render (null window) includes every child", async () => {
+  it("full-session render includes every child", async () => {
     const anytime = childSession("x", 42, 99);
-    const rows = await rollupChildren(PARENT, null, {
+    const rows = await rollupChildren(PARENT, { kind: "full" }, {
       discover: async () => ["x"],
       load: async () => anytime,
     });
     expect(rows).toHaveLength(1);
+  });
+
+  it("an unknown slice window excludes readable child usage but preserves unreadable evidence", async () => {
+    const pricedStart = Date.UTC(2026, 5, 15, 10, 0, 0);
+    const readable = childSession("readable", pricedStart, pricedStart + 1);
+    const rows = await rollupChildren(PARENT, { kind: "unknown" }, {
+      discover: async () => ["readable", "broken"],
+      load: async (file) => (file === "readable" ? readable : null),
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ filePath: "broken", usd: null, unreadable: true });
   });
 
   it("carries the exact unpriced portion of a partially-priced child", async () => {
@@ -108,7 +129,7 @@ describe("R1c rollup (window overlap + honest count)", () => {
     child.totals.tokens = withTotal({ ...emptyUsage(), input: 800, output: 175, cacheRead: 25 });
     child.totals.turnCount = 2;
 
-    const rows = await rollupChildren(PARENT, { start: mixedStart, end: mixedStart + 2 }, {
+    const rows = await rollupChildren(PARENT, { kind: "range", start: mixedStart, end: mixedStart + 2 }, {
       discover: async () => ["mixed"],
       load: async () => child,
     });

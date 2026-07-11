@@ -8,7 +8,7 @@
 // Maintainer-approved verbatim (PR #77 comment) — do not edit. This exact
 // string also ships in site/view.html's inline script for the browser-side
 // X intent link; test/site-share.test.ts asserts the two stay byte-identical.
-export const SHARE_TEXT = "An aireceipts cost receipt — what the AI agents actually cost.";
+export const SHARE_TEXT = "An aireceipts cost receipt — an observable Standard API cost floor, not an invoice.";
 
 /** The X/Twitter and LinkedIn intent URLs for one canonical artifact link — no `utm_*`, no added tracking key. */
 export function buildShareTargets(canonicalUrl: string): { x: string; linkedin: string } {

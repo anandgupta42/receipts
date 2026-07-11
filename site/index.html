@@ -171,28 +171,29 @@
     <div>
       <h1 class="display">Every agent session is a blank check. <span class="seal">Here&rsquo;s the receipt.</span></h1>
       <p class="hero-sub">The meter runs while the agent drives &middot; the receipt prints when the ride ends &middot; and it sticks with the PR.</p>
-      <p class="hero-note">Local and deterministic. No account; transcripts never leave your machine.</p>
+      <p class="hero-note">Local and deterministic. Observable Standard-API floors, never invoices. No account; transcripts never leave your machine.</p>
       <div class="cta-row">
         <button type="button" class="cmd-btn copy-btn" data-cmd="npx aireceipts-cli"><span class="p">$</span>npx aireceipts-cli</button>
         <a class="cta-link" href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">See a real receipt on a real PR &rarr;</a>
       </div>
     </div>
-    <figure class="paper" aria-label="A real aireceipts receipt for a Claude Code session that cost $12.30">
+    <figure class="paper" aria-label="An aireceipts Standard-API-equivalent floor for a Claude Code session: at least 12 dollars and 30 cents">
 <pre><span class="dim">- - - - - - - - - - - - - - - -</span>
           <span class="b">AIRECEIPTS</span>
 <span class="dim"> Claude Code · Jul 02 2026 · 33m</span>
 <span class="dim">- - - - - - - - - - - - - - - -</span>
-(thinking/reply)..........$5.36
-Bash......................$3.93
-Read......................$1.88
-Write.....................$0.66
-Edit......................$0.38
-TaskList..................$0.05
-SendMessage...............$0.04
-<span class="red">⚠ $2.68 recoverable</span>
+(thinking/reply)........≥ $5.36
+Bash....................≥ $3.93
+Read....................≥ $1.88
+Write...................≥ $0.66
+Edit....................≥ $0.38
+TaskList................≥ $0.05
+SendMessage.............≥ $0.04
+<span class="red">⚠ flagged pattern ≈ $2.68</span>
 <span class="red">  101 trivial turns</span>
 <span class="dim">--------------------------------</span>
-<span class="b">TOTAL....................<span class="grn">$12.30</span></span>
+<span class="b">TOTAL..................<span class="grn">≥ $12.30</span></span>
+<span class="dim">Standard-API floor; not an invoice</span>
 <span class="dim">(arithmetic, not a prediction)</span></pre>
     </figure>
   </div>
@@ -202,17 +203,17 @@ SendMessage...............$0.04
 <div class="ticker" role="list" aria-label="Real numbers from real receipts">
   <div class="ticker-track">
     <ul>
-      <li><b class="red">$156.28</b> caught in one day &middot; 45 sessions</li>
-      <li><b>$10,056.63</b> &middot; one real week &middot; 319 sessions</li>
-      <li>same tokens on claude-haiku-4-5 &middot; <b>78% less</b></li>
-      <li><b>$3.13</b> &middot; the receipt on PR #189 &middot; live</li>
+      <li><b class="red">≈ $156.28</b> flagged pattern cost &middot; not proven savings</li>
+      <li><b>≥ $10,056.63</b> Standard-API floor &middot; 319 sessions</li>
+      <li>same tokens on claude-haiku-4-5 &middot; <b>78% lower floor</b></li>
+      <li>PR #189 &middot; live historical receipt (pre-≥ notation)</li>
       <li>every price cited &middot; URL, date, excerpt</li>
     </ul>
     <ul aria-hidden="true">
-      <li><b class="red">$156.28</b> caught in one day &middot; 45 sessions</li>
-      <li><b>$10,056.63</b> &middot; one real week &middot; 319 sessions</li>
-      <li>same tokens on claude-haiku-4-5 &middot; <b>78% less</b></li>
-      <li><b>$3.13</b> &middot; the receipt on PR #189 &middot; live</li>
+      <li><b class="red">≈ $156.28</b> flagged pattern cost &middot; not proven savings</li>
+      <li><b>≥ $10,056.63</b> Standard-API floor &middot; 319 sessions</li>
+      <li>same tokens on claude-haiku-4-5 &middot; <b>78% lower floor</b></li>
+      <li>PR #189 &middot; live historical receipt (pre-≥ notation)</li>
       <li>every price cited &middot; URL, date, excerpt</li>
     </ul>
   </div>
@@ -225,22 +226,22 @@ SendMessage...............$0.04
       <p class="eyebrow"><span class="red">// 01</span> &middot; while the agent works</p>
       <h2 class="head">View the meter running.</h2>
       <p class="lede">One settings line pins <code>aireceipts statusline</code> under Claude Code&rsquo;s
-      input box — which model is billing you, cost so far, burn rate, context, and your
+      input box — which model is active, observable floor so far, floor rate, context, and your
       5-hour cap. tmux keeps it live for Codex and OpenCode too; starship and PowerShell
       refresh per prompt.</p>
       <div class="legend">
-        <b>Opus</b> — the model billing you right now<br>
-        <b>$23.78 · $14/hr</b> — cost so far, and what an hour costs<br>
+        <b>Opus</b> — the model active right now<br>
+        <b>≥$23.78 · ≥$14/hr</b> — observable floor so far and per hour<br>
         <b>⚠ Bash loop ×5</b> — waste, flagged the moment it happens
       </div>
     </div>
     <div>
       <div class="gifframe">
         <img src="assets/statusline.gif" width="1040" height="360" loading="lazy"
-             alt="An agent session replayed in a Claude Code-shaped terminal — tool rows scrolling above the input box, the aireceipts meter highlighted beneath it, cost ticking up as the session runs; host-supplied payload fields (context, quota) are simulated.">
+             alt="Historical agent-session replay with the aireceipts meter highlighted; it predates the current lower-bound glyph. Host-supplied context and quota fields are simulated.">
       </div>
-      <div class="pill" role="img" aria-label="The statusline: model Opus, $23.78 so far, $14 per hour, 17 million tokens, context 41 percent, Bash loop times 5 waste flag, 5-hour window 63 percent, resets in 2 hours 12 minutes"><span class="b">[aireceipts]</span> Opus · $23.78 · $14/hr · 17M · ctx 41% · <span class="w">⚠ Bash loop ×5</span> · <span class="m">5h 63% ↺2h12m</span></div>
-      <p class="cap">A replayed session — cost, tokens, and the waste flag re-priced by the real CLI
+      <div class="pill" role="img" aria-label="The statusline: model Opus, Standard-API floor at least 23 dollars 78 cents, floor rate at least 14 dollars per hour, 17 million tokens, context 41 percent, Bash loop times 5 waste flag, 5-hour window 63 percent, resets in 2 hours 12 minutes"><span class="b">[aireceipts]</span> Opus · ≥$23.78 · ≥$14/hr · 17M · ctx 41% · <span class="w">⚠ Bash loop ×5</span> · <span class="m">5h 63% ↺2h12m</span></div>
+      <p class="cap">A replayed session — the floor, tokens, and waste flag computed by the real CLI
       at each step; host payload fields simulated. <a href="docs/statusline.html">Set it up &rarr;</a></p>
     </div>
   </div>
@@ -253,7 +254,7 @@ SendMessage...............$0.04
       <p class="eyebrow"><span class="red">// 02</span> &middot; when the ride ends</p>
       <h2 class="head">The receipt prints.</h2>
       <p class="lede">One command. No install, no account, no upload. aireceipts reads the
-      transcripts your agent already writes to disk and prices the session tool by tool —
+      transcripts your agent already writes to disk and computes a cited floor tool by tool —
       waste flagged, and the cheaper-model line is arithmetic on the same tokens, never a
       prediction. New machine? <code>--demo</code> prints a bundled example.</p>
     </div>
@@ -263,14 +264,16 @@ SendMessage...............$0.04
 
             AIRECEIPTS
 <span class="dim">Claude Code · 10m 30s · claude-opus-4-8 87%</span>
-Bash.......................$0.05  (3 calls)
-Edit.......................$0.05  (2 calls)
-(thinking/reply)...........$0.03  (2 turns)
-Write......................$0.03  (2 calls)
-Read........................$0.02  (1 call)
+Bash...................≥ $0.0517  (3 calls)
+Edit...................≥ $0.0455  (2 calls)
+(thinking/reply).......≥ $0.0310  (2 turns)
+Write..................≥ $0.0290  (2 calls)
+Read...................≥ $0.0192  (1 call)
 <span class="dim">-------------------------------------------</span>
-TOTAL.................................<span class="grn">$0.18</span>
-same tokens on claude-haiku-4-5....$0.04 <span class="dim">(78% less)</span>
+TOTAL.............................<span class="grn">≥ $0.1767</span>
+<span class="dim">Standard-API floor; not an invoice</span>
+same tokens on claude-haiku-4-5..≥ $0.0392
+<span class="dim">  (78% lower observable floor)</span>
 <span class="dim">  (arithmetic, not a prediction)</span></pre>
       </div>
       <p class="cap">Abridged from a golden-tested receipt — the terminal prints the full
@@ -285,17 +288,17 @@ same tokens on claude-haiku-4-5....$0.04 <span class="dim">(78% less)</span>
     <div>
       <p class="eyebrow"><span class="red">// 03</span> &middot; when the PR ships</p>
       <h2 class="head">The receipt sticks with the PR.</h2>
-      <p class="lede"><code>aireceipts pr --post</code> attaches the cost of the sessions behind
+      <p class="lede"><code>aireceipts pr --post</code> attaches the observable floor of the sessions behind
       a branch to its pull request — one comment, kept current across pushes. A drop-in CI
-      check can require every PR to carry one. What a change cost becomes as visible as
+      check can require every PR to carry one. The observed usage behind a change becomes as visible as
       what it changed.</p>
     </div>
     <div>
       <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222" class="prshot">
         <img src="assets/pr-receipt-189.png" width="1176" height="870" loading="lazy"
-             alt="The real aireceipts receipt comment on merged PR #189: three sessions — a Claude orchestrator sliced to this PR's turns plus two Codex helpers — $3.13 total.">
+             alt="The real historical aireceipts receipt comment on merged PR 189, with three sessions. It predates the current lower-bound notation.">
       </a>
-      <p class="cap">Not a mockup — the receipt on PR #189 of this repo, $3.13.
+      <p class="cap">Not a mockup — the historical receipt on PR #189 predates the current ≥ notation.
       <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live &rarr;</a></p>
     </div>
   </div>
@@ -314,7 +317,7 @@ same tokens on claude-haiku-4-5....$0.04 <span class="dim">(78% less)</span>
     <div class="hands">
       <div class="hand">
         <h4>TODAY</h4>
-        <pre><span class="red">⚠ Bash loop ×5 · $0.08</span>
+        <pre><span class="red">⚠ Bash loop ×5 · ≥ $0.08</span>
 # paste into CLAUDE.md:
 - Bash loop ×5: change the input
   before a 3rd retry.</pre>
@@ -322,7 +325,7 @@ same tokens on claude-haiku-4-5....$0.04 <span class="dim">(78% less)</span>
       <div class="hand">
         <h4>TOMORROW</h4>
         <pre>Bash loop ............. none
-wasted ................ <span class="grn">$0.00</span></pre>
+observed waste ........ none</pre>
       </div>
     </div>
   </div>

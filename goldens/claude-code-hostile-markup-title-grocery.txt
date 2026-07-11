@@ -7,10 +7,12 @@
 
 TXN #BBC5F9A2
 ITEM                              QTY          AMT
-Read                                1        $0.01
+Read                                1    ≥ $0.0071
 --------------------------------------------------
-TOTAL                                        $0.01
-same tokens on claude-haiku-4-5...$0.00 (50% less)
+TOTAL                                    ≥ $0.0071
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0035
+  (50% lower observable floor)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-sonnet-5

@@ -8,7 +8,7 @@
 // format must not silently render a partial line.
 import type { MiniSummary } from "../receipt/mini.js";
 import { statuslineWasteFlag } from "../receipt/mini.js";
-import { formatShortTokens, formatUsd } from "../receipt/format.js";
+import { formatShortTokens, formatUsdFloor, formatUsdLowerBoundCompact } from "../receipt/format.js";
 import {
   projectCapCrossingMs,
   quotaWindowPath,
@@ -158,7 +158,7 @@ function resetCountdown(resetsAtSec: number | null, nowMs: number): string | nul
 
 /** R3 — a burn RATE `$/hr`: whole dollars once it's ≥ $1/hr (glanceable), else the cents. */
 function formatRate(perHr: number): string {
-  return perHr >= 1 ? String(Math.round(perHr)) : formatUsd(perHr);
+  return perHr >= 1 ? String(Math.floor(perHr)) : formatUsdFloor(perHr);
 }
 
 /**
@@ -200,7 +200,7 @@ const SEGMENTS: Record<SegmentName, (ctx: SegmentContext) => string | null> = {
       ? (payloadModelName(ctx.payload) ?? cleanModelName(ctx.summary.model))
       : cleanModelName(ctx.summary.model),
   cost: (ctx) =>
-    !ctx.summary.unpriceable && ctx.summary.totalUsd !== null ? `$${formatUsd(ctx.summary.totalUsd)}` : null,
+    !ctx.summary.unpriceable && ctx.summary.totalUsd !== null ? formatUsdLowerBoundCompact(ctx.summary.totalUsd) : null,
   tokens: (ctx) => formatShortTokens(ctx.summary.totalTokens),
   // R2 — Claude Code's pre-calculated context-window fullness; omitted when absent (I2/I3).
   context: (ctx) => {
@@ -214,7 +214,7 @@ const SEGMENTS: Record<SegmentName, (ctx: SegmentContext) => string | null> = {
       return null;
     }
     const perHr = totalUsd / (durationMs / 3_600_000);
-    return Number.isFinite(perHr) ? `$${formatRate(perHr)}/hr` : null;
+    return Number.isFinite(perHr) ? `≥$${formatRate(perHr)}/hr` : null;
   },
   waste: (ctx) => (ctx.summary.topWaste ? statuslineWasteFlag(ctx.summary.topWaste) : null),
   quota5h: (ctx) => {

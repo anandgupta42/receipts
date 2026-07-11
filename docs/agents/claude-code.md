@@ -10,6 +10,15 @@ a session-end hook and a statusline. (SPEC-0058; depth facts match
 - **Per-turn parsing.** Every turn's model, token usage (input, output, cache
   read/write), and tool calls — so the receipt prices each tool line and shows
   the session's real model mix (e.g. `claude-opus-4-8 87% · claude-sonnet-5 13%`).
+- **Same-id snapshots stay coherent.** Several records sharing one
+  `message.id` remain one observable response group. The complete usage record
+  with the highest output count is retained (later record wins a tie), rather
+  than fabricating a vector from independent bucket maxima; repeated
+  `tool_use.id` blocks count once.
+- **Id-less usage fails closed.** Without `message.id`, repeated snapshots
+  cannot be separated from distinct provider responses. Their tool evidence
+  remains visible, but all id-less usage is reduced to one coherent
+  highest-output envelope, carried as unattributed tokens, and never priced.
 - **Cache visibility.** The `cache served N% of input tokens` masthead line and
   cache-tier pricing come straight from the transcript's usage records.
 - **Subagents counted.** Sessions spawned via the Agent tool are discovered

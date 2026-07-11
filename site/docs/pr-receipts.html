@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -502,6 +502,8 @@ jobs:
 
 <pre class="doc-code"><code class="language-sh">npx aireceipts-cli pr --store ref --push-ref</code></pre>
 
+<p>The ref's internal producer/CI payload remains <code>PR_RECEIPT_SCHEMA_VERSION = 1</code>. It is not the public <code>--json</code>/<code>--csv</code> schema (currently v2), and it intentionally has no <code>costSemantics</code> field: it stores renderer inputs, while the rendered comment itself qualifies dollar floors with <code>≥</code>. See the <a href="json-schema.html#versioning-semver-discipline-r4">export schema</a>.</p>
+
 <p>Codex hooks are best-effort. Current Codex <code>PreToolUse</code> interception does not cover every shell path, including some <code>unified_exec</code> calls, so the <code>AGENTS.md</code> finalizer is a second chance and CI enforcement is the merge-time backstop. For the strongest agent-independent local path, a repo can also wire <code>pr --store ref --push-ref</code> into its own Git pre-push hook; Git requires one-time activation and never auto-runs a fetched hook.</p>
 
 <p>Safe to run alongside another <code>refs/receipts/*</code> producer (e.g. an attestation tool): aireceipts writes and reads only its own <code>refs/aireceipts/*</code> namespace, so the two never fight over the same refs. (Earlier versions shared <code>refs/receipts/*</code>, which left <code>pr-check</code> reading a foreign-schema payload and silently posting nothing; the dedicated namespace removes that collision.)</p>
@@ -525,10 +527,11 @@ jobs:
 
 <ul>
   <li>A marker line (<code>&lt;!-- aireceipts-dogfood --&gt;</code>) so the upsert and the CI check can find exactly one comment to keep current.</li>
-  <li>A fenced receipt headed <code>N sessions behind this PR</code>: one row per contributing session (<code>&lt;role&gt; · &lt;model mix&gt; · &lt;cost&gt;</code>), a muted provenance line under each (session id + <code>session slice: turns A–B of N</code>, or <code>entire session (slice unavailable)</code> when the work can't be cut cleanly — ambiguity is labeled, never presented as PR cost), and one indented <code>SUBAGENTS (N)</code> aggregate row summing any subagent sessions a contributor launched (SPEC-0060).</li>
+  <li>A fenced receipt headed <code>N sessions behind this PR</code>: one row per contributing session (<code>&lt;role&gt; · &lt;model mix&gt; · &lt;cost&gt;</code>), a muted provenance line under each (session id + <code>session slice: turns A–B of N</code>, or <code>entire session (slice unavailable)</code> when the work can't be cut cleanly — ambiguity is labeled, never presented as PR cost), and one indented <code>SUBAGENTS (N)</code> aggregate row for child sessions whose observable intervals overlap that parent scope (SPEC-0060). A sliced parent with no observable time range has an unknown child window: readable child costs are excluded instead of being claimed whole, while unreadable child evidence remains counted.</li>
   <li>One combined total. Priced and unpriced sessions are never blended: dollars and tokens total separately.</li>
   <li>An honest note counting any plausible-but-unproven sessions that were <strong>not</strong> attributed.</li>
   <li>A collapsed <code>full receipts</code> section: a per-session ledger table, each session's full receipt, and — for a session that launched subagents — a <code>subagents (N)</code> table under its receipt, sorted by cost and capped at 20 rows where the last row carries the remainder's sum (a capped list never silently drops value).</li>
+  <li>When a counted session fires a detector, a collapsed <code>handoff — flagged pattern cost ≈ …</code> section. Its headline is an overlap-safe heuristic subtotal with the explicit line <code>not proven savings</code>; it is not a savings floor or ceiling.</li>
 </ul>
 
 <h2 id="how-sessions-are-matched-to-a-pr">How sessions are matched to a PR</h2>
@@ -542,6 +545,8 @@ jobs:
 </ul>
 
 <p>Zero credited sessions → <code>aireceipts pr</code> refuses to guess and asks for <code>--session &lt;id&gt;</code>. One selector is an exact override; two or more are additive to this auto set. The <code>cwd</code>/branch/SHA signals used for matching are attribution-only: they never enter the rendered receipt, <code>--json</code>/<code>--csv</code>, or telemetry.</p>
+
+<p>Child rollups use true interval intersection, not endpoint containment: a child is included whole when <code>child.start &lt;= parent.end</code> and <code>child.end &gt;= parent.start</code>, including a child that spans the parent range. No readable child is included when a sliced parent lacks both usable bounds.</p>
     </article>
   </main>
   <footer>

@@ -468,3 +468,44 @@ tokens-only; only absent evidence retains legacy inference. Focused regressions
 cover nested/string/session metadata, direct and blocked providers, provider
 switches, and every pricing consumer so a routed turn cannot regain a dollar in
 waste, attribution, price-delta, or receipt-model side paths.
+
+**2026-07-10 · R13 visible cost-basis amendment.** Internal token×dated-row
+arithmetic remains deterministic, but a local transcript is not a
+billing ledger: auth/billing channel, negotiated plan, regional uplift, actual
+service tier, upstream credits, or an unpersisted usage dimension may differ.
+Every human-readable dollar total and component therefore carries `≥` as a
+**standard API list-price-equivalent observable floor**. Machine exports retain
+their numeric compatibility fields and gain an additive structured lower-bound
+cost marker. Counterfactual/savings lines stay explicitly approximate. For
+GPT-5.6 Codex, per-response context tier comes from changed cumulative usage;
+absent `cache_write_tokens` contributes zero to the floor. Built-artifact E2E
+fixtures for Claude Code, Codex, and opencode must assert both the independently
+calculated numeric arithmetic and its visible/machine-readable qualifier.
+
+**2026-07-10 · R14 strict-floor correction (supersedes B1/R8 display
+reconciliation).** A largest-remainder cent split can assign one cent to a row
+whose raw value is only 0.6 cents, making `≥ $0.01` false. Every human lower
+bound now rounds **down** independently (fractional-cent values retain four decimals),
+and no row borrows a cent from another. Machine scalars retain the unrounded
+arithmetic. Cached reads/writes with no cited applicable rate contribute zero,
+not a guessed input-rate fallback, with a visible cache-rate caveat. The public
+export meaning changed from exact-looking cost to lower bound, so
+`SCHEMA_VERSION` is 2. Rows need not sum byte-for-byte after independent display
+flooring; each row and total must instead be individually no greater than its
+raw scalar.
+
+**2026-07-10 · request/identity fail-closed amendment.** The product path now
+turns Codex reconciliation from a maintainer-only signal into a pricing gate.
+Non-monotone cumulative usage, a missing/zero/disagreeing post-baseline
+`last_token_usage`, mixed legacy+cumulative schemas, dropped records, or a
+request sum that misses the final local envelope disables all request dollars
+and preserves one unattributed token envelope with a caveat. Claude id-less
+assistant usage is also one coherent unattributed envelope, not a set of priced
+requests. Every pricing consumer uses each unit's own model/provider/timestamp;
+trivial-span dollars require all units to pass that gate.
+
+For PR child rollups, `full`, `range`, and `unknown` are distinct evidence
+states. Range inclusion uses true interval intersection. An unknown sliced
+parent excludes all readable child cost, while unreadable child evidence stays
+counted. OpenCode crossed aggregate/itemized vectors remain itemized and expose
+only positive aggregate-only conflict, excluded from totals and dollars.

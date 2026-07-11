@@ -7,10 +7,12 @@
 
 TXN #C59B5365
 ITEM                              QTY          AMT
-mcp__claude-in-chrome__brow…        1        $0.01
+mcp__claude-in-chrome__brow…        1    ≥ $0.0097
 --------------------------------------------------
-TOTAL                                        $0.01
-same tokens on claude-haiku-4-5...$0.00 (50% less)
+TOTAL                                    ≥ $0.0097
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0048
+  (50% lower observable floor)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-sonnet-5

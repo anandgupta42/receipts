@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -342,7 +342,7 @@ footer{
 
 <h2 id="im-on-a-flat-rate-subscription-what-do-the-dollar-figures-mean-for-me">I'm on a flat-rate subscription — what do the dollar figures mean for me?</h2>
 
-<p>They are <strong>API-equivalent arithmetic</strong> on your real token counts — what the same tokens would cost at the cited list prices — never a claim about your bill. On a subscription, the receipt's plan-independent lines are the useful ones: per-tool anatomy, cache economics, and waste lines. <code>aireceipts --quota</code> shows the official rate-limit window state, which is the ceiling that actually constrains a subscriber. How every dollar is computed: <a href="13-pricing.html">pricing</a>.</p>
+<p>They are <strong>Standard API list-price-equivalent lower bounds</strong> on the token usage the transcript exposes — never a claim about your bill or the marginal cost of a subscription session. That is why computed dollars render as <code>≥ $X</code>. On a subscription, the receipt's plan-independent lines are the useful ones: per-tool anatomy, cache economics, and waste lines. <code>aireceipts --quota</code> shows the official rate-limit window state, which is the ceiling that actually constrains a subscriber. How every dollar is computed: <a href="13-pricing.html">pricing</a>.</p>
 
 <h2 id="does-aireceipts-send-anything-off-my-machine">Does aireceipts send anything off my machine?</h2>
 
@@ -354,11 +354,11 @@ footer{
 
 <h2 id="why-does-my-receipt-show-tokens-but-no-dollars">Why does my receipt show tokens but no dollars?</h2>
 
-<p>No cited, dated price row matched that session's model and date, and aireceipts never guesses a dollar — that's an invariant, not a gap. The price tables live in <a href="https://github.com/anandgupta42/receipts/tree/main/data/prices"><code>data/prices/</code></a>, one JSON per vendor, each row carrying the vendor page it was copied from and the date it was observed. Add or update a row (with its citation) and the same transcript re-prices. Method details: <a href="13-pricing.html">pricing</a>.</p>
+<p>Tokens-only means at least one pricing prerequisite was not proven. Common reasons are: no cited row for the unit's exact model/date; an explicitly routed/custom provider; a missing unit model/timestamp; failed Codex cumulative/<code>last</code> reconciliation; or Claude usage without <code>message.id</code> and therefore without trustworthy response boundaries. aireceipts preserves those tokens and never guesses a dollar. Adding a cited row from <a href="https://github.com/anandgupta42/receipts/tree/main/data/prices"><code>data/prices/</code></a> re-prices only usage whose other identity and reconciliation gates pass. Receipt caveats distinguish unattributed/reconciliation cases from a missing row. GPT-5.5 deliberately stays tokens-only because its &quot;full session&quot; long-context scope cannot be selected from requests or a PR slice. Method details: <a href="13-pricing.html">pricing</a>.</p>
 
 <h2 id="why-doesnt-the-receipt-match-my-vendors-invoice">Why doesn't the receipt match my vendor's invoice?</h2>
 
-<p>The receipt is a <strong>local estimate</strong>: token counts from your transcript × cited price tables, computed at render time. It is not a feed from your vendor's billing system, and every fallback in the method is chosen to understate rather than overstate. <code>aireceipts --methodology</code> prints the exact attribution rules the tool applies. The full explanation of where estimate and invoice can diverge: <a href="13-pricing.html">pricing</a>.</p>
+<p>The receipt is a <strong>Standard API list-price-equivalent lower bound</strong>: observable tokens × cited rows, not a vendor billing feed. Traces can omit cache writes, billing/auth route, invoice join ids, region, service tier, credits, or negotiated prices; subscriptions may have no per-request invoice amount. <code>aireceipts --methodology</code> states the rules; <a href="13-pricing.html">pricing</a> explains the gap. For Codex, a content-free audit of 792 rollouts found 51,465 changed request envelopes. They support deterministic GPT-5.6 request-tier arithmetic and avoid aggregation error: 136 of 216 user-turn groups would falsely cross 272K only after summing requests. But rollouts persist no cache-write count, billing/auth route, provider request id, explicit dollar, invoice key, credits, or discounts. The trace supports a reproducible <code>≥ $X</code> floor, not invoice-exact billing: see <a href="https://developers.openai.com/api/docs/models/gpt-5.6-sol">GPT-5.6 pricing</a> and the <a href="https://github.com/anandgupta42/receipts/blob/main/docs/internal/research/2026-07-10-receipt-cost-correctness-deep-dive.md">audit</a>.</p>
 
 <h2 id="why-does-my-cursor-receipt-show-session-totals-only">Why does my Cursor receipt show session totals only?</h2>
 

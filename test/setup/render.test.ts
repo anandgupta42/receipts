@@ -25,6 +25,13 @@ function report(overrides: Partial<SetupReport> = {}): SetupReport {
       model: "claude-opus-4-8",
       totalUsd: 0.18,
       totalTokens: usage(100),
+      parentUnpricedTokens: usage(0),
+      combinedUnpricedTokens: usage(0),
+      subagentUnpricedCount: 0,
+      subagentUnreadableCount: 0,
+      subagentRollupStatus: "complete",
+      costScope: "parent-session",
+      tokenScope: "parent-session",
       wasteLineCount: 1,
       unpriceable: false,
     },
@@ -32,8 +39,15 @@ function report(overrides: Partial<SetupReport> = {}): SetupReport {
       sessionCount: 1,
       pricedSessionCount: 1,
       excludedSessionCount: 0,
+      fullyPricedSessionCount: 1,
+      partiallyPricedSessionCount: 0,
+      cacheRatePartialSessionCount: 0,
+      unpricedSessionCount: 0,
+      unreadableSessionCount: 0,
+      unpricedTokenTotal: usage(0),
       pricedUsd: 0.18,
       tokenTotal: usage(100),
+      childSessionsIncluded: false,
     },
     offers: [
       {
@@ -54,6 +68,8 @@ describe("SPEC-0050 setup render", () => {
     expect(out.indexOf("Latest session")).toBeLessThan(out.indexOf("Next"));
     expect(out).toContain("Claude Code");
     expect(out).toContain("$0.18");
+    expect(out).toContain("Priced floor (1 full + 0 partial)");
+    expect(out).toContain("top-level only; children excluded");
     expect(out).toContain("npx aireceipts-cli integrations");
   });
 
@@ -66,6 +82,13 @@ describe("SPEC-0050 setup render", () => {
           model: "local-provider",
           totalUsd: null,
           totalTokens: usage(1234),
+          parentUnpricedTokens: usage(1234),
+          combinedUnpricedTokens: usage(1234),
+          subagentUnpricedCount: 0,
+          subagentUnreadableCount: 0,
+          subagentRollupStatus: "complete",
+          costScope: "parent-session",
+          tokenScope: "parent-session",
           wasteLineCount: 0,
           unpriceable: false,
         },
@@ -73,6 +96,67 @@ describe("SPEC-0050 setup render", () => {
     );
     expect(out).toContain("1,234 tok");
     expect(out).not.toContain("$0.00");
+  });
+
+  it("exposes exact known-unpriced coverage and explicit cost/token scope", () => {
+    const withChildren = report({
+      latest: {
+        source: "claude-code",
+        label: "Claude Code",
+        model: "claude-opus-4-8",
+        totalUsd: 1.18,
+        totalTokens: usage(100),
+        combinedTotalTokens: 4_100,
+        subagentCount: 2,
+        parentUnpricedTokens: usage(125),
+        combinedUnpricedTokens: usage(400),
+        subagentUnpricedCount: 1,
+        subagentUnreadableCount: 1,
+        subagentRollupStatus: "complete",
+        costScope: "parent-session-plus-readable-subagents",
+        tokenScope: "parent-session-plus-readable-subagents",
+        wasteLineCount: 0,
+        unpriceable: false,
+      },
+    });
+    expect(renderSetupReport(withChildren)).toContain("Total (incl. 2 subagents)");
+    expect(renderSetupReport(withChildren)).toContain("Parent unpriced tokens");
+    expect(renderSetupReport(withChildren)).toContain("125 tok");
+    expect(renderSetupReport(withChildren)).toContain("Known unpriced (combined)");
+    expect(renderSetupReport(withChildren)).toContain("400 tok");
+    expect(renderSetupReport(withChildren)).toContain("1 unpriced · 1 unreadable (tokens unknown)");
+    expect(renderSetupReport(withChildren)).toContain("parent + readable subagents");
+    expect(setupReportToJson(withChildren).latest).toMatchObject({
+      totalUsd: 1.18,
+      combinedTotalTokens: 4_100,
+      subagentCount: 2,
+      parentUnpricedTokens: usage(125),
+      combinedUnpricedTokens: usage(400),
+      subagentUnpricedCount: 1,
+      subagentUnreadableCount: 1,
+      subagentRollupStatus: "complete",
+      costScope: "parent-session-plus-readable-subagents",
+      tokenScope: "parent-session-plus-readable-subagents",
+    });
+  });
+
+  it("does not fabricate zero child counts when subagent discovery is unavailable", () => {
+    const unavailable = report({
+      latest: {
+        ...report().latest!,
+        subagentUnpricedCount: null,
+        subagentUnreadableCount: null,
+        subagentRollupStatus: "unavailable",
+      },
+    });
+    expect(renderSetupReport(unavailable)).toContain("unavailable · child counts/tokens unknown");
+    expect(setupReportToJson(unavailable).latest).toMatchObject({
+      subagentUnpricedCount: null,
+      subagentUnreadableCount: null,
+      subagentRollupStatus: "unavailable",
+      costScope: "parent-session",
+      tokenScope: "parent-session",
+    });
   });
 
   it("exits the no-session path as useful text without requiring hooks", () => {
@@ -85,7 +169,10 @@ describe("SPEC-0050 setup render", () => {
 
   it("emits JSON without session paths or prompt-like titles", () => {
     const json = setupReportToJson(report());
-    expect(Object.keys(json)).toEqual(["schemaVersion", "status", "agents", "latest", "week", "offers"]);
+    expect(Object.keys(json)).toEqual(["schemaVersion", "costSemantics", "status", "agents", "latest", "week", "offers"]);
+    expect(json.costSemantics).toEqual({ kind: "lower-bound", basis: "standard-api-list-price-equivalent" });
+    expect(json.week?.pricingCoverage).toMatchObject({ fullyPricedSessionCount: 1, partiallyPricedSessionCount: 0 });
+    expect(json.week?.scope).toEqual({ childSessionsIncluded: false });
     expect(JSON.stringify(json)).not.toMatch(/filePath|sessionId|title|\/Users|repo/);
   });
 });

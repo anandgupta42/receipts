@@ -72,4 +72,13 @@ describe("pushSessionSubagentEvents — the cost-loop ConfidenceEvent emitter", 
     ], {});
     expect(events).toContainEqual({ kind: "partial-priced-coverage", sessionId: "lead/subagents/mixed.jsonl" });
   });
+
+  it("emits the GPT-5.6 cache-write omission for contributors and subagents", () => {
+    const events: ConfidenceEvent[] = [];
+    pushSessionSubagentEvents(events, raw("lead.jsonl"), [
+      subagent({ unobservedCacheWriteTokens: true, filePath: "lead/subagents/gpt56.jsonl" }),
+    ], { unobservedCacheWriteTokens: true });
+    expect(events).toContainEqual({ kind: "unobserved-cache-write-tokens", sessionId: "lead.jsonl" });
+    expect(events).toContainEqual({ kind: "unobserved-cache-write-tokens", sessionId: "lead/subagents/gpt56.jsonl" });
+  });
 });

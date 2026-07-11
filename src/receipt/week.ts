@@ -7,8 +7,12 @@ import type { AgentSplit, ProjectSplit, WeekDigest, WindowAggregate } from "../a
 import type { WasteClassAggregate } from "../aggregate/waste.js";
 import type { TokenUsage } from "../parse/types.js";
 import { colorEnabled, makeColorizer } from "./color.js";
-import { center, dottedLine, formatDateUtc, formatInt, formatUsd } from "./format.js";
+import { center, dottedLine, formatDateUtc, formatInt, formatUsd, formatUsdFloor, formatUsdLowerBound } from "./format.js";
 import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "./branding.js";
+import {
+  HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+  STANDARD_API_LOWER_BOUND_SEMANTICS,
+} from "./costEstimate.js";
 
 const WIDTH = 50;
 const INNER = WIDTH - 2;
@@ -43,12 +47,12 @@ function trend(n: number, more: string, less: string): string {
 
 /** A priced bucket renders `$`; an unpriced bucket falls back to tokens (mirrors the receipt's tokens-only mode). */
 function splitValue(usd: number | null, tokens: TokenUsage, sessionCount: number): string {
-  const magnitude = usd !== null ? `$${formatUsd(usd)}` : `${formatInt(tokens.total)} tok`;
+  const magnitude = usd !== null ? formatUsdLowerBound(usd) : `${formatInt(tokens.total)} tok`;
   return `${magnitude} · ${sessionCount} sess`;
 }
 
 function wasteValue(waste: WasteClassAggregate): string {
-  const magnitude = waste.cost > 0 ? `$${formatUsd(waste.cost)}` : `${formatInt(waste.tokens.total)} tok`;
+  const magnitude = waste.cost > 0 ? `≈ $${formatUsdFloor(waste.cost)}` : `≈ ${formatInt(waste.tokens.total)} tok`;
   const unit = waste.distinctSessionCount === 1 ? "session" : "sessions";
   return `${magnitude} · ${waste.distinctSessionCount} ${unit}`;
 }
@@ -61,11 +65,24 @@ function windowBody(window: WindowAggregate): string[] {
   const lines: string[] = [];
   lines.push(dottedLine("Sessions", String(window.sessionCount), WIDTH));
 
-  const pricedLabel = `Priced total (${window.pricedSessionCount} of ${window.sessionCount})`;
-  const pricedValue = window.pricedUsd !== null ? `$${formatUsd(window.pricedUsd)}` : "n/a";
+  const pricedLabel = `Priced floor (${window.fullyPricedSessionCount} full + ${window.partiallyPricedSessionCount} partial)`;
+  const pricedValue = window.pricedUsd !== null ? formatUsdLowerBound(window.pricedUsd) : "n/a";
   lines.push(dottedLine(pricedLabel, pricedValue, WIDTH));
 
-  lines.push(dottedLine("Tokens (all sessions)", `${formatInt(window.tokenTotal.total)} tok`, WIDTH));
+  const coverage = `${window.fullyPricedSessionCount} full · ${window.partiallyPricedSessionCount} partial · ${window.unpricedSessionCount} none`;
+  lines.push(dottedLine("Pricing coverage", coverage, WIDTH));
+  if (window.cacheRatePartialSessionCount > 0) {
+    lines.push(dottedLine("Cache-rate gaps", `${window.cacheRatePartialSessionCount} partial sess`, WIDTH));
+  }
+  if (window.unreadableSessionCount > 0) {
+    lines.push(dottedLine("Unreadable", `${window.unreadableSessionCount} sess`, WIDTH));
+  }
+  if (window.unpricedTokenTotal.total > 0) {
+    lines.push(dottedLine("Known unpriced tokens", `${formatInt(window.unpricedTokenTotal.total)} tok`, WIDTH));
+  }
+
+  lines.push(dottedLine("Tokens (observable)", `${formatInt(window.tokenTotal.total)} tok`, WIDTH));
+  lines.push(dottedLine("Scope", "top-level only; children excluded", WIDTH));
 
   if (window.byAgent.length > 0) {
     lines.push("");
@@ -98,7 +115,7 @@ function deltaBody(digest: WeekDigest): string[] {
     delta.pricedUsdDelta !== null
       ? `${signedUsd(delta.pricedUsdDelta)} (${trend(delta.pricedUsdDelta, "more", "less")})`
       : "n/a (priced coverage differs)";
-  lines.push(indented("Priced $ Δ", usdValue));
+  lines.push(indented("Priced floor Δ", delta.pricedUsdDelta !== null ? `≈ ${usdValue}` : usdValue));
   lines.push(indented("Tokens Δ", `${signedInt(delta.tokenDelta)} tok (${trend(delta.tokenDelta, "more", "fewer")})`));
   lines.push(indented("Excluded", `${delta.currentExcluded} now / ${delta.priorExcluded} prior`));
   return lines;
@@ -120,10 +137,11 @@ export function renderWeek(digest: WeekDigest, opts: RenderWeekOptions = {}): st
 
   if (digest.topWaste.length > 0) {
     lines.push("");
-    lines.push("Top waste");
+    lines.push("Flagged patterns");
     for (const waste of digest.topWaste) {
       lines.push(indented(waste.class, wasteValue(waste)));
     }
+    lines.push("  heuristic pattern cost · standard API floor · not proven savings");
   }
 
   lines.push(...deltaBody(digest));
@@ -156,7 +174,13 @@ function projectJson(p: ProjectSplit) {
 }
 
 function wasteJson(w: WasteClassAggregate) {
-  return { class: w.class, cost: w.cost, tokens: usageJson(w.tokens), distinctSessionCount: w.distinctSessionCount };
+  return {
+    class: w.class,
+    costInterpretation: w.costInterpretation ?? HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+    cost: w.cost,
+    tokens: usageJson(w.tokens),
+    distinctSessionCount: w.distinctSessionCount,
+  };
 }
 
 function windowJson(window: WindowAggregate) {
@@ -164,6 +188,14 @@ function windowJson(window: WindowAggregate) {
     sessionCount: window.sessionCount,
     pricedSessionCount: window.pricedSessionCount,
     excludedSessionCount: window.excludedSessionCount,
+    pricingCoverage: {
+      fullyPricedSessionCount: window.fullyPricedSessionCount,
+      partiallyPricedSessionCount: window.partiallyPricedSessionCount,
+      cacheRatePartialSessionCount: window.cacheRatePartialSessionCount,
+      unpricedSessionCount: window.unpricedSessionCount,
+      unreadableSessionCount: window.unreadableSessionCount,
+      unpricedTokenTotal: usageJson(window.unpricedTokenTotal),
+    },
     pricedUsd: window.pricedUsd,
     tokenTotal: usageJson(window.tokenTotal),
     byAgent: window.byAgent.map(agentJson),
@@ -175,6 +207,8 @@ function windowJson(window: WindowAggregate) {
 /** Full structured digest for `--json` — fixed key order (the schema SPEC-0011 consumes). */
 export function weekToJson(digest: WeekDigest) {
   return {
+    costSemantics: STANDARD_API_LOWER_BOUND_SEMANTICS,
+    scope: { childSessionsIncluded: false },
     window: { startMs: digest.windowStartMs, endMs: digest.windowEndMs },
     priorWindow: { startMs: digest.priorStartMs, endMs: digest.priorEndMs },
     sinceOverride: digest.sinceOverride,
@@ -184,6 +218,7 @@ export function weekToJson(digest: WeekDigest) {
     delta: {
       hasPrior: digest.delta.hasPrior,
       pricedUsdDelta: digest.delta.pricedUsdDelta,
+      pricedUsdDeltaKind: digest.delta.pricedUsdDelta === null ? null : "difference-of-lower-bounds" as const,
       tokenDelta: digest.delta.tokenDelta,
       currentExcluded: digest.delta.currentExcluded,
       priorExcluded: digest.delta.priorExcluded,

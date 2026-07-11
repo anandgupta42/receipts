@@ -5,7 +5,7 @@ import { listFullSessions, loadSession, selectSummary } from "../../index.js";
 import { renderCompare, compareDeltaLine } from "../../receipt/compare.js";
 import { toCompareCsv } from "../../receipt/csv.js";
 import { toCompareJsonModel } from "../../receipt/json.js";
-import { buildReceiptModel } from "../../receipt/model.js";
+import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
 import { renderCompareSvg } from "../../receipt/svg.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { noSessionsMessage } from "../common/session.js";
@@ -79,7 +79,10 @@ async function run(ctx: CommandContext): Promise<number> {
     ctx.stderr.write("failed to load one or both sessions\n");
     return 1;
   }
-  const [modelA, modelB] = await Promise.all([buildReceiptModel(sessionA), buildReceiptModel(sessionB)]);
+  const [modelA, modelB] = await Promise.all([
+    buildFullSessionReceiptModel(sessionA),
+    buildFullSessionReceiptModel(sessionB),
+  ]);
   const totals = {
     turnCount: sessionA.totals.turnCount + sessionB.totals.turnCount,
     toolCallCount: sessionA.totals.toolCallCount + sessionB.totals.toolCallCount,

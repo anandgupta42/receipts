@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How pricing is estimated — aireceipts docs</title>
+<title>How pricing lower bounds are computed — aireceipts docs</title>
 <meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
 <meta name="theme-color" content="#e9edf0">
 <style>
@@ -287,7 +287,7 @@ footer{
     <div class="rule2" aria-hidden="true"></div>
     <div class="doc-hero">
       <p class="doc-label">Docs ledger</p>
-      <h1>How pricing is estimated</h1>
+      <h1>How pricing lower bounds are computed</h1>
       <p class="sub">Rendered from <code>docs/guide/13-pricing.md</code>.</p>
     </div>
   </header>
@@ -325,16 +325,16 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
       </ul>
     </aside>
     <article class="doc-content">
-<h1 id="how-pricing-is-estimated">How pricing is estimated</h1>
+<h1 id="how-pricing-lower-bounds-are-computed">How pricing lower bounds are computed</h1>
 
-<p>Every dollar on a receipt is an <strong>estimate computed locally</strong> from token counts and a cited price table — not a feed from your vendor's billing system. This page explains the math, where the prices come from, and why the number can differ from the invoice you eventually get.</p>
+<p>Every dollar on a receipt is a <strong>Standard API list-price-equivalent lower bound</strong> computed locally from observable token counts and a cited price table. It is not a feed from your vendor's billing system and never claims to be the invoice. This page explains the math, the observability limits, and the meaning of <code>≥ $X</code>.</p>
 
 <h2 id="the-method-verbatim">The method, verbatim</h2>
 
@@ -342,9 +342,9 @@ footer{
 
 <pre class="doc-code"><code class="language-sh">aireceipts --methodology</code></pre>
 
-<blockquote>Cost is attributed per assistant turn. A turn is one billed API response: when an agent's transcript repeats a response across several records (Claude Code writes one record per content block, each carrying the same message id and the same usage snapshot), the response is counted once, deduplicated by message id. Each turn's priced usage (tokens × the dated price row matching its model and date) is split evenly across the tool(s) it called; a turn with no tool calls is attributed to &quot;(thinking/reply)&quot;. Turns whose model has no matching price row contribute tokens only — never a guessed dollar amount. Cache-write tokens are priced per known TTL tier when the transcript splits them (5-minute and 1-hour rates); any unsplit cache-write tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and priced at that rate, or the plain input rate if the price row cites neither — a conservative fallback that may understate real cost (cache-write billing runs ≥1.25× input) but never overstates it with a guessed premium.</blockquote>
+<blockquote>Cost is attributed per observable assistant turn. Records sharing a response id are one turn; evolving Claude Code snapshots are merged by the maximum observed output count, and repeated tool_use ids are counted once. When a trace exposes several model requests inside one turn, context tiers are selected for each request. Each turn's observed usage (tokens × the dated Standard API list-price row matching its model and date) is split evenly across the tool(s) it called; a turn with no tool calls is attributed to &quot;(thinking/reply)&quot;. Turns whose model has no matching price row contribute tokens only — never a guessed dollar amount. A dominating session aggregate with no request/model join appears in an explicit &quot;(unattributed usage)&quot; token bucket; an aggregate that conflicts with itemized components remains excluded evidence. Both contribute zero dollars. Every computed dollar is a Standard-API list-price-equivalent lower bound, never an invoice or subscription charge. Cache-write tokens are priced per known TTL tier when the transcript splits them (5-minute and 1-hour rates); any unsplit cache-write tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and priced only when that rate is cited. Cached reads or writes with no cited applicable rate contribute zero dollars to the floor. Billing route, service tier, regional uplift, discounts, subscription allocation, and unrecorded token buckets are never guessed.</blockquote>
 
-<p>Two properties fall out of this. First, cost is per-tool because it's split across the tools a turn called — that's why <code>Bash</code> and <code>Edit</code> carry a dollar figure. Second, every fallback is chosen to <strong>under</strong>-state rather than over-state, so the receipt is a floor, not an inflated guess.</p>
+<p>Two properties fall out of this. First, cost is per-tool because it's split across the tools a turn called — that's why <code>Bash</code> and <code>Edit</code> carry a dollar figure. Second, the product makes only a floor claim: all computed dollar rows use <code>≥</code>, even when the internal token×row arithmetic reconciles perfectly.</p>
 
 <h2 id="where-the-prices-come-from">Where the prices come from</h2>
 
@@ -355,12 +355,22 @@ footer{
 <ul>
   <li><strong><code>sources</code> is required.</strong> Each source is a real vendor page <code>url</code>, an <code>observed_at</code> date, and a quoted <code>excerpt</code> of the price text. A PR that touches <code>data/prices/</code> without a <code>sources</code> array is rejected mechanically, before review.</li>
   <li><strong>Citations are liveness-checked.</strong> CI fetches every <code>url</code> and requires it to resolve; a source dated recently must carry an excerpt a reviewer can match against the page. No price is ever invented, inferred, or remembered.</li>
-  <li><strong>Awkward pricing is omitted, not faked.</strong> A model priced in a shape the flat schema can't hold honestly — tiered by context length, batch, or tool-priced — is listed in an <code>omitted</code> array with the reason, and stays tokens-only. It is never given a fabricated flat rate.</li>
+  <li><strong>Awkward pricing is omitted, not faked.</strong> The schema can represent explicit per-request context tiers, but not every commercial scope. A model whose published rule cannot be selected from local evidence is listed in <code>omitted</code> with the reason and stays tokens-only. GPT-5.5's &quot;full session&quot; long-context rule is the current example.</li>
 </ul>
+
+<h2 id="what-the-local-agents-actually-expose">What the local agents actually expose</h2>
+
+<ul>
+  <li><strong>Claude Code:</strong> model plus input, output, cache-read, and cache-write usage, including 5-minute/1-hour splits in current transcripts. Several records can share one <code>message.id</code>; the complete usage record with the highest output count is retained (later record wins a tie), and tools merge by <code>tool_use.id</code>. Token buckets are not independently maximized into a record that never existed. Id-less records cannot prove response boundaries: their usage is one coherent highest-output unattributed envelope and is never priced. The transcript does not provide an authoritative bill.</li>
+  <li><strong>Codex:</strong> per-request input, cached-input, and output can be derived from changed cumulative envelopes, including several request usage units inside one user-facing turn. Pricing is enabled only when the full cumulative stream is monotone, each changed delta agrees with <code>last_token_usage</code>, no schema is mixed, no records were dropped, and the request sum matches the local total. Failure preserves the envelope as unattributed tokens and prices nothing. The rollout does not persist cache-write tokens, auth/billing route, provider request id, explicit cost, or an invoice join key.</li>
+  <li><strong>opencode:</strong> itemized message tokens include cache read/write, but stored <code>cost</code> is calculated client-side from models.dev rates. If the stored session aggregate componentwise dominates itemized messages, aireceipts keeps the difference as a separate, unpriced <code>(unattributed usage)</code> bucket — not a fake turn, model, provider, or tool. A partial turn slice excludes that session-level residual and reports the excluded token count. If the vectors cross, itemized usage remains authoritative and positive aggregate-only components are conflicting evidence excluded from both totals and dollars.</li>
+</ul>
+
+<p>These are enough for reproducible Standard API arithmetic, not invoice-grade billing reconciliation.</p>
 
 <h2 id="multi-provider-agents">Multi-provider agents</h2>
 
-<p>Some agents, especially opencode, can run any provider or local model the user configures. aireceipts does not treat the agent name as the vendor for those sessions. When the transcript names a provider, that identity is the pricing gate: direct Anthropic/OpenAI/Google/DeepSeek traffic selects that provider's cited table, while OpenRouter, Bedrock, Azure, local, and custom providers stay tokens-only. Only older transcript rows with no provider field fall back to the turn's model id:</p>
+<p>Some agents, especially opencode, can run any provider or local model the user configures. aireceipts does not treat the agent name as the vendor for those sessions. Every request/message unit uses its own model, provider field (including absence), and timestamp; no identity is inherited from an enclosing turn or session. When the transcript names a provider, that identity is the pricing gate: direct Anthropic/OpenAI/Google/DeepSeek traffic selects that provider's cited table, while OpenRouter, Bedrock, Azure, local, and custom providers stay tokens-only. Only older transcript rows with no provider field fall back to the turn's model id:</p>
 
 <ul>
   <li><code>claude-*</code> resolves to the Anthropic price table.</li>
@@ -369,18 +379,30 @@ footer{
   <li><code>deepseek-*</code> resolves to the DeepSeek price table.</li>
 </ul>
 
-<p>After that, the usual rule still applies: the exact model id and session date must match a cited <code>data/prices/&lt;vendor&gt;.json</code> row. If the provider is routed/custom, or the model is simply not in the tables yet, that turn contributes tokens only. Mixed sessions can therefore have priced rows for known direct turns and tokens-only rows for unknown turns; a fully unknown session renders <code>no price table matched</code>.</p>
+<p>After that, the usual rule still applies: the unit's exact model id and date must match a cited <code>data/prices/&lt;vendor&gt;.json</code> row. If the provider is routed/custom, or the model is simply not in the tables yet, that turn contributes tokens only. Mixed sessions can therefore have priced rows for known direct turns and tokens-only rows for unknown turns; a fully unknown session renders <code>no price table matched</code>.</p>
+
+<p>A direct-looking provider id chooses a price table; it does not prove whether the user authenticated by API key, subscription, gateway, cloud account, credits, or a negotiated contract.</p>
+
+<h2 id="gpt-56-and-gpt-55-long-context">GPT-5.6 and GPT-5.5 long context</h2>
+
+<p>For GPT-5.6, OpenAI publishes a &gt;272K prompt-input tier for the full request on the official <a href="https://developers.openai.com/api/docs/models/gpt-5.6-sol">Sol</a>, <a href="https://developers.openai.com/api/docs/models/gpt-5.6-terra">Terra</a>, and <a href="https://developers.openai.com/api/docs/models/gpt-5.6-luna">Luna</a> pages. Codex's changed cumulative envelopes expose persisted request usage units and their input, cached-input, and output, so aireceipts selects the Standard tier for each request unit — never from the sum of a user-facing tool-loop turn. A content-free audit of 792 rollouts found 51,465 changed request envelopes and 216 GPT-5.6 user-turn groups; 136 groups would falsely cross 272K only after aggregation. No intra-turn model/provider switch was observed. Each unit must still carry its own usable model/timestamp/provider evidence, and the cumulative stream must pass the reconciliation gate; otherwise the tier is not selected and the entire envelope remains tokens-only. Codex does not persist GPT-5.6 cache-write tokens, however, so that unobserved premium contributes zero: the displayed <code>≥ $X</code> remains a lower bound.</p>
+
+<p>GPT-5.5 stays tokens-only. Its <a href="https://developers.openai.com/api/docs/models/gpt-5.5">official page</a> describes the &gt;272K multiplier as covering the &quot;full session,&quot; while aireceipts sees requests and may price only a PR slice. Selecting a request or slice rate would invent a billing scope.</p>
 
 <h2 id="same-tokens-on-claude-haiku-4-5">&quot;same tokens on claude-haiku-4-5&quot;</h2>
 
-<p>The line under the total re-prices the session's <strong>identical token counts</strong> on a cheaper model. It is arithmetic on numbers you already spent — not a claim that the other model would have completed the task, used the same tokens, or produced the same result. Read it as &quot;the floor if those exact tokens had been that model's rate,&quot; nothing more.</p>
+<p>The line under the total re-prices the session's <strong>identical token counts</strong> on a cheaper model. It is arithmetic on numbers you already spent — not a claim that the other model would have completed the task, used the same tokens, or produced the same result. Read it as &quot;the Standard API floor if those same observable tokens had been priced at that model's rate,&quot; nothing more.</p>
+
+<p>The <code>trivial spans</code> detector uses the same strict boundary. It emits a dollar only when every request unit in the candidate turn carries its own model/date/ provider evidence, resolves to the agent's direct source vendor, and has a cited row that is more expensive than the comparison row. One missing or routed unit suppresses the finding instead of pricing a partial turn.</p>
 
 <h2 id="why-it-may-differ-from-your-bill">Why it may differ from your bill</h2>
 
 <ul>
   <li><strong>Flat-rate and subscription plans.</strong> If you pay a fixed monthly fee, the receipt still shows the metered token cost — useful for comparing sessions, but not what you're charged. It is a measure of <em>effort</em>, not an invoice line.</li>
-  <li><strong>Rounding.</strong> The receipt rounds to cents; <code>--json</code>/<code>--csv</code> carry full precision.</li>
-  <li><strong>Cache-write tiers.</strong> When a transcript doesn't split cache-write tokens by TTL, aireceipts prices them at the conservative tier (see the method above), which can land below what the vendor actually billed.</li>
+  <li><strong>Auth route, tier, region, credits, and contracts.</strong> Local transcripts do not establish the commercial route that produced the request. Standard list-price arithmetic can differ from account billing, which is why the receipt claims only an observable floor on that standard basis.</li>
+  <li><strong>Downward formatting.</strong> Every human <code>≥ $X</code> is floored independently: two decimals for an exact-cent value, four when fractional cents remain. Rows need not visibly sum to the separately floored TOTAL; <code>--json</code>/<code>--csv</code> carry the raw values and lower-bound basis.</li>
+  <li><strong>Cache rates.</strong> An unsplit write uses the documented 5m assumption only when the row cites a 5m or generic write rate. Cached reads or writes with no cited applicable rate contribute $0 with a caveat — never the plain input rate. Codex does not persist cache-write counts at all, so those writes cannot enter its floor.</li>
+  <li><strong>Client-estimated costs.</strong> OpenCode's stored <code>cost</code> comes from its models.dev catalog, and Claude SDK cost fields are documented as client estimates. Neither is an invoice source; aireceipts independently uses cited, dated rows.</li>
   <li><strong>Unpriced models.</strong> A model with no cited row contributes tokens only, so its dollars are absent rather than approximated — the total covers the priced part.</li>
 </ul>
 

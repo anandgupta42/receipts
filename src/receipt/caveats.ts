@@ -1,6 +1,6 @@
 // SPEC-0028 R3 — time-integrity caveats. Deterministic facts about a
 // session's internal consistency, surfaced as muted lines and `--json`
-// entries; they never change a `$` (I2) and never block a render. Two
+// entries; they never change the arithmetic (I2) and never block a render. Two
 // checks, both cheap edits to catch:
 //   - a turn timestamp later than the transcript file's own mtime (plus a
 //     fixed write-slack): content claiming to postdate its file;
@@ -15,17 +15,20 @@ import type { Session } from "../parse/types.js";
 export const CAVEAT_MTIME_SLACK_MS = 2 * 60 * 1000;
 
 export interface CaveatFinding {
-  /** A3's `cost-lower-bound-cache-tier`, B3's `dropped-transcript-records`, and SPEC-0054 R3's `partial-priced-coverage` are constructed by `buildReceiptModel` directly (they need the attribution result / session drop-count / tool-row coverage, not a session/mtime fact) — not by `detectTimeCaveats` below. SPEC-0061's `subagents-*` floors are appended post-build by `attachSubagentRollup` (src/receipt/subagents.ts). */
+  /** Pricing/coverage caveats, including `unobserved-cache-write-tokens`, are constructed by `buildReceiptModel` directly because they need attribution or adapter facts. SPEC-0061's `subagents-*` floors are appended post-build by `attachSubagentRollup` (src/receipt/subagents.ts). */
   kind:
     | "time-mtime"
     | "time-span"
     | "cost-lower-bound-cache-tier"
+    | "unobserved-cache-write-tokens"
+    | "unattributed-aggregate-usage"
     | "dropped-transcript-records"
     | "partial-priced-coverage"
     | "subagents-unreadable"
     | "subagents-unpriced"
     | "subagents-priced-tokens-only"
-    | "subagents-dropped-records";
+    | "subagents-dropped-records"
+    | "subagent-rollup-unavailable";
   text: string;
 }
 

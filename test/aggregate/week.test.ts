@@ -88,6 +88,13 @@ describe("partitionWindows (R1)", () => {
     expect(current.map((s) => s.id)).toEqual(["start"]);
     expect(prior).toHaveLength(0);
   });
+
+  it("retains a timestamped degraded summary even when its unreliable totals are all zero", () => {
+    const degraded = summary("degraded", NOW - DAY);
+    degraded.degraded = "unreadable";
+    const { current } = partitionWindows([degraded], windowBounds(NOW));
+    expect(current.map((session) => session.id)).toEqual(["degraded"]);
+  });
 });
 
 describe("aggregateWindow (R2/R3/R4)", () => {
@@ -109,6 +116,63 @@ describe("aggregateWindow (R2/R3/R4)", () => {
     expect(w.pricedUsd).toBeNull();
     expect(w.tokenTotal.total).toBe(400_000);
     expect(w.excludedSessionCount).toBe(1);
+  });
+
+  it("classifies mixed priced/unpriced turns as partial and preserves the exact unpriced-token subtotal", async () => {
+    const mixed = sess("mixed", "claude-code", "claude-sonnet-5", 1_000);
+    mixed.turns.push({
+      index: 1,
+      timestamp: NOW - DAY,
+      model: "claude-unknown-xyz",
+      usage: usage(250),
+      toolCalls: [],
+    });
+    mixed.totals = totals(usage(1_250));
+
+    const w = await aggregateWindow([mixed], false, dataDir);
+
+    expect(w.pricedSessionCount).toBe(1);
+    expect(w.fullyPricedSessionCount).toBe(0);
+    expect(w.partiallyPricedSessionCount).toBe(1);
+    expect(w.unpricedSessionCount).toBe(0);
+    expect(w.unpricedTokenTotal.total).toBe(250);
+  });
+
+  it("does not call a session full when a cached component lacks a cited applicable rate", async () => {
+    const cachedWrite = sess("cache-gap", "codex", "gpt-5.3-codex", 1_000);
+    const cacheUsage: TokenUsage = {
+      input: 900,
+      output: 0,
+      cacheRead: 0,
+      cacheCreation: 100,
+      total: 1_000,
+    };
+    cachedWrite.turns[0].usage = cacheUsage;
+    cachedWrite.totals = totals(cacheUsage);
+
+    const w = await aggregateWindow([cachedWrite], false, dataDir);
+
+    expect(w.fullyPricedSessionCount).toBe(0);
+    expect(w.partiallyPricedSessionCount).toBe(1);
+    expect(w.cacheRatePartialSessionCount).toBe(1);
+    // No invented component breakdown: only the boolean row evidence is known.
+    expect(w.unpricedTokenTotal.total).toBe(0);
+  });
+
+  it("keeps unreadable summaries in the coverage denominator without trusting degraded totals", async () => {
+    const reloadFailed = summary("reload-failed", NOW - DAY);
+    reloadFailed.totals = totals(usage(300));
+    const degraded = summary("degraded", NOW - DAY);
+    degraded.totals = totals(usage(999));
+    degraded.degraded = "unreadable";
+
+    const w = await aggregateWindow([], false, dataDir, [reloadFailed, degraded]);
+
+    expect(w.sessionCount).toBe(2);
+    expect(w.unreadableSessionCount).toBe(2);
+    expect(w.excludedSessionCount).toBe(2);
+    expect(w.tokenTotal.total).toBe(300);
+    expect(w.unpricedTokenTotal.total).toBe(300);
   });
 
   it("R3: per-agent split sums to the grand total and is ordered desc", async () => {

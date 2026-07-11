@@ -36,28 +36,97 @@
           ]
         }
       ]
+    },
+    "gpt-5.6-sol": {
+      "price_history": [
+        {
+          "input": 5.0,
+          "output": 30.0,
+          "input_cached": 0.5,
+          "input_cache_write": 6.25,
+          "context_tiers": [
+            {
+              "above_input_tokens": 272000,
+              "input": 10.0,
+              "output": 45.0,
+              "input_cached": 1.0,
+              "input_cache_write": 12.5
+            }
+          ],
+          "from_date": "2026-07-09",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/models/gpt-5.6-sol",
+              "observed_at": "2026-07-10",
+              "excerpt": "Input $5.00; cached input $0.50; output $30.00. Above 272K: 2x input, 1.5x output. Cache writes: 1.25x input."
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-5.6-terra": {
+      "price_history": [
+        {
+          "input": 2.5,
+          "output": 15.0,
+          "input_cached": 0.25,
+          "input_cache_write": 3.125,
+          "context_tiers": [
+            {
+              "above_input_tokens": 272000,
+              "input": 5.0,
+              "output": 22.5,
+              "input_cached": 0.5,
+              "input_cache_write": 6.25
+            }
+          ],
+          "from_date": "2026-07-09",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+              "observed_at": "2026-07-10",
+              "excerpt": "Input $2.50; cached input $0.25; output $15.00. Above 272K: 2x input, 1.5x output. Cache writes: 1.25x input."
+            }
+          ]
+        }
+      ]
+    },
+    "gpt-5.6-luna": {
+      "price_history": [
+        {
+          "input": 1.0,
+          "output": 6.0,
+          "input_cached": 0.1,
+          "input_cache_write": 1.25,
+          "context_tiers": [
+            {
+              "above_input_tokens": 272000,
+              "input": 2.0,
+              "output": 9.0,
+              "input_cached": 0.2,
+              "input_cache_write": 2.5
+            }
+          ],
+          "from_date": "2026-07-09",
+          "to_date": null,
+          "sources": [
+            {
+              "url": "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+              "observed_at": "2026-07-10",
+              "excerpt": "Input $1.00; cached input $0.10; output $6.00. Above 272K: 2x input, 1.5x output. Cache writes: 1.25x input."
+            }
+          ]
+        }
+      ]
     }
   },
   "omitted": [
     {
       "model": "gpt-5.5",
-      "reason": "Tiered by request input length (>272K input tokens: 2x input and 1.5x output for the full session), which the flat PriceRow schema cannot select honestly (SPEC-0005 R1). It stays tokens-only rather than silently apply the short-context row.",
+      "reason": "The official model page says the >272K input multiplier applies to the full session. aireceipts prices individual observed requests and PR/session slices, so it cannot select that billing scope soundly without a session-level pricing model. It stays tokens-only rather than emit an unsound dollar floor (SPEC-0005 R1, I2).",
       "source": "https://developers.openai.com/api/docs/models/gpt-5.5"
-    },
-    {
-      "model": "gpt-5.6-sol",
-      "reason": "Tiered by request input length (>272K input tokens: 2x input and 1.5x output for the full request) and separately bills cache writes at 1.25x uncached input. The flat PriceRow/normalized-usage path cannot determine both the request tier and cache-write amount, so a single row would under-report some requests (SPEC-0005 R1, I2); it stays tokens-only.",
-      "source": "https://developers.openai.com/api/docs/models/gpt-5.6-sol"
-    },
-    {
-      "model": "gpt-5.6-terra",
-      "reason": "Tiered by request input length (>272K input tokens: 2x input and 1.5x output for the full request) and separately bills cache writes at 1.25x uncached input. The flat PriceRow/normalized-usage path cannot determine both the request tier and cache-write amount, so a single row would under-report some requests (SPEC-0005 R1, I2); it stays tokens-only.",
-      "source": "https://developers.openai.com/api/docs/models/gpt-5.6-terra"
-    },
-    {
-      "model": "gpt-5.6-luna",
-      "reason": "Tiered by request input length (>272K input tokens: 2x input and 1.5x output for the full request) and separately bills cache writes at 1.25x uncached input. The flat PriceRow/normalized-usage path cannot determine both the request tier and cache-write amount, so a single row would under-report some requests (SPEC-0005 R1, I2); it stays tokens-only.",
-      "source": "https://developers.openai.com/api/docs/models/gpt-5.6-luna"
     }
   ]
 }

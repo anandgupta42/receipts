@@ -9,7 +9,7 @@ import type { TokenUsage } from "../parse/types.js";
 import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry, WasteLine } from "../receipt/model.js";
 import { couldHaveSavedOf, couldHaveSavedValue, prCoverageLine, savingsSlipLines } from "../receipt/handoff.js";
-import { formatCentsAmount, formatInt, formatUsd, reconcileCents } from "../receipt/format.js";
+import { formatInt, formatSharePercent, formatUsdFloor, formatUsdLowerBound, STANDARD_API_LOWER_BOUND_NOTE, type UsdFloorDecimals, usdFloorDecimals } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
 import { INSTALL_FOOTER_TEXT, PR_ATTRIBUTION_LINE, REPOSITORY_DISPLAY } from "../receipt/branding.js";
 import { MESSAGE_BASIS_LABEL } from "./messageAnchor.js";
@@ -32,7 +32,7 @@ export interface ContributorView {
   slice: SliceResult;
   /** The session's model mix (share by tokens) — `[]` when no turn carried a resolvable model. */
   modelMix: ModelMixEntry[];
-  /** The session's own slice cost — `null` → tokens-only (I2). */
+  /** The session slice's Standard-API floor — `null` → tokens-only (I2). */
   usd: number | null;
   tokens: TokenUsage;
   /** Exact contributor tokens excluded from a partial `usd`; absent unless some turns priced and some did not. */
@@ -81,30 +81,16 @@ function formatModelMix(modelMix: ModelMixEntry[]): string {
   if (modelMix.length === 1) {
     return modelMix[0].model;
   }
-  // Display honesty (same rule as the cache line): a real mix never rounds a
-  // partial share up to 100% or down to 0%.
-  const sharePct = (share: number): string => {
-    const pct = Math.round(share * 100);
-    if (pct >= 100 && share < 1) {
-      return ">99%";
-    }
-    if (pct <= 0 && share > 0) {
-      return "<1%";
-    }
-    return `${pct}%`;
-  };
-  return modelMix.map((m) => `${m.model} ${sharePct(m.tokenShare)}`).join(" · ");
+  return modelMix.map((m) => `${m.model} ${formatSharePercent(m.tokenShare)}`).join(" · ");
 }
 
 /**
- * A priced atom renders `$`; an unpriced one falls back to tokens (I2). `reconciled`
- * (B1) is this atom's cent-reconciled string — every priced row on the fence must
- * use it so displayed rows sum to the displayed total; falls back to `formatUsd`
- * only when no reconciliation map was threaded through (should not happen on any
- * real render path, kept only so a future caller can't crash on a missing entry).
+ * A priced atom renders a downward-rounded dollar floor; an unpriced one falls
+ * back to tokens (I2). The optional string is the precomputed floor for this
+ * atom/aggregate and never contains redistributed cents.
  */
 function costText(usd: number | null, tokens: TokenUsage, reconciled?: string): string {
-  return usd !== null ? `$${reconciled ?? formatUsd(usd)}` : `${formatInt(tokens.total)} tokens`;
+  return usd !== null ? `≥ $${reconciled ?? formatUsdFloor(usd)}` : `${formatInt(tokens.total)} tokens`;
 }
 
 function plural(n: number, singular: string, pluralForm = `${singular}s`): string {
@@ -229,24 +215,14 @@ function totalsFor(contributors: ContributorView[]): Totals {
   };
 }
 
-/** SPEC-0044/B1 at SPEC-0060 granularity — cent-reconciled display strings for the rows the fence DRAWS (contributors and per-contributor subagent aggregates), keyed by object reference. */
+/** Independently downward-rounded display strings for contributor and aggregate rows. */
 interface FenceRows {
   reconciled: Map<ContributorView | SubagentAggregate, string>;
   aggregates: Map<ContributorView, SubagentAggregate>;
+  precision: UsdFloorDecimals;
 }
 
-/**
- * SPEC-0044/B1 — reconcile every DRAWN priced row so the rows this comment
- * actually renders sum exactly to "TOTAL priced". Since SPEC-0060 the fence
- * draws one aggregate row per contributor's subagents instead of one row per
- * child, but reconciliation still runs at ATOM granularity — the exact
- * universe (and float-summation order) {@link totalsFor} sums into the total —
- * and each aggregate's cents are the integer sum of its children's reconciled
- * cents. Regrouping integers preserves the total exactly; apportioning against
- * a pre-summed aggregate dollar instead re-rounds a different float and can
- * land one cent off the displayed TOTAL at a half-cent boundary (fast-check
- * ledger counterexample: two children summing to an exact .5 cent).
- */
+/** A true `≥` row never receives a redistributed cent from another row. */
 function fenceRows(contributors: ContributorView[]): FenceRows {
   const aggregates = new Map<ContributorView, SubagentAggregate>();
   for (const c of contributors) {
@@ -254,36 +230,22 @@ function fenceRows(contributors: ContributorView[]): FenceRows {
       aggregates.set(c, aggregateSubagents(c.subagents));
     }
   }
-  const keys: (ContributorView | SubagentRow)[] = [];
-  const amounts: number[] = [];
+  const reconciled: FenceRows["reconciled"] = new Map();
+  const displayedAtomValues = [
+    ...contributors.map((contributor) => contributor.usd),
+    ...[...aggregates.values()].map((aggregate) => aggregate.usd),
+  ];
+  const precision = usdFloorDecimals(displayedAtomValues);
   for (const c of contributors) {
     if (c.usd !== null) {
-      keys.push(c);
-      amounts.push(c.usd);
-    }
-    for (const s of c.subagents) {
-      if (s.usd !== null) {
-        keys.push(s);
-        amounts.push(s.usd);
-      }
-    }
-  }
-  const cents = reconcileCents(amounts);
-  const centOf = new Map<ContributorView | SubagentRow, number>();
-  keys.forEach((k, i) => centOf.set(k, cents[i]));
-  const reconciled: FenceRows["reconciled"] = new Map();
-  for (const c of contributors) {
-    const own = centOf.get(c);
-    if (own !== undefined) {
-      reconciled.set(c, formatCentsAmount(own));
+      reconciled.set(c, formatUsdFloor(c.usd, precision));
     }
     const agg = aggregates.get(c);
     if (agg !== undefined && agg.usd !== null) {
-      const aggCents = c.subagents.reduce((sum, s) => sum + (centOf.get(s) ?? 0), 0);
-      reconciled.set(agg, formatCentsAmount(aggCents));
+      reconciled.set(agg, formatUsdFloor(agg.usd, precision));
     }
   }
-  return { reconciled, aggregates };
+  return { reconciled, aggregates, precision };
 }
 
 function countLine(sessionCount: number, totals: Totals): string {
@@ -301,22 +263,25 @@ function countLine(sessionCount: number, totals: Totals): string {
  * an explicit floor (`≥`); a known-partial number must say so in the number,
  * never only in a note below it.
  */
-function totalBlocks(input: PrBodyInput): Block[] {
+function totalBlocks(input: PrBodyInput, precision: UsdFloorDecimals): Block[] {
   const totals = totalsFor(input.contributors);
   // SPEC-0044 R1/S2-finding-5 — floor on ANY incompleteness/lower-bound event
   // (not just excludedCount): every ConfidenceEvent kind that can under-state
   // the total drives the `≥`. excludedCount/unreadable kept for legacy callers
   // that don't pass a confidence summary.
-  const floor = input.excludedCount > 0 || totals.unreadableCount > 0 || (input.confidence !== undefined && isFloored(input.confidence)) ? "≥ " : "";
+  const tokenFloor = input.excludedCount > 0 || totals.unreadableCount > 0 || (input.confidence !== undefined && isFloored(input.confidence)) ? "≥ " : "";
   const blocks: Block[] = [{ kind: "rule" }];
   if (totals.pricedCount > 0) {
-    blocks.push({ kind: "total", label: "TOTAL priced", value: `${floor}$${formatUsd(totals.pricedSubtotal)}` });
+    blocks.push({ kind: "total", label: "TOTAL priced", value: formatUsdLowerBound(totals.pricedSubtotal, precision) });
   }
   if (totals.tokensOnlyCount > 0) {
-    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${floor}${formatInt(totals.tokenSubtotal)} tokens` });
+    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${tokenFloor}${formatInt(totals.tokenSubtotal)} tokens` });
   }
   if (totals.pricedCount === 0 && totals.tokensOnlyCount === 0) {
-    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${floor}0 tokens` });
+    blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${tokenFloor}0 tokens` });
+  }
+  if (totals.pricedCount > 0) {
+    blocks.push(mutedNote(STANDARD_API_LOWER_BOUND_NOTE));
   }
   blocks.push(mutedNote(countLine(input.contributors.length, totals)));
   // SPEC-0026 R2 — one aggregate cache line over exactly the atoms the totals
@@ -363,17 +328,27 @@ function totalBlocks(input: PrBodyInput): Block[] {
     });
     blocks.push({ kind: "note", text: "(see docs/trust.md)", muted: true });
   }
-  // SPEC-0044 A3 — a session whose cache-write cost took the unsplit-tier
-  // fallback (assumed 5m rate): its `$` share is a lower bound, not exact.
+  // SPEC-0044 A3 — observed cache tokens with no cited applicable rate are
+  // excluded from the floor rather than priced through a guessed fallback.
   const cacheTierLowerBound = input.confidence?.costLowerBoundCacheTier ?? 0;
   if (cacheTierLowerBound > 0) {
     blocks.push({
       kind: "note",
-      text: `${plural(cacheTierLowerBound, "session")} had a cache-write cost that is a lower bound`,
+      text: `${plural(cacheTierLowerBound, "session")} had cache tokens with no cited applicable rate`,
       muted: true,
       spaceBefore: true,
     });
     blocks.push({ kind: "note", text: "(see docs/cost-model.md)", muted: true });
+  }
+  const unobservedCacheWrites = input.confidence?.unobservedCacheWriteTokens ?? 0;
+  if (unobservedCacheWrites > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(unobservedCacheWrites, "GPT-5.6 Codex session")} omitted cache-write tokens`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(floor excludes any write premium — see docs/cost-model.md)", muted: true });
   }
   // SPEC-0044 B4 — in-window candidates we couldn't READ (load/parse failed),
   // outside this worktree so the excluded note above never saw them. Counted,
@@ -435,8 +410,8 @@ function helperGroupBlocks(helpers: ContributorView[], spaceBefore: boolean, row
     const label = dur !== undefined ? `${formatModelMix(h.modelMix)} · ${dur}` : formatModelMix(h.modelMix);
     blocks.push({ kind: "row", label: `  ${label}`, value: costText(h.usd, h.tokens, rows.reconciled.get(h)), muted: true });
     // SPEC-0044/B1: a helper's subagents are counted in the TOTAL (collectAtoms)
-    // and cent-reconciled (fenceRows), so their aggregate must also be DRAWN —
-    // otherwise the displayed rows would not sum to the total. Codex helpers
+    // and independently floored (fenceRows), so their aggregate is also DRAWN.
+    // Codex helpers
     // carry none in practice; this keeps the invariant true regardless.
     const agg = rows.aggregates.get(h);
     if (agg !== undefined) {
@@ -463,7 +438,7 @@ function prBlocks(input: PrBodyInput): Block[] {
     blocks.push(...contributorBlocks(view, i === 0, showRole, rows));
   });
   blocks.push(...helperGroupBlocks(helpers, authors.length === 0, rows));
-  blocks.push(...totalBlocks(input));
+  blocks.push(...totalBlocks(input, rows.precision));
   blocks.push({ kind: "footer", text: INSTALL_FOOTER_TEXT });
   blocks.push({ kind: "note", text: REPOSITORY_DISPLAY, align: "center", muted: true });
   return blocks;
@@ -486,12 +461,8 @@ function tableCell(s: string): string {
  * SPEC-0060 R3 — the per-child breakdown the fence no longer draws: a markdown
  * table sorted by cost, capped at {@link SUBAGENT_TABLE_CAP} rows where the
  * final row accounts for the remainder's priced dollars, unpriced tokens, and
- * unreadable count (a capped list never silently drops value). Priced cells
- * are cent-reconciled within the table so the column sums to the CHILDREN'S
- * rounded dollar total. That target is the table's own — the fence aggregate
- * row is reconciled against `TOTAL priced` instead, so the two can differ by a
- * cent, exactly as each session's full receipt in this section re-renders its
- * own independently rounded total.
+ * unreadable count (a capped list never silently drops value). Each priced
+ * cell rounds down independently; no cell borrows a cent.
  */
 export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_CAP): string {
   const sorted = [...rows].sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1));
@@ -499,26 +470,35 @@ export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_C
   const rest = sorted.slice(shown.length);
   const restPriced = rest.filter((r) => r.usd !== null);
   const restUsd = restPriced.reduce((sum, r) => sum + (r.usd ?? 0), 0);
-  const amounts = [...shown.filter((r) => r.usd !== null).map((r) => r.usd ?? 0), ...(restPriced.length > 0 ? [restUsd] : [])];
-  const cents = reconcileCents(amounts);
-  let next = 0;
   const lines = ["| subagent | cost |", "|---|---|"];
   for (const r of shown) {
-    const cell = r.unreadable ? "(unreadable)" : r.usd !== null ? `$${formatCentsAmount(cents[next++])}` : `${formatInt(r.tokens.total)} tokens`;
+    let cell: string;
+    if (r.unreadable) {
+      cell = "(unreadable)";
+    } else if (r.usd !== null) {
+      const partial = r.unpricedTokens && r.unpricedTokens.total > 0 ? ` + ${formatInt(r.unpricedTokens.total)} unpriced tokens` : "";
+      cell = `≥ $${formatUsdFloor(r.usd)}${partial}`;
+    } else {
+      cell = `${formatInt(r.tokens.total)} tokens`;
+    }
     lines.push(`| ${tableCell(subagentLabel(r))} | ${cell} |`);
   }
   if (rest.length > 0) {
     // Every kind of remainder value is stated separately (I2 — dollars and
     // tokens never blend into one number; unknowns are counted, not guessed).
-    const restTokensOnly = rest.filter((r) => r.usd === null && !r.unreadable);
     const restUnreadable = rest.filter((r) => r.unreadable);
     const parts: string[] = [];
     if (restPriced.length > 0) {
-      parts.push(`$${formatCentsAmount(cents[next++])}`);
+      parts.push(`≥ $${formatUsdFloor(restUsd)}`);
     }
-    if (restTokensOnly.length > 0) {
-      const restTokens = restTokensOnly.reduce((acc, r) => addUsage(acc, r.tokens), emptyUsage());
-      parts.push(`${formatInt(restTokens.total)} tokens`);
+    const restUnpriced = rest.reduce((acc, r) => {
+      if (r.unreadable) {
+        return acc;
+      }
+      return addUsage(acc, r.usd === null ? r.tokens : (r.unpricedTokens ?? emptyUsage()));
+    }, emptyUsage());
+    if (restUnpriced.total > 0) {
+      parts.push(`${formatInt(restUnpriced.total)} unpriced tokens`);
     }
     if (restUnreadable.length > 0) {
       parts.push(`${restUnreadable.length} unreadable`);
@@ -625,9 +605,9 @@ export interface HandoffSlipView {
 /**
  * SPEC-0059 R5 — the aggregated slip over every counted session's fired waste
  * lines, or `null` when none fired (a clean PR's comment stays byte-identical).
- * The percent (summary and hedge) is withheld when the PR total renders with
- * the `≥` floor marker — a percent of a floor overstates (I3) — by denying the
- * slip its denominator; the `≤ $` ceiling itself is still an extracted sum.
+ * The percent is withheld when priced coverage is incomplete. With complete
+ * coverage it is still labeled approximate: a ratio of two lower bounds has
+ * no bound direction of its own.
  */
 export function buildHandoffSlip(data: HandoffSectionData, input: PrBodyInput): HandoffSlipView | null {
   if (data.wasteLines.length === 0) {
@@ -638,8 +618,8 @@ export function buildHandoffSlip(data: HandoffSectionData, input: PrBodyInput): 
     input.excludedCount > 0 || totals.unreadableCount > 0 || (input.confidence !== undefined && isFloored(input.confidence));
   const denominator = floored || totals.pricedCount === 0 ? null : totals.pricedSubtotal;
   const saved = couldHaveSavedOf(data.wasteLines, denominator);
-  const pct = saved.pctOfTotal !== null ? ` (${saved.pctOfTotal}%)` : "";
-  const summary = `handoff — could have saved ${couldHaveSavedValue(saved)}${pct}`;
+  const pct = saved.pctOfTotal !== null ? ` (≈${saved.pctOfTotal}% floor share)` : "";
+  const summary = `handoff — flagged pattern cost ${couldHaveSavedValue(saved)}${pct}`;
   const text = [
     ...savingsSlipLines(data.wasteLines, denominator),
     "",

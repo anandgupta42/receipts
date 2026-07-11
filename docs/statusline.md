@@ -268,9 +268,9 @@ in tmux or another shell UI.
 ## Output
 
 ```
-[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
-[aireceipts] Opus · $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
-[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k
+[aireceipts] Opus · ≥$4.20 · ≥$9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+[aireceipts] Opus · ≥$2.50 · ≥$6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
+[aireceipts · Codex] gpt-5.2-codex · ≥$1.10 · ≥$4/hr · 84k
 [aireceipts · Cursor] 8k
 aireceipts: no sessions detected
 ```
@@ -278,9 +278,9 @@ aireceipts: no sessions detected
 - `Opus` (after the brand) is the model — in stdin mode, Claude Code's own current
   model name (a mid-session switch shows on the next render); in disk fallback, the
   session's dominant model by token share. Omitted when neither is known.
-- `$X.XX` is the session's priced cost (aireceipts' own cited-price figure, incl.
-  subagents); omitted when it can't be priced — never a fabricated `$` amount.
-- `$X/hr` is the session-average burn rate (that same priced cost over the session
+- `≥$X.XX` is the session's observable Standard-API list-price-equivalent floor
+  (including subagents), not an invoice; omitted when no cited row matches.
+- `≥$X/hr` is the session-average floor rate (that same observable floor over the session
   wall-clock); omitted when the session isn't priced or has no duration yet.
 - `Nk` / `NM` is the session's token count, abbreviated (`12k`, `1.2M`, `501M`).
 - `ctx N%` is how full the current context window is — Claude Code's own
@@ -332,8 +332,8 @@ select known segments — it cannot inject text, colors, paths, or values.
 |---|---|---|
 | `brand` | `[aireceipts]` (stdin) / `[aireceipts · <agent>]` (disk fallback) | — |
 | `model` | `Opus` / `claude-opus-4-8` | stdin: Claude Code's own `model.display_name` (the **current** model, so a mid-session switch shows on the next render); disk fallback: the session's dominant model by token share (the mini receipt's value); omitted when neither exists (e.g. Cursor). Guarded: trimmed, ≤ 64 chars, no control characters. |
-| `cost` | `$X.XX` | priced session total incl. subagents; omitted when unpriced (I2) |
-| `burn` | `$X/hr` | session-average burn (priced cost ÷ wall-clock); omitted when unpriced or no duration |
+| `cost` | `≥$X.XX` | Standard-API-equivalent session floor incl. subagents; omitted when unpriced (I2) |
+| `burn` | `≥$X/hr` | session-average floor (observable floor ÷ wall-clock); omitted when unpriced or no duration |
 | `tokens` | `Nk` / `NM` | session + subagent tokens, abbreviated |
 | `context` | `ctx N%` | Claude Code's `context_window.used_percentage` (stdin only) |
 | `waste` | `⚠ ...` | first fired waste detector |

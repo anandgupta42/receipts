@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -514,16 +514,16 @@ function global:prompt {
 
 <h2 id="output">Output</h2>
 
-<pre class="doc-code"><code>[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
-[aireceipts] Opus · $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
-[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k
+<pre class="doc-code"><code>[aireceipts] Opus · ≥$4.20 · ≥$9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+[aireceipts] Opus · ≥$2.50 · ≥$6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
+[aireceipts · Codex] gpt-5.2-codex · ≥$1.10 · ≥$4/hr · 84k
 [aireceipts · Cursor] 8k
 aireceipts: no sessions detected</code></pre>
 
 <ul>
   <li><code>Opus</code> (after the brand) is the model — in stdin mode, Claude Code's own current model name (a mid-session switch shows on the next render); in disk fallback, the session's dominant model by token share. Omitted when neither is known.</li>
-  <li><code>$X.XX</code> is the session's priced cost (aireceipts' own cited-price figure, incl. subagents); omitted when it can't be priced — never a fabricated <code>$</code> amount.</li>
-  <li><code>$X/hr</code> is the session-average burn rate (that same priced cost over the session wall-clock); omitted when the session isn't priced or has no duration yet.</li>
+  <li><code>≥$X.XX</code> is the session's observable Standard-API list-price-equivalent floor (including subagents), not an invoice; omitted when no cited row matches.</li>
+  <li><code>≥$X/hr</code> is the session-average floor rate (that same observable floor over the session wall-clock); omitted when the session isn't priced or has no duration yet.</li>
   <li><code>Nk</code> / <code>NM</code> is the session's token count, abbreviated (<code>12k</code>, <code>1.2M</code>, <code>501M</code>).</li>
   <li><code>ctx N%</code> is how full the current context window is — Claude Code's own pre-calculated <code>context_window.used_percentage</code>, omitted when the payload lacks it.</li>
   <li><code>5h N% ↺Xh Ym</code> is your official 5-hour rate-limit usage (Claude Code's own <code>rate_limits.five_hour.used_percentage</code>, subscribers only) plus the time until the window resets, derived from the real <code>resets_at</code> — the countdown is dropped (leaving <code>5h N%</code>) when <code>resets_at</code> is absent or already past, never a guessed time.</li>
@@ -555,8 +555,8 @@ aireceipts: no sessions detected</code></pre>
   <tbody>
     <tr><td><code>brand</code></td><td><code>[aireceipts]</code> (stdin) / <code>[aireceipts · &lt;agent&gt;]</code> (disk fallback)</td><td>—</td></tr>
     <tr><td><code>model</code></td><td><code>Opus</code> / <code>claude-opus-4-8</code></td><td>stdin: Claude Code's own <code>model.display_name</code> (the <strong>current</strong> model, so a mid-session switch shows on the next render); disk fallback: the session's dominant model by token share (the mini receipt's value); omitted when neither exists (e.g. Cursor). Guarded: trimmed, ≤ 64 chars, no control characters.</td></tr>
-    <tr><td><code>cost</code></td><td><code>$X.XX</code></td><td>priced session total incl. subagents; omitted when unpriced (I2)</td></tr>
-    <tr><td><code>burn</code></td><td><code>$X/hr</code></td><td>session-average burn (priced cost ÷ wall-clock); omitted when unpriced or no duration</td></tr>
+    <tr><td><code>cost</code></td><td><code>≥$X.XX</code></td><td>Standard-API-equivalent session floor incl. subagents; omitted when unpriced (I2)</td></tr>
+    <tr><td><code>burn</code></td><td><code>≥$X/hr</code></td><td>session-average floor (observable floor ÷ wall-clock); omitted when unpriced or no duration</td></tr>
     <tr><td><code>tokens</code></td><td><code>Nk</code> / <code>NM</code></td><td>session + subagent tokens, abbreviated</td></tr>
     <tr><td><code>context</code></td><td><code>ctx N%</code></td><td>Claude Code's <code>context_window.used_percentage</code> (stdin only)</td></tr>
     <tr><td><code>waste</code></td><td><code>⚠ ...</code></td><td>first fired waste detector</td></tr>

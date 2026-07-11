@@ -20,6 +20,12 @@ interface CodexUsage {
   output_tokens?: number;
   cached_input_tokens?: number;
   reasoning_output_tokens?: number;
+  total_tokens?: number;
+}
+
+interface MappedCodexUsage {
+  usage?: TokenUsage;
+  malformed: boolean;
 }
 
 /**
@@ -28,24 +34,47 @@ interface CodexUsage {
  * `output` — our `TokenUsage` has no separate reasoning bucket to absorb those
  * tokens into, so subtracting them would silently drop billed spend from the
  * total (I2: never under-report). Reasoning tokens stay folded into `output`.
- * `cacheCreation` is always 0 here: OpenAI's usage payload has no cache-write
- * counterpart to `cached_input_tokens` — prompt caching is automatic and its
- * pricing only ever discounts cached reads (per team-lead: "OpenAI publishes
- * cached-read only"), so `openai.json` price rows carry no
- * `input_cache_write_*` fields for `costOf` to price against.
+ * `cacheCreation` is always 0 here: Codex's persisted usage payload has no
+ * cache-write counterpart to `cached_input_tokens`. Some OpenAI models do
+ * publish a cache-write price, so receipts explicitly caveat that this
+ * unobserved component is excluded from the observable floor.
  */
-function mapUsage(usage: CodexUsage | undefined) {
-  if (!usage) {
-    return undefined;
+function mapUsage(raw: unknown): MappedCodexUsage {
+  if (raw === undefined || raw === null) {
+    return { malformed: false };
   }
-  const input = Math.max(0, (usage.input_tokens ?? 0) - (usage.cached_input_tokens ?? 0));
-  return withTotal({
-    input,
-    output: usage.output_tokens ?? 0,
-    cacheRead: usage.cached_input_tokens ?? 0,
-    cacheCreation: 0,
-    total: 0,
-  });
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    return { malformed: true };
+  }
+
+  const usage = raw as CodexUsage;
+  const fields: ReadonlyArray<keyof CodexUsage> = [
+    "input_tokens",
+    "output_tokens",
+    "cached_input_tokens",
+    "reasoning_output_tokens",
+    "total_tokens",
+  ];
+  if (fields.some((field) => usage[field] !== undefined && (!Number.isSafeInteger(usage[field]) || (usage[field] as number) < 0))) {
+    return { malformed: true };
+  }
+
+  const inputTokens = usage.input_tokens ?? 0;
+  const cachedInputTokens = usage.cached_input_tokens ?? 0;
+  if (cachedInputTokens > inputTokens) {
+    return { malformed: true };
+  }
+
+  return {
+    malformed: false,
+    usage: withTotal({
+      input: inputTokens - cachedInputTokens,
+      output: usage.output_tokens ?? 0,
+      cacheRead: cachedInputTokens,
+      cacheCreation: 0,
+      total: 0,
+    }),
+  };
 }
 
 function sameUsage(a: TokenUsage, b: TokenUsage): boolean {
@@ -55,6 +84,15 @@ function sameUsage(a: TokenUsage, b: TokenUsage): boolean {
     a.cacheRead === b.cacheRead &&
     a.cacheCreation === b.cacheCreation &&
     a.total === b.total
+  );
+}
+
+function componentwiseDominates(a: TokenUsage, b: TokenUsage): boolean {
+  return (
+    a.input >= b.input &&
+    a.output >= b.output &&
+    a.cacheRead >= b.cacheRead &&
+    a.cacheCreation >= b.cacheCreation
   );
 }
 
@@ -145,6 +183,8 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let cumulativeBaseline: TokenUsage | undefined;
   let perTurnUsage = emptyUsage();
   let sawCumulative = false;
+  let sawLegacyUsage = false;
+  let requestEvidenceValid = true;
   let toolCallCount = 0;
   const turns: Turn[] = [];
   const toolCallById = new Map<string, ToolCall>();
@@ -220,13 +260,6 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         : undefined;
     if (providerOwner) {
       currentPricingProvider = normalizePricingProvider(providerOwner.model_provider);
-      if (currentPricingProvider !== undefined) {
-        for (const turn of turns) {
-          if (turn.pricingProvider === undefined) {
-            turn.pricingProvider = currentPricingProvider;
-          }
-        }
-      }
     }
 
     if (typeof item.model === "string") {
@@ -243,10 +276,18 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     // the delta billed to the turn that just completed.
     const info = item.info as Record<string, unknown> | undefined;
     if (info) {
-      const total = mapUsage(info.total_token_usage as CodexUsage);
+      const mappedTotal = mapUsage(info.total_token_usage);
+      const mappedReportedDelta = mapUsage(info.last_token_usage);
+      if (mappedTotal.malformed || mappedReportedDelta.malformed) {
+        requestEvidenceValid = false;
+      }
+      const total = mappedTotal.usage;
       if (total && total.total > 0) {
+        if (!sawCumulative && sawLegacyUsage) {
+          requestEvidenceValid = false;
+        }
         sawCumulative = true;
-        const reportedDelta = mapUsage(info.last_token_usage as CodexUsage);
+        const reportedDelta = mappedReportedDelta.usage;
         // Codex's cumulative envelope is allowed to repeat unchanged while
         // retaining the prior turn's non-zero `last_token_usage`. Treating
         // every record as a new turn bills that stale delta twice. A changed
@@ -254,8 +295,17 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         // usage event completed.
         const previousCumulative = cumulativeUsage;
         const changed = previousCumulative === undefined || !sameUsage(total, previousCumulative);
-        if (previousCumulative === undefined && reportedDelta && reportedDelta.total > 0) {
-          cumulativeBaseline = subtractUsage(total, reportedDelta);
+        if (previousCumulative === undefined) {
+          if (reportedDelta && reportedDelta.total > 0) {
+            if (!componentwiseDominates(total, reportedDelta)) {
+              requestEvidenceValid = false;
+            }
+            cumulativeBaseline = subtractUsage(total, reportedDelta);
+          } else {
+            // A baseline-only first snapshot establishes no local request. It
+            // is safe to exclude it and price only later proven deltas.
+            cumulativeBaseline = total;
+          }
         }
         cumulativeUsage = total;
         // After the first snapshot, the cumulative vector itself is the
@@ -267,24 +317,47 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         const delta = previousCumulative === undefined
           ? reportedDelta
           : subtractUsage(total, previousCumulative);
+        if (previousCumulative !== undefined && changed) {
+          if (!componentwiseDominates(total, previousCumulative)) {
+            requestEvidenceValid = false;
+          }
+          if (!reportedDelta || !delta || reportedDelta.total === 0 || !sameUsage(delta, reportedDelta)) {
+            requestEvidenceValid = false;
+          }
+        }
         if (changed && delta && delta.total > 0) {
           const t = ensureTurn(ts);
           t.usage = addUsage(t.usage ?? emptyUsage(), delta);
           t.outputTokens = t.usage.output;
           t.model ??= currentModel;
+          (t.pricingUnits ??= []).push({
+            usage: delta,
+            timestamp: ts,
+            model: currentModel,
+            pricingProvider: currentPricingProvider,
+          });
         }
       }
     }
     if (!sawCumulative) {
-      const perMsg = mapUsage((item.usage as CodexUsage) ?? (top.usage as CodexUsage));
+      const mappedPerMsg = mapUsage(item.usage ?? top.usage);
+      if (mappedPerMsg.malformed) {
+        requestEvidenceValid = false;
+      }
+      const perMsg = mappedPerMsg.usage;
       if (perMsg && perMsg.total > 0) {
+        sawLegacyUsage = true;
         perTurnUsage = addUsage(perTurnUsage, perMsg);
         const t = ensureTurn(ts);
-        if (!t.usage) {
-          t.usage = perMsg;
-          t.outputTokens = perMsg.output;
-          t.model ??= currentModel;
-        }
+        t.usage = addUsage(t.usage ?? emptyUsage(), perMsg);
+        t.outputTokens = t.usage.output;
+        t.model ??= currentModel;
+        (t.pricingUnits ??= []).push({
+          usage: perMsg,
+          timestamp: ts,
+          model: currentModel,
+          pricingProvider: currentPricingProvider,
+        });
       }
     }
 
@@ -349,6 +422,23 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   const totalUsage = sawCumulative
     ? subtractUsage(cumulativeUsage ?? emptyUsage(), cumulativeBaseline ?? emptyUsage())
     : perTurnUsage;
+  const summedTurnUsage = turns.reduce(
+    (sum, turn) => addUsage(sum, turn.usage ?? emptyUsage()),
+    emptyUsage(),
+  );
+  const usageReconciliationFailed =
+    droppedRecords > 0 || !requestEvidenceValid || !sameUsage(summedTurnUsage, totalUsage);
+  if (usageReconciliationFailed) {
+    // Without a complete, monotone request envelope sequence, a cumulative
+    // delta may combine requests and select the wrong context tier. Preserve
+    // the final local envelope as unattributed tokens, but remove every
+    // request-level pricing claim.
+    for (const turn of turns) {
+      delete turn.usage;
+      delete turn.outputTokens;
+      delete turn.pricingUnits;
+    }
+  }
 
   const totals = {
     tokens: totalUsage,
@@ -377,7 +467,14 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   );
 
   return withTurns
-    ? { summary, turns, compactions, droppedRecords }
+    ? {
+        summary,
+        turns,
+        compactions,
+        droppedRecords,
+        ...(usageReconciliationFailed ? { usageReconciliationFailed: true as const } : {}),
+        ...(usageReconciliationFailed && totalUsage.total > 0 ? { unattributedUsage: totalUsage } : {}),
+      }
     : { summary, turns: [] as Turn[], compactions: [] as Compaction[], droppedRecords: 0 };
 }
 
@@ -431,13 +528,16 @@ export class CodexAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns, compactions, droppedRecords } = await parseTranscript(id, true);
+      const { summary, turns, compactions, droppedRecords, usageReconciliationFailed, unattributedUsage } = await parseTranscript(id, true);
       // SPEC-0040 R5 — compactions absent (not `[]`) when none; SPEC-0044 B3 —
       // droppedRecords present only when > 0 (absent → clean).
       const dropped = droppedRecords > 0 ? { droppedRecords } : {};
+      const reconciliation = usageReconciliationFailed
+        ? { usageReconciliationFailed, ...(unattributedUsage ? { unattributedUsage } : {}) }
+        : {};
       return compactions.length > 0
-        ? { ...summary, turns, compactions, ...dropped }
-        : { ...summary, turns, ...dropped };
+        ? { ...summary, turns, compactions, ...dropped, ...reconciliation }
+        : { ...summary, turns, ...dropped, ...reconciliation };
     } catch {
       return null;
     }

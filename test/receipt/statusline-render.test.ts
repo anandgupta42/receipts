@@ -64,14 +64,14 @@ function renderDefault(model: ReceiptModel, over: Partial<SegmentContext> = {}):
 }
 
 describe("default line (R1 priced, no waste)", () => {
-  it("renders [aireceipts] $usd · Nk tok with no waste-flag segment", () => {
+  it("renders [aireceipts] ≥$usd · Nk tok with no waste-flag segment", () => {
     const model = baseModel({ totalUsd: 1.23, totalTokens: usage(12345) });
-    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · $1.23 · 12k");
+    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · ≥$1.23 · 12k");
   });
 
   it("disk-fallback mode names the session's agent in the brand", () => {
     const model = baseModel({ agentLabel: "Codex", source: "codex" });
-    expect(renderDefault(model, { inputMode: "disk_fallback" })).toBe("[aireceipts · Codex] claude-opus-4-8 · $1.23 · 12k");
+    expect(renderDefault(model, { inputMode: "disk_fallback" })).toBe("[aireceipts · Codex] claude-opus-4-8 · ≥$1.23 · 12k");
   });
 });
 
@@ -111,7 +111,7 @@ describe("default line (R1 waste flags)", () => {
       wallClockMs: 15000,
     };
     const model = baseModel({ totalUsd: 2.5, totalTokens: usage(20000), wasteLines: [waste] });
-    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · $2.50 · 20k · ⚠ Bash loop ×5");
+    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · ≥$2.50 · 20k · ⚠ Bash loop ×5");
   });
 
   it("appends a trivial-spans flag with the eligible turn count", () => {
@@ -123,7 +123,7 @@ describe("default line (R1 waste flags)", () => {
       cheaperModel: "claude-haiku-4-5",
     };
     const model = baseModel({ totalUsd: 2.5, totalTokens: usage(20000), wasteLines: [waste] });
-    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · $2.50 · 20k · ⚠ 7 trivial spans");
+    expect(renderDefault(model)).toBe("[aireceipts] claude-opus-4-8 · ≥$2.50 · 20k · ⚠ 7 trivial spans");
   });
 
   it("omits the waste segment entirely when nothing fired (I6: absence, not a claim)", () => {
@@ -158,12 +158,12 @@ describe("SPEC-0062 R2 — quota on the default line", () => {
   const payload = { rate_limits: { five_hour: { used_percentage: 23.5 } } };
 
   it("appends the official 5h percentage, integer-rounded", () => {
-    expect(renderDefault(baseModel(), { payload })).toBe("[aireceipts] claude-opus-4-8 · $1.23 · 12k · 5h 24%");
+    expect(renderDefault(baseModel(), { payload })).toBe("[aireceipts] claude-opus-4-8 · ≥$1.23 · 12k · 5h 24%");
   });
 
   it("omits the segment for an out-of-range percentage (SPEC-0014 R4: never a guess)", () => {
     const bad = { rate_limits: { five_hour: { used_percentage: 130 } } };
-    expect(renderDefault(baseModel(), { payload: bad })).toBe("[aireceipts] claude-opus-4-8 · $1.23 · 12k");
+    expect(renderDefault(baseModel(), { payload: bad })).toBe("[aireceipts] claude-opus-4-8 · ≥$1.23 · 12k");
   });
 
   it("the 7d window stays off the default line", () => {

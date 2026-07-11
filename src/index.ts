@@ -39,6 +39,15 @@ export { attributeByTool, METHODOLOGY } from "./pricing/attribution.js";
 export type { ContextThrashFinding, PriceDeltaFootnote, StuckLoopFinding, TrivialSpansFinding } from "./pricing/waste.js";
 export { detectContextThrash, detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "./pricing/waste.js";
 
+export type { CostBasis, CostEstimate, CostSemantics } from "./receipt/costEstimate.js";
+export {
+  HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+  lowerBoundCostEstimate,
+  SAME_TOKENS_REPRICING_INTERPRETATION,
+  STANDARD_API_LIST_PRICE_EQUIVALENT,
+  STANDARD_API_LOWER_BOUND_SEMANTICS,
+} from "./receipt/costEstimate.js";
+
 // SPEC-0008 weekly digest + the shared waste-aggregation primitive (also consumed by SPEC-0013).
 export type { WasteClassAggregate } from "./aggregate/waste.js";
 export { aggregateWaste } from "./aggregate/waste.js";

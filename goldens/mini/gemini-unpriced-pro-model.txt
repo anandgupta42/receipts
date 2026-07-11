@@ -2,5 +2,5 @@ aireceipts · session receipt
 Gemini CLI · gemini-2.5-pro · 40s
 total  31,600 tok
 top    read_file · 31,600 tok (1 call)
-no waste detected
+no flagged pattern detected
 run  aireceipts  for the full receipt

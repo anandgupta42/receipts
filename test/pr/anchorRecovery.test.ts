@@ -154,7 +154,7 @@ describe("SPEC-0072 R1 - patch-id anchor recovery", () => {
     }
     const rendered = sliceSessionForReceipt(s, slice);
     const child = makeSession("child", cwd, [bashTurn(0, "npm test", "child tests passed")]);
-    const rows = await rollupChildren(s.filePath, { start: rendered.startedAt!, end: rendered.endedAt! }, {
+    const rows = await rollupChildren(s.filePath, { kind: "range", start: rendered.startedAt!, end: rendered.endedAt! }, {
       discover: async () => [child.filePath],
       load: async () => child,
     });

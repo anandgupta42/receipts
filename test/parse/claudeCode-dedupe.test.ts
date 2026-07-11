@@ -1,18 +1,25 @@
-// One billed API response = one turn. Claude Code writes one `assistant`
-// record per content block, and every record of the same response repeats the
-// same `message.id` and the same `usage` snapshot (audited 2026-07-08 over 19
-// real transcripts: up to 12 records per id, usage byte-identical). Counting
-// per record multiplied session cost ~2.8× — the PR #189 receipt claimed
-// $5.17 for a slice whose deduped cost is $1.61. These tests pin the fix:
-// turns and usage are keyed by message id; tool_use blocks from every record
-// of the id merge into that one turn.
+// One observable assistant response group = one turn. Claude Code writes one `assistant`
+// record per content block. Same-id usage is often identical, but Anthropic's
+// Agent SDK guidance explicitly says duplicate ids can report evolving output
+// and the highest output value identifies the accurate response. These tests
+// pin both sides: group once by id, retain that record's coherent usage vector,
+// and preserve each distinct tool use/result exactly once.
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { loadById } from "../../src/parse/load.js";
+import { buildReceiptModel } from "../../src/receipt/model.js";
 
 const SESS = "dddddddd-1111-2222-3333-555555555555";
+const EVOLVING_FIXTURE = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "fixtures",
+  "claude-code",
+  "evolving-duplicate-snapshots.jsonl",
+);
 
 type Rec = Record<string, unknown>;
 
@@ -24,7 +31,13 @@ const USAGE = {
 };
 
 /** `usage: null` omits the field entirely (a usage-less record). */
-function assistantRecord(uuid: string, ts: string, messageId: string, content: unknown[], usage: Record<string, number> | null = USAGE): Rec {
+function assistantRecord(
+  uuid: string,
+  ts: string,
+  messageId: string,
+  content: unknown[],
+  usage: Record<string, unknown> | null = USAGE,
+): Rec {
   return {
     type: "assistant",
     uuid,
@@ -54,7 +67,7 @@ async function loadFixture(records: Rec[]) {
   return session!;
 }
 
-describe("claude-code adapter: one billed response = one turn (message-id dedupe)", () => {
+describe("claude-code adapter: one observable response group = one turn (message-id dedupe)", () => {
   it("merges multi-record responses into one turn and books usage once", async () => {
     const session = await loadFixture([
       { type: "user", uuid: "u-1", timestamp: "10:00:00.000", sessionId: SESS, message: { role: "user", content: "do the thing" } },
@@ -84,13 +97,16 @@ describe("claude-code adapter: one billed response = one turn (message-id dedupe
     expect(session.totals.toolCallCount).toBe(2);
   });
 
-  it("keeps records without a message id as separate turns (nothing to match on)", async () => {
+  it("keeps id-less records unpriced and retains one coherent snapshot as unattributed tokens", async () => {
     const session = await loadFixture([
       { type: "assistant", uuid: "a-1", timestamp: "2026-07-04T10:00:00.000Z", sessionId: SESS, message: { role: "assistant", model: "claude-opus-4-8", content: [{ type: "text", text: "x" }], usage: USAGE } },
       { type: "assistant", uuid: "a-2", timestamp: "2026-07-04T10:00:01.000Z", sessionId: SESS, message: { role: "assistant", model: "claude-opus-4-8", content: [{ type: "text", text: "y" }], usage: USAGE } },
     ]);
     expect(session.turns.length).toBe(2);
-    expect(session.totals.tokens.total).toBe(2_700);
+    expect(session.turns.every((turn) => turn.usage === undefined)).toBe(true);
+    expect(session.unattributedUsage).toMatchObject({ input: 100, output: 50, cacheRead: 1_000, cacheCreation: 200, total: 1_350 });
+    expect(session.totals.tokens.total).toBe(1_350);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
   });
 
   it("attaches usage from a later record when the id's first record carried none", async () => {
@@ -101,5 +117,85 @@ describe("claude-code adapter: one billed response = one turn (message-id dedupe
     expect(session.turns.length).toBe(1);
     expect(session.turns[0].usage?.total).toBe(1_350);
     expect(session.turns[0].toolCalls.map((c) => c.name)).toEqual(["Bash"]);
+  });
+
+  it("retains the coherent snapshot with highest output across evolving duplicates", async () => {
+    const session = await loadById("claude-code", EVOLVING_FIXTURE);
+    expect(session).not.toBeNull();
+
+    // msg_evolving is one observable response group despite four records. The
+    // second record has the documented highest output; its other components
+    // stay together rather than fabricating independent bucket maxima.
+    expect(session!.turns[0].usage).toEqual({
+      input: 90,
+      output: 50,
+      cacheRead: 900,
+      cacheCreation: 180,
+      cacheCreation5m: 120,
+      cacheCreation1h: 60,
+      total: 1_220,
+    });
+    expect(session!.turns[0].outputTokens).toBe(50);
+
+    // tool-1 is repeated in a cumulative snapshot but remains one call; the
+    // distinct tool-2 and both later results survive the merge.
+    expect(session!.turns[0].toolCalls).toHaveLength(2);
+    expect(session!.turns[0].toolCalls[0]).toMatchObject({
+      name: "Bash",
+      input: { command: "first" },
+      output: "first result",
+      status: "ok",
+    });
+    expect(session!.turns[0].toolCalls[1]).toMatchObject({
+      name: "Read",
+      output: "second result",
+      status: "error",
+    });
+
+    // Records without an API message id cannot be grouped safely. Their two
+    // identical snapshots contribute one tokens-only unattributed envelope.
+    expect(session!.turns).toHaveLength(3);
+    expect(session!.unattributedUsage).toMatchObject({ input: 7, output: 3, total: 10 });
+    expect(session!.totals).toMatchObject({
+      tokens: { input: 97, output: 53, cacheRead: 900, cacheCreation: 180, total: 1_230 },
+      turnCount: 3,
+      toolCallCount: 2,
+    });
+  });
+
+  it("clears usage and tool-id merge state at a fork boundary", async () => {
+    const session = await loadFixture([
+      assistantRecord("pre", "09:00:00.000", "msg_reused", [
+        { type: "tool_use", id: "tool-reused", name: "Bash", input: { command: "parent" } },
+      ], { input_tokens: 1_000, output_tokens: 100 }),
+      { type: "fork-context-ref", agentId: "fork-1", parentSessionId: SESS },
+      assistantRecord("post-1", "10:00:00.000", "msg_reused", [
+        { type: "tool_use", id: "tool-reused", name: "Bash", input: { command: "child" } },
+      ], { input_tokens: 20, output_tokens: 5 }),
+      assistantRecord("post-2", "10:00:01.000", "msg_reused", [
+        { type: "tool_use", id: "tool-reused", name: "Bash", input: { command: "duplicate child" } },
+      ], { input_tokens: 18, output_tokens: 10 }),
+      {
+        type: "user",
+        uuid: "post-result",
+        timestamp: "2026-07-04T10:00:02.000Z",
+        sessionId: SESS,
+        message: {
+          role: "user",
+          content: [{ type: "tool_result", tool_use_id: "tool-reused", content: "child result" }],
+        },
+      },
+    ]);
+
+    expect(session.turns).toHaveLength(1);
+    expect(session.turns[0].usage).toMatchObject({ input: 18, output: 10, total: 28 });
+    expect(session.turns[0].toolCalls).toEqual([
+      expect.objectContaining({ input: { command: "child" }, output: "child result", status: "ok" }),
+    ]);
+    expect(session.totals).toMatchObject({
+      tokens: { input: 18, output: 10, total: 28 },
+      turnCount: 1,
+      toolCallCount: 1,
+    });
   });
 });

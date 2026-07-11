@@ -11,11 +11,11 @@
      so any single hardcoded URL here would misrepresent the actual link. -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="aireceipts — receipt viewer">
-<meta property="og:description" content="A local, deterministic viewer for aireceipts cost receipts — what AI coding agents actually cost.">
+<meta property="og:description" content="A local, deterministic viewer for aireceipts cost receipts — an observable Standard API cost floor, not an invoice.">
 <meta property="og:image" content="https://anandgupta42.github.io/receipts/og-card.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="aireceipts — receipt viewer">
-<meta name="twitter:description" content="A local, deterministic viewer for aireceipts cost receipts — what AI coding agents actually cost.">
+<meta name="twitter:description" content="A local, deterministic viewer for aireceipts cost receipts — an observable Standard API cost floor, not an invoice.">
 <meta name="twitter:image" content="https://anandgupta42.github.io/receipts/og-card.png">
 <style>
   :root{--paper:#FAF7F1;--ink:#23262E;--muted:#8B8578;--ground:#EFEAE0;--warn:#B0574E}
@@ -80,7 +80,7 @@
   // SPEC-0035 R3 — maintainer-approved verbatim (PR #77 comment); do not edit.
   // This exact string also ships as SHARE_TEXT in src/pr/share.ts for the CLI
   // --share hint; test/site-share.test.ts asserts the two stay byte-identical.
-  var SHARE_TEXT = "An aireceipts cost receipt — what the AI agents actually cost.";
+  var SHARE_TEXT = "An aireceipts cost receipt — an observable Standard API cost floor, not an invoice.";
 
   function fail(text, href) {
     status.className = "msg error";

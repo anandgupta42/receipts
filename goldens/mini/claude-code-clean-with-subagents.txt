@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Claude Code · claude-opus-4-8 · 3m 10s
-total  $0.04 (incl. 2 subagents)
-top    Task · $0.01 (1 call)
-no waste detected
+total  ≥ $0.0397 (incl. 2 subagents)
+top    Task · ≥ $0.0132 (1 call)
+no flagged pattern detected
 run  aireceipts  for the full receipt

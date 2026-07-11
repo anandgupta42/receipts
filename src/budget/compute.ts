@@ -12,10 +12,19 @@ export interface UsdBudgetSum {
   kind: "usd";
   spent: number;
   cap: number;
-  /** in-window sessions that resolved a price and contributed to `spent`. */
+  /** All in-window top-level summaries, including unreadable ones. */
+  inWindowSessionCount: number;
+  /** Sessions with at least one priced component that contributed to `spent`. */
   sessionCount: number;
-  /** in-window sessions with no resolvable price — excluded from `spent`, surfaced in the rendered note (R2 honesty). */
+  fullyPricedSessionCount: number;
+  partiallyPricedSessionCount: number;
+  cacheRatePartialSessionCount: number;
+  /** In-window sessions with no priced component, including unreadable summaries. */
   excludedUnpricedCount: number;
+  unreadableSessionCount: number;
+  /** Exact tokens from unpriced request envelopes; cache-rate gaps are counted separately. */
+  unpricedTokenCount: number;
+  childSessionsIncluded: false;
 }
 
 export interface TokensBudgetSum {
@@ -23,6 +32,8 @@ export interface TokensBudgetSum {
   spentTokens: number;
   cap: number;
   sessionCount: number;
+  excludedUnreadableCount: number;
+  childSessionsIncluded: false;
 }
 
 export type BudgetSum = UsdBudgetSum | TokensBudgetSum;
@@ -44,31 +55,77 @@ export async function computeBudgetSum(
   dataDir: string = defaultDataDir(),
 ): Promise<BudgetSum> {
   const bounds = windowFor(period, now);
-  const all = await listFullSessions();
-  const inWindowSummaries = all.filter((s) => inWindow(s.endedAt, bounds));
+  const all = await listFullSessions(undefined, { includeDegraded: true });
+  const inWindowSummaries = all.filter(
+    (summary) =>
+      summary.isSidechain !== true &&
+      summary.parentSessionId === undefined &&
+      inWindow(summary.endedAt, bounds),
+  );
 
   if (periodConfig.tokens !== undefined) {
-    // I2: a token budget counts every in-window session regardless of pricing.
-    const spentTokens = inWindowSummaries.reduce((sum, s) => sum + s.totals.tokens.total, 0);
-    return { kind: "tokens", spentTokens, cap: periodConfig.tokens, sessionCount: inWindowSummaries.length };
+    // Degraded summaries have no reliable totals. Keep them visible in the
+    // denominator while excluding their unknown token quantity from the sum.
+    const readable = inWindowSummaries.filter((summary) => summary.degraded === undefined);
+    const spentTokens = readable.reduce((sum, summary) => sum + summary.totals.tokens.total, 0);
+    return {
+      kind: "tokens",
+      spentTokens,
+      cap: periodConfig.tokens,
+      sessionCount: inWindowSummaries.length,
+      excludedUnreadableCount: inWindowSummaries.length - readable.length,
+      childSessionsIncluded: false,
+    };
   }
 
   // usd mode — R1 validation guarantees exactly one of usd/tokens is set.
   let spent = 0;
   let priced = 0;
+  let fullyPriced = 0;
+  let partiallyPriced = 0;
+  let cacheRatePartial = 0;
   let excludedUnpriced = 0;
+  let unreadable = 0;
+  let unpricedTokens = 0;
   for (const summary of inWindowSummaries) {
     const session = await loadSession(summary);
-    if (!session) {
+    if (!session || session.degraded !== undefined) {
+      excludedUnpriced += 1;
+      unreadable += 1;
+      if (summary.degraded === undefined) {
+        unpricedTokens += summary.totals.tokens.total;
+      }
       continue;
     }
     const attribution = await attributeByTool(session, dataDir);
+    unpricedTokens += attribution.unpricedTokens.total;
     if (attribution.totalUsd === null) {
       excludedUnpriced += 1;
       continue;
     }
     spent += attribution.totalUsd;
     priced += 1;
+    if (attribution.unpricedTokens.total > 0 || attribution.costLowerBoundCacheTier) {
+      partiallyPriced += 1;
+      if (attribution.costLowerBoundCacheTier) {
+        cacheRatePartial += 1;
+      }
+    } else {
+      fullyPriced += 1;
+    }
   }
-  return { kind: "usd", spent, cap: periodConfig.usd ?? 0, sessionCount: priced, excludedUnpricedCount: excludedUnpriced };
+  return {
+    kind: "usd",
+    spent,
+    cap: periodConfig.usd ?? 0,
+    inWindowSessionCount: inWindowSummaries.length,
+    sessionCount: priced,
+    fullyPricedSessionCount: fullyPriced,
+    partiallyPricedSessionCount: partiallyPriced,
+    cacheRatePartialSessionCount: cacheRatePartial,
+    excludedUnpricedCount: excludedUnpriced,
+    unreadableSessionCount: unreadable,
+    unpricedTokenCount: unpricedTokens,
+    childSessionsIncluded: false,
+  };
 }

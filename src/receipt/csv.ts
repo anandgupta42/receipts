@@ -6,7 +6,9 @@
 // are additive-only within a schema major version — never reorder or remove.
 import type { TokenUsage } from "../parse/types.js";
 import { SCHEMA_VERSION } from "./exportSchema.js";
-import type { ReceiptModel } from "./model.js";
+import { combinedPricedUsd, combinedTokenTotal, type ReceiptModel } from "./model.js";
+import { lowerBoundCostEstimate } from "./costEstimate.js";
+import { knownUnpricedTokens, pricingCoverageOf } from "./pricingCoverage.js";
 
 /** RFC 4180 §2: quote a field iff it contains `"`, `,`, CR, or LF; escape embedded quotes by doubling. */
 function csvField(value: string): string {
@@ -20,6 +22,11 @@ function csvRow(cells: string[]): string {
 /** A CSV `$` cell: empty string when unpriced (I2), else the raw number — byte-identical to the value `--json` emits (no `$`, no comma grouping, no rounding). */
 function usdCell(usd: number | null): string {
   return usd === null ? "" : String(usd);
+}
+
+function costMetadataCells(usd: number | null): [string, string] {
+  const estimate = lowerBoundCostEstimate(usd);
+  return estimate === null ? ["", ""] : [estimate.kind, estimate.basis];
 }
 
 /** Session-level tokens: the adapter's session totals for unpriceable sources (Cursor's only real number), else the attributed per-turn sum — the same choice `compareDeltaLine` makes. */
@@ -41,6 +48,25 @@ const SESSION_COLUMNS = [
   "cacheReadTokens",
   "cacheCreationTokens",
   "totalTokens",
+  "costKind",
+  "costBasis",
+  "totalUsdScope",
+  "subagentsPricedUsd",
+  "combinedPricedUsd",
+  "combinedCostKind",
+  "combinedCostBasis",
+  "subagentsTokens",
+  "combinedTotalTokens",
+  "subagentCount",
+  "subagentUnpricedCount",
+  "subagentUnreadableCount",
+  "pricingCoverage",
+  "unpricedInputTokens",
+  "unpricedOutputTokens",
+  "unpricedCacheReadTokens",
+  "unpricedCacheCreationTokens",
+  "unpricedTotalTokens",
+  "unpricedTokensScope",
 ] as const;
 
 const TOOL_COLUMNS = [
@@ -55,10 +81,18 @@ const TOOL_COLUMNS = [
   "cacheCreationTokens",
   "totalTokens",
   "callCount",
+  "costKind",
+  "costBasis",
+  "costScope",
+  "pricingCoverage",
+  "pricingCoverageLimitation",
 ] as const;
 
 function sessionCells(model: ReceiptModel): string[] {
   const tokens = effectiveTokens(model);
+  const costMetadata = costMetadataCells(model.totalUsd);
+  const combinedUsd = combinedPricedUsd(model);
+  const unpricedTokens = knownUnpricedTokens(model);
   return [
     String(SCHEMA_VERSION),
     model.sessionId,
@@ -73,6 +107,23 @@ function sessionCells(model: ReceiptModel): string[] {
     String(tokens.cacheRead),
     String(tokens.cacheCreation),
     String(tokens.total),
+    ...costMetadata,
+    "parent-session",
+    usdCell(model.subagents?.pricedUsd ?? null),
+    usdCell(combinedUsd),
+    ...costMetadataCells(combinedUsd),
+    String(model.subagents?.tokensTotal ?? 0),
+    String(combinedTokenTotal(model)),
+    String(model.subagents?.count ?? 0),
+    String(model.subagents?.unpricedCount ?? 0),
+    String(model.subagents?.unreadableCount ?? 0),
+    pricingCoverageOf(model),
+    String(unpricedTokens.input),
+    String(unpricedTokens.output),
+    String(unpricedTokens.cacheRead),
+    String(unpricedTokens.cacheCreation),
+    String(unpricedTokens.total),
+    "parent-session",
   ];
 }
 
@@ -83,8 +134,14 @@ export function toSessionCsv(model: ReceiptModel): string {
 
 /** `--csv=tool`: header + one row per tool line (token cells always populated; `$` cell empty when that tool's turns never priced). */
 export function toToolCsv(model: ReceiptModel): string {
-  const rows = model.toolRows.map((row) =>
-    csvRow([
+  const sessionCoverage = pricingCoverageOf(model);
+  const rows = model.toolRows.map((row) => {
+    const rowCoverage = row.usd === null ? "unpriced" : sessionCoverage === "full" ? "full" : "indeterminate";
+    const limitation =
+      rowCoverage === "indeterminate"
+        ? "session pricing is partial; unpriced tokens are not separable at tool-row granularity"
+        : "";
+    return csvRow([
       String(SCHEMA_VERSION),
       model.sessionId,
       model.source,
@@ -96,8 +153,12 @@ export function toToolCsv(model: ReceiptModel): string {
       String(row.tokens.cacheCreation),
       String(row.tokens.total),
       String(row.callCount),
-    ]),
-  );
+      ...costMetadataCells(row.usd),
+      "parent-session-tool",
+      rowCoverage,
+      limitation,
+    ]);
+  });
   return [csvRow([...TOOL_COLUMNS]), ...rows].join("\n");
 }
 

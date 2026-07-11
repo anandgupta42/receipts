@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Claude Code · claude-haiku-4-5 · 16m 00s
-total  $5.50
-top    (thinking/reply) · $5.50 (30 turns)
-no waste detected
+total  ≥ $5.50
+top    (thinking/reply) · ≥ $5.50 (30 turns)
+no flagged pattern detected
 run  aireceipts  for the full receipt

@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { listFullSessions, loadSession } from "../../parse/load.js";
 import type { Session, SessionSummary } from "../../parse/types.js";
 import { MANIFEST_MARKER, buildManifest, planBackfill } from "../../aggregate/backfill.js";
-import { buildReceiptModel } from "../../receipt/model.js";
+import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
 import { renderReceipt } from "../../receipt/render.js";
 import { backfillToJson, renderBackfillSummary } from "../../receipt/backfill.js";
 import type { BackfillReport, BackfillReportEntry } from "../../receipt/backfill.js";
@@ -164,7 +164,7 @@ async function run(ctx: CommandContext, deps: BackfillDeps = defaultDeps): Promi
       entries.push({ ...base, fileName: null, loadFailed: true });
       continue;
     }
-    const model = await buildReceiptModel(session);
+    const model = await buildFullSessionReceiptModel(session);
     // I5: renderer bytes + trailing newline — what `aireceipts <selector>` writes
     // with colour off and no budget configured.
     await ctx.fs.writeFile(join(options.outDir, planned.fileName), `${renderReceipt(model, { color: false })}\n`);

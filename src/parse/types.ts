@@ -72,6 +72,21 @@ export interface ToolCall {
   endedAt?: number;
 }
 
+/**
+ * One provider-reported model-request usage unit. Some agents expose several
+ * requests inside one user-facing assistant turn (for example, a Codex tool
+ * loop). Context-sensitive price tiers are selected per request, never from
+ * the aggregate turn. The unit metadata is evidence captured at the usage
+ * event; it is not exported as an extra turn and its usage must sum exactly to
+ * `Turn.usage`.
+ */
+export interface PricingUnit {
+  usage: TokenUsage;
+  timestamp?: number;
+  model?: string;
+  pricingProvider?: DirectPricingProvider | null;
+}
+
 /** One assistant turn: its text/thinking is not modeled (not needed by pricing,
  * attribution, or waste detection) — only what those consumers need: usage,
  * model, timing, and the tool calls issued during the turn. */
@@ -88,6 +103,8 @@ export interface Turn {
    */
   pricingProvider?: DirectPricingProvider | null;
   usage?: TokenUsage;
+  /** Request-granular usage evidence for tiered pricing; omitted when the turn itself is one request. */
+  pricingUnits?: PricingUnit[];
   /** approximate output token count for this turn, when known independently of
    * `usage.output` (e.g. before usage is attached) — used by the R4b trivial-span
    * detector's "output <= 120 tokens" eligibility check. Equal to
@@ -175,6 +192,24 @@ export interface Compaction {
 
 export interface Session extends SessionSummary {
   turns: Turn[];
+  /**
+   * Usage with no trustworthy request/model/tool join (for example a
+   * session-level aggregate or an id-less response snapshot). It contributes
+   * observed tokens but zero dollars to the floor; renderers expose it as an
+   * explicit unattributed bucket, never a fake priced turn.
+  */
+  unattributedUsage?: TokenUsage;
+  /**
+   * Positive components from a session aggregate that crossed the itemized
+   * vector (larger in some buckets, smaller in others). Retained as excluded
+   * evidence, never added to totals or dollars, because doing so would create
+   * a vector no source actually reported.
+   */
+  conflictingAggregateUsage?: TokenUsage;
+  /** Request-level usage could not be reconciled to the adapter's aggregate oracle; pricing is disabled and any retained envelope is unattributed. */
+  usageReconciliationFailed?: true;
+  /** Session-level aggregate usage intentionally excluded from a partial turn slice because no trace evidence can assign it to that slice. */
+  excludedUnattributedUsage?: TokenUsage;
   /** SPEC-0017 — raw compaction events, ordered by `turnIndex`. Absent when the adapter records none. */
   compactions?: Compaction[];
   /**

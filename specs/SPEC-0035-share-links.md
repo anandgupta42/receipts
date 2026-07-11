@@ -59,7 +59,7 @@ unfurls fall back to a single static brand card — never a dynamic one.
   `sandbox=""` with no `allow-*`; the share row is chrome, never inside it.
 - **R3 — Prefilled text: fixed template, URL as a separate parameter.**
   The X intent `text` is a FIXED string only — `An aireceipts cost receipt
-  — what the AI agents actually cost.` — and the canonical URL is the
+  — an observable Standard API cost floor, not an invoice.` — and the canonical URL is the
   separate `url` parameter (never concatenated into `text`, so no repo/PR
   bytes leak into the text field). LinkedIn's share-offsite takes the `url`
   parameter ONLY (no text field). Everything `URLSearchParams`-encoded; no
@@ -252,7 +252,7 @@ on a successful check.
 **2026-07-03 · PR #77 comment (maintainer, folded in at build time per the
 comment's own instruction):** "Maintainer confirmation (in-session,
 2026-07-03): the prefilled share copy — 'An aireceipts cost receipt — what
-the AI agents actually cost.' — is approved verbatim as the one string that
+an observable Standard API cost floor, not an invoice.' — is approved verbatim as the one string that
 ships under the author's name." This exact string is what R3/`SHARE_TEXT`
 ships; it is not edited anywhere in this build.
 

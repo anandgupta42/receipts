@@ -8,7 +8,7 @@ import { addUsage, emptyUsage, sanitizeText } from "../parse/util.js";
 import { attributeByTool, METHODOLOGY } from "../pricing/attribution.js";
 import { computeCostShape, type CostShape } from "../pricing/costShape.js";
 import { defaultDataDir } from "../pricing/priceTable.js";
-import { isoDateOf, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
+import { isoDateOf, pricingUnitsForTurn, resolvePrice, vendorForTurn } from "../pricing/resolve.js";
 import type { ResolvedPrice } from "../pricing/types.js";
 import { detectContextThrash, detectSameFileReReads, detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "../pricing/waste.js";
 import { detectTimeCaveats, type CaveatFinding } from "./caveats.js";
@@ -19,7 +19,7 @@ export interface ModelMixEntry {
   tokens: TokenUsage;
   /** 0..1 share of the session's total per-turn priced-or-not tokens. */
   tokenShare: number;
-  /** SPEC-0054 R4 — this model's priced cost (`attribution.byModelUsd`); `null` when none of its turns priced (I2). */
+  /** SPEC-0054 R4 — this model's Standard-API floor; `null` when none of its turns priced (I2). */
   usd: number | null;
 }
 
@@ -109,8 +109,10 @@ export interface ReceiptModel {
   priceRowsUsed: PriceRowUsed[];
   /** Cursor's degraded mode (R1): no per-turn model/usage, session totals only. */
   unpriceable: boolean;
-  /** SPEC-0044 A3 — true when `totalUsd` includes a cache-write fallback price (unsplit TTL remainder), so the total is a lower bound. Mirrored into `caveats` as a rendered note; also folded into a `ConfidenceEvent` at the PR layer (src/pr/index.ts). */
+  /** SPEC-0044 A3 — one additional lower-bound cause: observed cache tokens with no cited applicable rate. All computed dollars are floors regardless. */
   costLowerBoundCacheTier: boolean;
+  /** Codex priced GPT-5.6 usage but persisted no cache-write token bucket. */
+  unobservedCacheWriteTokens?: boolean;
   /** SPEC-0054 R4 — from `session.totals`, so a PR-sliced receipt (`sliceSessionForReceipt`) reflects only its slice. */
   turnCount: number;
   toolCallCount: number;
@@ -120,10 +122,25 @@ export interface ReceiptModel {
   cacheReadAtInputRateUsd: number | null;
   /** SPEC-0067 — cost-shape facts (pre-edit share + JSON/details expensive-turn & late-turn). Standalone facts, not WasteLines; never enter savings math. */
   costShape: CostShape;
-  /** SPEC-0068 — same-file re-reads, a LOW-confidence neutral diagnostic. A standalone field, NOT a WasteLine, so it is structurally never in the handoff/PR "could have saved" savings math (R4 satisfied by construction). Absent on mocks; `null` when no re-reads. */
+  /** SPEC-0068 — same-file re-reads, a LOW-confidence neutral diagnostic. Not a WasteLine, so it never enters observable-waste-floor arithmetic. */
   sameFileReReads?: SameFileReReadsFinding | null;
   /** SPEC-0061 — subagent rollup, composed after build by session surfaces; absent ⇒ no children discovered (or the surface didn't compose it) and output stays byte-identical (I5). */
   subagents?: SubagentAggregate;
+}
+
+/** Priced lower-bound atoms across the parent and every readable priced child. */
+export function combinedPricedUsd(model: ReceiptModel): number | null {
+  const childUsd = model.subagents?.pricedUsd ?? null;
+  if (model.totalUsd === null && childUsd === null) {
+    return null;
+  }
+  return (model.totalUsd ?? 0) + (childUsd ?? 0);
+}
+
+/** Observable parent tokens plus every readable child's token total. */
+export function combinedTokenTotal(model: ReceiptModel): number {
+  const parentTokens = model.unpriceable ? model.sessionTotalTokens.total : model.totalTokens.total;
+  return parentTokens + (model.subagents?.tokensTotal ?? 0);
 }
 
 /**
@@ -154,6 +171,16 @@ export function sliceSessionForReceipt(session: Session, range: { startTurn: num
       endedAt = endedAt === undefined ? turn.timestamp : Math.max(endedAt, turn.timestamp);
     }
   }
+  const isFullSlice = start === 0 && end === session.turns.length - 1;
+  const unattributedUsage = isFullSlice ? session.unattributedUsage : undefined;
+  if (unattributedUsage) {
+    tokens = addUsage(tokens, unattributedUsage);
+  }
+  const excludedUnattributedUsage = isFullSlice
+    ? session.excludedUnattributedUsage
+    : session.unattributedUsage && session.excludedUnattributedUsage
+      ? addUsage(session.unattributedUsage, session.excludedUnattributedUsage)
+      : session.unattributedUsage ?? session.excludedUnattributedUsage;
 
   // SPEC-0017 — the sliced turns are re-indexed 0..k, so compaction turnIndices
   // must be re-based onto the slice too (a stale original index would misplace or
@@ -175,17 +202,28 @@ export function sliceSessionForReceipt(session: Session, range: { startTurn: num
     },
     turns: slice,
     compactions,
+    unattributedUsage,
+    excludedUnattributedUsage,
   };
 }
 
 async function buildModelMix(session: Session, byModelUsd: { model: string; usd: number }[]): Promise<ModelMixEntry[]> {
   const mixMap = new Map<string, TokenUsage>();
   for (const turn of session.turns) {
-    const model = turn.model ?? session.model;
-    if (!model || !turn.usage) {
+    const units = pricingUnitsForTurn(turn);
+    if (!units) {
       continue;
     }
-    mixMap.set(model, addUsage(mixMap.get(model) ?? emptyUsage(), turn.usage));
+    for (const unit of units) {
+      const model = unit.model ?? turn.model ?? session.model;
+      if (!model) {
+        continue;
+      }
+      mixMap.set(model, addUsage(mixMap.get(model) ?? emptyUsage(), unit.usage));
+    }
+  }
+  if (session.unattributedUsage && session.unattributedUsage.total > 0) {
+    mixMap.set("(unattributed usage)", session.unattributedUsage);
   }
   // SPEC-0054 R4 — looked up by the raw (pre-sanitize) model id, matching how `attributeByTool` keys `byModelUsd`.
   const usdMap = new Map(byModelUsd.map((m) => [m.model, m.usd]));
@@ -238,19 +276,26 @@ async function collectPriceRowsUsed(
   }
   const seen = new Map<string, PriceRowUsed>();
   for (const turn of session.turns) {
-    const model = turn.model ?? session.model;
-    const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = vendorForTurn(session.source, model, turn.pricingProvider);
-    if (!vendor || !model || !dateISO) {
+    const units = pricingUnitsForTurn(turn);
+    if (!units) {
       continue;
     }
-    const key = `${vendor}|${model}|${dateISO}`;
-    if (seen.has(key)) {
-      continue;
-    }
-    const row = await resolvePrice(vendor, model, dateISO, dataDir);
-    if (row) {
-      seen.set(key, row);
+    for (const unit of units) {
+      const model = unit.model;
+      const dateISO = isoDateOf(unit.timestamp);
+      const provider = unit.pricingProvider;
+      const vendor = vendorForTurn(session.source, model, provider);
+      if (!vendor || !model || !dateISO) {
+        continue;
+      }
+      const key = `${vendor}|${model}|${dateISO}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      const row = await resolvePrice(vendor, model, dateISO, dataDir);
+      if (row) {
+        seen.set(key, row);
+      }
     }
   }
   return [...seen.values()];
@@ -262,7 +307,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
   const trivialSpans = await detectTrivialSpans(session, dataDir);
   const contextThrash = await detectContextThrash(session, dataDir);
   const priceDelta =
-    attribution.totalUsd !== null && attribution.unpricedUsageTurnCount === 0
+    attribution.totalUsd !== null && attribution.unpricedTokens.total === 0 && !attribution.costLowerBoundCacheTier
       ? await priceDeltaFootnote(session, attribution.totalTokens, attribution.totalUsd, dataDir)
       : null;
 
@@ -310,6 +355,10 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
 
   const priceRowsUsed = await collectPriceRowsUsed(session, dataDir);
   const caveats = detectTimeCaveats(session);
+  const unobservedCacheWriteTokens =
+    session.source === "codex" &&
+    attribution.totalUsd !== null &&
+    attribution.byModelUsd.some((entry) => entry.model.startsWith("gpt-5.6-"));
   // SPEC-0044 A3 — `costLowerBoundCacheTier` is only ever set from a PRICED
   // turn whose cache-write actually fell back to an uncited rate
   // (attribution.ts guards on `priced !== null && priced.cacheWriteLowerBound`,
@@ -320,7 +369,37 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
   if (attribution.costLowerBoundCacheTier) {
     caveats.push({
       kind: "cost-lower-bound-cache-tier",
-      text: "caveat: cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)",
+      text: "caveat: some observed cache tokens have no cited applicable rate — floor excludes them",
+    });
+  }
+  if (unobservedCacheWriteTokens) {
+    caveats.push({
+      kind: "unobserved-cache-write-tokens",
+      text: "caveat: Codex trace omits GPT-5.6 cache-write tokens — floor excludes any write premium",
+    });
+  }
+  if (session.usageReconciliationFailed) {
+    caveats.push({
+      kind: "unattributed-aggregate-usage",
+      text: "caveat: Codex request envelopes did not reconcile — request-level pricing disabled",
+    });
+  }
+  if (session.unattributedUsage && session.unattributedUsage.total > 0 && !session.usageReconciliationFailed) {
+    caveats.push({
+      kind: "unattributed-aggregate-usage",
+      text: `caveat: ${session.unattributedUsage.total.toLocaleString("en-US")} unattributed tokens lack a trustworthy request/model join — floor excludes them`,
+    });
+  }
+  if (session.excludedUnattributedUsage && session.excludedUnattributedUsage.total > 0) {
+    caveats.push({
+      kind: "unattributed-aggregate-usage",
+      text: `caveat: ${session.excludedUnattributedUsage.total.toLocaleString("en-US")} session-level aggregate-only tokens cannot be assigned to this slice — excluded`,
+    });
+  }
+  if (session.conflictingAggregateUsage && session.conflictingAggregateUsage.total > 0) {
+    caveats.push({
+      kind: "unattributed-aggregate-usage",
+      text: `caveat: ${session.conflictingAggregateUsage.total.toLocaleString("en-US")} session-aggregate tokens conflict with itemized components — excluded from totals and floor`,
     });
   }
   // SPEC-0044 B3 — the parse layer skipped malformed/truncated transcript
@@ -343,7 +422,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     const n = attribution.unpricedUsageTurnCount;
     caveats.push({
       kind: "partial-priced-coverage",
-      text: `caveat: ${n} of ${attribution.usageTurnCount} turns unpriced — TOTAL excludes their tokens`,
+      text: `caveat: ${n} of ${attribution.usageTurnCount} usage turns include unpriced tokens — TOTAL excludes those tokens`,
     });
   }
 
@@ -375,6 +454,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     priceRowsUsed,
     unpriceable: session.unpriceable === true,
     costLowerBoundCacheTier: attribution.costLowerBoundCacheTier,
+    unobservedCacheWriteTokens,
     turnCount: session.totals.turnCount,
     toolCallCount: session.totals.toolCallCount,
     peakTurn: findPeakTurn(session),

@@ -17,6 +17,7 @@ import {
   SUBJECT_DISPLAY_CAP,
 } from "../../src/pr/perCommit.js";
 import { renderPrArtifactHtml, type ArtifactInput } from "../../src/pr/html.js";
+import { STANDARD_API_LIST_PRICE_EQUIVALENT } from "../../src/receipt/costEstimate.js";
 
 const SHA_A = "aaaa111122223333444455556666777788889999";
 const SHA_B = "bbbb111122223333444455556666777788889999";
@@ -179,6 +180,12 @@ describe("SPEC-0031 R3 · surfaces", () => {
     const lines = renderPerCommitLines(rows);
 
     expect(rows[0].unpricedTokens).toBe(550);
+    expect(rows[0].costEstimate).toEqual({
+      kind: "lower-bound",
+      basis: STANDARD_API_LIST_PRICE_EQUIVALENT,
+      minUsd: 0.0037,
+    });
+    expect(rows[0].costEstimate!.minUsd).toBeLessThanOrEqual(rows[0].usd!);
     expect(lines[0]).toContain("≥ $");
     expect(lines[0]).toContain("550 unpriced tokens");
   });

@@ -27,8 +27,17 @@ export const codexFidelity: AdapterFidelity = {
         summed = addUsage(summed, turn.usage);
       }
     }
+    if (session.unattributedUsage) {
+      summed = addUsage(summed, session.unattributedUsage);
+    }
     const reported = session.totals.tokens;
     const findings: FidelityFinding[] = [];
+    if (session.usageReconciliationFailed) {
+      findings.push({
+        check: "codex-request-boundaries",
+        detail: "request envelopes did not prove a complete monotone per-request sequence; pricing disabled",
+      });
+    }
     for (const axis of AXES) {
       const ours = summed[axis];
       const theirs = reported[axis];

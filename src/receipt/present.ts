@@ -15,11 +15,10 @@ import {
   TRIVIAL_SPANS_LABEL,
   barcodePattern,
   normalizedBar,
-  reconciledModelCents,
   sessionToken,
 } from "./blocks.js";
 import type { Block, ReceiptView, TemplateName } from "./blocks.js";
-import { formatAbsoluteUtc, formatCentsAmount, formatDuration, formatInt, formatShortTokens, formatUsd, reconcileCents } from "./format.js";
+import { formatAbsoluteUtc, formatDuration, formatInt, formatSharePercent, formatShortTokens, formatUsdFloor, formatUsdLowerBound, STANDARD_API_LOWER_BOUND_NOTE, usdFloorDecimals } from "./format.js";
 import type { ModelMixEntry, ReceiptModel, ToolRow, WasteLine } from "./model.js";
 import type { TokenUsage } from "../parse/types.js";
 import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "./branding.js";
@@ -77,17 +76,6 @@ export function cacheServedPct(t: TokenUsage): string | undefined {
  * display-honesty rule as {@link cacheServedPct} and `src/pr/body.ts`'s
  * `sharePct`. Shared by R1's price-delta suffix and R4's BY MODEL row.
  */
-function honestPct(ratio: number): string {
-  const pct = Math.round(ratio * 100);
-  if (pct <= 0 && ratio > 0) {
-    return "<1";
-  }
-  if (pct >= 100 && ratio < 1) {
-    return ">99";
-  }
-  return String(pct);
-}
-
 export function cacheServedText(t: TokenUsage): string | undefined {
   const pct = cacheServedPct(t);
   return pct === undefined ? undefined : `cache served ${pct}% of input tokens`;
@@ -139,7 +127,7 @@ function metaLines(model: ReceiptModel): string[] {
   }
   lines.push(agentTimeLine(model));
   if (model.modelMix.length > 0) {
-    lines.push(model.modelMix.map((m) => `${m.model} ${Math.round(m.tokenShare * 100)}%`).join(" · "));
+    lines.push(model.modelMix.map((m) => `${m.model} ${formatSharePercent(m.tokenShare)}`).join(" · "));
   }
   const cache = cacheLine(model);
   if (cache !== undefined) {
@@ -175,49 +163,55 @@ function countLabel(row: ToolRow): string {
   return `(${formatInt(row.callCount)} ${unit}${row.callCount === 1 ? "" : "s"})`;
 }
 
-/** B1/SPEC-0061 — the cent-reconciliation result: every priced tool row's display string plus, when the subagent aggregate is priced on a priced receipt, its own reconciled amount from the SAME cents universe — so the rows a receipt draws still sum byte-exactly to TOTAL. */
-interface ReconciledAmounts {
+/** Independently downward-rounded row amounts; no displayed floor can exceed its raw value. */
+interface FloorAmounts {
   /** Keyed by object reference (`buildDatavis` filters `toolRows` into subsets, so a position-based lookup would misalign). */
   rows: Map<ToolRow, string>;
   /** The `SUBAGENTS (N)` row's `$` text; `undefined` when the aggregate renders tokens (I2) or the session has no children. */
   subagents?: string;
 }
 
-function reconciledRowText(model: ReceiptModel): ReconciledAmounts {
+function receiptFloorPrecision(model: ReceiptModel) {
+  const combinedTotal = model.totalUsd !== null ? model.totalUsd + (model.subagents?.pricedUsd ?? 0) : null;
+  return usdFloorDecimals([
+    ...model.toolRows.map((row) => row.usd),
+    ...model.modelMix.map((entry) => entry.usd),
+    model.subagents?.pricedUsd,
+    combinedTotal,
+  ]);
+}
+
+function floorRowText(model: ReceiptModel): FloorAmounts {
   const priced = model.toolRows.filter((r) => r.usd !== null);
-  const values = priced.map((r) => r.usd as number);
   const agg = model.subagents;
   const aggPriced = agg !== undefined && agg.pricedUsd !== null && model.totalUsd !== null;
-  if (aggPriced) {
-    values.push(agg.pricedUsd as number);
-  }
-  const cents = reconcileCents(values);
+  const precision = receiptFloorPrecision(model);
   const rows = new Map<ToolRow, string>();
-  priced.forEach((row, i) => rows.set(row, formatCentsAmount(cents[i])));
-  return { rows, ...(aggPriced ? { subagents: formatCentsAmount(cents[priced.length]) } : {}) };
+  priced.forEach((row) => rows.set(row, formatUsdFloor(row.usd as number, precision)));
+  return { rows, ...(aggPriced ? { subagents: formatUsdFloor(agg.pricedUsd as number, precision) } : {}) };
 }
 
 /** SPEC-0061 R1 — the one `SUBAGENTS (N)` spend row: `$` only when the aggregate joined the reconciled universe; tokens otherwise (I2). `undefined` when the session has no children, keeping every existing render byte-identical (I5). */
-function subagentRowParts(model: ReceiptModel, reconciled: ReconciledAmounts): { label: string; amount: string } | undefined {
+function subagentRowParts(model: ReceiptModel, reconciled: FloorAmounts): { label: string; amount: string } | undefined {
   const agg = model.subagents;
   if (!agg) {
     return undefined;
   }
   const label = `SUBAGENTS (${formatInt(agg.count)})`;
-  const amount = reconciled.subagents !== undefined ? `$${reconciled.subagents}` : `${formatInt(agg.tokensTotal)} tok`;
+  const amount = reconciled.subagents !== undefined ? `≥ $${reconciled.subagents}` : `${formatInt(agg.tokensTotal)} tok`;
   return { label, amount };
 }
 
 /** The bare amount for one tool row: `$X.XX`, `N tok`, or `""` in Cursor's degraded (per-tool tokens always zero) mode. */
-function rowAmount(row: ToolRow, model: ReceiptModel, reconciled: ReconciledAmounts): string {
+function rowAmount(row: ToolRow, model: ReceiptModel, reconciled: FloorAmounts): string {
   if (model.unpriceable) {
     return "";
   }
-  return row.usd !== null ? `$${reconciled.rows.get(row) ?? formatUsd(row.usd)}` : `${formatInt(row.tokens.total)} tok`;
+  return row.usd !== null ? `≥ $${reconciled.rows.get(row) ?? formatUsdFloor(row.usd)}` : `${formatInt(row.tokens.total)} tok`;
 }
 
 /** The classic `.`-leader value: amount + count (or count alone in Cursor mode). */
-function classicRowValue(row: ToolRow, model: ReceiptModel, reconciled: ReconciledAmounts): string {
+function classicRowValue(row: ToolRow, model: ReceiptModel, reconciled: FloorAmounts): string {
   const amt = rowAmount(row, model, reconciled);
   return amt === "" ? countLabel(row) : `${amt}  ${countLabel(row)}`;
 }
@@ -250,7 +244,9 @@ function totalParts(model: ReceiptModel): TotalParts {
   // children under a priced total stay out of the `$` (their floor caveat says so).
   const agg = model.subagents;
   if (model.totalUsd !== null) {
-    return { value: `$${formatUsd(model.totalUsd + (agg?.pricedUsd ?? 0))}` };
+    const total = model.totalUsd + (agg?.pricedUsd ?? 0);
+    const precision = receiptFloorPrecision(model);
+    return { value: formatUsdLowerBound(total, precision), note: STANDARD_API_LOWER_BOUND_NOTE };
   }
   return { value: `${formatInt(model.totalTokens.total + (agg?.tokensTotal ?? 0))} tok`, note: NO_PRICE_MATCH_NOTE };
 }
@@ -258,11 +254,11 @@ function totalParts(model: ReceiptModel): TotalParts {
 /**
  * The `same tokens on <model>` price-delta value, or `undefined` when the
  * session did not price. SPEC-0054 R1: when the delta is real savings
- * (`actualUsd > 0` and `usd < actualUsd`), the value gains a `(N% less)`
- * suffix — arithmetic on the already-traced `usd`/`actualUsd` pair, not a new
- * dollar figure, so the honesty battery's allowlist needs no change.
+ * (`actualUsd > 0` and `usd < actualUsd`), a separate percentage note keeps
+ * the full model id visible inside the 50-column receipt. The percentage is
+ * arithmetic on the already-traced observable floors, not a new dollar.
  */
-function priceDeltaParts(model: ReceiptModel): { label: string; value: string } | undefined {
+function priceDeltaParts(model: ReceiptModel): { label: string; value: string; percentageNote?: string } | undefined {
   if (!model.priceDelta) {
     return undefined;
   }
@@ -273,9 +269,12 @@ function priceDeltaParts(model: ReceiptModel): { label: string; value: string } 
   if (model.subagents !== undefined && model.subagents.pricedUsd !== null) {
     return undefined;
   }
-  const { cheaperModel, usd, actualUsd } = model.priceDelta;
-  const suffix = actualUsd > 0 && usd < actualUsd ? ` (${honestPct((actualUsd - usd) / actualUsd)}% less)` : "";
-  return { label: `same tokens on ${cheaperModel}`, value: `$${formatUsd(usd)}${suffix}` };
+  const { cheaperModel, usd } = model.priceDelta;
+  const baselineUsd = model.priceDelta.baselineUsd ?? model.priceDelta.actualUsd;
+  const percentageNote = baselineUsd > 0 && usd < baselineUsd
+    ? `(${formatSharePercent((baselineUsd - usd) / baselineUsd)} lower observable floor)`
+    : undefined;
+  return { label: `same tokens on ${cheaperModel}`, value: formatUsdLowerBound(usd), percentageNote };
 }
 
 /** SPEC-0054 R2 — the stuck-loop turn location, 1-based (`turnIndices` is 0-based): `at turn N` for a single turn, `at turns A-B` for a span. */
@@ -296,7 +295,7 @@ function stuckLoopDetail(turnIndices: number[]): string | undefined {
  */
 export function wasteRowBlock(waste: WasteLine): Extract<Block, { kind: "wasteRow" }> {
   if (waste.kind === "stuck-loop") {
-    const valuePart = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
+    const valuePart = waste.usd !== null ? formatUsdLowerBound(waste.usd) : `${formatInt(waste.tokens.total)} tok`;
     const clockPart = waste.wallClockMs !== null ? ` (${formatDuration(waste.wallClockMs)})` : "";
     const detail = stuckLoopDetail(waste.turnIndices);
     return {
@@ -308,13 +307,13 @@ export function wasteRowBlock(waste: WasteLine): Extract<Block, { kind: "wasteRo
     };
   }
   if (waste.kind === "context-thrash") {
-    // R7: `≈ context thrash: N compactions in M turns` + a methodology sub-line.
+    // R7 compact form keeps the full count and lower-bound amount inside 50 columns.
     // Value is $ when priced, tokens otherwise (I2 — a tokens-only line when any
     // contributing turn is unpriced or the session never priced).
-    const value = waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
+    const value = waste.usd !== null ? formatUsdLowerBound(waste.usd) : `${formatInt(waste.tokens.total)} tok`;
     return {
       kind: "wasteRow",
-      label: `≈ context thrash: ${waste.compactionCount} compactions in ${waste.turnSpan} turns`,
+      label: `≈ context thrash: ${waste.compactionCount} compactions (${waste.turnSpan}t)`,
       value,
       detail: CONTEXT_THRASH_NOTE,
       badge: false,
@@ -323,7 +322,7 @@ export function wasteRowBlock(waste: WasteLine): Extract<Block, { kind: "wasteRo
   return {
     kind: "wasteRow",
     label: TRIVIAL_SPANS_LABEL,
-    value: `$${formatUsd(waste.usd)}`,
+    value: `≈ $${formatUsdFloor(waste.usd)}`,
     detail: `(${waste.eligibleTurnCount} tiny turns, priced at ${waste.cheaperModel})`,
     badge: false,
   };
@@ -337,20 +336,17 @@ function detailsTokens(model: ReceiptModel): TokenUsage {
 }
 
 /**
- * BY MODEL rows, cent-reconciled across priced entries only (same
- * `reconcileCents` universe {@link reconciledRowText} uses for tool rows) so
- * the displayed rows sum to the displayed TOTAL; an unpriced entry (a
- * Cursor-style per-model gap) renders its token share instead of a fabricated
- * `$` (I2).
+ * BY MODEL rows independently round down so every `≥` remains true. An
+ * unpriced entry renders its token share instead of a fabricated dollar (I2).
  */
 function byModelRows(model: ReceiptModel): Block[] {
   const priced = model.modelMix.filter((m) => m.usd !== null);
-  const cents = reconciledModelCents(model);
+  const precision = receiptFloorPrecision(model);
   const centText = new Map<ModelMixEntry, string>();
-  priced.forEach((m, i) => centText.set(m, formatCentsAmount(cents[i])));
+  priced.forEach((m) => centText.set(m, formatUsdFloor(m.usd as number, precision)));
   return model.modelMix.map((m): Block => {
-    const pct = honestPct(m.tokenShare);
-    const value = m.usd !== null ? `${pct}% · $${centText.get(m)}` : `${pct}% · ${formatShortTokens(m.tokens.total)} tok`;
+    const pct = formatSharePercent(m.tokenShare);
+    const value = m.usd !== null ? `${pct} · ≥ $${centText.get(m)}` : `${pct} · ${formatShortTokens(m.tokens.total)} tok`;
     return { kind: "row", label: m.model, value };
   });
 }
@@ -409,11 +405,11 @@ export function detailsBlocks(model: ReceiptModel): Block[] {
     blocks.push({ kind: "note", text: "(low conf — may be legitimate re-grounding)", indent: 2, muted: true });
   }
   if (model.cacheReadAtInputRateUsd !== null) {
-    blocks.push({ kind: "row", label: "same reads at uncached input rate", value: `$${formatUsd(model.cacheReadAtInputRateUsd)}` });
+    blocks.push({ kind: "row", label: "same reads at uncached input rate", value: formatUsdLowerBound(model.cacheReadAtInputRateUsd) });
     blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
   }
   if (model.totalUsd !== null && model.modelMix.length > 1) {
-    blocks.push({ kind: "note", text: "BY MODEL" });
+    blocks.push({ kind: "note", text: model.subagents ? "BY PARENT MODEL" : "BY MODEL" });
     blocks.push(...byModelRows(model));
   }
   return blocks;
@@ -446,6 +442,9 @@ function tailBlocks(model: ReceiptModel, footer: Block, extra?: Block[]): Block[
   const delta = priceDeltaParts(model);
   if (delta) {
     blocks.push({ kind: "row", label: delta.label, value: delta.value, muted: true });
+    if (delta.percentageNote) {
+      blocks.push({ kind: "note", text: delta.percentageNote, indent: 2, muted: true });
+    }
     blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
   }
   if (extra) {
@@ -458,7 +457,7 @@ function tailBlocks(model: ReceiptModel, footer: Block, extra?: Block[]): Block[
 // --- classic (default; byte-identical to pre-SPEC-0020) ----------------------
 
 function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[] {
-  const reconciled = reconciledRowText(model);
+  const reconciled = floorRowText(model);
   const blocks: Block[] = [
     { kind: "masthead", text: WORDMARK },
     { kind: "meta", lines: metaLines(model) },
@@ -490,7 +489,7 @@ function buildClassic(model: ReceiptModel, view?: { details?: boolean }): Block[
 // --- grocery (the shareable meme; Receiptify column mechanics) ---------------
 
 function buildGrocery(model: ReceiptModel): Block[] {
-  const reconciled = reconciledRowText(model);
+  const reconciled = floorRowText(model);
   const dominantModel = model.modelMix[0]?.model ?? "unknown";
   const token = sessionToken(model.sessionId);
   const blocks: Block[] = [
@@ -525,6 +524,9 @@ function buildGrocery(model: ReceiptModel): Block[] {
   const delta = priceDeltaParts(model);
   if (delta) {
     blocks.push({ kind: "row", label: delta.label, value: delta.value, muted: true });
+    if (delta.percentageNote) {
+      blocks.push({ kind: "note", text: delta.percentageNote, indent: 2, muted: true });
+    }
     blocks.push({ kind: "note", text: PRICE_DELTA_NOTE, indent: 2, muted: true });
   }
   blocks.push({ kind: "note", text: `CARDHOLDER: ${dominantModel}`, spaceBefore: true });
@@ -539,7 +541,7 @@ function buildGrocery(model: ReceiptModel): Block[] {
 
 const DATAVIS_LEGEND = "[##########] = priciest line; others in proportion";
 
-function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number, reconciled: ReconciledAmounts): Block {
+function datavisRowBlock(row: ToolRow, model: ReceiptModel, max: number, reconciled: FloorAmounts): Block {
   const amt = rowAmount(row, model, reconciled);
   const bar = normalizedBar(rowMetric(row, model), max);
   const value = amt === "" ? bar : `${amt} ${bar}`;
@@ -559,7 +561,7 @@ function subagentMetric(model: ReceiptModel): number {
 }
 
 function buildDatavis(model: ReceiptModel): Block[] {
-  const reconciled = reconciledRowText(model);
+  const reconciled = floorRowText(model);
   const max = model.toolRows.reduce((m, row) => Math.max(m, rowMetric(row, model)), subagentMetric(model));
   const modelOutput = model.toolRows.filter((r) => r.tool === THINKING_REPLY);
   const toolCalls = model.toolRows.filter((r) => r.tool !== THINKING_REPLY);

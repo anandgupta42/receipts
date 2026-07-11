@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Gemini CLI · gemini-2.5-flash · 1m 20s
-total  $0.01
-top    replace · $0.00 (1 call)
-no waste detected
+total  ≥ $0.0067
+top    replace · ≥ $0.0022 (1 call)
+no flagged pattern detected
 run  aireceipts  for the full receipt

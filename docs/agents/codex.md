@@ -6,12 +6,22 @@ compactions surfaced as a waste signal. (SPEC-0058; depth facts match
 
 ## What you get
 
-- **Per-turn parsing.** Each turn's model and token usage, tool-by-tool cost
-  attribution (`exec_command`, MCP tools, …), cache-read visibility.
-- **Provider-safe pricing.** Explicit `model_provider` is retained per turn;
+- **Per-turn parsing, request-granular pricing.** Each user-facing turn keeps
+  its model, token usage, and tools (`exec_command`, MCP tools, …). Changed
+  cumulative envelopes also remain separate request usage units, so a GPT-5.6
+  >272K tier is selected per request rather than from an aggregated tool loop.
+  Every unit uses its own persisted model, provider evidence, and timestamp;
+  none is inherited later from an enclosing turn or session.
+- **Request evidence fails closed.** Cumulative vectors must be monotone; each
+  changed vector after the baseline must agree exactly with its non-zero
+  `last_token_usage`; the file may not mix legacy and cumulative schemas, drop
+  records, or disagree with the final local total. Any failure disables all
+  request-level pricing and preserves the local envelope as unattributed tokens
+  with an explicit caveat.
+- **Provider-safe pricing.** Explicit `model_provider` is retained per request;
   recognized direct OpenAI traffic uses the cited table, while Azure, routed,
-  or custom providers remain tokens-only. Older rows without the field keep
-  model-id inference.
+  or custom providers remain tokens-only. An absent provider field can still
+  use model-id inference, but a request never borrows a provider from its turn.
 - **Compaction detection.** Codex's context compactions are parsed and priced
   as context-thrash waste lines (SPEC-0040) — repeated compactions in one
   session are called out with their cost.
@@ -19,6 +29,11 @@ compactions surfaced as a waste signal. (SPEC-0058; depth facts match
   as contributors; Codex sessions in the repo's worktrees with no git writes
   appear under `CODEX HELPERS` in PR receipts — grouped honestly by what the
   credit rule proved.
+
+Codex rollouts do not persist cache-write token counts, auth/billing route,
+provider request/invoice identifiers, discounts, or credits. Receipts can
+therefore reproduce a cited Standard-API-equivalent `≥` floor for observable
+request components, not an invoice-exact charge.
 
 ## Where transcripts live
 

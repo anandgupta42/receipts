@@ -140,6 +140,26 @@ describe("R3 render-first ordering", () => {
     expect(out[0]).toContain("session slice: turns 2–4 of 6");
   });
 
+  it("marks a selected slice with no turn timestamps as an unknown subagent window", async () => {
+    const session = (await loadById("claude-code", ANCHORS))!;
+    const timeless = {
+      ...session,
+      turns: session.turns.map((turn) => ({ ...turn, timestamp: undefined })),
+    };
+    let observedWindow: Parameters<PrDeps["rollup"]>[1] | undefined;
+    const { deps } = await makeDeps({
+      listSessions: async () => [timeless],
+      loadSession: async () => timeless,
+      rollup: async (_parentFilePath, window) => {
+        observedWindow = window;
+        return [];
+      },
+    });
+
+    expect(await runPr({ post: false }, deps)).toBe(0);
+    expect(observedWindow).toEqual({ kind: "unknown" });
+  });
+
   it("SPEC-0070 R1 end-to-end — opts.samosa threads through pr → PrOptions → the rendered comment; off by default", async () => {
     // Off by default: the dry-run body carries no tip link.
     const base = await makeDeps();
@@ -776,7 +796,7 @@ describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e thro
     const code = await runPr({ post: false, session: session.id }, deps);
     expect(code).toBe(0);
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
-    expect(out[0]).toContain("1 session had a cache-write cost that is a lower bound");
+    expect(out[0]).toContain("1 session had cache tokens with no cited applicable rate");
     expect(out[0]).toContain("(see docs/cost-model.md)");
     // The `≥` floor prefix (isFloored) fires for this event kind (A3's own
     // "at least this much" meaning matches the existing floor semantics —
@@ -795,7 +815,8 @@ describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e thro
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
     expect(out[0]).not.toContain("cache-write cost that is a lower bound");
     expect(out[0]).not.toContain("cost-model.md");
-    expect(out[0]).not.toMatch(/TOTAL priced\.+≥/);
+    expect(out[0]).toMatch(/TOTAL priced\.+≥/);
+    expect(out[0]).toContain("standard API-equivalent floor; not an invoice");
   });
 });
 
@@ -828,8 +849,8 @@ describe("SPEC-0059 handoff section (e2e through runPr)", () => {
     expect(result.code).toBe(0);
     expect(result.handoffSectionIncluded).toBe(true);
     const body = out[0];
-    expect(body).toContain("<details><summary>handoff — could have saved ≤ $");
-    expect(body).toContain("COULD HAVE SAVED");
+    expect(body).toContain("<details><summary>handoff — flagged pattern cost ≈ $");
+    expect(body).toContain("FLAGGED PATTERN COST");
     expect(body).toContain("→ change or stop after two identical failures");
     expect(body).toContain("covers: 1 session ·");
     expect(body.indexOf("full receipts (")).toBeLessThan(body.indexOf("<details><summary>handoff — "));

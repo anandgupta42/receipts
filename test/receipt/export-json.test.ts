@@ -1,4 +1,4 @@
-// SPEC-0011 R1/R3: `--json` output validates against the versioned v1 schema.
+// SPEC-0011 R1/R3: `--json` output validates against the current versioned schema.
 // Uses real priced fixtures (end-to-end: parse → model → json) plus a hand-built
 // unpriceable model for the tokens-only path, so both `totalUsd: number` and
 // `totalUsd: null` shapes are exercised, and both `wasteLines` variants.
@@ -11,6 +11,12 @@ import { buildReceiptModel } from "../../src/receipt/model.js";
 import { toCompareJsonModel, toJsonModel } from "../../src/receipt/json.js";
 import { compareJsonSchema, receiptJsonSchema, SCHEMA_VERSION } from "../../src/receipt/exportSchema.js";
 import { emptyCostShape } from "../../src/pricing/costShape.js";
+import {
+  HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+  SAME_TOKENS_REPRICING_INTERPRETATION,
+  STANDARD_API_LIST_PRICE_EQUIVALENT,
+} from "../../src/receipt/costEstimate.js";
+import { formatUsdFloor } from "../../src/receipt/format.js";
 
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures");
 
@@ -54,8 +60,8 @@ function unpricedModel(): ReceiptModel {
   };
 }
 
-describe("R1: --json validates against schema v1", () => {
-  it.each(PRICED_FIXTURES)("$file validates and carries schemaVersion 1", async ({ source, file }) => {
+describe("R1: --json validates against the current schema", () => {
+  it.each(PRICED_FIXTURES)("$file validates and carries the current schemaVersion", async ({ source, file }) => {
     const json = toJsonModel(await modelFor(source, file));
     expect(json.schemaVersion).toBe(SCHEMA_VERSION);
     const result = receiptJsonSchema.safeParse(json);
@@ -65,7 +71,144 @@ describe("R1: --json validates against schema v1", () => {
   it("an unpriceable (tokens-only) model validates with totalUsd null", () => {
     const json = toJsonModel(unpricedModel());
     expect(json.totalUsd).toBeNull();
+    expect(json.totalCostEstimate).toBeNull();
+    expect(json.totalUsdScope).toBe("parent-session");
+    expect(json.combinedPricedUsd).toBeNull();
+    expect(json.combinedPricedCostEstimate).toBeNull();
+    expect(json.combinedTotalTokens).toBe(2168);
+    expect(json.pricingCoverage).toBe("unpriced");
+    expect(json.unpricedTokens).toMatchObject({ input: 1900, output: 268, total: 2168 });
+    expect(json.toolRows[0]?.costEstimate).toBeNull();
     expect(receiptJsonSchema.safeParse(json).success).toBe(true);
+  });
+
+  it("exports fixed-order known unpriced usage for receipt and compare bodies", async () => {
+    const partial = await modelFor("claude-code", "claude-code/mixed-priced-coverage.jsonl");
+    const full = await modelFor("claude-code", "claude-code/clean-multi-tool-2-models.jsonl");
+    const receipt = toJsonModel(partial);
+    const keys = Object.keys(receipt);
+    const tokenStart = keys.indexOf("totalTokens");
+
+    expect(keys.slice(tokenStart, tokenStart + 5)).toEqual([
+      "totalTokens",
+      "sessionTotalTokens",
+      "pricingCoverage",
+      "unpricedTokens",
+      "wasteLines",
+    ]);
+    expect(receipt.pricingCoverage).toBe("partial");
+    expect(receipt.unpricedTokens).toMatchObject({
+      input: partial.unpricedTokens?.input,
+      output: partial.unpricedTokens?.output,
+      cacheRead: partial.unpricedTokens?.cacheRead,
+      cacheCreation: partial.unpricedTokens?.cacheCreation,
+      total: partial.unpricedTokens?.total,
+    });
+    expect(receipt.unpricedTokens.total).toBeGreaterThan(0);
+
+    const compared = toCompareJsonModel(partial, full);
+    expect(compared.a.pricingCoverage).toBe("partial");
+    expect(compared.a.unpricedTokens.total).toBe(receipt.unpricedTokens.total);
+    expect(compared.b.pricingCoverage).toBe("full");
+    expect(compared.b.unpricedTokens.total).toBe(0);
+    expect(compareJsonSchema.safeParse(compared).success).toBe(true);
+  });
+
+  it("adds lower-bound cost semantics beside every computed receipt dollar", async () => {
+    const model = await modelFor("claude-code", "claude-code/clean-multi-tool-2-models.jsonl");
+    model.priceDelta = { cheaperModel: "test-cheaper", usd: 0.12, actualUsd: 0.34 };
+    model.costShape.preEdit = {
+      ...model.costShape.preEdit,
+      preEditUsd: 0.1,
+      postEditUsd: 0.24,
+    };
+    model.sameFileReReads = {
+      count: 1,
+      turnIndices: [1],
+      tokens: model.totalTokens,
+      usd: 0.02,
+      confidence: "low",
+    };
+    model.subagents = { count: 1, pricedUsd: 0.03, tokensTotal: 100, unpricedCount: 0, unreadableCount: 0 };
+    model.wasteLines = [
+      {
+        kind: "stuck-loop",
+        tool: "Bash",
+        runLength: 3,
+        usd: 0.01,
+        tokens: model.totalTokens,
+        wallClockMs: null,
+        turnIndices: [0],
+      },
+    ];
+
+    const json = toJsonModel(model);
+    const estimate = (minUsd: number) => ({
+      kind: "lower-bound" as const,
+      basis: STANDARD_API_LIST_PRICE_EQUIVALENT,
+      minUsd: Number(formatUsdFloor(minUsd, 4).replaceAll(",", "")),
+    });
+
+    expect(json.totalCostEstimate).toEqual(estimate(model.totalUsd as number));
+    expect(json.totalUsdScope).toBe("parent-session");
+    expect(json.combinedPricedUsd).toBeCloseTo((model.totalUsd as number) + 0.03, 12);
+    expect(json.combinedPricedCostEstimate).toEqual(estimate(json.combinedPricedUsd as number));
+    expect(json.combinedScope).toBe("parent-session-plus-readable-subagents");
+    expect(json.combinedTotalTokens).toBe(model.totalTokens.total + 100);
+    expect(
+      json.toolRows
+        .filter((row) => row.usd !== null)
+        .every((row) => row.costEstimate?.minUsd === estimate(row.usd as number).minUsd),
+    ).toBe(true);
+    expect(json.wasteLines[0]?.costEstimate).toEqual(estimate(0.01));
+    expect(json.wasteLines[0]?.costInterpretation).toBe(HEURISTIC_PATTERN_PRICING_INTERPRETATION);
+    expect(json.priceDelta?.costEstimate).toEqual(estimate(0.12));
+    expect(json.priceDelta?.interpretation).toBe(SAME_TOKENS_REPRICING_INTERPRETATION);
+    expect(json.priceDelta?.actualCostEstimate).toEqual(estimate(0.34));
+    expect(json.priceDelta?.baselineUsd).toBe(0.34);
+    expect(json.priceDelta?.baselineCostEstimate).toEqual(estimate(0.34));
+    expect(json.costShape.preEdit.preEditCostEstimate).toEqual(estimate(0.1));
+    expect(json.costShape.preEdit.postEditCostEstimate).toEqual(estimate(0.24));
+    expect(json.sameFileReReads?.costEstimate).toEqual(estimate(0.02));
+    expect(json.subagents?.pricedCostEstimate).toEqual(estimate(0.03));
+    expect(receiptJsonSchema.safeParse(json).success).toBe(true);
+  });
+
+  it("serializes generic cache-write and context-tier rates for price traceability", () => {
+    const model = unpricedModel();
+    model.priceRowsUsed = [{
+      vendor: "openai",
+      model: "gpt-5.6-sol",
+      input: 5,
+      output: 30,
+      input_cached: 0.5,
+      input_cache_write: 6.25,
+      context_tiers: [{
+        above_input_tokens: 272_000,
+        input: 10,
+        output: 45,
+        input_cached: 1,
+        input_cache_write: 12.5,
+      }],
+      from_date: "2026-07-09",
+      to_date: null,
+      sources: [{ url: "https://developers.openai.com/api/docs/models/gpt-5.6-sol" }],
+    }];
+
+    const [row] = toJsonModel(model).priceRowsUsed;
+    expect(row).toMatchObject({
+      input_cache_write: 6.25,
+      context_tiers: [{
+        above_input_tokens: 272_000,
+        input: 10,
+        output: 45,
+        input_cached: 1,
+        input_cache_write: 12.5,
+        input_cache_write_5m: null,
+        input_cache_write_1h: null,
+      }],
+    });
+    expect(receiptJsonSchema.safeParse(toJsonModel(model)).success).toBe(true);
   });
 
   it("rejects an object carrying an extra, undocumented field (.strict())", () => {

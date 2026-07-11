@@ -28,7 +28,7 @@ Every finding is one of:
 |---|---|---|---|
 | A1 | **Anchor-pool full-fallback session dropped with NO trace** — not credited, not in `excludedCount`, nowhere. A cross-repo/worktree session that touched the PR but can only render "entire session" vanishes silently. | `contributors.ts` requires `slice.kind !== "full"` to credit an anchor-pool session; failing it drops silently — `test/pr/contributors.test.ts:167`, `attribution-fidelity.test.ts:99` both assert "not credited, not counted as excluded". | under-credit, **no floor** (mirror of #87) |
 | A2 | **Cursor Background Agents invisible** — `cursor.ts` reads only `composerData:`/`bubbleId:` keys; Background Agent sessions live under `agentKv:`/`glass.` in the same DB. A PR built with one shows a receipt missing a whole contributor, with no counted-absence signal. | grep of `src/parse/cursor.ts` → zero `agentKv`/`glass` references (verified by lead). | under-credit, no signal |
-| A3 | **Cache-tier fallback under-reports** — unsplit cache-write tokens priced at base input rate (cheaper); real 5m write is ≥1.25× input. Older Claude Code sessions and ALL opencode sessions hit this. | `resolve.ts` `cacheWriteCost` — the code comment itself says it "may understate the true cost". | under-report, tension with I2 |
+| A3 | **Cache-tier fallback under-reported (fixed 2026-07-10)** — unsplit cache-write tokens were priced at an uncited base-input rate. The resolver now includes the component only when a 5m or generic write rate is cited; otherwise it contributes zero with a visible caveat. | `resolve.ts` `cacheWriteCost`; regression coverage in `test/pricing/cost.test.ts` and `test/pricing/attribution.test.ts`. | safe lower bound after fix |
 | A4 | **Stale price table at render time** — a receipt rendered before a same-day price correction shows stale numbers with no in-receipt caveat (unlike every other silent case, which has some in-band signal). | coverage-map C.3; only mitigation is an external drift tripwire + "re-render". | either direction |
 
 ## Category B — fragile / hard-to-test
@@ -79,11 +79,12 @@ count.
   `message.id`s (up to 12 records per id). Across all duplicated ids, usage was
   byte-identical (1,071 duplicated ids, 0 with differing usage); no
   `message.id` ever spanned two `requestId`s.
-- Session `9ae6a4a2` (PR #189's orchestrator): whole-session cost $102.97 as
-  computed per-record vs **$36.69** deduped by message id — 2.81× inflation.
-  The receipt posted on PR #189 claimed **$5.17** for the slice "turns
-  359–377"; replaying the per-record logic reproduces $5.17 exactly, and the
-  deduped figure is **$1.61** — every Claude Code dollar posted before the fix
+- Session `9ae6a4a2` (PR #189's orchestrator): whole-session Standard-API
+  arithmetic produced legacy exact-looking `$102.97` per record vs a `≥ $36.69`
+  observable floor after message-id deduplication — 2.81× inflation.
+  The receipt posted on PR #189 claimed legacy **`$5.17`** for the slice "turns
+  359–377"; replaying the per-record logic reproduces it, while the deduped
+  observable floor is **`≥ $1.61`** — every Claude Code dollar posted before the fix
   over-reports by roughly the session's average blocks-per-response (~2.5–3×).
 - Codex cross-check (same PR, session `6ddefcc9`): per-turn `last_token_usage`
   delta sum == final cumulative envelope == the posted $1.20, to the cent. The
@@ -95,9 +96,14 @@ fidelity validator explicitly listed duplicate-record detection as a non-goal;
 and Claude Code (unlike Codex) carries no vendor cumulative total to reconcile
 against.
 
-**Fix:** `src/parse/claudeCode.ts` keys turns by `message.id` — the first
-record of an id opens the turn and books usage once; later records only merge
-their `tool_use` blocks into it. Regression-pinned by
+**Fix (updated after the 2026-07-10 evolving-snapshot audit):**
+`src/parse/claudeCode.ts` keys turns by `message.id`. Every same-id record
+merges its `tool_use` blocks, while usage retains the complete coherent record
+with the highest output count (later record wins a tie), following Anthropic's
+published discrepancy rule. Token buckets are never maximized independently.
+Assistant records without an id cannot prove request boundaries: their tools
+remain visible, but their usage becomes one coherent highest-output unattributed
+envelope and is never priced. Regression-pinned by
 `test/parse/claudeCode-dedupe.test.ts`; summary cache version bumped (2 → 3) to
 invalidate inflated cached totals; methodology string + `docs/cost-model.md`
 now state the turn-identity rule per agent.

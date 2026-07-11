@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Claude Code · claude-opus-4-8 · 4m 35s
-total  $0.09
-top    Bash · $0.08 (5 calls)
-⚠ Bash loop ×5 · $0.08
+total  ≥ $0.0945
+top    Bash · ≥ $0.0767 (5 calls)
+⚠ Bash loop ×5 · ≈ $0.0767
 run  aireceipts  for the full receipt

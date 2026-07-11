@@ -73,6 +73,24 @@ describe("computeCostShape — pre-edit share", () => {
     expect(topTurns).toBeNull();
     expect(lateTurn).toBeNull();
   });
+
+  it("treats a partially priced request-vector turn as incomplete", async () => {
+    const mixed = turn(0, 2, HAIKU, [read()]);
+    mixed.pricingUnits = [
+      { usage: usage(1_000_000), model: HAIKU, timestamp: JUNE_15_2026, pricingProvider: "anthropic" },
+      { usage: usage(1_000_000), model: HAIKU, timestamp: JUNE_15_2026, pricingProvider: null },
+    ];
+    const { preEdit, topTurns, lateTurn } = await computeCostShape(
+      session([mixed, turn(1, 1, HAIKU, [edit()])]),
+      dataDir,
+    );
+
+    expect(preEdit.preEditUsd).toBeNull();
+    expect(preEdit.postEditUsd).toBeCloseTo(1, 12);
+    expect(preEdit.preEditPct).toBeNull();
+    expect(topTurns).toBeNull();
+    expect(lateTurn).toBeNull();
+  });
 });
 
 describe("computeCostShape — expensive-turn concentration & late-turn ratio", () => {

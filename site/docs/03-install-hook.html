@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -376,9 +376,9 @@ Installed. A 6-line receipt now prints when a Claude Code session ends (`npx air
 
 <pre class="doc-code"><code>aireceipts · session receipt
 Claude Code · claude-opus-4-8 · 10m 30s
-total  $0.18
-top    Bash · $0.05 (3 calls)
-no waste detected
+total  ≥ $0.1767
+top    Bash · ≥ $0.0517 (3 calls)
+no flagged pattern detected
 run  aireceipts  for the full receipt</code></pre>
 
 <h2 id="where-it-writes">Where it writes</h2>

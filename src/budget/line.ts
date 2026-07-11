@@ -3,9 +3,16 @@
 import { loadBudgetConfig } from "./config.js";
 import { computeBudgetSum, type BudgetSum } from "./compute.js";
 import type { BudgetPeriod, BudgetPeriodConfig } from "./types.js";
+import { formatUsdFloor } from "../receipt/format.js";
 
-function formatUsd(n: number): string {
-  return `$${n.toFixed(2)}`;
+function exactUsd(n: number): string {
+  const raw = String(n);
+  if (/[eE]/.test(raw)) {
+    return `$${raw}`;
+  }
+  const [whole, fraction = ""] = raw.split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `$${grouped}.${fraction.padEnd(2, "0")}`;
 }
 
 function periodLabel(period: BudgetPeriod): string {
@@ -18,14 +25,23 @@ const ADVISORY_SUFFIX = "advisory only — does not stop the agent";
 export function renderBudgetLine(period: BudgetPeriod, sum: BudgetSum): string {
   const label = periodLabel(period);
   if (sum.kind === "usd") {
-    const base = `budget (${label}): ${formatUsd(sum.spent)} of ${formatUsd(sum.cap)} — ${ADVISORY_SUFFIX}`;
-    if (sum.excludedUnpricedCount > 0) {
-      const noun = sum.excludedUnpricedCount === 1 ? "session" : "sessions";
-      return `${base} (${sum.excludedUnpricedCount} unpriced ${noun} excluded from this sum)`;
+    const base = `budget (${label}): ≥ $${formatUsdFloor(sum.spent)} of ${exactUsd(sum.cap)} — ${ADVISORY_SUFFIX}`;
+    const coverage = `${sum.fullyPricedSessionCount} full, ${sum.partiallyPricedSessionCount} partial, ${sum.excludedUnpricedCount} excluded`;
+    const caveats = [`coverage: ${coverage}`];
+    if (sum.unreadableSessionCount > 0) {
+      caveats.push(`${sum.unreadableSessionCount} unreadable`);
     }
-    return base;
+    if (sum.cacheRatePartialSessionCount > 0) {
+      caveats.push(`${sum.cacheRatePartialSessionCount} partial with uncited cache rate`);
+    }
+    if (sum.unpricedTokenCount > 0) {
+      caveats.push(`${sum.unpricedTokenCount.toLocaleString("en-US")} known unpriced tok outside ≥ sum`);
+    }
+    caveats.push("top-level only; child/subagent transcripts excluded");
+    return `${base} (${caveats.join("; ")})`;
   }
-  return `budget (${label}): ${sum.spentTokens.toLocaleString("en-US")} of ${sum.cap.toLocaleString("en-US")} tokens — ${ADVISORY_SUFFIX}`;
+  const unreadable = sum.excludedUnreadableCount > 0 ? `; ${sum.excludedUnreadableCount} unreadable excluded` : "";
+  return `budget (${label}): ${sum.spentTokens.toLocaleString("en-US")} of ${sum.cap.toLocaleString("en-US")} tokens — ${ADVISORY_SUFFIX} (${sum.sessionCount} summaries${unreadable}; top-level only; child/subagent transcripts excluded)`;
 }
 
 /** R3: "exceeded" is a strict `>` — a sum exactly at the cap is not yet over it. */

@@ -70,7 +70,8 @@ or smaller, evidence is insufficient and the detector cannot ship.
   non-additive (for example `nonAdditive: true` plus overlap metadata) so callers do not
   sum overlapping class costs as a session total.
 - **R7 — Output surfaces are separate contracts.** Text receipts gain an
-  `≈ context thrash: N compactions in M turns` waste line and one methodology sentence.
+  `≈ context thrash: N compactions (Mt)` waste line and one methodology sentence
+  (compact form preserves the full counts plus the `≥ $` floor inside 50 columns).
   `--handoff` gains a static suggestion to clear or split context at task boundaries.
   `--json` emits a waste row with `kind: "context-thrash"`, `compactionCount`,
   `turnSpan`, `turnIndices`, prompt-side `tokens`, and `usd: number | null`.

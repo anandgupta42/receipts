@@ -1,10 +1,10 @@
 import { spawn, spawnSync } from "node:child_process";
-import { copyFile, mkdir, mkdtemp, readdir, readFile, realpath, rm, utimes, writeFile } from "node:fs/promises";
+import { copyFile, cp, mkdir, mkdtemp, readdir, readFile, realpath, rm, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { handoffJsonSchema, receiptJsonSchema } from "../../src/receipt/exportSchema.js";
+import { handoffJsonSchema, receiptJsonSchema, SCHEMA_VERSION } from "../../src/receipt/exportSchema.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
@@ -46,15 +46,33 @@ interface ReceiptToolRowJson {
   callCount: number;
 }
 
+interface CostEstimateJson {
+  kind: "lower-bound";
+  basis: "standard-api-list-price-equivalent";
+  minUsd: number;
+}
+
 interface ReceiptJson {
   source: string;
   title: string | null;
   modelMix: Array<{ model: string }>;
   toolRows: ReceiptToolRowJson[];
   totalUsd: number | null;
+  totalCostEstimate: CostEstimateJson | null;
   totalTokens: ReceiptTokenJson;
   sessionTotalTokens: ReceiptTokenJson;
-  priceRowsUsed: Array<{ vendor: string; model: string }>;
+  pricingCoverage: "full" | "partial" | "unpriced";
+  unpricedTokens: ReceiptTokenJson;
+  combinedPricedUsd?: number | null;
+  combinedTotalTokens?: number;
+  subagents?: { count: number; pricedUsd: number | null; tokensTotal: number };
+  caveats: Array<{ kind: string; text: string }>;
+  priceRowsUsed: Array<{
+    vendor: string;
+    model: string;
+    input_cache_write: number | null;
+    context_tiers: Array<{ above_input_tokens: number; input: number; output: number }>;
+  }>;
 }
 
 interface ListRowJson {
@@ -78,6 +96,16 @@ interface SetupJson {
     model: string | null;
     totalUsd: number | null;
     totalTokens: ReceiptTokenJson;
+    parentUnpricedTokens: ReceiptTokenJson;
+    combinedUnpricedTokens: ReceiptTokenJson;
+    combinedTotalTokens?: number;
+    subagentCount?: number;
+    subagentUnpricedCount: number | null;
+    subagentUnreadableCount: number | null;
+    subagentRollupStatus: "complete" | "unavailable";
+    costScope: string;
+    tokenScope: string;
+    totalScope?: string;
     wasteLineCount: number;
   } | null;
   week: {
@@ -179,6 +207,14 @@ async function stageClaudeSession(home: string, fixtureName: string, destName = 
   return dest;
 }
 
+async function stageClaudeSessionWithSubagents(home: string, fixtureName: string, destName: string): Promise<string> {
+  const parent = await stageClaudeSession(home, fixtureName, destName);
+  const sourceChildren = path.join(fixturesDir, "claude-code", "clean-with-subagents", "subagents");
+  const destinationChildren = path.join(parent.replace(/\.jsonl$/u, ""), "subagents");
+  await cp(sourceChildren, destinationChildren, { recursive: true });
+  return parent;
+}
+
 async function stageCodexSession(home: string, fixtureName: string, destName = `rollout-${fixtureName}`): Promise<string> {
   const root = path.join(home, ".codex", "sessions", "2026", "06", "20");
   await mkdir(root, { recursive: true });
@@ -267,7 +303,7 @@ describe("built CLI e2e", () => {
     expect(result.stdout).not.toContain("buy me a samosa");
   });
 
-  it("prices Claude Code raw usage to the independent exact-cost oracle through the built CLI", async () => {
+  it("prices Claude Code raw usage to an independent Standard-API floor oracle", async () => {
     const home = await makeHome();
     await stageClaudeSession(home, "clean-multi-tool-2-models.jsonl");
 
@@ -283,10 +319,40 @@ describe("built CLI e2e", () => {
     });
     expect(receipt.sessionTotalTokens).toEqual(receipt.totalTokens);
     expect(receipt.totalUsd).toBeCloseTo(0.1767, 12);
+    expect(receipt.totalCostEstimate).toEqual({
+      kind: "lower-bound",
+      basis: "standard-api-list-price-equivalent",
+      minUsd: 0.1767,
+    });
     expect(receipt.priceRowsUsed.map((row) => row.model).sort()).toEqual(["claude-opus-4-8", "claude-sonnet-5"]);
   });
 
-  it("prices Codex normalized cache usage to the independent exact-cost oracle through the built CLI", async () => {
+  it("merges evolving Claude snapshots and duplicate tool ids through the built CLI", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "evolving-duplicate-snapshots.jsonl");
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+    expect(receipt.source).toBe("claude-code");
+    expect(receipt.totalTokens).toMatchObject({
+      input: 97,
+      output: 53,
+      cacheRead: 900,
+      cacheCreation: 180,
+      total: 1230,
+    });
+    expect(receipt.sessionTotalTokens).toEqual(receipt.totalTokens);
+    const tools = toolRowsByName(receipt.toolRows);
+    expect(tools.Bash.callCount).toBe(1);
+    expect(tools.Read.callCount).toBe(1);
+    expect(tools["(unattributed usage)"].tokens.total).toBe(10);
+    expect(receipt.unpricedTokens?.total).toBe(10);
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("trustworthy request/model join") }),
+    );
+    expect(receipt.totalCostEstimate?.kind).toBe("lower-bound");
+  });
+
+  it("prices Codex normalized cache usage to an independent Standard-API floor oracle", async () => {
     const home = await makeHome();
     await stageCodexSession(home, "clean-session.jsonl");
 
@@ -302,7 +368,51 @@ describe("built CLI e2e", () => {
     });
     expect(receipt.sessionTotalTokens).toEqual(receipt.totalTokens);
     expect(receipt.totalUsd).toBeCloseTo(0.0165025, 12);
+    expect(receipt.totalCostEstimate?.kind).toBe("lower-bound");
+    expect(receipt.totalCostEstimate?.minUsd).toBe(0.0165);
+    expect(receipt.totalCostEstimate!.minUsd).toBeLessThanOrEqual(receipt.totalUsd!);
     expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`)).toEqual(["openai:gpt-5.3-codex"]);
+  });
+
+  it("prices GPT-5.6 at and above 272K per request, exposing only a Standard-API lower bound", async () => {
+    const home = await makeHome();
+    await stageCodexSession(home, "gpt-5.6-context-tiers.jsonl");
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+    expect(receipt.source).toBe("codex");
+    expect(receipt.totalTokens).toMatchObject({
+      input: 400001,
+      output: 4000,
+      cacheRead: 544000,
+      cacheCreation: 0,
+      total: 948001,
+    });
+    // The first observable turn contains three requests: two 200K requests
+    // (0.58 each) and one exactly at 272K (0.616). Its 672K aggregate must NOT
+    // select the long tier. Only request 4 (272,001) uses that tier (1.21701).
+    expect(receipt.totalUsd).toBeCloseTo(2.99301, 12);
+    expect(receipt.totalCostEstimate).toEqual({
+      kind: "lower-bound",
+      basis: "standard-api-list-price-equivalent",
+      minUsd: 2.993,
+    });
+    expect(receipt.caveats).toContainEqual(expect.objectContaining({
+      kind: "unobserved-cache-write-tokens",
+    }));
+    expect(receipt.priceRowsUsed).toEqual([
+      expect.objectContaining({
+        vendor: "openai",
+        model: "gpt-5.6-sol",
+        input_cache_write: 6.25,
+        context_tiers: [expect.objectContaining({ above_input_tokens: 272000, input: 10, output: 45 })],
+      }),
+    ]);
+
+    const textReceipt = await runCli([], home);
+    expectSuccess(textReceipt);
+    expect(textReceipt.stdout).toMatch(/TOTAL\.+≥ \$2\.99/u);
+    expect(textReceipt.stdout).toContain("standard API-equivalent floor; not an invoice");
+    expect(textReceipt.stdout).toContain("Codex trace omits GPT-5.6 cache-write tokens");
   });
 
   // SPEC-0054 R9 e2e: `--details` through real argv parsing renders the
@@ -342,7 +452,7 @@ describe("built CLI e2e", () => {
 
     const textResult = await runCli([], home);
     expectSuccess(textResult);
-    expect(textResult.stdout).toContain("caveat: cache-write cost is a lower bound for this session");
+    expect(textResult.stdout).toContain("caveat: some observed cache tokens have no cited applicable rate");
 
     const receipt = readJson<ReceiptJson & { caveats: Array<{ kind: string; text: string }> }>(await runCli(["--json"], home));
     expect(receipt.caveats.some((c) => c.kind === "cost-lower-bound-cache-tier")).toBe(true);
@@ -355,7 +465,7 @@ describe("built CLI e2e", () => {
 
     const textResult = await runCli([], home);
     expectSuccess(textResult);
-    expect(textResult.stdout).not.toContain("cache-write cost is a lower bound");
+    expect(textResult.stdout).not.toContain("some observed cache tokens have no cited applicable rate");
 
     const receipt = readJson<ReceiptJson & { caveats: Array<{ kind: string; text: string }> }>(await runCli(["--json"], home));
     expect(receipt.caveats.some((c) => c.kind === "cost-lower-bound-cache-tier")).toBe(false);
@@ -547,14 +657,45 @@ describe("built CLI e2e", () => {
     expect(receipt.title).toBe("Port parser adapter");
     expect(receipt.totalTokens.total).toBe(3140);
     expect(receipt.sessionTotalTokens.total).toBe(3140);
-    expect(receipt.totalUsd).toBeCloseTo(0.00975625, 12);
+    expect(receipt.totalUsd).toBeCloseTo(0.00966875, 12);
+    expect(receipt.totalCostEstimate?.kind).toBe("lower-bound");
+    expect(receipt.totalCostEstimate?.minUsd).toBe(0.0096);
+    expect(receipt.totalCostEstimate!.minUsd).toBeLessThanOrEqual(receipt.totalUsd!);
     expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`).sort()).toEqual([
       "anthropic:claude-haiku-4-5",
       "openai:gpt-5.3-codex",
     ]);
     expect(receipt.modelMix.map((entry) => entry.model).sort()).toEqual(["claude-haiku-4-5", "gpt-5.3-codex"]);
     expect(tools.read.usd).toBeCloseTo(0.00301, 12);
-    expect(tools.bash.usd).toBeCloseTo(0.00674625, 12);
+    expect(tools.bash.usd).toBeCloseTo(0.00665875, 12);
+  });
+
+  it.skipIf(!hasNodeSqlite)("preserves OpenCode aggregate-only usage as an unpriced residual through the built CLI", async () => {
+    const home = await makeHome();
+    const dbPath = await stageOpenCodeDb(home, "clean-multi-vendor.db");
+    const { DatabaseSync } = await import("node:sqlite");
+    const db = new DatabaseSync(dbPath);
+    db.prepare(`
+      UPDATE session
+      SET tokens_input = 2500, tokens_output = 700, tokens_reasoning = 100,
+          tokens_cache_read = 200, tokens_cache_write = 120
+      WHERE id = 'ses_clean'
+    `).run();
+    db.close();
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+    expect(receipt.totalTokens).toMatchObject({
+      input: 2500,
+      output: 800,
+      cacheRead: 200,
+      cacheCreation: 120,
+      total: 3620,
+    });
+    expect(receipt.sessionTotalTokens).toEqual(receipt.totalTokens);
+    expect(receipt.totalUsd).toBeCloseTo(0.00966875, 12);
+    expect(receipt.caveats).toContainEqual(expect.objectContaining({ kind: "unattributed-aggregate-usage" }));
+    const residual = receipt.toolRows.find((row) => row.tool === "(unattributed usage)");
+    expect(residual).toMatchObject({ usd: null, tokens: { input: 300, output: 100, cacheRead: 50, cacheCreation: 30, total: 480 } });
   });
 
   it("partially prices opencode sessions when only some provider models are known", async () => {
@@ -662,9 +803,50 @@ describe("built CLI e2e", () => {
 
     expect(result.code, result.stderr).toBe(0);
     expect(result.stderr).toBe("");
-    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
     expect(Object.keys(parsed).sort()).toEqual(["a", "b", "delta", "schemaVersion"]);
     expect(String(parsed.delta)).not.toMatch(/better|worse|winner|superior|inferior/i);
+  });
+
+  it("composes subagents across compare, setup latest, handoff, and benchmark full-session commands", async () => {
+    const home = await makeHome();
+    const cleanParent = await stageClaudeSessionWithSubagents(home, "clean-with-subagents.jsonl", "parent.jsonl");
+    const loopParent = await stageClaudeSessionWithSubagents(home, "loop-bash-5x.jsonl", "loop-parent.jsonl");
+
+    const compared = readJson<{ a: ReceiptJson; b: ReceiptJson }>(
+      await runCli(["compare", cleanParent, loopParent, "--json"], home),
+    );
+    expect(compared.a.subagents?.count).toBe(2);
+    expect(compared.b.subagents?.count).toBe(2);
+    expect(compared.a.combinedPricedUsd).toBeGreaterThan(compared.a.totalUsd ?? 0);
+    expect(compared.a.combinedTotalTokens).toBeGreaterThan(compared.a.totalTokens.total);
+    expect(compared.b.combinedPricedUsd).toBeGreaterThan(compared.b.totalUsd ?? 0);
+
+    const setup = readJson<SetupJson>(await runCli(["setup", "--json"], home));
+    expect(setup.latest).toMatchObject({
+      subagentCount: 2,
+      subagentUnpricedCount: 0,
+      subagentUnreadableCount: 0,
+      subagentRollupStatus: "complete",
+      costScope: "parent-session-plus-readable-subagents",
+      tokenScope: "parent-session-plus-readable-subagents",
+      totalScope: "parent-session-plus-readable-subagents",
+    });
+    expect(setup.latest?.combinedUnpricedTokens.total).toBeGreaterThanOrEqual(setup.latest?.parentUnpricedTokens.total ?? 0);
+    expect(setup.latest?.combinedTotalTokens).toBeGreaterThan(setup.latest?.totalTokens.total ?? 0);
+
+    const handoff = await runCli(["--handoff", loopParent], home);
+    expectSuccess(handoff);
+    const expectedHandoffFloor = (Math.floor((compared.b.combinedPricedUsd as number) * 100 + 1e-9) / 100).toFixed(2);
+    expect(handoff.stdout).toContain(`total ≥ $${expectedHandoffFloor}`);
+    expect(handoff.stdout).toContain("2 subagents");
+    expect(handoff.stdout).toContain("parent turns");
+    expect(handoff.stdout.match(/2 subagents/gu)).toHaveLength(2);
+
+    const benchmark = readJson<{ properties: { costPerTurnBucket: string } }>(
+      await runCli(["benchmark", cleanParent, "--dry-run"], home),
+    );
+    expect(benchmark.properties.costPerTurnBucket).not.toBe("unpriced");
   });
 
   it("SPEC-0042: --handoff --json emits the schema-valid resume packet; text form carries header + coverage", async () => {
@@ -675,8 +857,14 @@ describe("built CLI e2e", () => {
     expect(jsonRun.code, jsonRun.stderr).toBe(0);
     const parsed = JSON.parse(jsonRun.stdout) as Record<string, unknown>;
     expect(() => handoffJsonSchema.parse(parsed)).not.toThrow();
-    expect(parsed.coverage).toEqual({ turns: 6, toolCalls: 5, compactions: 0, wasteLines: 1 });
-    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.coverage).toEqual({
+      scope: "parent-session",
+      turns: 6,
+      toolCalls: 5,
+      compactions: 0,
+      wasteLines: 1,
+    });
+    expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
     expect(Object.keys(parsed)).toEqual([
       "schemaVersion",
       "source",
@@ -685,7 +873,18 @@ describe("built CLI e2e", () => {
       "startedAtMs",
       "durationMs",
       "totals",
+      "pricingCoverage",
+      "unpricedTokens",
+      "totalUsd",
+      "totalCostEstimate",
+      "totalUsdScope",
+      "combinedPricedUsd",
+      "combinedPricedCostEstimate",
+      "combinedTotalTokens",
+      "combinedScope",
+      "subagents",
       "wasteLines",
+      "wasteLinesScope",
       "couldHaveSaved",
       "suggestions",
       "threshold",
@@ -697,9 +896,9 @@ describe("built CLI e2e", () => {
     const textRun = await runCli(["--handoff"], home);
     expect(textRun.code, textRun.stderr).toBe(0);
     expect(textRun.stdout).toContain("handoff: ");
-    expect(textRun.stdout).toContain("total $");
+    expect(textRun.stdout).toContain("total ≥ $");
     // SPEC-0059 R1/R3 — the slip headline and the class's rule line ride the packet.
-    expect(textRun.stdout).toContain("COULD HAVE SAVED");
+    expect(textRun.stdout).toContain("FLAGGED PATTERN COST");
     expect(textRun.stdout).toContain("→ change or stop after two identical failures");
     expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
   });
@@ -727,7 +926,7 @@ describe("built CLI e2e", () => {
     expect(result.code, result.stderr).toBe(0);
     expect(result.stderr).toBe("");
     expect(result.stdout).toContain("[aireceipts]");
-    expect(result.stdout).toContain("$0.18");
+    expect(result.stdout).toContain("$0.17");
     expect(result.stdout).toContain("147k");
     expect(result.stdout.endsWith("\n")).toBe(true);
   });
@@ -753,7 +952,7 @@ describe("built CLI e2e", () => {
 
     expect(result.code).toBe(0);
     // SPEC-0076: default line now carries the dominant model between brand and cost.
-    expect(result.stdout).toContain("[aireceipts] claude-opus-4-8 · $0.18");
+    expect(result.stdout).toContain("[aireceipts] claude-opus-4-8 · ≥$0.17");
     expect(result.stderr).toBe("statusline.json ignored: statusline.json is not valid JSON\n");
   });
 
@@ -852,8 +1051,8 @@ describe("packed tarball smoke", () => {
     expect(run.stdout).toContain("AIRECEIPTS");
     expect(run.stdout).toContain("Claude Code");
     expect(run.stdout).toContain("TOTAL");
-    // The fixture is a priced session: a `$` on the TOTAL line proves the
-    // installed package loaded its data/prices tables (not a tokens-only fall).
-    expect(run.stdout).toMatch(/TOTAL[.\s]*\$\d/);
+    // A visibly floored `$` on TOTAL proves the installed package loaded its
+    // price tables (rather than degrading to tokens-only mode).
+    expect(run.stdout).toMatch(/TOTAL[.\s]*≥ \$\d/);
   });
 }, 90_000);

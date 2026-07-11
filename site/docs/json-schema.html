@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -338,12 +338,12 @@ footer{
 
 <p>The <strong>single source of truth</strong> is the <code>zod</code> schema in <code>src/receipt/exportSchema.ts</code> (<code>receiptJsonSchema</code> / <code>compareJsonSchema</code>). This document mirrors it, and an automated parity test (<code>test/receipt/json-schema-parity.test.ts</code>) fails the build if the two ever disagree — every documented field name must equal the schema's field names, and the version below must equal the schema's <code>SCHEMA_VERSION</code>. If you find a discrepancy, it's a bug; please open an issue.</p>
 
-<p>The current schema version is <strong>1</strong>. It appears as <code>schemaVersion</code> on the root of every JSON export.</p>
+<p>The current public export schema version is <strong>2</strong>. It appears as <code>schemaVersion</code> on receipt, compare, handoff, and backfill JSON exports, and in the first column of CSV exports. Version 2 makes the lower-bound meaning machine-readable beside legacy dollar scalars.</p>
 
 <h2 id="invariants-this-schema-upholds">Invariants this schema upholds</h2>
 
 <ul>
-  <li><strong>I2 — never a fabricated dollar.</strong> A <code>usd</code>/<code>totalUsd</code>/<code>actualUsd</code> field is <code>null</code> (JSON) or an empty cell (CSV) whenever nothing priced; it is never <code>0</code> standing in for &quot;unknown&quot;. Token fields are always populated.</li>
+  <li><strong>I2 — never a fabricated dollar.</strong> A <code>usd</code>/<code>totalUsd</code>/<code>actualUsd</code> field is <code>null</code> (JSON) or an empty cell (CSV) whenever nothing priced; it is never <code>0</code> standing in for &quot;unknown&quot;. Every non-null computed dollar is a lower bound at the standard API list-price-equivalent basis, recorded explicitly in its adjacent CostEstimate. Token fields are always populated.</li>
   <li><strong>I5 — byte-stable contract.</strong> Key order is fixed; the exporters build objects by hand rather than routing through <code>zod</code>, so output is deterministic.</li>
   <li><strong>I6 — facts, not rankings.</strong> <code>compare</code> carries a factual <code>delta</code> line only — never a better/worse field.</li>
 </ul>
@@ -357,7 +357,7 @@ footer{
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>schemaVersion</code></td><td>number (literal <code>1</code>)</td><td>This schema's major version. Bumped only on a breaking change.</td></tr>
+    <tr><td><code>schemaVersion</code></td><td>number (literal <code>2</code>)</td><td>This public export schema's major version. Bumped only on a breaking change.</td></tr>
     <tr><td><code>agentLabel</code></td><td>string</td><td>Human label for the agent, e.g. &quot;Claude Code&quot;.</td></tr>
     <tr><td><code>source</code></td><td>enum</td><td>One of <code>claude-code</code>, <code>codex</code>, <code>cursor</code>, <code>gemini</code>, <code>opencode</code>.</td></tr>
     <tr><td><code>sessionId</code></td><td>string</td><td>Adapter-local id (an absolute file path for file-based adapters).</td></tr>
@@ -367,11 +367,19 @@ footer{
     <tr><td><code>unpriceable</code></td><td>boolean</td><td>True for degraded sources (Cursor) with no per-turn usage/model.</td></tr>
     <tr><td><code>modelMix</code></td><td>array</td><td>Per-model token breakdown; see ModelMix entry. Empty when no turn carries a model.</td></tr>
     <tr><td><code>toolRows</code></td><td>array</td><td>Per-tool cost/token rows; see ToolRow.</td></tr>
-    <tr><td><code>totalUsd</code></td><td>number | null</td><td>Total attributed cost, or null when nothing priced (I2).</td></tr>
+    <tr><td><code>totalUsd</code></td><td>number | null</td><td>Compatibility scalar containing the <strong>parent-session-only</strong> attributed lower bound, or null when nothing in the parent priced (I2).</td></tr>
+    <tr><td><code>totalCostEstimate</code></td><td>CostEstimate | null</td><td>Structured lower-bound semantics for <code>totalUsd</code>, or null when unpriced.</td></tr>
+    <tr><td><code>totalUsdScope</code></td><td>literal <code>parent-session</code></td><td>Makes the compatibility scalar's scope explicit; it never silently includes children.</td></tr>
+    <tr><td><code>combinedPricedUsd</code></td><td>number | null</td><td>Lower-bound sum of priced parent and readable priced-subagent atoms; null when neither side priced.</td></tr>
+    <tr><td><code>combinedPricedCostEstimate</code></td><td>CostEstimate | null</td><td>Structured lower-bound semantics for <code>combinedPricedUsd</code>.</td></tr>
+    <tr><td><code>combinedScope</code></td><td>literal <code>parent-session-plus-readable-subagents</code></td><td>Explicit scope of the combined fields; unreadable children remain counted in <code>subagents</code>.</td></tr>
+    <tr><td><code>combinedTotalTokens</code></td><td>number</td><td>Observable parent tokens plus readable child tokens.</td></tr>
     <tr><td><code>totalTokens</code></td><td>TokenUsage</td><td>Attributed token totals.</td></tr>
     <tr><td><code>sessionTotalTokens</code></td><td>TokenUsage</td><td>Adapter-reported session totals (the only real number for Cursor).</td></tr>
+    <tr><td><code>pricingCoverage</code></td><td>enum</td><td>Parent-session price coverage: <code>full</code>, <code>partial</code>, or <code>unpriced</code>. <code>partial</code> includes exact known unpriced usage, an uncited applicable cache rate, unobserved GPT-5.6 cache writes, or dropped transcript records.</td></tr>
+    <tr><td><code>unpricedTokens</code></td><td>TokenUsage</td><td>Exact known parent-session tokens excluded from <code>totalUsd</code>. It is the whole observable token vector when the parent is unpriced and all zeroes when coverage is full. Unknown/unrecorded components are never invented; their caveats make <code>pricingCoverage</code> partial.</td></tr>
     <tr><td><code>wasteLines</code></td><td>array</td><td>Fired waste findings; see WasteLine.</td></tr>
-    <tr><td><code>caveats</code></td><td>array</td><td>Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): <code>kind</code> (<code>time-mtime</code> | <code>time-span</code> | <code>cost-lower-bound-cache-tier</code> | <code>dropped-transcript-records</code> | <code>partial-priced-coverage</code> | <code>subagents-unreadable</code> | <code>subagents-unpriced</code> | <code>subagents-priced-tokens-only</code> | <code>subagents-dropped-records</code>) + <code>text</code>. Never affects <code>$</code> itself. Empty when nothing to flag.</td></tr>
+    <tr><td><code>caveats</code></td><td>array</td><td>Confidence facts, never a ranking: <code>kind</code> (<code>time-mtime</code> | <code>time-span</code> | <code>cost-lower-bound-cache-tier</code> | <code>unobserved-cache-write-tokens</code> | <code>unattributed-aggregate-usage</code> | <code>dropped-transcript-records</code> | <code>partial-priced-coverage</code> | <code>subagents-unreadable</code> | <code>subagents-unpriced</code> | <code>subagents-priced-tokens-only</code> | <code>subagents-dropped-records</code> | <code>subagent-rollup-unavailable</code>) + <code>text</code>. Never changes the arithmetic itself. Empty when nothing extra is known.</td></tr>
     <tr><td><code>budget</code></td><td>array (optional)</td><td>Advisory budget lines (SPEC-0009); present only when <code>~/.aireceipts/budget.json</code> is configured.</td></tr>
     <tr><td><code>priceDelta</code></td><td>PriceDelta | null</td><td>Cheapest-current-model arithmetic, or null in tokens-only mode.</td></tr>
     <tr><td><code>methodology</code></td><td>string</td><td>The attribution methodology string (I3).</td></tr>
@@ -388,29 +396,32 @@ footer{
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>count</code></td><td>number</td><td>Every discovered child, readable or not.</td></tr>
-    <tr><td><code>pricedUsd</code></td><td>number | null</td><td>Sum over priced children; null when no child priced (I2 — surfaces render tokens).</td></tr>
+    <tr><td><code>pricedUsd</code></td><td>number | null</td><td>Compatibility scalar containing the lower-bound sum over priced children; null when no child priced.</td></tr>
+    <tr><td><code>pricedCostEstimate</code></td><td>CostEstimate | null</td><td>Structured lower-bound semantics for <code>pricedUsd</code>, or null when no child priced.</td></tr>
     <tr><td><code>tokensTotal</code></td><td>number</td><td>Total tokens across readable children; unreadable children contribute nothing (counted, never guessed).</td></tr>
-    <tr><td><code>unpricedCount</code></td><td>number</td><td>Readable children with no matching price row.</td></tr>
+    <tr><td><code>unpricedCount</code></td><td>number</td><td>Readable children with wholly or partially unpriced usage.</td></tr>
     <tr><td><code>unreadableCount</code></td><td>number</td><td>Children whose transcripts failed to parse — the rendered TOTAL is a floor.</td></tr>
   </tbody>
 </table></div>
 
 <h3 id="costshape-object">CostShape object</h3>
 
-<p>SPEC-0067 cost-shape facts — standalone, never in savings math. <code>preEdit</code> always present; <code>topTurns</code> and <code>lateTurn</code> are null unless every usage-bearing turn is priced.</p>
+<p>SPEC-0067 cost-shape facts — standalone, never in flagged-pattern arithmetic. <code>preEdit</code> always present; <code>topTurns</code> and <code>lateTurn</code> are null unless every usage-bearing turn is priced.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>preEdit</code></td><td>object</td><td>The pre-edit cost/token split (below).</td></tr>
     <tr><td><code>preEditUsd</code></td><td>number | null</td><td>Priced cost before the first named edit turn; null unless all pre-edit turns priced (I2).</td></tr>
+    <tr><td><code>preEditCostEstimate</code></td><td>CostEstimate | null</td><td>Structured lower-bound semantics for <code>preEditUsd</code>, or null when unpriced.</td></tr>
     <tr><td><code>postEditUsd</code></td><td>number | null</td><td>Priced cost from the first named edit turn onward; null unless all priced.</td></tr>
+    <tr><td><code>postEditCostEstimate</code></td><td>CostEstimate | null</td><td>Structured lower-bound semantics for <code>postEditUsd</code>, or null when unpriced.</td></tr>
     <tr><td><code>preEditPct</code></td><td>number | null</td><td><code>preEditUsd / totalUsd</code> percent; null unless every usage-bearing turn is priced (never a ratio over a partial denominator).</td></tr>
     <tr><td><code>preEditTokenPct</code></td><td>number</td><td>The same split in tokens (always present).</td></tr>
     <tr><td><code>firstEditTurn</code></td><td>number | null</td><td>1-based turn of the first named edit tool, or null when none observed.</td></tr>
     <tr><td><code>confidence</code></td><td>string</td><td><code>high</code> for <code>preEdit</code>/<code>topTurns</code>, <code>low</code> for <code>lateTurn</code>.</td></tr>
     <tr><td><code>topTurns</code></td><td>object | null</td><td>Expensive-turn concentration: <code>sharePct</code> and 1-based <code>indices</code> of the top-3 priced turns.</td></tr>
-    <tr><td><code>sharePct</code></td><td>number</td><td>Share of priced cost in the top-3 turns.</td></tr>
+    <tr><td><code>sharePct</code></td><td>number</td><td>Share of the raw priced lower-bound total in the top-3 turns.</td></tr>
     <tr><td><code>indices</code></td><td>array</td><td>1-based turn numbers of the top-3 turns, ascending.</td></tr>
     <tr><td><code>lateTurn</code></td><td>object | null</td><td><code>lateRatio</code>: a neutral late-half/early-half average-cost ratio (low confidence; never a &quot;context growth&quot; cause).</td></tr>
     <tr><td><code>lateRatio</code></td><td>number</td><td>Second-half average turn cost / first-half average.</td></tr>
@@ -419,7 +430,7 @@ footer{
 
 <h3 id="samefilerereads-object">SameFileReReads object</h3>
 
-<p>SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to a &quot;could have saved&quot; figure.</p>
+<p>SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to the handoff's flagged-pattern subtotal.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
@@ -427,8 +438,22 @@ footer{
     <tr><td><code>count</code></td><td>number</td><td>No-recorded-cause re-reads (2nd..Nth reads of a path).</td></tr>
     <tr><td><code>turnIndices</code></td><td>array</td><td>1-/0-based transcript turn indices of the counted re-reads, ascending.</td></tr>
     <tr><td><code>tokens</code></td><td>TokenUsage</td><td>Per-call token share of the counted re-reads.</td></tr>
-    <tr><td><code>usd</code></td><td>number | null</td><td>Priced share; null if any counted re-read is unpriced (I2).</td></tr>
+    <tr><td><code>usd</code></td><td>number | null</td><td>Compatibility scalar containing the priced lower-bound share; null if any counted re-read is unpriced (I2).</td></tr>
+    <tr><td><code>costEstimate</code></td><td>CostEstimate | null</td><td>Structured lower-bound semantics for the adjacent <code>usd</code>, or null when unpriced.</td></tr>
     <tr><td><code>confidence</code></td><td>string</td><td>Always <code>low</code> — the transcript cannot prove a re-read was unnecessary.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="costestimate-object">CostEstimate object</h3>
+
+<p>An additive interpretation beside legacy numeric dollar fields. Receipts currently expose only lower bounds; future estimate kinds require an additive schema change rather than silently changing a numeric field's meaning. The legacy scalar retains its raw compatibility precision, while <code>minUsd</code> is deliberately floored for safe display.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>kind</code></td><td>string</td><td>Always <code>lower-bound</code>.</td></tr>
+    <tr><td><code>basis</code></td><td>string</td><td>Always <code>standard-api-list-price-equivalent</code>; this is price-table arithmetic, not a claim about a subscription invoice.</td></tr>
+    <tr><td><code>minUsd</code></td><td>number</td><td>Four-decimal downward floor of the adjacent non-null legacy USD scalar; it never exceeds that scalar and does not imply invoice precision.</td></tr>
   </tbody>
 </table></div>
 
@@ -464,7 +489,7 @@ footer{
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>tool</code></td><td>string</td><td>Tool name, or &quot;(thinking/reply)&quot; for tool-free turns.</td></tr>
-    <tr><td><code>usd</code></td><td>number | null</td><td>Cost attributed to this tool, or null when its turns never priced (I2).</td></tr>
+    <tr><td><code>usd</code></td><td>number | null</td><td>Compatibility scalar containing the lower bound attributed to this tool, or null when unpriced.</td></tr>
     <tr><td><code>callCount</code></td><td>number</td><td>Number of calls to this tool.</td></tr>
   </tbody>
 </table></div>
@@ -474,7 +499,7 @@ footer{
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Meaning</th></tr></thead>
   <tbody>
-    <tr><td><code>kind</code></td><td>enum</td><td><code>time-mtime</code> (a turn timestamp postdates the transcript file), <code>time-span</code> (non-positive span carrying usage), or <code>cost-lower-bound-cache-tier</code> (a priced turn's cache-write fell back to the base <code>input</code> rate because the vendor's price row cites no cache-write rate — row-aware, not just &quot;unsplit&quot;: an unsplit write against a row that cites the 5m rate, e.g. Anthropic, is priced exactly and never sets this).</td></tr>
+    <tr><td><code>kind</code></td><td>enum</td><td>Includes <code>time-mtime</code>, <code>time-span</code>, <code>cost-lower-bound-cache-tier</code> (observed cached reads/writes had no cited applicable rate and contributed zero), <code>unobserved-cache-write-tokens</code> (the Codex GPT-5.6 trace has no cache-write bucket, so any write premium is absent from the floor), and <code>unattributed-aggregate-usage</code>. The last kind covers several no-trustworthy-join cases distinguished by <code>text</code>: Claude id-less usage is one coherent unpriced envelope; an unreconciled Codex cumulative stream disables request-level pricing and preserves the local envelope as tokens; a componentwise-dominating OpenCode aggregate yields an unpriced bucket on a full receipt and is excluded from a partial slice; crossed aggregate/itemized vectors keep itemized totals and expose only positive aggregate-only components as conflicting evidence excluded from totals and floor.</td></tr>
     <tr><td><code>text</code></td><td>string</td><td>The rendered caveat line, verbatim.</td></tr>
   </tbody>
 </table></div>
@@ -492,21 +517,26 @@ footer{
     <tr><td><code>compactionCount</code></td><td>number</td><td>(context-thrash) Refill-positive compactions clustered in the window.</td></tr>
     <tr><td><code>turnSpan</code></td><td>number</td><td>(context-thrash) Assistant-turn span from the window's first to last compaction.</td></tr>
     <tr><td><code>turnIndices</code></td><td>array</td><td>(context-thrash) The contributing post-compaction turn indices (the cost basis).</td></tr>
+    <tr><td><code>costInterpretation</code></td><td>string</td><td>Always <code>heuristic-pattern-pricing-not-proven-savings</code>: a detector identifies a pattern but does not prove avoidability or savings.</td></tr>
   </tbody>
 </table></div>
 
-<p>Each variant also carries a <code>tool</code>/<code>usd</code>/<code>tokens</code> field as documented above. The <code>context-thrash</code> variant omits <code>tool</code>, carries a nullable <code>usd</code> (tokens-only when any contributing turn is unpriced, I2), and reports prompt-only <code>tokens</code>.</p>
+<p>Each variant also carries a <code>tool</code>/<code>usd</code>/<code>costEstimate</code>/<code>tokens</code> field as documented above. The <code>context-thrash</code> variant omits <code>tool</code>, carries a nullable <code>usd</code> (tokens-only when any contributing turn is unpriced, I2), and reports prompt-only <code>tokens</code>.</p>
 
 <h3 id="pricedelta">PriceDelta</h3>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>actualUsd</code></td><td>number</td><td>The session's real attributed cost.</td></tr>
+    <tr><td><code>interpretation</code></td><td>string</td><td>Always <code>same-observed-tokens-repricing-not-completion-claim</code>: list-price arithmetic over the observed token vector, never a prediction that another model would complete the work.</td></tr>
+    <tr><td><code>actualUsd</code></td><td>number</td><td>Compatibility scalar containing the session's attributed lower bound.</td></tr>
+    <tr><td><code>actualCostEstimate</code></td><td>CostEstimate</td><td>Structured lower-bound semantics for <code>actualUsd</code>.</td></tr>
+    <tr><td><code>baselineUsd</code></td><td>number</td><td>Explicit replacement for the misleading legacy name <code>actualUsd</code>; the observed session's Standard-API floor, never an invoice.</td></tr>
+    <tr><td><code>baselineCostEstimate</code></td><td>CostEstimate</td><td>Structured lower-bound semantics for <code>baselineUsd</code>.</td></tr>
   </tbody>
 </table></div>
 
-<p>Also carries <code>cheaperModel</code> (the cheapest current model) and <code>usd</code> (the re-priced total).</p>
+<p>Also carries <code>cheaperModel</code> (the cheapest current model), <code>usd</code> (the re-priced lower-bound scalar), and <code>costEstimate</code> (its structured lower-bound semantics).</p>
 
 <h3 id="pricerowused">PriceRowUsed</h3>
 
@@ -515,8 +545,11 @@ footer{
   <tbody>
     <tr><td><code>vendor</code></td><td>string</td><td>Price-table vendor.</td></tr>
     <tr><td><code>input_cached</code></td><td>number | null</td><td>Cache-hit rate (USD per MTok), or null when the row cites none.</td></tr>
+    <tr><td><code>input_cache_write</code></td><td>number | null</td><td>Vendor-generic cache-write rate, or null.</td></tr>
     <tr><td><code>input_cache_write_5m</code></td><td>number | null</td><td>5-minute cache-write rate, or null.</td></tr>
     <tr><td><code>input_cache_write_1h</code></td><td>number | null</td><td>1-hour cache-write rate, or null.</td></tr>
+    <tr><td><code>context_tiers</code></td><td>array</td><td>Alternate full-request rate cards. Each has <code>above_input_tokens</code>, <code>input</code>, <code>output</code>, and nullable cache-rate fields matching this row. The highest threshold strictly below normalized prompt input is selected <strong>for each persisted request usage unit</strong>, never from an aggregate user-facing turn. Empty for an untiered row.</td></tr>
+    <tr><td><code>above_input_tokens</code></td><td>integer</td><td>Context-tier-only threshold; the tier applies when normalized prompt input is strictly greater than this count.</td></tr>
     <tr><td><code>from_date</code></td><td>string</td><td>ISO date the row takes effect.</td></tr>
     <tr><td><code>to_date</code></td><td>string | null</td><td>ISO date the row expires, or null when still current.</td></tr>
     <tr><td><code>sources</code></td><td>array</td><td>Cited price sources; see PriceSource.</td></tr>
@@ -562,16 +595,29 @@ footer{
     <tr><td><code>title</code></td><td>string | null</td><td>Session title when known.</td></tr>
     <tr><td><code>startedAtMs</code></td><td>number | null</td><td>Session start, epoch ms.</td></tr>
     <tr><td><code>durationMs</code></td><td>number | null</td><td>Wall-clock span.</td></tr>
-    <tr><td><code>totals</code></td><td>object</td><td><code>tokens</code> (TokenUsage object) + <code>turnCount</code> + <code>toolCallCount</code>.</td></tr>
+    <tr><td><code>totals</code></td><td>object</td><td>Compatibility parent-session totals: <code>tokens</code> (TokenUsage object) + <code>turnCount</code> + <code>toolCallCount</code> + <code>scope</code>.</td></tr>
+    <tr><td><code>scope</code></td><td>string</td><td>Explicitly <code>parent-session</code> on <code>totals</code>, <code>coverage</code>, and <code>couldHaveSaved</code>; none of those legacy structures silently includes child turns or findings.</td></tr>
     <tr><td><code>turnCount</code></td><td>number</td><td>(totals) Assistant turns in the session.</td></tr>
     <tr><td><code>toolCallCount</code></td><td>number</td><td>(totals) Tool calls in the session.</td></tr>
+    <tr><td><code>pricingCoverage</code></td><td>enum</td><td>Coverage of the parent-session <code>totalUsd</code>, with the same <code>full</code>/<code>partial</code>/<code>unpriced</code> semantics as a receipt.</td></tr>
+    <tr><td><code>unpricedTokens</code></td><td>TokenUsage</td><td>Exact known parent-session usage excluded from the parent floor.</td></tr>
+    <tr><td><code>totalUsd</code></td><td>number | null</td><td>Parent-session lower-bound scalar, retained separately from the combined child rollup.</td></tr>
+    <tr><td><code>totalCostEstimate</code></td><td>CostEstimate | null</td><td>Structured semantics for the handoff's parent <code>totalUsd</code>.</td></tr>
+    <tr><td><code>totalUsdScope</code></td><td>literal <code>parent-session</code></td><td>Scope of <code>totalUsd</code> and <code>unpricedTokens</code>.</td></tr>
+    <tr><td><code>combinedPricedUsd</code></td><td>number | null</td><td>Lower-bound sum of priced parent and readable priced-subagent atoms.</td></tr>
+    <tr><td><code>combinedPricedCostEstimate</code></td><td>CostEstimate | null</td><td>Structured semantics for <code>combinedPricedUsd</code>.</td></tr>
+    <tr><td><code>combinedTotalTokens</code></td><td>number</td><td>Observable parent tokens plus all readable-child tokens. Child token components are not fabricated.</td></tr>
+    <tr><td><code>combinedScope</code></td><td>literal <code>parent-session-plus-readable-subagents</code></td><td>Explicit scope of the combined fields.</td></tr>
+    <tr><td><code>subagents</code></td><td>Subagents | null</td><td>Aggregate child counts/sums; null when the model has no composed child rollup. No child ids, titles, or paths.</td></tr>
     <tr><td><code>wasteLines</code></td><td>array</td><td>Same WasteLine union as the receipt, plus a per-line <code>rule</code> (SPEC-0059).</td></tr>
+    <tr><td><code>wasteLinesScope</code></td><td>literal <code>parent-session</code></td><td>Handoff waste findings remain parent-only; the combined cost fields must not be read as their denominator.</td></tr>
     <tr><td><code>rule</code></td><td>string | null</td><td>(wasteLines) The class's fixed one-line next-time rule; <code>null</code> for a class without one.</td></tr>
-    <tr><td><code>couldHaveSaved</code></td><td>object</td><td>SPEC-0059: the extracted savings ceiling — <code>usd</code> (sum of priced waste lines, <code>null</code> when none priced), <code>tokens</code> (sum over all fired lines), <code>pctOfTotal</code>. Arithmetic, never a prediction.</td></tr>
-    <tr><td><code>pctOfTotal</code></td><td>number | null</td><td>(couldHaveSaved) <code>round(100 · usd / totalUsd)</code>; <code>null</code> without both dollar sides.</td></tr>
+    <tr><td><code>couldHaveSaved</code></td><td>object</td><td>Historical field name, not a savings assertion. Its <code>usd</code> is the largest priced class subtotal across stuck-loop/context-thrash findings (null when none priced), with adjacent <code>costEstimate</code>; it excludes counterfactual trivial-span re-pricing and never adds classes that may overlap. <code>tokens</code> is the largest one-class token subtotal. This is the heuristic subtotal rendered as <code>FLAGGED PATTERN COST ≈ …</code>; detector membership does not prove avoidability, so the value is neither a savings floor nor a savings ceiling.</td></tr>
+    <tr><td><code>interpretation</code></td><td>string</td><td>(couldHaveSaved) Always <code>heuristic-pattern-pricing-not-proven-savings</code>; explicitly overrides the legacy field name's implication.</td></tr>
+    <tr><td><code>pctOfTotal</code></td><td>number | null</td><td>Retained for compatibility and always <code>null</code>: a ratio of two lower bounds has no reliable direction.</td></tr>
     <tr><td><code>suggestions</code></td><td>array</td><td>Standing-rule suggestion strings (SPEC-0013), possibly empty.</td></tr>
     <tr><td><code>threshold</code></td><td>number</td><td>The distinct-session recurrence threshold in effect.</td></tr>
-    <tr><td><code>coverage</code></td><td>object</td><td>What the packet covers, checkably: <code>turns</code>, <code>toolCalls</code>, <code>compactions</code>, <code>wasteLines</code> (all numbers).</td></tr>
+    <tr><td><code>coverage</code></td><td>object</td><td>What the parent-only packet covers, checkably: <code>scope</code>, <code>turns</code>, <code>toolCalls</code>, <code>compactions</code>, <code>wasteLines</code>.</td></tr>
     <tr><td><code>turns</code></td><td>number</td><td>(coverage) Turn count the packet covers.</td></tr>
     <tr><td><code>toolCalls</code></td><td>number</td><td>(coverage) Tool-call count the packet covers.</td></tr>
     <tr><td><code>compactions</code></td><td>number</td><td>(coverage) Compaction events in the session.</td></tr>
@@ -608,7 +654,9 @@ footer{
 
 <p>One summary row per session. Columns:</p>
 
-<p><code>schemaVersion, sessionId, agent, title, startedAt, durationMs, primaryModel, totalUsd, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens</code></p>
+<p><code>schemaVersion, sessionId, agent, title, startedAt, durationMs, primaryModel, totalUsd, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens, costKind, costBasis, totalUsdScope, subagentsPricedUsd, combinedPricedUsd, combinedCostKind, combinedCostBasis, subagentsTokens, combinedTotalTokens, subagentCount, subagentUnpricedCount, subagentUnreadableCount, pricingCoverage, unpricedInputTokens, unpricedOutputTokens, unpricedCacheReadTokens, unpricedCacheCreationTokens, unpricedTotalTokens, unpricedTokensScope</code></p>
+
+<p><code>costKind</code> is <code>lower-bound</code> and <code>costBasis</code> is <code>standard-api-list-price-equivalent</code> when <code>totalUsd</code> is populated; both cells are empty when unpriced. <code>totalUsdScope</code> is always <code>parent-session</code>. The appended combined columns expose the parent + readable-subagent floor and token total without changing the legacy scalar. <code>pricingCoverage</code> describes the parent as <code>full</code>, <code>partial</code>, or <code>unpriced</code>. The five appended unpriced-token columns are exact parent-session components; <code>unpricedTokensScope</code> is always <code>parent-session</code>. Unknown/unrecorded components stay absent from those counts and instead force partial coverage plus a caveat.</p>
 
 <p><code>compare --csv</code> emits exactly two such rows plus a trailing <code>delta</code> column carrying the factual delta line on the first row (empty on the second) — <code>compare</code> accepts <code>--csv=session</code> only.</p>
 
@@ -616,7 +664,13 @@ footer{
 
 <p>One row per tool line. Columns:</p>
 
-<p><code>schemaVersion, sessionId, agent, tool, usd, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens, callCount</code></p>
+<p><code>schemaVersion, sessionId, agent, tool, usd, inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens, callCount, costKind, costBasis, costScope, pricingCoverage, pricingCoverageLimitation</code></p>
+
+<p><code>costScope</code> is <code>parent-session-tool</code>; subagent aggregation has no fabricated tool breakdown and is available from session CSV/JSON instead.</p>
+
+<p><code>pricingCoverage</code> is <code>full</code> when the parent session is fully covered and <code>unpriced</code> when that tool row has no priced contribution. For a priced tool row inside a partial parent it is <code>indeterminate</code>: the current attribution model cannot separate the row's priced and unpriced contributing turns. In that case <code>pricingCoverageLimitation</code> states this limitation verbatim; otherwise it is empty.</p>
+
+<p>The two cost metadata cells describe that row's <code>usd</code>; both are empty for an unpriced tool row.</p>
 
 <h2 id="versioning-semver-discipline-r4">Versioning (semver discipline, R4)</h2>
 
@@ -626,9 +680,11 @@ footer{
   <li>CSV columns are additive-only within a major version.</li>
 </ul>
 
+<p>This public export version is deliberately separate from the internal PR receipt-ref payload stored at <code>refs/aireceipts/&lt;slug&gt;</code>. That producer/CI handoff remains <code>PR_RECEIPT_SCHEMA_VERSION = 1</code>: it serializes renderer inputs, has no <code>costSemantics</code> field, and did not need an incompatible shape change for the human receipt to render <code>≥</code> floors. Do not treat its v1 as the version of <code>--json</code>/<code>--csv</code>, and do not add a field to the ref merely to mirror a public export envelope.</p>
+
 <h2 id="weekly-digest-spec-0008-integration-point">Weekly digest (SPEC-0008 integration point)</h2>
 
-<p><code>week --json</code> (SPEC-0008's weekly digest) <strong>is</strong> implemented (<code>weekToJson</code> in <code>src/receipt/week.ts</code>) and emits a <code>{window, priorWindow, sinceOverride, byProject, current, prior, delta, topWaste}</code> digest (waste lines are under <code>topWaste</code>). It does <strong>not</strong> yet carry a <code>schemaVersion</code> wrapper or a <code>weekJsonSchema</code> in <code>exportSchema.ts</code>, so it is not covered by the field-parity test — a known gap tracked for a follow-up: it MUST gain the same <code>schemaVersion</code> constant (from <code>src/receipt/exportSchema.ts</code>) and a <code>weekJsonSchema</code> documented inside the <code>json-fields</code> markers above, rather than a second undocumented shape (R5, single-source-of-truth). Until then, treat <code>week --json</code> as an unversioned convenience surface, not part of the versioned contract.</p>
+<p><code>week --json</code> (SPEC-0008's weekly digest) <strong>is</strong> implemented (<code>weekToJson</code> in <code>src/receipt/week.ts</code>) and emits a <code>{costSemantics, scope, window, priorWindow, sinceOverride, byProject, current, prior, delta, topWaste}</code> digest (waste lines are under <code>topWaste</code>). <code>scope.childSessionsIncluded</code> is <code>false</code>: week is top-level-only. Each current/prior window has a <code>pricingCoverage</code> object with full, partial, cache-rate-partial, unpriced, and unreadable session counts plus the exact known <code>unpricedTokenTotal</code>. <code>costSemantics</code> labels every non-null dollar scalar as a Standard-API list-price-equivalent lower bound; every <code>waste</code>/<code>topWaste</code> row carries <code>costInterpretation: heuristic-pattern-pricing-not-proven-savings</code>; <code>delta.pricedUsdDeltaKind</code> is <code>difference-of-lower-bounds</code> (or null), because subtracting two floors is not itself a directional bound. It does <strong>not</strong> yet carry a <code>schemaVersion</code> wrapper or a <code>weekJsonSchema</code> in <code>exportSchema.ts</code>, so it is not covered by the field-parity test — a known gap tracked for a follow-up: it MUST gain the same <code>schemaVersion</code> constant (from <code>src/receipt/exportSchema.ts</code>) and a <code>weekJsonSchema</code> documented inside the <code>json-fields</code> markers above, rather than a second undocumented shape (R5, single-source-of-truth). Until then, treat <code>week --json</code> as an unversioned convenience surface, not part of the versioned contract.</p>
     </article>
   </main>
   <footer>

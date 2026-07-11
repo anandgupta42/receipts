@@ -14,7 +14,7 @@ fabricated sums), I5 (no budget file → byte-identical receipt to before this s
 ## Purpose
 
 An optional `~/.aireceipts/budget.json` (daily or weekly, USD or tokens) adds one budget
-line to the receipt ("today: $34.20 of $50.00") and a `--check-budget` flag that exits
+line to the receipt ("today: ≥ $34.20 of $50.00") and a `--check-budget` flag that exits
 non-zero when exceeded (scriptable for CI). A live `watch` command was cut from this
 spec by S2 review — see Non-goals. **Kill criterion:** if the
 budget line is read as a hard cap (support requests asking "why didn't it stop the
@@ -45,8 +45,8 @@ agent") despite R4's labeling, the framing has failed and the feature needs rewo
 
 - **Given** no `budget.json`, **when** a receipt renders, **then** no budget line,
   byte-identical to before this spec.
-- **Given** a $50/day budget and $34.20 spent today, **when** it renders, **then**
-  "today: $34.20 of $50.00" appears.
+- **Given** a $50/day budget and a $34.20 observable spend floor today, **when** it renders, **then**
+  "today: ≥ $34.20 of $50.00" appears.
 - **Given** the daily cap exceeded, **when** `--check-budget` runs, **then** exit 1.
 - **Given** a malformed `budget.json`, **when** a receipt renders, **then** no budget
   line + stderr note, exit 0.
@@ -91,3 +91,22 @@ determinism, and `--on-exceed` shell-exec is an injection/network footgun; a fut
 owns it with argv-style commands and defined tailing semantics. SPEC-0008 added as a
 dependency; windowing matrix rows added (date boundary, frozen clock, priced-coverage
 honesty). **S4:** spec-lint green.
+
+## 2026-07-10 aggregate-truthfulness amendment
+
+USD budget spend is a Standard-API-equivalent lower bound over observable priced
+components, never an invoice total. Coverage reports full, partial, excluded, and
+unreadable sessions separately; mixed sessions contribute their priced components
+but never count as fully priced, and their exact observable unpriced-token subtotal
+is surfaced. Null/degraded full loads remain in the in-window denominator as
+unreadable exclusions rather than vanishing. A zero `--check-budget` exit means
+only that the observable floor does not exceed the cap.
+
+A priced session carrying a cached component with no cited applicable rate is
+partial, not full. The cache-rate gap is counted separately; no token subtotal is
+invented when the missing component's quantity is not observable.
+
+The configured cap is exact and renders with its comparison precision (`20.005`
+stays `$20.005`; `0.004` stays `$0.004`). Budget windows currently cover top-level
+sessions only; child/subagent transcripts are explicitly excluded in the line and
+machine result rather than silently implied to be included.

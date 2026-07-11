@@ -1,17 +1,9 @@
-// B1 — displayed rows must sum to the displayed TOTAL. Before this fix, rows
-// were `formatUsd`'d independently while the TOTAL summed the RAW usd and
-// rounded separately, so a receipt could visibly contradict its own math:
-//   3 rows @ $0.004 → rows show $0.00×3 (Σ $0.00) but TOTAL $0.01
-//   2 rows @ $0.006 → rows show $0.01×2 (Σ $0.02) but TOTAL $0.01
-// The fix is `reconcileCents` (largest-remainder / Hamilton's method, in
-// `src/receipt/format.ts`): TOTAL keeps its own correctly-rounded raw sum,
-// and rows are floored to cents then handed leftover cents by largest
-// fractional remainder until displayed rows sum EXACTLY to the displayed
-// total. This file proves the unit and both real render paths (single-session
-// receipt via `present.ts`, PR body via `body.ts`) across every template.
+// Lower-bound display regression tests. Hamilton cent reconciliation remains
+// as a legacy utility, but it must not drive `≥` rows: redistributing a cent can
+// make a 0.6¢ component claim `≥ $0.01`, which is mathematically false.
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import { formatCentsAmount, formatUsd, reconcileCents } from "../../src/receipt/format.js";
+import { formatCentsAmount, formatUsd, formatUsdFloor, reconcileCents } from "../../src/receipt/format.js";
 import { buildReceiptView } from "../../src/receipt/present.js";
 import { loadById } from "../../src/index.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
@@ -88,6 +80,36 @@ describe("reconcileCents — largest-remainder apportionment (B1)", () => {
   });
 });
 
+describe("formatUsdFloor — a displayed lower bound never rounds upward", () => {
+  it("keeps sub-cent evidence and floors ordinary cents", () => {
+    expect(formatUsdFloor(0.006)).toBe("0.0060");
+    expect(formatUsdFloor(0.0165025)).toBe("0.0165");
+    expect(formatUsdFloor(0)).toBe("0.00");
+  });
+
+  it("stays below the float immediately before a decimal boundary", () => {
+    const buffer = new ArrayBuffer(8);
+    const view = new DataView(buffer);
+    view.setFloat64(0, 0.1, false);
+    view.setBigUint64(0, view.getBigUint64(0, false) - 1n, false);
+    const immediatelyBelowTenCents = view.getFloat64(0, false);
+
+    expect(formatUsdFloor(0.1)).toBe("0.10");
+    expect(formatUsdFloor(immediatelyBelowTenCents)).toBe("0.0999");
+    expect(Number(formatUsdFloor(immediatelyBelowTenCents))).toBeLessThanOrEqual(immediatelyBelowTenCents);
+  });
+
+  it("property: parsing the display never exceeds the nonnegative input", () => {
+    fc.assert(
+      fc.property(fc.double({ min: 0, max: 1_000_000, noNaN: true, noDefaultInfinity: true }), (amount) => {
+        const shown = Number(formatUsdFloor(amount).replace(/,/g, ""));
+        expect(shown).toBeLessThanOrEqual(amount);
+      }),
+      { numRuns: 500 },
+    );
+  });
+});
+
 // --- single-session receipt (present.ts) -------------------------------------
 
 async function baseModel(): Promise<ReceiptModel> {
@@ -107,28 +129,28 @@ function rowsWithUsd(base: ReceiptModel, amounts: number[]): ToolRow[] {
   }));
 }
 
-/** Leading `$X.XX` off any block's display value (rows carry it as a prefix in every template; the TOTAL block's value IS it). */
-function leadingDollarCents(text: string): number | undefined {
-  const m = /\$([\d,]+\.\d{2})/.exec(text);
-  return m ? Math.round(Number(m[1].replace(/,/g, "")) * 100) : undefined;
+/** Leading dollar value off any block's display value. */
+function leadingDollar(text: string): number | undefined {
+  const m = /\$([\d,]+\.\d+)/.exec(text);
+  return m ? Number(m[1].replace(/,/g, "")) : undefined;
 }
 
-function rowDollarCents(blocks: Block[]): number[] {
+function rowDollars(blocks: Block[]): number[] {
   return blocks
     .filter((b): b is Extract<Block, { kind: "row" }> => b.kind === "row")
     .flatMap((b) => {
-      const c = leadingDollarCents(b.value);
+      const c = leadingDollar(b.value);
       return c === undefined ? [] : [c];
     });
 }
 
-function totalDollarCents(blocks: Block[]): number | undefined {
+function totalDollars(blocks: Block[]): number | undefined {
   const total = blocks.find((b): b is Extract<Block, { kind: "total" }> => b.kind === "total");
-  return total ? leadingDollarCents(total.value) : undefined;
+  return total ? leadingDollar(total.value) : undefined;
 }
 
-describe("B1 — single-session receipt rows sum exactly to TOTAL (present.ts, every template)", () => {
-  it.each([...TEMPLATE_NAMES])("3 rows @ $0.004 (%s): rows sum to $0.01, matching TOTAL", async (template) => {
+describe("lower-bound rows — single-session receipt (present.ts, every template)", () => {
+  it.each([...TEMPLATE_NAMES])("3 rows @ $0.004 (%s): each row remains a true sub-cent floor", async (template) => {
     const base = await baseModel();
     // `priceDelta`/`wasteLines` are unrelated features of the real fixture we
     // borrow for its shape; null them so the only dollar-bearing blocks are
@@ -141,12 +163,12 @@ describe("B1 — single-session receipt rows sum exactly to TOTAL (present.ts, e
       wasteLines: [],
     };
     const { blocks } = buildReceiptView(model, template);
-    const total = totalDollarCents(blocks);
-    expect(total).toBe(1);
-    expect(rowDollarCents(blocks).reduce((a, b) => a + b, 0)).toBe(total);
+    expect(totalDollars(blocks)).toBe(0.012);
+    expect(rowDollars(blocks)).toEqual([0.004, 0.004, 0.004]);
+    expect(rowDollars(blocks).reduce((sum, usd) => sum + usd, 0)).toBeLessThanOrEqual(totalDollars(blocks) as number);
   });
 
-  it.each([...TEMPLATE_NAMES])("2 rows @ $0.006 (%s): rows sum to $0.01, matching TOTAL", async (template) => {
+  it.each([...TEMPLATE_NAMES])("2 rows @ $0.006 (%s): no row is rounded up to one cent", async (template) => {
     const base = await baseModel();
     const model: ReceiptModel = {
       ...base,
@@ -156,9 +178,31 @@ describe("B1 — single-session receipt rows sum exactly to TOTAL (present.ts, e
       wasteLines: [],
     };
     const { blocks } = buildReceiptView(model, template);
-    const total = totalDollarCents(blocks);
-    expect(total).toBe(1);
-    expect(rowDollarCents(blocks).reduce((a, b) => a + b, 0)).toBe(total);
+    expect(totalDollars(blocks)).toBe(0.012);
+    expect(rowDollars(blocks)).toEqual([0.006, 0.006]);
+    expect(rowDollars(blocks).reduce((sum, usd) => sum + usd, 0)).toBeLessThanOrEqual(totalDollars(blocks) as number);
+  });
+
+  it("property: displayed additive rows never exceed the displayed TOTAL", async () => {
+    const base = await baseModel();
+    fc.assert(
+      fc.property(
+        fc.array(fc.double({ min: 0.0001, max: 10, noNaN: true, noDefaultInfinity: true }), { minLength: 1, maxLength: 8 }),
+        (amounts) => {
+          const model: ReceiptModel = {
+            ...base,
+            toolRows: rowsWithUsd(base, amounts),
+            totalUsd: amounts.reduce((sum, usd) => sum + usd, 0),
+            priceDelta: null,
+            wasteLines: [],
+          };
+          const { blocks } = buildReceiptView(model, "classic");
+          const displayedRows = rowDollars(blocks).reduce((sum, usd) => sum + usd, 0);
+          expect(displayedRows).toBeLessThanOrEqual((totalDollars(blocks) as number) + 1e-9);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 });
 
@@ -182,35 +226,47 @@ function contributorsWithUsd(amounts: number[]) {
   }));
 }
 
-/** Every `$X.XX` on a non-TOTAL fence line — the PR body's per-contributor rows. */
-function bodyRowCents(fence: string): number[] {
+/** Every dollar on a non-TOTAL fence line — the PR body's per-contributor rows. */
+function bodyRowDollars(fence: string): number[] {
   return fence
     .split("\n")
     .filter((l) => !l.includes("TOTAL"))
     .flatMap((l) => {
-      const m = /\$([\d,]+\.\d{2})\s*$/.exec(l);
-      return m ? [Math.round(Number(m[1].replace(/,/g, "")) * 100)] : [];
+      const m = /\$([\d,]+\.\d+)\s*$/.exec(l);
+      return m ? [Number(m[1].replace(/,/g, ""))] : [];
     });
 }
 
-function bodyTotalCents(fence: string): number | undefined {
+function bodyTotalDollars(fence: string): number | undefined {
   const line = fence.split("\n").find((l) => l.includes("TOTAL priced"));
-  const m = line ? /\$([\d,]+\.\d{2})\s*$/.exec(line) : null;
-  return m ? Math.round(Number(m[1].replace(/,/g, "")) * 100) : undefined;
+  const m = line ? /\$([\d,]+\.\d+)\s*$/.exec(line) : null;
+  return m ? Number(m[1].replace(/,/g, "")) : undefined;
 }
 
-describe("B1 — PR body contributor rows sum exactly to TOTAL priced (body.ts)", () => {
-  it("3 contributors @ $0.004: rows sum to $0.01, matching TOTAL", () => {
+describe("lower-bound rows — PR body (body.ts)", () => {
+  it("3 contributors @ $0.004 retain true sub-cent floors", () => {
     const body = renderPrBody({ contributors: contributorsWithUsd([0.004, 0.004, 0.004]), excludedCount: 0 });
-    const total = bodyTotalCents(body);
-    expect(total).toBe(1);
-    expect(bodyRowCents(body).reduce((a, b) => a + b, 0)).toBe(total);
+    expect(bodyTotalDollars(body)).toBe(0.012);
+    expect(bodyRowDollars(body)).toEqual([0.004, 0.004, 0.004]);
   });
 
-  it("2 contributors @ $0.006: rows sum to $0.01, matching TOTAL", () => {
+  it("2 contributors @ $0.006 are never rounded up", () => {
     const body = renderPrBody({ contributors: contributorsWithUsd([0.006, 0.006]), excludedCount: 0 });
-    const total = bodyTotalCents(body);
-    expect(total).toBe(1);
-    expect(bodyRowCents(body).reduce((a, b) => a + b, 0)).toBe(total);
+    expect(bodyTotalDollars(body)).toBe(0.012);
+    expect(bodyRowDollars(body)).toEqual([0.006, 0.006]);
+  });
+
+  it("property: displayed contributor floors never exceed the displayed PR total", () => {
+    fc.assert(
+      fc.property(
+        fc.array(fc.double({ min: 0.0001, max: 10, noNaN: true, noDefaultInfinity: true }), { minLength: 1, maxLength: 8 }),
+        (amounts) => {
+          const body = renderPrBody({ contributors: contributorsWithUsd(amounts), excludedCount: 0 });
+          const displayedRows = bodyRowDollars(body).reduce((sum, usd) => sum + usd, 0);
+          expect(displayedRows).toBeLessThanOrEqual((bodyTotalDollars(body) as number) + 1e-9);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 });

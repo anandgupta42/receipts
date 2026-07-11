@@ -9,11 +9,25 @@
 // producing it, so no render ever routes through zod.
 import { z } from "zod";
 import { AGENT_SOURCES } from "../parse/types.js";
+import {
+  HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+  SAME_TOKENS_REPRICING_INTERPRETATION,
+  STANDARD_API_LIST_PRICE_EQUIVALENT,
+} from "./costEstimate.js";
 import { SCHEMA_VERSION } from "./schemaVersion.js";
 
 // Re-exported so existing importers keep one canonical path; the constant itself
 // lives in the zod-free `schemaVersion.ts` (see the rationale there).
 export { SCHEMA_VERSION } from "./schemaVersion.js";
+
+/** Additive machine-readable semantics for every currently computed dollar. */
+export const costEstimateSchema = z
+  .object({
+    kind: z.literal("lower-bound"),
+    basis: z.literal(STANDARD_API_LIST_PRICE_EQUIVALENT),
+    minUsd: z.number().nonnegative(),
+  })
+  .strict();
 
 const tokenUsageSchema = z
   .object({
@@ -24,6 +38,19 @@ const tokenUsageSchema = z
     cacheCreation5m: z.number().nullable(),
     cacheCreation1h: z.number().nullable(),
     total: z.number(),
+  })
+  .strict();
+
+const pricingCoverageSchema = z.enum(["full", "partial", "unpriced"]);
+
+const subagentAggregateSchema = z
+  .object({
+    count: z.number().int().nonnegative(),
+    pricedUsd: z.number().nullable(),
+    pricedCostEstimate: costEstimateSchema.nullable(),
+    tokensTotal: z.number().int().nonnegative(),
+    unpricedCount: z.number().int().nonnegative(),
+    unreadableCount: z.number().int().nonnegative(),
   })
   .strict();
 
@@ -39,6 +66,7 @@ const toolRowSchema = z
   .object({
     tool: z.string(),
     usd: z.number().nullable(),
+    costEstimate: costEstimateSchema.nullable(),
     tokens: tokenUsageSchema,
     callCount: z.number(),
   })
@@ -46,26 +74,32 @@ const toolRowSchema = z
 
 const stuckLoopWasteShape = {
   kind: z.literal("stuck-loop"),
+  costInterpretation: z.literal(HEURISTIC_PATTERN_PRICING_INTERPRETATION),
   tool: z.string(),
   runLength: z.number(),
   usd: z.number().nullable(),
+  costEstimate: costEstimateSchema.nullable(),
   tokens: tokenUsageSchema,
   wallClockMs: z.number().nullable(),
 } as const;
 const trivialSpansWasteShape = {
   kind: z.literal("trivial-spans"),
+  costInterpretation: z.literal(HEURISTIC_PATTERN_PRICING_INTERPRETATION),
   eligibleTurnCount: z.number(),
   usd: z.number(),
+  costEstimate: costEstimateSchema,
   tokens: tokenUsageSchema,
   cheaperModel: z.string(),
 } as const;
 const contextThrashWasteShape = {
   kind: z.literal("context-thrash"),
+  costInterpretation: z.literal(HEURISTIC_PATTERN_PRICING_INTERPRETATION),
   compactionCount: z.number(),
   turnSpan: z.number(),
   turnIndices: z.array(z.number()),
   tokens: tokenUsageSchema,
   usd: z.number().nullable(),
+  costEstimate: costEstimateSchema.nullable(),
 } as const;
 
 const wasteLineSchema = z.discriminatedUnion("kind", [
@@ -85,8 +119,13 @@ const handoffWasteLineSchema = z.discriminatedUnion("kind", [
 const priceDeltaSchema = z
   .object({
     cheaperModel: z.string(),
+    interpretation: z.literal(SAME_TOKENS_REPRICING_INTERPRETATION),
     usd: z.number(),
+    costEstimate: costEstimateSchema,
     actualUsd: z.number(),
+    actualCostEstimate: costEstimateSchema,
+    baselineUsd: z.number(),
+    baselineCostEstimate: costEstimateSchema,
   })
   .strict();
 
@@ -98,6 +137,18 @@ const priceSourceSchema = z
   })
   .strict();
 
+const contextPriceTierSchema = z
+  .object({
+    above_input_tokens: z.number().int().nonnegative(),
+    input: z.number(),
+    output: z.number(),
+    input_cached: z.number().nullable(),
+    input_cache_write: z.number().nullable(),
+    input_cache_write_5m: z.number().nullable(),
+    input_cache_write_1h: z.number().nullable(),
+  })
+  .strict();
+
 const priceRowUsedSchema = z
   .object({
     vendor: z.string(),
@@ -105,8 +156,10 @@ const priceRowUsedSchema = z
     input: z.number(),
     output: z.number(),
     input_cached: z.number().nullable(),
+    input_cache_write: z.number().nullable(),
     input_cache_write_5m: z.number().nullable(),
     input_cache_write_1h: z.number().nullable(),
+    context_tiers: z.array(contextPriceTierSchema),
     from_date: z.string(),
     to_date: z.string().nullable(),
     sources: z.array(priceSourceSchema),
@@ -125,10 +178,18 @@ const receiptBodyShape = {
   modelMix: z.array(modelMixEntrySchema),
   toolRows: z.array(toolRowSchema),
   totalUsd: z.number().nullable(),
+  totalCostEstimate: costEstimateSchema.nullable(),
+  totalUsdScope: z.literal("parent-session"),
+  combinedPricedUsd: z.number().nullable(),
+  combinedPricedCostEstimate: costEstimateSchema.nullable(),
+  combinedScope: z.literal("parent-session-plus-readable-subagents"),
+  combinedTotalTokens: z.number().nonnegative(),
   totalTokens: tokenUsageSchema,
   sessionTotalTokens: tokenUsageSchema,
+  pricingCoverage: pricingCoverageSchema,
+  unpricedTokens: tokenUsageSchema,
   wasteLines: z.array(wasteLineSchema),
-  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span", "cost-lower-bound-cache-tier", "dropped-transcript-records", "partial-priced-coverage", "subagents-unreadable", "subagents-unpriced", "subagents-priced-tokens-only", "subagents-dropped-records"]), text: z.string() }).strict()),
+  caveats: z.array(z.object({ kind: z.enum(["time-mtime", "time-span", "cost-lower-bound-cache-tier", "unobserved-cache-write-tokens", "unattributed-aggregate-usage", "dropped-transcript-records", "partial-priced-coverage", "subagents-unreadable", "subagents-unpriced", "subagents-priced-tokens-only", "subagents-dropped-records", "subagent-rollup-unavailable"]), text: z.string() }).strict()),
   priceDelta: priceDeltaSchema.nullable(),
   methodology: z.string(),
   priceRowsUsed: z.array(priceRowUsedSchema),
@@ -138,7 +199,9 @@ const receiptBodyShape = {
       preEdit: z
         .object({
           preEditUsd: z.number().nullable(),
+          preEditCostEstimate: costEstimateSchema.nullable(),
           postEditUsd: z.number().nullable(),
+          postEditCostEstimate: costEstimateSchema.nullable(),
           preEditPct: z.number().nullable(),
           preEditTokenPct: z.number(),
           firstEditTurn: z.number().nullable(),
@@ -156,21 +219,13 @@ const receiptBodyShape = {
       turnIndices: z.array(z.number().int()),
       tokens: tokenUsageSchema,
       usd: z.number().nullable(),
+      costEstimate: costEstimateSchema.nullable(),
       confidence: z.literal("low"),
     })
     .strict()
     .nullable(),
   /** SPEC-0061 R5 — subagent rollup aggregate; present only when the session has children. Counts and sums only — never child ids, titles, or paths. */
-  subagents: z
-    .object({
-      count: z.number().int().nonnegative(),
-      pricedUsd: z.number().nullable(),
-      tokensTotal: z.number().int().nonnegative(),
-      unpricedCount: z.number().int().nonnegative(),
-      unreadableCount: z.number().int().nonnegative(),
-    })
-    .strict()
-    .optional(),
+  subagents: subagentAggregateSchema.optional(),
 } as const;
 
 export const receiptBodySchema = z.object(receiptBodyShape).strict();
@@ -209,13 +264,28 @@ export const handoffJsonSchema = z
         tokens: tokenUsageSchema,
         turnCount: z.number(),
         toolCallCount: z.number(),
+        scope: z.literal("parent-session"),
       })
       .strict(),
+    pricingCoverage: pricingCoverageSchema,
+    unpricedTokens: tokenUsageSchema,
+    totalUsd: z.number().nullable(),
+    totalCostEstimate: costEstimateSchema.nullable(),
+    totalUsdScope: z.literal("parent-session"),
+    combinedPricedUsd: z.number().nullable(),
+    combinedPricedCostEstimate: costEstimateSchema.nullable(),
+    combinedTotalTokens: z.number().nonnegative(),
+    combinedScope: z.literal("parent-session-plus-readable-subagents"),
+    subagents: subagentAggregateSchema.nullable(),
     wasteLines: z.array(handoffWasteLineSchema),
+    wasteLinesScope: z.literal("parent-session"),
     /** SPEC-0059 R7 — extracted could-have-saved ceiling; additive to the SPEC-0042-pinned list, no version bump (line 14's contract). */
     couldHaveSaved: z
       .object({
+        interpretation: z.literal(HEURISTIC_PATTERN_PRICING_INTERPRETATION),
+        scope: z.literal("parent-session"),
         usd: z.number().nullable(),
+        costEstimate: costEstimateSchema.nullable(),
         tokens: z.number(),
         pctOfTotal: z.number().nullable(),
       })
@@ -224,6 +294,7 @@ export const handoffJsonSchema = z
     threshold: z.number(),
     coverage: z
       .object({
+        scope: z.literal("parent-session"),
         turns: z.number(),
         toolCalls: z.number(),
         compactions: z.number(),

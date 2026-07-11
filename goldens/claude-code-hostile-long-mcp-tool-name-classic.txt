@@ -8,10 +8,12 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-mcp__claude-in-chrome__browser_…...$0.01  (1 call)
+mcp__claude-in-chrome__brow…...≥ $0.0097  (1 call)
 --------------------------------------------------
-TOTAL........................................$0.01
-same tokens on claude-haiku-4-5...$0.00 (50% less)
+TOTAL....................................≥ $0.0097
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0048
+  (50% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

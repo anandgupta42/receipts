@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -353,19 +353,21 @@ footer{
 
 <p>With a budget configured, the full receipt appends one advisory line per period:</p>
 
-<pre class="doc-code"><code>budget (this week): $0.00 of $20.00 — advisory only — does not stop the agent</code></pre>
+<pre class="doc-code"><code>budget (this week): ≥ $0.00 of $20.00 — advisory only — does not stop the agent (coverage: 0 full, 0 partial, 0 excluded; top-level only; child/subagent transcripts excluded)</code></pre>
 
-<p>(The demo sessions here are from an earlier week, so this window's spend is <code>$0.00</code>; on your machine it's your real spend for the current window.)</p>
+<p>(The demo sessions here are from an earlier week, so this window's observable floor is <code>≥ $0.00</code>. The configured <code>$20.00</code> cap is exact; computed spend is not.) The cap is rendered at the same precision used by the comparison: for example, <code>20.005</code> displays as <code>$20.005</code>, and <code>0.004</code> displays as <code>$0.004</code>.</p>
 
 <h2 id="check-it-in-a-script">Check it in a script</h2>
 
 <pre class="doc-code"><code class="language-sh">aireceipts --check-budget</code></pre>
 
-<p>prints the same advisory line(s) and sets an <strong>exit code</strong>: <code>0</code> when you're under every configured cap, <code>1</code> when any cap is exceeded. &quot;Exceeded&quot; is a strict <code>&gt;</code> — a sum exactly at the cap is not yet over it. That makes it composable:</p>
+<p>prints the same advisory line(s) and sets an <strong>exit code</strong>: <code>1</code> when an observable lower-bound sum exceeds any configured cap, and <code>0</code> otherwise. A zero exit does not prove the eventual invoice is under the cap; unobserved components can only make the real amount higher. &quot;Exceeded&quot; is a strict <code>&gt;</code> — a floor exactly at the cap is not yet over it. That makes it composable:</p>
 
 <pre class="doc-code"><code class="language-sh">aireceipts --check-budget || echo &quot;over budget this week&quot;</code></pre>
 
-<p>The daily window is the current UTC calendar day; the weekly window is the rolling <code>[now − 7 days, now)</code>. Sessions on unpriced models are excluded from a <code>usd</code> sum (and the line says how many), never guessed into it.</p>
+<p>The daily window is the current UTC calendar day; the weekly window is the rolling <code>[now − 7 days, now)</code>. USD coverage is split into <code>full</code>, <code>partial</code>, and <code>excluded</code>. The line prints the exact known unpriced-token subtotal when a partial or excluded session has one. A summary whose full load is null or degraded stays in the window denominator and is labeled unreadable; its unknown dollars are never guessed into the sum. A session with a cached component but no cited applicable cache rate is also <code>partial</code>; the line calls out that cache-rate gap without fabricating a token quantity the trace did not record.</p>
+
+<p>Budget windows are top-level-only and explicitly exclude child/subagent transcripts. This is a current limitation, not a claim that child activity was free; use a single-session or PR receipt for child rollups.</p>
 
 <h2 id="when-the-file-is-wrong">When the file is wrong</h2>
 

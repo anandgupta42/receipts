@@ -8,14 +8,16 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-Bash..............................$0.07  (5 calls)
-(thinking/reply)...................$0.02  (1 turn)
+Bash..........................≥ $0.0767  (5 calls)
+(thinking/reply)...............≥ $0.0178  (1 turn)
 
-⚠ Bash loop ×5......................$0.08 (3m 45s)
+⚠ Bash loop ×5..................≥ $0.0767 (3m 45s)
   at turns 1-5
 --------------------------------------------------
-TOTAL........................................$0.09
-same tokens on claude-haiku-4-5...$0.02 (80% less)
+TOTAL....................................≥ $0.0945
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0189
+  (80% lower observable floor)
   (arithmetic, not a prediction)
 
 DETAILS
@@ -26,7 +28,7 @@ peak turn.........................16k tok (turn 6)
 top 3 turns......................53% (turns 4,5,6)
 late-turn...............1.1× late/early (low conf)
   (ratio only — mixes output/cache/model)
-same reads at uncached input rate............$0.28
+same reads at uncached input rate........≥ $0.2835
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

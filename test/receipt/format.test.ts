@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { dottedLine } from "../../src/receipt/format.js";
+import { dottedLine, formatSharePercent } from "../../src/receipt/format.js";
+
+describe("model-share display honesty", () => {
+  it("preserves real minority shares instead of displaying false endpoints", () => {
+    expect(formatSharePercent(1)).toBe("100%");
+    expect(formatSharePercent(0)).toBe("0%");
+    expect(formatSharePercent(0.996)).toBe(">99%");
+    expect(formatSharePercent(0.004)).toBe("<1%");
+  });
+});
 
 describe("dottedLine — long labels never move the value column (A4)", () => {
   it("truncates with … and keeps the value flush right at fixed width", () => {

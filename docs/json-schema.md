@@ -11,16 +11,19 @@ the two ever disagree — every documented field name must equal the schema's fi
 names, and the version below must equal the schema's `SCHEMA_VERSION`. If you find a
 discrepancy, it's a bug; please open an issue.
 
-<!-- SCHEMA_VERSION: 1 -->
+<!-- SCHEMA_VERSION: 2 -->
 
-The current schema version is **1**. It appears as `schemaVersion` on the root of every
-JSON export.
+The current public export schema version is **2**. It appears as `schemaVersion`
+on receipt, compare, handoff, and backfill JSON exports, and in the first column
+of CSV exports. Version 2 makes the lower-bound meaning machine-readable beside
+legacy dollar scalars.
 
 ## Invariants this schema upholds
 
 - **I2 — never a fabricated dollar.** A `usd`/`totalUsd`/`actualUsd` field is `null`
   (JSON) or an empty cell (CSV) whenever nothing priced; it is never `0` standing in for
-  "unknown". Token fields are always populated.
+  "unknown". Every non-null computed dollar is a lower bound at the standard API list-price-equivalent
+  basis, recorded explicitly in its adjacent CostEstimate. Token fields are always populated.
 - **I5 — byte-stable contract.** Key order is fixed; the exporters build objects by hand
   rather than routing through `zod`, so output is deterministic.
 - **I6 — facts, not rankings.** `compare` carries a factual `delta` line only — never a
@@ -37,7 +40,7 @@ JSON export.
 
 | Field | Type | Notes |
 |---|---|---|
-| `schemaVersion` | number (literal `1`) | This schema's major version. Bumped only on a breaking change. |
+| `schemaVersion` | number (literal `2`) | This public export schema's major version. Bumped only on a breaking change. |
 | `agentLabel` | string | Human label for the agent, e.g. "Claude Code". |
 | `source` | enum | One of `claude-code`, `codex`, `cursor`, `gemini`, `opencode`. |
 | `sessionId` | string | Adapter-local id (an absolute file path for file-based adapters). |
@@ -47,11 +50,19 @@ JSON export.
 | `unpriceable` | boolean | True for degraded sources (Cursor) with no per-turn usage/model. |
 | `modelMix` | array | Per-model token breakdown; see ModelMix entry. Empty when no turn carries a model. |
 | `toolRows` | array | Per-tool cost/token rows; see ToolRow. |
-| `totalUsd` | number \| null | Total attributed cost, or null when nothing priced (I2). |
+| `totalUsd` | number \| null | Compatibility scalar containing the **parent-session-only** attributed lower bound, or null when nothing in the parent priced (I2). |
+| `totalCostEstimate` | CostEstimate \| null | Structured lower-bound semantics for `totalUsd`, or null when unpriced. |
+| `totalUsdScope` | literal `parent-session` | Makes the compatibility scalar's scope explicit; it never silently includes children. |
+| `combinedPricedUsd` | number \| null | Lower-bound sum of priced parent and readable priced-subagent atoms; null when neither side priced. |
+| `combinedPricedCostEstimate` | CostEstimate \| null | Structured lower-bound semantics for `combinedPricedUsd`. |
+| `combinedScope` | literal `parent-session-plus-readable-subagents` | Explicit scope of the combined fields; unreadable children remain counted in `subagents`. |
+| `combinedTotalTokens` | number | Observable parent tokens plus readable child tokens. |
 | `totalTokens` | TokenUsage | Attributed token totals. |
 | `sessionTotalTokens` | TokenUsage | Adapter-reported session totals (the only real number for Cursor). |
+| `pricingCoverage` | enum | Parent-session price coverage: `full`, `partial`, or `unpriced`. `partial` includes exact known unpriced usage, an uncited applicable cache rate, unobserved GPT-5.6 cache writes, or dropped transcript records. |
+| `unpricedTokens` | TokenUsage | Exact known parent-session tokens excluded from `totalUsd`. It is the whole observable token vector when the parent is unpriced and all zeroes when coverage is full. Unknown/unrecorded components are never invented; their caveats make `pricingCoverage` partial. |
 | `wasteLines` | array | Fired waste findings; see WasteLine. |
-| `caveats` | array | Confidence facts, never a ranking (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound): `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier` \| `dropped-transcript-records` \| `partial-priced-coverage` \| `subagents-unreadable` \| `subagents-unpriced` \| `subagents-priced-tokens-only` \| `subagents-dropped-records`) + `text`. Never affects `$` itself. Empty when nothing to flag. |
+| `caveats` | array | Confidence facts, never a ranking: `kind` (`time-mtime` \| `time-span` \| `cost-lower-bound-cache-tier` \| `unobserved-cache-write-tokens` \| `unattributed-aggregate-usage` \| `dropped-transcript-records` \| `partial-priced-coverage` \| `subagents-unreadable` \| `subagents-unpriced` \| `subagents-priced-tokens-only` \| `subagents-dropped-records` \| `subagent-rollup-unavailable`) + `text`. Never changes the arithmetic itself. Empty when nothing extra is known. |
 | `budget` | array (optional) | Advisory budget lines (SPEC-0009); present only when `~/.aireceipts/budget.json` is configured. |
 | `priceDelta` | PriceDelta \| null | Cheapest-current-model arithmetic, or null in tokens-only mode. |
 | `methodology` | string | The attribution methodology string (I3). |
@@ -65,41 +76,55 @@ JSON export.
 | Field | Type | Notes |
 |---|---|---|
 | `count` | number | Every discovered child, readable or not. |
-| `pricedUsd` | number \| null | Sum over priced children; null when no child priced (I2 — surfaces render tokens). |
+| `pricedUsd` | number \| null | Compatibility scalar containing the lower-bound sum over priced children; null when no child priced. |
+| `pricedCostEstimate` | CostEstimate \| null | Structured lower-bound semantics for `pricedUsd`, or null when no child priced. |
 | `tokensTotal` | number | Total tokens across readable children; unreadable children contribute nothing (counted, never guessed). |
-| `unpricedCount` | number | Readable children with no matching price row. |
+| `unpricedCount` | number | Readable children with wholly or partially unpriced usage. |
 | `unreadableCount` | number | Children whose transcripts failed to parse — the rendered TOTAL is a floor. |
 
 ### CostShape object
 
-SPEC-0067 cost-shape facts — standalone, never in savings math. `preEdit` always present; `topTurns` and `lateTurn` are null unless every usage-bearing turn is priced.
+SPEC-0067 cost-shape facts — standalone, never in flagged-pattern arithmetic. `preEdit` always present; `topTurns` and `lateTurn` are null unless every usage-bearing turn is priced.
 
 | Field | Type | Notes |
 |---|---|---|
 | `preEdit` | object | The pre-edit cost/token split (below). |
 | `preEditUsd` | number \| null | Priced cost before the first named edit turn; null unless all pre-edit turns priced (I2). |
+| `preEditCostEstimate` | CostEstimate \| null | Structured lower-bound semantics for `preEditUsd`, or null when unpriced. |
 | `postEditUsd` | number \| null | Priced cost from the first named edit turn onward; null unless all priced. |
+| `postEditCostEstimate` | CostEstimate \| null | Structured lower-bound semantics for `postEditUsd`, or null when unpriced. |
 | `preEditPct` | number \| null | `preEditUsd / totalUsd` percent; null unless every usage-bearing turn is priced (never a ratio over a partial denominator). |
 | `preEditTokenPct` | number | The same split in tokens (always present). |
 | `firstEditTurn` | number \| null | 1-based turn of the first named edit tool, or null when none observed. |
 | `confidence` | string | `high` for `preEdit`/`topTurns`, `low` for `lateTurn`. |
 | `topTurns` | object \| null | Expensive-turn concentration: `sharePct` and 1-based `indices` of the top-3 priced turns. |
-| `sharePct` | number | Share of priced cost in the top-3 turns. |
+| `sharePct` | number | Share of the raw priced lower-bound total in the top-3 turns. |
 | `indices` | array | 1-based turn numbers of the top-3 turns, ascending. |
 | `lateTurn` | object \| null | `lateRatio`: a neutral late-half/early-half average-cost ratio (low confidence; never a "context growth" cause). |
 | `lateRatio` | number | Second-half average turn cost / first-half average. |
 
 ### SameFileReReads object
 
-SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to a "could have saved" figure.
+SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to the handoff's flagged-pattern subtotal.
 
 | Field | Type | Notes |
 |---|---|---|
 | `count` | number | No-recorded-cause re-reads (2nd..Nth reads of a path). |
 | `turnIndices` | array | 1-/0-based transcript turn indices of the counted re-reads, ascending. |
 | `tokens` | TokenUsage | Per-call token share of the counted re-reads. |
-| `usd` | number \| null | Priced share; null if any counted re-read is unpriced (I2). |
+| `usd` | number \| null | Compatibility scalar containing the priced lower-bound share; null if any counted re-read is unpriced (I2). |
+| `costEstimate` | CostEstimate \| null | Structured lower-bound semantics for the adjacent `usd`, or null when unpriced. |
 | `confidence` | string | Always `low` — the transcript cannot prove a re-read was unnecessary. |
+
+### CostEstimate object
+
+An additive interpretation beside legacy numeric dollar fields. Receipts currently expose only lower bounds; future estimate kinds require an additive schema change rather than silently changing a numeric field's meaning. The legacy scalar retains its raw compatibility precision, while `minUsd` is deliberately floored for safe display.
+
+| Field | Type | Notes |
+|---|---|---|
+| `kind` | string | Always `lower-bound`. |
+| `basis` | string | Always `standard-api-list-price-equivalent`; this is price-table arithmetic, not a claim about a subscription invoice. |
+| `minUsd` | number | Four-decimal downward floor of the adjacent non-null legacy USD scalar; it never exceeds that scalar and does not imply invoice precision. |
 
 ### TokenUsage object
 
@@ -126,14 +151,14 @@ SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recor
 | Field | Type | Notes |
 |---|---|---|
 | `tool` | string | Tool name, or "(thinking/reply)" for tool-free turns. |
-| `usd` | number \| null | Cost attributed to this tool, or null when its turns never priced (I2). |
+| `usd` | number \| null | Compatibility scalar containing the lower bound attributed to this tool, or null when unpriced. |
 | `callCount` | number | Number of calls to this tool. |
 
 ### Caveat (SPEC-0028 time-integrity; SPEC-0044 A3 cost lower bound)
 
 | Field | Type | Meaning |
 |---|---|---|
-| `kind` | enum | `time-mtime` (a turn timestamp postdates the transcript file), `time-span` (non-positive span carrying usage), or `cost-lower-bound-cache-tier` (a priced turn's cache-write fell back to the base `input` rate because the vendor's price row cites no cache-write rate — row-aware, not just "unsplit": an unsplit write against a row that cites the 5m rate, e.g. Anthropic, is priced exactly and never sets this). |
+| `kind` | enum | Includes `time-mtime`, `time-span`, `cost-lower-bound-cache-tier` (observed cached reads/writes had no cited applicable rate and contributed zero), `unobserved-cache-write-tokens` (the Codex GPT-5.6 trace has no cache-write bucket, so any write premium is absent from the floor), and `unattributed-aggregate-usage`. The last kind covers several no-trustworthy-join cases distinguished by `text`: Claude id-less usage is one coherent unpriced envelope; an unreconciled Codex cumulative stream disables request-level pricing and preserves the local envelope as tokens; a componentwise-dominating OpenCode aggregate yields an unpriced bucket on a full receipt and is excluded from a partial slice; crossed aggregate/itemized vectors keep itemized totals and expose only positive aggregate-only components as conflicting evidence excluded from totals and floor. |
 | `text` | string | The rendered caveat line, verbatim. |
 
 ### WasteLine (discriminated on `kind`)
@@ -148,8 +173,9 @@ SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recor
 | `compactionCount` | number | (context-thrash) Refill-positive compactions clustered in the window. |
 | `turnSpan` | number | (context-thrash) Assistant-turn span from the window's first to last compaction. |
 | `turnIndices` | array | (context-thrash) The contributing post-compaction turn indices (the cost basis). |
+| `costInterpretation` | string | Always `heuristic-pattern-pricing-not-proven-savings`: a detector identifies a pattern but does not prove avoidability or savings. |
 
-Each variant also carries a `tool`/`usd`/`tokens` field as documented above. The
+Each variant also carries a `tool`/`usd`/`costEstimate`/`tokens` field as documented above. The
 `context-thrash` variant omits `tool`, carries a nullable `usd` (tokens-only when
 any contributing turn is unpriced, I2), and reports prompt-only `tokens`.
 
@@ -157,9 +183,13 @@ any contributing turn is unpriced, I2), and reports prompt-only `tokens`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `actualUsd` | number | The session's real attributed cost. |
+| `interpretation` | string | Always `same-observed-tokens-repricing-not-completion-claim`: list-price arithmetic over the observed token vector, never a prediction that another model would complete the work. |
+| `actualUsd` | number | Compatibility scalar containing the session's attributed lower bound. |
+| `actualCostEstimate` | CostEstimate | Structured lower-bound semantics for `actualUsd`. |
+| `baselineUsd` | number | Explicit replacement for the misleading legacy name `actualUsd`; the observed session's Standard-API floor, never an invoice. |
+| `baselineCostEstimate` | CostEstimate | Structured lower-bound semantics for `baselineUsd`. |
 
-Also carries `cheaperModel` (the cheapest current model) and `usd` (the re-priced total).
+Also carries `cheaperModel` (the cheapest current model), `usd` (the re-priced lower-bound scalar), and `costEstimate` (its structured lower-bound semantics).
 
 ### PriceRowUsed
 
@@ -167,8 +197,11 @@ Also carries `cheaperModel` (the cheapest current model) and `usd` (the re-price
 |---|---|---|
 | `vendor` | string | Price-table vendor. |
 | `input_cached` | number \| null | Cache-hit rate (USD per MTok), or null when the row cites none. |
+| `input_cache_write` | number \| null | Vendor-generic cache-write rate, or null. |
 | `input_cache_write_5m` | number \| null | 5-minute cache-write rate, or null. |
 | `input_cache_write_1h` | number \| null | 1-hour cache-write rate, or null. |
+| `context_tiers` | array | Alternate full-request rate cards. Each has `above_input_tokens`, `input`, `output`, and nullable cache-rate fields matching this row. The highest threshold strictly below normalized prompt input is selected **for each persisted request usage unit**, never from an aggregate user-facing turn. Empty for an untiered row. |
+| `above_input_tokens` | integer | Context-tier-only threshold; the tier applies when normalized prompt input is strictly greater than this count. |
 | `from_date` | string | ISO date the row takes effect. |
 | `to_date` | string \| null | ISO date the row expires, or null when still current. |
 | `sources` | array | Cited price sources; see PriceSource. |
@@ -207,16 +240,29 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 | `title` | string \| null | Session title when known. |
 | `startedAtMs` | number \| null | Session start, epoch ms. |
 | `durationMs` | number \| null | Wall-clock span. |
-| `totals` | object | `tokens` (TokenUsage object) + `turnCount` + `toolCallCount`. |
+| `totals` | object | Compatibility parent-session totals: `tokens` (TokenUsage object) + `turnCount` + `toolCallCount` + `scope`. |
+| `scope` | string | Explicitly `parent-session` on `totals`, `coverage`, and `couldHaveSaved`; none of those legacy structures silently includes child turns or findings. |
 | `turnCount` | number | (totals) Assistant turns in the session. |
 | `toolCallCount` | number | (totals) Tool calls in the session. |
+| `pricingCoverage` | enum | Coverage of the parent-session `totalUsd`, with the same `full`/`partial`/`unpriced` semantics as a receipt. |
+| `unpricedTokens` | TokenUsage | Exact known parent-session usage excluded from the parent floor. |
+| `totalUsd` | number \| null | Parent-session lower-bound scalar, retained separately from the combined child rollup. |
+| `totalCostEstimate` | CostEstimate \| null | Structured semantics for the handoff's parent `totalUsd`. |
+| `totalUsdScope` | literal `parent-session` | Scope of `totalUsd` and `unpricedTokens`. |
+| `combinedPricedUsd` | number \| null | Lower-bound sum of priced parent and readable priced-subagent atoms. |
+| `combinedPricedCostEstimate` | CostEstimate \| null | Structured semantics for `combinedPricedUsd`. |
+| `combinedTotalTokens` | number | Observable parent tokens plus all readable-child tokens. Child token components are not fabricated. |
+| `combinedScope` | literal `parent-session-plus-readable-subagents` | Explicit scope of the combined fields. |
+| `subagents` | Subagents \| null | Aggregate child counts/sums; null when the model has no composed child rollup. No child ids, titles, or paths. |
 | `wasteLines` | array | Same WasteLine union as the receipt, plus a per-line `rule` (SPEC-0059). |
+| `wasteLinesScope` | literal `parent-session` | Handoff waste findings remain parent-only; the combined cost fields must not be read as their denominator. |
 | `rule` | string \| null | (wasteLines) The class's fixed one-line next-time rule; `null` for a class without one. |
-| `couldHaveSaved` | object | SPEC-0059: the extracted savings ceiling — `usd` (sum of priced waste lines, `null` when none priced), `tokens` (sum over all fired lines), `pctOfTotal`. Arithmetic, never a prediction. |
-| `pctOfTotal` | number \| null | (couldHaveSaved) `round(100 · usd / totalUsd)`; `null` without both dollar sides. |
+| `couldHaveSaved` | object | Historical field name, not a savings assertion. Its `usd` is the largest priced class subtotal across stuck-loop/context-thrash findings (null when none priced), with adjacent `costEstimate`; it excludes counterfactual trivial-span re-pricing and never adds classes that may overlap. `tokens` is the largest one-class token subtotal. This is the heuristic subtotal rendered as `FLAGGED PATTERN COST ≈ …`; detector membership does not prove avoidability, so the value is neither a savings floor nor a savings ceiling. |
+| `interpretation` | string | (couldHaveSaved) Always `heuristic-pattern-pricing-not-proven-savings`; explicitly overrides the legacy field name's implication. |
+| `pctOfTotal` | number \| null | Retained for compatibility and always `null`: a ratio of two lower bounds has no reliable direction. |
 | `suggestions` | array | Standing-rule suggestion strings (SPEC-0013), possibly empty. |
 | `threshold` | number | The distinct-session recurrence threshold in effect. |
-| `coverage` | object | What the packet covers, checkably: `turns`, `toolCalls`, `compactions`, `wasteLines` (all numbers). |
+| `coverage` | object | What the parent-only packet covers, checkably: `scope`, `turns`, `toolCalls`, `compactions`, `wasteLines`. |
 | `turns` | number | (coverage) Turn count the packet covers. |
 | `toolCalls` | number | (coverage) Tool-call count the packet covers. |
 | `compactions` | number | (coverage) Compaction events in the session. |
@@ -259,7 +305,21 @@ never reordered or removed. Every row's first column is `schemaVersion`.
 One summary row per session. Columns:
 
 `schemaVersion, sessionId, agent, title, startedAt, durationMs, primaryModel, totalUsd,
-inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens`
+inputTokens, outputTokens, cacheReadTokens, cacheCreationTokens, totalTokens, costKind,
+costBasis, totalUsdScope, subagentsPricedUsd, combinedPricedUsd, combinedCostKind,
+combinedCostBasis, subagentsTokens, combinedTotalTokens, subagentCount,
+subagentUnpricedCount, subagentUnreadableCount, pricingCoverage,
+unpricedInputTokens, unpricedOutputTokens, unpricedCacheReadTokens,
+unpricedCacheCreationTokens, unpricedTotalTokens, unpricedTokensScope`
+
+`costKind` is `lower-bound` and `costBasis` is
+`standard-api-list-price-equivalent` when `totalUsd` is populated; both cells are empty when unpriced.
+`totalUsdScope` is always `parent-session`. The appended combined columns expose the
+parent + readable-subagent floor and token total without changing the legacy scalar.
+`pricingCoverage` describes the parent as `full`, `partial`, or `unpriced`.
+The five appended unpriced-token columns are exact parent-session components;
+`unpricedTokensScope` is always `parent-session`. Unknown/unrecorded components
+stay absent from those counts and instead force partial coverage plus a caveat.
 
 `compare --csv` emits exactly two such rows plus a trailing `delta` column carrying the
 factual delta line on the first row (empty on the second) — `compare` accepts
@@ -270,7 +330,19 @@ factual delta line on the first row (empty on the second) — `compare` accepts
 One row per tool line. Columns:
 
 `schemaVersion, sessionId, agent, tool, usd, inputTokens, outputTokens, cacheReadTokens,
-cacheCreationTokens, totalTokens, callCount`
+cacheCreationTokens, totalTokens, callCount, costKind, costBasis, costScope,
+pricingCoverage, pricingCoverageLimitation`
+
+`costScope` is `parent-session-tool`; subagent aggregation has no fabricated tool
+breakdown and is available from session CSV/JSON instead.
+
+`pricingCoverage` is `full` when the parent session is fully covered and
+`unpriced` when that tool row has no priced contribution. For a priced tool row
+inside a partial parent it is `indeterminate`: the current attribution model
+cannot separate the row's priced and unpriced contributing turns. In that case
+`pricingCoverageLimitation` states this limitation verbatim; otherwise it is empty.
+
+The two cost metadata cells describe that row's `usd`; both are empty for an unpriced tool row.
 
 ## Versioning (semver discipline, R4)
 
@@ -280,11 +352,29 @@ cacheCreationTokens, totalTokens, callCount`
 - **Additive** changes (a new field, a new CSV column appended) do not bump the version.
 - CSV columns are additive-only within a major version.
 
+This public export version is deliberately separate from the internal PR
+receipt-ref payload stored at `refs/aireceipts/<slug>`. That producer/CI handoff
+remains `PR_RECEIPT_SCHEMA_VERSION = 1`: it serializes renderer inputs, has no
+`costSemantics` field, and did not need an incompatible shape change for the
+human receipt to render `≥` floors. Do not treat its v1 as the version of
+`--json`/`--csv`, and do not add a field to the ref merely to mirror a public
+export envelope.
+
 ## Weekly digest (SPEC-0008 integration point)
 
 `week --json` (SPEC-0008's weekly digest) **is** implemented (`weekToJson` in
-`src/receipt/week.ts`) and emits a `{window, priorWindow, sinceOverride, byProject, current, prior, delta,
-topWaste}` digest (waste lines are under `topWaste`). It does **not** yet carry a `schemaVersion` wrapper or a `weekJsonSchema` in
+`src/receipt/week.ts`) and emits a `{costSemantics, scope, window, priorWindow,
+sinceOverride, byProject, current, prior, delta, topWaste}` digest (waste lines
+are under `topWaste`). `scope.childSessionsIncluded` is `false`: week is
+top-level-only. Each current/prior window has a `pricingCoverage` object with
+full, partial, cache-rate-partial, unpriced, and unreadable session counts plus
+the exact known `unpricedTokenTotal`. `costSemantics` labels every non-null
+dollar scalar as a Standard-API list-price-equivalent lower bound; every
+`waste`/`topWaste` row carries
+`costInterpretation: heuristic-pattern-pricing-not-proven-savings`;
+`delta.pricedUsdDeltaKind` is `difference-of-lower-bounds` (or null), because
+subtracting two floors is not itself a directional bound. It does **not** yet
+carry a `schemaVersion` wrapper or a `weekJsonSchema` in
 `exportSchema.ts`, so it is not covered by the field-parity test — a known gap tracked
 for a follow-up: it MUST gain the same `schemaVersion` constant (from
 `src/receipt/exportSchema.ts`) and a `weekJsonSchema` documented inside the

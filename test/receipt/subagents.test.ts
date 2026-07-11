@@ -5,11 +5,17 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 import { loadById } from "../../src/index.js";
-import type { TokenUsage } from "../../src/parse/types.js";
+import type { Session, TokenUsage } from "../../src/parse/types.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
 import type { ReceiptModel, SubagentAggregate, ToolRow } from "../../src/receipt/model.js";
 import { emptyCostShape } from "../../src/pricing/costShape.js";
-import { attachSubagentRollup, foldSubagentRows, subagentCaveats } from "../../src/receipt/subagents.js";
+import {
+  attachSubagentRollup,
+  buildFullSessionReceiptModel,
+  buildFullSessionReceiptWithCoverage,
+  foldSubagentRows,
+  subagentCaveats,
+} from "../../src/receipt/subagents.js";
 import { renderReceipt } from "../../src/receipt/render.js";
 import { renderReceiptSvg } from "../../src/receipt/svg.js";
 import { buildMiniSummary, renderMiniReceipt } from "../../src/receipt/mini.js";
@@ -17,6 +23,7 @@ import { DEFAULT_FORMAT, parseFormat, renderSegments } from "../../src/cli/statu
 import { toJsonModel } from "../../src/receipt/json.js";
 import { receiptJsonSchema } from "../../src/receipt/exportSchema.js";
 import { receiptTelemetryFromModels } from "../../src/cli/common/telemetry.js";
+import { compareDeltaLine } from "../../src/receipt/compare.js";
 
 const PARENT_FIXTURE = "test/fixtures/claude-code/clean-with-subagents.jsonl";
 
@@ -43,6 +50,20 @@ function toolRow(tool: string, usd: number | null, tokens: number, callCount: nu
 
 function childRow(over: Partial<SubagentRow> = {}): SubagentRow {
   return { name: "tester", usd: 0.1, tokens: usage(1000), unreadable: false, filePath: "x/subagents/agent-x.jsonl", ...over };
+}
+
+function withUnknownModel(session: Session): Session {
+  return {
+    ...session,
+    model: "unknown-model",
+    turns: session.turns.map((turn) => ({
+      ...turn,
+      model: "unknown-model",
+      ...(turn.pricingUnits
+        ? { pricingUnits: turn.pricingUnits.map((unit) => ({ ...unit, model: "unknown-model" })) }
+        : {}),
+    })),
+  };
 }
 
 /** Minimal fully-populated model; overrides per test. */
@@ -73,9 +94,9 @@ function baseModel(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
 
 const AGG: SubagentAggregate = { count: 2, pricedUsd: 0.1, tokensTotal: 4000, unpricedCount: 0, unreadableCount: 0 };
 
-/** Every `$X.XX` amount on receipt lines that end in one (rows + TOTAL). */
+/** Every fixed-precision dollar amount on receipt lines that end in one (rows + TOTAL). */
 function dollarAmounts(text: string): number[] {
-  return [...text.matchAll(/\$(\d+\.\d{2})(?:\s|$)/gm)].map((m) => Number(m[1]));
+  return [...text.matchAll(/\$(\d+\.\d{2,4})(?:\s|$)/gm)].map((m) => Number(m[1]));
 }
 
 describe("SPEC-0061 foldSubagentRows", () => {
@@ -141,7 +162,7 @@ describe("SPEC-0061 R2 caveats — floors, dollars and tokens never blended", ()
     expect(rendered.find((l) => l.includes("SUBAGENTS"))).toContain("tok");
     expect(rendered.find((l) => l.includes("SUBAGENTS"))).not.toContain("$");
     expect(rendered.find((l) => l.includes("TOTAL"))).not.toContain("$");
-    expect(receipt).toContain("1 subagent priced ($9.85) — shown as tokens above; the session itself is unpriced");
+    expect(receipt).toContain("1 subagent priced (≥ $9.85) — shown as tokens above; the session itself is unpriced");
     expect(renderStatusline(model)).not.toContain("$");
     expect(toJsonModel(model).subagents?.pricedUsd).toBe(9.85);
   });
@@ -151,10 +172,18 @@ describe("SPEC-0061 R2 caveats — floors, dollars and tokens never blended", ()
     const caveats = subagentCaveats(rows, foldSubagentRows(rows)!, true);
     expect(caveats).toEqual([{ kind: "subagents-dropped-records", text: "1 subagent transcript dropped malformed records — total is a floor" }]);
   });
+
+  it("a GPT-5.6 Codex child propagates its missing cache-write bucket", () => {
+    const rows = [childRow({ unobservedCacheWriteTokens: true })];
+    expect(subagentCaveats(rows, foldSubagentRows(rows)!, true)).toContainEqual({
+      kind: "unobserved-cache-write-tokens",
+      text: "1 GPT-5.6 Codex subagent omitted cache-write tokens — floor excludes any write premium",
+    });
+  });
 });
 
 describe("SPEC-0061 R1 — the SUBAGENTS row across templates", () => {
-  it("classic: one row after tool rows, before waste rows; drawn $ rows sum byte-exactly to TOTAL", () => {
+  it("classic: one row after tool rows, before waste rows; every row stays below its raw amount", () => {
     const model = baseModel({
       toolRows: [toolRow("Bash", 0.015, 9000, 3), toolRow("Edit", 0.015, 3000, 1)],
       totalUsd: 0.03,
@@ -171,23 +200,21 @@ describe("SPEC-0061 R1 — the SUBAGENTS row across templates", () => {
     const spendLines = lines.slice(0, lines.findIndex((l) => l.includes("TOTAL"))).filter((l) => !l.includes("⚠"));
     const amounts = dollarAmounts(spendLines.join("\n"));
     const total = dollarAmounts(lines.find((l) => l.includes("TOTAL"))!)[0];
-    expect(amounts.reduce((s, a) => s + a, 0)).toBeCloseTo(total, 10);
+    expect(amounts).toEqual([0.015, 0.015, 0.015]);
+    expect(total).toBe(0.045);
   });
 
-  it("the aggregate joins the SAME reconciliation universe as tool rows (independent rounding would differ byte-wise)", () => {
-    // Three 0.6¢ atoms: reconcileCents([0.6,0.6,0.6]) → [1,1,0] (2¢ total, largest-
-    // remainder ties broken by index) so the SUBAGENTS row must draw $0.00.
-    // A broken implementation that rounds the aggregate independently prints $0.01.
+  it("sub-cent tool and aggregate rows retain four-decimal lower bounds", () => {
     const model = baseModel({
       toolRows: [toolRow("Bash", 0.006, 9000, 3), toolRow("Edit", 0.006, 3000, 1)],
       totalUsd: 0.012,
       subagents: { ...AGG, pricedUsd: 0.006 },
     });
     const lines = renderReceipt(model).split("\n");
-    expect(lines.find((l) => l.includes("Bash"))).toContain("$0.01");
-    expect(lines.find((l) => l.includes("Edit"))).toContain("$0.01");
-    expect(lines.find((l) => l.includes("SUBAGENTS (2)"))).toContain("$0.00");
-    expect(lines.find((l) => l.includes("TOTAL"))).toContain("$0.02");
+    expect(lines.find((l) => l.includes("Bash"))).toContain("$0.0060");
+    expect(lines.find((l) => l.includes("Edit"))).toContain("$0.0060");
+    expect(lines.find((l) => l.includes("SUBAGENTS (2)"))).toContain("$0.0060");
+    expect(lines.find((l) => l.includes("TOTAL"))).toContain("$0.0180");
   });
 
   it("tokens-only aggregate renders tokens, never $ (I2)", () => {
@@ -217,14 +244,17 @@ describe("SPEC-0061 R1 — the SUBAGENTS row across templates", () => {
     const shown = baseModel({ priceDelta: delta });
     expect(renderReceipt(shown)).toContain("same tokens on");
     expect(renderReceipt(suppressed)).not.toContain("same tokens on");
-    expect(toJsonModel(suppressed).priceDelta).toEqual(delta);
+    const jsonDelta = toJsonModel(suppressed).priceDelta;
+    expect(jsonDelta).toMatchObject(delta);
+    expect(jsonDelta?.costEstimate).toMatchObject({ kind: "lower-bound", minUsd: delta.usd });
+    expect(jsonDelta?.actualCostEstimate).toMatchObject({ kind: "lower-bound", minUsd: delta.actualUsd });
   });
 });
 
 describe("SPEC-0061 R3/R4 — statusline and mini fold the aggregate in", () => {
   it("statusline $ and tokens cover parent + children, format unchanged", () => {
     const model = baseModel({ subagents: { ...AGG, pricedUsd: 9.85, tokensTotal: 1_000_000 } });
-    expect(renderStatusline(model)).toBe("[aireceipts] claude-opus-4-8 · $10.03 · 1M");
+    expect(renderStatusline(model)).toBe("[aireceipts] claude-opus-4-8 · ≥$10.03 · 1M");
   });
 
   it("statusline stays tokens-only when the parent is unpriced (I2)", () => {
@@ -235,12 +265,41 @@ describe("SPEC-0061 R3/R4 — statusline and mini fold the aggregate in", () => 
   it("mini total line carries the (incl. N subagents) marker only when children exist", () => {
     const withAgg = renderMiniReceipt(baseModel({ subagents: { ...AGG, count: 8 } }));
     const without = renderMiniReceipt(baseModel());
-    expect(withAgg.split("\n")[2]).toMatch(/^total {2}\$\d+\.\d{2} \(incl\. 8 subagents\)$/);
+    expect(withAgg.split("\n")[2]).toMatch(/^total {2}≥ \$\d+\.\d{2} \(incl\. 8 subagents\)$/);
     expect(without).not.toContain("subagent");
+  });
+
+  it("compare delta uses the same parent+child floors as the rendered TOTALs", () => {
+    const a = baseModel({ totalUsd: 0.1, subagents: { ...AGG, pricedUsd: 0.2 } });
+    const b = baseModel({ totalUsd: 0.05, subagents: { ...AGG, pricedUsd: 0.05 } });
+    expect(compareDeltaLine(a, b)).toContain("(≥ $0.30 vs ≥ $0.10)");
   });
 });
 
 describe("SPEC-0061 attachSubagentRollup — discovery, I/O discipline, fail-safe", () => {
+  it("the full-session composition seam includes each real child once", async () => {
+    const session = await loadById("claude-code", PARENT_FIXTURE);
+    expect(session).not.toBeNull();
+    const model = await buildFullSessionReceiptModel(session!);
+    expect(model.subagents?.count).toBe(2);
+    expect(renderReceipt(model).match(/SUBAGENTS \(2\)/gu)).toHaveLength(1);
+  });
+
+  it("the full-session composition seam preserves a no-child model exactly", async () => {
+    const session = await loadById("claude-code", "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl");
+    expect(session).not.toBeNull();
+    const bare = await buildReceiptModel(session!);
+    let loads = 0;
+    const composed = await buildFullSessionReceiptModel(session!, {
+      load: async () => {
+        loads += 1;
+        return null;
+      },
+    });
+    expect(loads).toBe(0);
+    expect(composed).toEqual(bare);
+  });
+
   it("real fixture family: discovers 2 children, receipt shows the row, totals combine", async () => {
     const session = await loadById("claude-code", PARENT_FIXTURE);
     expect(session).not.toBeNull();
@@ -267,14 +326,59 @@ describe("SPEC-0061 attachSubagentRollup — discovery, I/O discipline, fail-saf
     expect(out).toBe(model);
   });
 
-  it("rollup failure degrades to the parent-only model, never a throw (R4 fail-safe)", async () => {
+  it("rollup failure degrades to a visibly caveated parent-only model, never a throw (R4 fail-safe)", async () => {
     const model = baseModel();
     const out = await attachSubagentRollup(model, PARENT_FIXTURE, {
       discover: async () => {
         throw new Error("disk exploded");
       },
     });
-    expect(out).toBe(model);
+    expect(out.subagents).toBeUndefined();
+    expect(out.caveats).toContainEqual({
+      kind: "subagent-rollup-unavailable",
+      text: "caveat: subagent rollup unavailable — total covers the parent session only; child cost and tokens may be missing",
+    });
+    expect(renderReceipt(out)).toContain("subagent rollup unavailable");
+    expect(receiptJsonSchema.safeParse(toJsonModel(out)).success).toBe(true);
+
+    const session = await loadById("claude-code", PARENT_FIXTURE);
+    expect(session).not.toBeNull();
+    const withCoverage = await buildFullSessionReceiptWithCoverage(session!, {
+      discover: async () => {
+        throw new Error("disk exploded");
+      },
+    });
+    expect(withCoverage.coverage).toMatchObject({
+      subagentUnpricedCount: null,
+      subagentUnreadableCount: null,
+      subagentRollupStatus: "unavailable",
+      costScope: "parent-session",
+      tokenScope: "parent-session",
+    });
+  });
+
+  it("reports exact parent + readable-child unpriced tokens and keeps unreadable tokens unknown", async () => {
+    const parent = await loadById("claude-code", PARENT_FIXTURE);
+    const childPath = `${PARENT_FIXTURE.replace(".jsonl", "")}/subagents/agent-t1.jsonl`;
+    const child = await loadById("claude-code", childPath);
+    expect(parent).not.toBeNull();
+    expect(child).not.toBeNull();
+
+    const receipt = await buildFullSessionReceiptWithCoverage(withUnknownModel(parent!), {
+      discover: async () => [childPath, "p/subagents/agent-unreadable.jsonl"],
+      load: async (filePath) => (filePath === childPath ? withUnknownModel(child!) : null),
+    });
+
+    expect(receipt.coverage).toMatchObject({
+      parentUnpricedTokens: parent!.totals.tokens,
+      subagentUnpricedCount: 1,
+      subagentUnreadableCount: 1,
+      subagentRollupStatus: "complete",
+      costScope: "parent-session-plus-readable-subagents",
+      tokenScope: "parent-session-plus-readable-subagents",
+    });
+    expect(receipt.coverage.combinedUnpricedTokens.total).toBe(parent!.totals.tokens.total + child!.totals.tokens.total);
+    expect(receipt.model.subagents).toMatchObject({ count: 2, unpricedCount: 1, unreadableCount: 1 });
   });
 
   it("unreadable child: counted, caveat attached, floor language present (R2 end-to-end)", async () => {

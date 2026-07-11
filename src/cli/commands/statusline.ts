@@ -12,8 +12,7 @@ import * as path from "node:path";
 import { listSessions, listSessionsForCwd, loadById, loadSession } from "../../index.js";
 import type { Session, SessionSummary } from "../../parse/types.js";
 import { cwdMatchesForAttribution } from "../../parse/cwdScope.js";
-import { buildReceiptModel } from "../../receipt/model.js";
-import { attachSubagentRollup } from "../../receipt/subagents.js";
+import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
 import { buildMiniSummary } from "../../receipt/mini.js";
 import { DEFAULT_FORMAT, parseFormat, renderSegments, SEGMENT_NAMES } from "../statuslineSegments.js";
 import { loadStatuslineFormatConfig } from "../statuslineConfig.js";
@@ -223,7 +222,7 @@ export async function runStatusline(
     return 0;
   }
   // SPEC-0061 R3 — the one-liner covers parent + subagents (no children → zero extra transcript reads).
-  const model = await attachSubagentRollup(await buildReceiptModel(session), session.filePath);
+  const model = await buildFullSessionReceiptModel(session);
   const line = renderSegments(parsed.segments, {
     summary: buildMiniSummary(model),
     inputMode: payloadValid ? "stdin_payload" : "disk_fallback",
@@ -256,6 +255,6 @@ export const command: CommandDef = {
   run,
   help: {
     order: 180,
-    lines: ["  aireceipts statusline [--format <s>] [--cwd <path>]  the meter — model + running cost for Claude Code's statusLine (any bar via --cwd)"],
+    lines: ["  aireceipts statusline [--format <s>] [--cwd <path>]  model + running Standard-API floor for Claude Code's statusLine (any bar via --cwd)"],
   },
 };

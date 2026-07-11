@@ -96,3 +96,20 @@ drawn-row granularity.
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked.
+## 2026-07-10 strict-floor amendment
+
+Supersedes R2's byte-exact displayed-row sum. Contributor, child, remainder,
+aggregate, and TOTAL dollar floors round down independently. A lower-bound row
+must never borrow a cent through Hamilton reconciliation; machine scalars retain
+the exact deterministic sums.
+
+## 2026-07-10 child-window evidence amendment
+
+PR rollup windows are an explicit union: `full`, `range`, or `unknown`. A full
+parent includes readable descendants. A range includes a readable child whole
+only when its observable interval truly intersects the parent range
+(`child.start <= parent.end && child.end >= parent.start`), including a child
+that spans both boundaries. A sliced parent whose start/end cannot be observed
+is `unknown` and includes no readable child dollars or tokens. Unreadable child
+transcripts remain listed/countable in every window so missing evidence still
+floors rather than vanishes.

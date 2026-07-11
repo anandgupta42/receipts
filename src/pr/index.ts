@@ -325,13 +325,16 @@ export function pushSessionSubagentEvents(
   events: ConfidenceEvent[],
   raw: RawContributor,
   subagents: SubagentRow[],
-  model: Pick<ReceiptModel, "unpricedTokens">,
+  model: Pick<ReceiptModel, "unpricedTokens" | "unobservedCacheWriteTokens">,
 ): void {
   if ((raw.session.droppedRecords ?? 0) > 0) {
     events.push({ kind: "dropped-transcript-records", sessionId: raw.summary.filePath });
   }
   if ((model.unpricedTokens?.total ?? 0) > 0) {
     events.push({ kind: "partial-priced-coverage", sessionId: raw.summary.filePath });
+  }
+  if (model.unobservedCacheWriteTokens) {
+    events.push({ kind: "unobserved-cache-write-tokens", sessionId: raw.summary.filePath });
   }
   for (const row of subagents) {
     if ((row.droppedRecords ?? 0) > 0) {
@@ -343,6 +346,9 @@ export function pushSessionSubagentEvents(
     if ((row.unpricedTokens?.total ?? 0) > 0) {
       events.push({ kind: "partial-priced-coverage", sessionId: row.filePath });
     }
+    if (row.unobservedCacheWriteTokens) {
+      events.push({ kind: "unobserved-cache-write-tokens", sessionId: row.filePath });
+    }
   }
 }
 
@@ -350,9 +356,11 @@ async function buildContributorView(raw: RawContributor, deps: PrDeps, excludedC
   const rendered = raw.slice.kind === "slice" ? sliceSessionForReceipt(raw.session, raw.slice) : raw.session;
   const model = await buildReceiptModel(rendered);
   const window: RollupWindow =
-    raw.slice.kind === "slice" && rendered.startedAt !== undefined && rendered.endedAt !== undefined
-      ? { start: rendered.startedAt, end: rendered.endedAt }
-      : null;
+    raw.slice.kind === "full"
+      ? { kind: "full" }
+      : rendered.startedAt !== undefined && rendered.endedAt !== undefined
+        ? { kind: "range", start: rendered.startedAt, end: rendered.endedAt }
+        : { kind: "unknown" };
   const subagents = await deps.rollup(raw.summary.filePath, window, excludedChildren);
   const view: ContributorView = {
     role: deriveRole(raw.summary, raw.session, subagents.length > 0),

@@ -270,3 +270,38 @@ estimate-tier `≈` hedge was specified but the scenario and the committed desig
 mock still showed the bare hedge next to a `≈ trivial turns` line. Fixed in both
 (scenario now `≈ 16% of $2.84 · …`; mock hedges prefixed, width re-verified at
 ≤ 50). No other blockers; seam citations spot-checked valid.
+
+**2026-07-10 · lower-bound correction (supersedes R1/R2 dollar wording).**
+The universal cost contract now treats every computed dollar as an observable
+Standard-API list-price-equivalent lower bound. A sum of lower bounds cannot
+prove the finite `COULD HAVE SAVED ≤ $X` ceiling specified above. The handoff
+therefore moved from a savings ceiling to an explicitly qualified detector
+subtotal, and every dollar evidence row carries `≥`. A percentage between two floors is
+not a directional bound, so it is always labeled approximate and omits the bare
+`$<total>` denominator: `≈ N% of floor · arithmetic, not prediction`. The JSON
+field remains named `couldHaveSaved` for compatibility, but its adjacent
+`costEstimate.kind = lower-bound` is normative and the docs call the historical
+name out explicitly. This correction narrows the claim; it does not alter waste
+detection, class ordering, static rules, recurrence, or telemetry.
+
+**2026-07-10 · overlap-safe correction (supersedes the additive headline and
+percentage).** Waste classes are not additive: context-thrash may share turns
+with stuck loops, and trivial-span dollars are cheapest-model re-pricing rather
+than observed current-model cost. `couldHaveSaved.usd` therefore takes the
+largest priced subtotal among observed-cost classes (`stuck-loop` and
+`context-thrash`) instead of summing classes; trivial-span re-pricing remains a
+separate `≈` evidence row. The token headline likewise takes the largest
+one-class subtotal. `pctOfTotal` is retained for schema shape but is always
+`null`, because dividing two lower bounds has no directional meaning. This is a
+v2 machine-contract change and prevents overlap or counterfactual arithmetic
+from inflating the detector subtotal.
+
+**2026-07-10 · detector-truthfulness correction (supersedes the lower-bound
+headline above).** Even an overlap-safe observed-cost subtotal is not a savings
+floor: the detectors identify patterns to inspect but cannot prove that the work
+was avoidable. Human handoff and PR summaries therefore render `FLAGGED PATTERN
+COST ≈ $X` (or `≈ N tok`) and the mandatory line `heuristic pattern subtotal ·
+not proven savings`. Evidence rows retain factual `≥` lower-bound dollars. The
+historical JSON key `couldHaveSaved` remains for compatibility only; its value
+is the same overlap-safe flagged-class subtotal and must not be interpreted as
+saved money. `pctOfTotal` remains `null`.

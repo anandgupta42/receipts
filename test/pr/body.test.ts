@@ -62,7 +62,7 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
     expect(body).not.toContain("builder ·");
     expect(body).not.toContain("100%");
-    expect(body).toMatch(/^claude-opus-4-8\.+\$1\.50$/m);
+    expect(body).toMatch(/^claude-opus-4-8\.+≥ \$1\.50$/m);
     // Round 2: a real slice keeps its line (it changes the number's meaning); the id does not.
     expect(body).toContain("session slice: turns 2–4 of 6");
     expect(body).not.toContain("abc123");
@@ -74,10 +74,10 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
     expect(body).not.toContain("100%");
   });
 
-  it("shows each model with its rounded share for a multi-model session (no role at N=1)", () => {
+  it("shows the multi-model mix up to the fixed-width cap (no role at N=1)", () => {
     const view = builder({ modelMix: [mix("claude-opus-4-8", 0.8), mix("claude-haiku-4-5", 0.2)] });
     const body = renderPrBody({ contributors: [view], excludedCount: 0 });
-    expect(body).toMatch(/^claude-opus-4-8 80% · claude-haiku-4-5 20%\.*\$1\.50$/m);
+    expect(body).toMatch(/^claude-opus-4-8 80% · claude-haiku-4-5…\.+≥ \$1\.50$/m);
   });
 
   it("a real mix never rounds to 100%/0% (>99%/<1%, the cache line's rule)", () => {
@@ -107,7 +107,7 @@ describe("renderPrBody header + rows (#39 fixes)", () => {
       ],
       excludedCount: 0,
     });
-    expect(body).toContain("orchestrator · claude-opus-4-8...............$1.50");
+    expect(body).toMatch(/^orchestrator · claude-opus-4-8\.+≥ \$1\.50$/m);
     expect(body).toContain("codex · no model reported.............5,000 tokens");
   });
 });
@@ -118,7 +118,7 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
       contributors: [builder({ usd: 1.5 }), builder({ sessionId: "d", usd: 2.25 })],
       excludedCount: 0,
     });
-    expect(body).toContain("TOTAL priced.................................$3.75");
+    expect(body).toMatch(/TOTAL priced\.+≥ \$3\.75/);
     expect(body).toContain("counted: 2 sessions");
     expect(body).not.toContain("TOTAL unpriced");
     expect(body).not.toContain("tokens-only");
@@ -128,7 +128,7 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     const priced = builder({ usd: 3.0 });
     const codex = builder({ role: "codex", sessionId: "cx", modelMix: [], usd: null, tokens: tokens(45000) });
     const body = renderPrBody({ contributors: [priced, codex], excludedCount: 0 });
-    expect(body).toContain("TOTAL priced.................................$3.00");
+    expect(body).toMatch(/TOTAL priced\.+≥ \$3\.00/);
     expect(body).toContain("TOTAL unpriced.......................45,000 tokens");
     expect(body).not.toContain("priced +");
   });
@@ -187,7 +187,7 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     ];
     const body = renderPrBody({ contributors: [builder({ usd: 1.5, subagents })], excludedCount: 0 });
     // SPEC-0060 R1: ONE aggregate row in the fence — never per-child rows.
-    expect(body).toContain("SUBAGENTS (2)..............................$0.25");
+    expect(body).toMatch(/SUBAGENTS \(2\)\.+≥ \$0\.25/);
     expect(body).not.toContain("tester · claude-opus-4-8");
     // parent $1.50 + tester $0.25 = $1.75; the unreadable child makes the
     // total a FLOOR (SPEC-0028 R1) on top of the not-priced note.
@@ -196,22 +196,22 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     expect(body).toContain("1 unreadable subagent not priced");
   });
 
-  it("SPEC-0060 R1/R2: the aggregate row sums the priced children and drawn rows sum to the total", () => {
+  it("SPEC-0060 R1/R2: the aggregate row sums the priced children and remains a true floor", () => {
     const subagents: SubagentRow[] = [
       { name: "verifier", model: "claude-fable-5", usd: 0.25, tokens: tokens(400), unreadable: false, filePath: "a" },
       { name: "searcher", model: "claude-fable-5", usd: 0.1, tokens: tokens(200), unreadable: false, filePath: "b" },
     ];
     const body = renderPrBody({ contributors: [builder({ usd: 1.5, subagents })], excludedCount: 0 });
-    expect(body).toContain("SUBAGENTS (2)..............................$0.35");
+    expect(body).toMatch(/SUBAGENTS \(2\)\.+≥ \$0\.35/);
     expect(body).not.toContain("verifier");
-    expect(body).toContain("TOTAL priced.................................$1.85");
-    // Drawn `$` rows sum byte-exactly to the drawn total (SPEC-0044/B1 at the
-    // SPEC-0060 aggregate granularity).
+    expect(body).toMatch(/TOTAL priced\.+≥ \$1\.85/);
+    // These exact-cent inputs happen to add visibly too; the strict-floor
+    // contract no longer redistributes cents merely to force that property.
     const fence = fencedLines(body);
     const rowDollars = fence
       .filter((l) => l.includes("$") && !l.includes("TOTAL"))
       .map((l) => Number(/\$([\d,]+\.\d\d)/.exec(l)![1].replace(",", "")));
-    const total = Number(/TOTAL priced\.+\$([\d,]+\.\d\d)/.exec(body)![1].replace(",", ""));
+    const total = Number(/TOTAL priced\.+≥ \$([\d,]+\.\d+)/.exec(body)![1].replace(",", ""));
     expect(rowDollars.reduce((a, b) => a + b, 0)).toBeCloseTo(total, 10);
   });
 
@@ -248,9 +248,11 @@ describe("SPEC-0028 R1 floor totals (a known-incomplete number says so)", () => 
     expect(body).toContain("unreadable subagent");
   });
 
-  it("keeps complete receipts byte-identical (no floor marker anywhere)", () => {
+  it("labels complete receipts as standard API-equivalent floors too", () => {
     const body = renderPrBody({ contributors: [builder()], excludedCount: 0 });
-    expect(body).not.toContain("≥");
+    expect(body).toMatch(/TOTAL priced\.+≥ \$1\.50/);
+    expect(body).toContain("standard API-equivalent floor; not an invoice");
+    expect(body).not.toContain("candidate session not attributed");
   });
 
   it("floors BOTH subtotals in a mixed priced/tokens-only receipt, never blending them (I2)", () => {
@@ -319,8 +321,8 @@ describe("SPEC-0026 R3 (round 2) · helpers group under one explanatory header",
     const lines = fencedLines(body);
     const header = lines.findIndex((l) => l.includes(`CODEX HELPERS (2) — ${HELPER_FULL_LABEL}`));
     expect(header).toBeGreaterThan(-1);
-    expect(lines[header + 1]).toMatch(/gpt-5\.5 · 18m\.+\$1\.74/);
-    expect(lines[header + 2]).toMatch(/gpt-5\.5 · 4m\.+\$0\.30/);
+    expect(lines[header + 1]).toMatch(/gpt-5\.5 · 18m\.+≥ \$1\.74/);
+    expect(lines[header + 2]).toMatch(/gpt-5\.5 · 4m\.+≥ \$0\.30/);
     // The explainer lives once on the header — never per row, never the old long label.
     expect(body).not.toContain("no commits to slice by");
     expect(body).not.toContain(FULL_FALLBACK_LABEL);
@@ -332,7 +334,7 @@ describe("SPEC-0026 R3 (round 2) · helpers group under one explanatory header",
     const body = renderPrBody({ contributors: [builder({ slice: fullSlice, basis: "anchor" })], excludedCount: 0 });
     expect(body).not.toContain("CODEX HELPERS");
     expect(body).not.toContain(FULL_FALLBACK_LABEL);
-    expect(body).toMatch(/^claude-opus-4-8\.+\$1\.50$/m);
+    expect(body).toMatch(/^claude-opus-4-8\.+≥ \$1\.50$/m);
   });
 
   it("an all-helper receipt still renders the group (header explains the whole set)", () => {
@@ -435,8 +437,8 @@ describe("SPEC-0060 R3 · subagentDetailsTable", () => {
     const cheapIdx = lines.findIndex((l) => l.includes("cheap"));
     expect(dearIdx).toBeGreaterThan(-1);
     expect(dearIdx).toBeLessThan(cheapIdx);
-    expect(table).toContain("| dear · claude-fable-5 | $5.05 |");
-    expect(table).toContain("| cheap · claude-fable-5 | $0.10 |");
+    expect(table).toContain("| dear · claude-fable-5 | ≥ $5.05 |");
+    expect(table).toContain("| cheap · claude-fable-5 | ≥ $0.10 |");
     expect(table).toContain("| tokens-only · claude-fable-5 | 1,234 tokens |");
     expect(table).toContain("| ghost · claude-fable-5 | (unreadable) |");
   });
@@ -446,7 +448,7 @@ describe("SPEC-0060 R3 · subagentDetailsTable", () => {
     const table = subagentDetailsTable(rows);
     const dataRows = table.split("\n").filter((l) => l.startsWith("| agent-"));
     expect(dataRows.length).toBe(19);
-    expect(table).toContain("| 6 more subagents | $6.00 |");
+    expect(table).toContain("| 6 more subagents | ≥ $6.00 |");
     expect(table).toContain("##### subagents (25)");
   });
 
@@ -456,7 +458,7 @@ describe("SPEC-0060 R3 · subagentDetailsTable", () => {
     expect(twenty).not.toContain("more subagent");
     const twentyOne = subagentDetailsTable(Array.from({ length: 21 }, (_, i) => row(`agent-${i}`, 1.0)));
     expect(twentyOne.split("\n").filter((l) => l.startsWith("| agent-")).length).toBe(19);
-    expect(twentyOne).toContain("| 2 more subagents | $2.00 |");
+    expect(twentyOne).toContain("| 2 more subagents | ≥ $2.00 |");
   });
 
   it("a mixed remainder states dollars, tokens, and unreadable count separately — nothing dropped (I2)", () => {
@@ -467,34 +469,44 @@ describe("SPEC-0060 R3 · subagentDetailsTable", () => {
       row("late-ghost", null, { unreadable: true, tokens: emptyUsage() }),
     ];
     const table = subagentDetailsTable(rows);
-    expect(table).toContain("| 3 more subagents | $0.50 + 500 tokens + 1 unreadable |");
+    expect(table).toContain("| 3 more subagents | ≥ $0.50 + 500 unpriced tokens + 1 unreadable |");
   });
 
-  it("the priced column (shown cells + remainder dollars) sums to the children's rounded total", () => {
-    // 21 children at $0.335: raw sum $7.035 → $7.04 (formatUsd rounding). Naive
-    // per-cell rounding gives 20 × $0.34 + remainder — largest-remainder must
-    // land the column exactly on 704 cents.
+  it("keeps a shown partially-priced child's excluded tokens beside its floor", () => {
+    const table = subagentDetailsTable([row("partial", 0.5, { unpricedTokens: tokens(250) })]);
+    expect(table).toContain("| partial · claude-fable-5 | ≥ $0.50 + 250 unpriced tokens |");
+  });
+
+  it("includes partially-priced children in a capped remainder's unpriced-token subtotal", () => {
+    const rows = [
+      ...Array.from({ length: 19 }, (_, i) => row(`agent-${i}`, 1.0)),
+      row("partial-a", 0.5, { unpricedTokens: tokens(200) }),
+      row("partial-b", 0.25, { unpricedTokens: tokens(300) }),
+    ];
+    const table = subagentDetailsTable(rows);
+    expect(table).toContain("| 2 more subagents | ≥ $0.75 + 500 unpriced tokens |");
+  });
+
+  it("every priced cell rounds down, including the capped remainder", () => {
     const table = subagentDetailsTable(Array.from({ length: 21 }, (_, i) => row(`agent-${i}`, 0.335)));
     const cents = [...table.matchAll(/\$(\d+\.\d\d)/g)].map((m) => Math.round(Number(m[1]) * 100));
-    expect(cents.reduce((a, b) => a + b, 0)).toBe(704);
+    expect(cents.reduce((a, b) => a + b, 0)).toBe(694);
   });
 
   it("escapes pipes and flattens newlines in prompt-derived names", () => {
     const table = subagentDetailsTable([row("a|b\nc", 0.5, { model: undefined })]);
-    expect(table).toContain("| a\\|b c | $0.50 |");
+    expect(table).toContain("| a\\|b c | ≥ $0.50 |");
   });
 
   it("escapes backslashes before pipes — a name's own backslash can't neutralize the pipe escape", () => {
     const table = subagentDetailsTable([row("a\\|b", 0.5, { model: undefined })]);
-    expect(table).toContain("| a\\\\\\|b | $0.50 |");
+    expect(table).toContain("| a\\\\\\|b | ≥ $0.50 |");
   });
 
-  it("reconciles the priced column so cells sum to the rounded total", () => {
-    // 3 × $0.335 = $1.005 → rounds to $1.01; naive per-cell rounding would
-    // print 3 × $0.34 = $1.02. Largest-remainder must keep the column at $1.01.
+  it("never rounds a 33.5-cent child up", () => {
     const table = subagentDetailsTable([row("a", 0.335), row("b", 0.335), row("c", 0.335)]);
     const cents = [...table.matchAll(/\$(\d+\.\d\d)/g)].map((m) => Math.round(Number(m[1]) * 100));
-    expect(cents.reduce((a, b) => a + b, 0)).toBe(101);
+    expect(cents.reduce((a, b) => a + b, 0)).toBe(99);
   });
 });
 

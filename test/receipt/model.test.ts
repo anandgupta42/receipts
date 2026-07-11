@@ -104,8 +104,22 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     expect(model.priceDelta).toBeNull();
     const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
     expect(coverage).toHaveLength(1);
-    expect(coverage[0].text).toBe("caveat: 1 of 2 turns unpriced — TOTAL excludes their tokens");
+    expect(coverage[0].text).toBe("caveat: 1 of 2 usage turns include unpriced tokens — TOTAL excludes those tokens");
     expect(coverage[0].text).not.toContain("$");
+  });
+
+  it("suppresses whole-session repricing when unattributed usage has no model join", async () => {
+    const priced = turn(0, {
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 1000, output: 0 }),
+      toolCalls: [call("Bash")],
+    });
+    const unattributedUsage = usage({ input: 500, output: 0 });
+    const model = await buildReceiptModel(session({ turns: [priced], unattributedUsage }), dataDir);
+
+    expect(model.totalUsd).not.toBeNull();
+    expect(model.unpricedTokens).toEqual(unattributedUsage);
+    expect(model.priceDelta).toBeNull();
   });
 
   it("fires even when one tool row spans a priced AND an unpriced turn (the row shows a $, so only the turn count discloses the gap — S2 round 3)", async () => {
@@ -123,7 +137,7 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     // ...but the caveat still fires: row-level coverage would miss this.
     const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
     expect(coverage).toHaveLength(1);
-    expect(coverage[0].text).toBe("caveat: 1 of 2 turns unpriced — TOTAL excludes their tokens");
+    expect(coverage[0].text).toBe("caveat: 1 of 2 usage turns include unpriced tokens — TOTAL excludes those tokens");
   });
 
   it("stays silent when every tool row priced", async () => {
@@ -151,6 +165,21 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
 
     expect(model.totalTokens).toEqual(turns[0].usage);
     expect(model.priceDelta).not.toBeNull();
+  });
+
+  it("suppresses repricing when a cited cache-write component rate is missing", async () => {
+    const turns = [
+      turn(0, {
+        model: "gpt-5.4-mini",
+        usage: usage({ input: 1000, output: 10, cacheCreation: 500 }),
+        toolCalls: [call("Read")],
+      }),
+    ];
+    const model = await buildReceiptModel(session({ source: "codex", turns }), dataDir);
+
+    expect(model.totalUsd).not.toBeNull();
+    expect(model.costLowerBoundCacheTier).toBe(true);
+    expect(model.priceDelta).toBeNull();
   });
 
   it("stays silent when nothing priced at all (totalUsd null — a partial-coverage claim would be meaningless without a total to bound)", async () => {

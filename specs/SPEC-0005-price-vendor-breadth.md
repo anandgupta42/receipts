@@ -87,3 +87,21 @@ legacy fallback only when the transcript has no provider evidence. Codex
 an explicit router, cloud intermediary, local endpoint, malformed value, or
 custom provider blocks dollar pricing and remains tokens-only. This preserves
 the aggregator non-goal without accidentally applying first-party rates.
+
+**2026-07-10 · reviewed tier-schema amendment (supersedes the temporary
+omission above).** The maintainer accepted an explicitly labeled observable
+lower bound instead of requiring invoice-grade exactness. `PriceRow` may now
+carry cited, explicit context tiers selected per assistant response by total
+prompt input (`input + cacheRead + cacheCreation`) and a provider-generic
+cache-write rate. The OpenAI Standard rows for `gpt-5.6-{sol,terra,luna}`
+return with their exact `>272,000` per-request boundary and cited short/long
+rates. `gpt-5.5` remains omitted: its official page applies the multiplier to
+the "full session", a scope the per-request resolver and PR slicing path cannot
+select soundly. GPT-5.6 Codex rollouts omit the API's `cache_write_tokens`, so
+their observable standard-API-equivalent arithmetic treats the unobserved
+write premium as zero and MUST render `≥`, never an exact-looking `$`. The
+same visible lower-bound qualifier applies to every computed dollar surface:
+the engine may test exact token×row arithmetic, but the product does not call
+that arithmetic the user's invoice. Batch/Flex/Priority, regional uplifts,
+subscription/credit conversion, and actual invoice reconciliation remain out
+of scope and are named in `docs/cost-model.md`.

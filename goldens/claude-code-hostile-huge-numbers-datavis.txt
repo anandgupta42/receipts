@@ -7,10 +7,12 @@
 [##########] = priciest line; others in proportion
 
 --- TOOL CALLS ---
-Bash.......................$12,500.00 [##########]
+Bash.....................≥ $12,500.00 [##########]
 --------------------------------------------------
-TOTAL...................................$12,500.00
-same tokens on claude-haik…...$2,500.00 (80% less)
+TOTAL.................................≥ $12,500.00
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5........≥ $2,500.00
+  (80% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

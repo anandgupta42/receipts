@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -342,26 +342,33 @@ footer{
     Jun 18 2026 → Jun 25 2026 · since override    
 
 Sessions.........................................5
-Priced total (5 of 5)........................$0.22
-Tokens (all sessions)..................166,338 tok
+Priced floor (5 full + 0 partial).......≥ $0.22
+Pricing coverage.......5 full · 0 partial · 0 none
+Tokens (observable)..................166,338 tok
+Scope............top-level only; children excluded
 
 By agent
-  Claude Code.......................$0.19 · 2 sess
-  Codex.............................$0.03 · 3 sess
+  Claude Code.....................≥ $0.19 · 2 sess
+  Codex...........................≥ $0.03 · 3 sess
 
-Top waste
-  stuck-loop.....................$0.01 · 1 session
-  trivial-spans.................$0.00 · 2 sessions
+Flagged patterns
+  stuck-loop...................≈ $0.01 · 1 session
+  trivial-spans.............≈ $0.0040 · 2 sessions
+  heuristic pattern cost · standard API floor · not proven savings
 
 vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
-  Priced $ Δ.........................+$0.12 (more)
+  Priced floor Δ...................≈ +$0.12 (more)
   Tokens Δ......................+93,700 tok (more)
   Excluded.........................0 now / 0 prior
 --------------------------------------------------
                 npx aireceipts-cli                
          github.com/anandgupta42/receipts</code></pre>
 
-<p><code>Priced total (5 of 5)</code> reads &quot;5 of 5 sessions had a price&quot;; if some ran on unpriced models, the dollar total covers only the priced ones while the token total covers all of them — a coverage gap can never masquerade as a spend change. The deltas at the bottom are reported <strong>per category, never blended</strong>: the dollar delta only appears when both weeks are fully priced, the token delta always appears, and <code>Excluded</code> counts unpriced sessions in each window separately. Each delta carries a plain-language direction — <code>(more)</code>, <code>(less)</code>/<code>(fewer)</code>, or <code>(flat)</code> — read against the <code>vs. prior 7 days</code> header, so a negative figure like <code>-93,700 tok (fewer)</code> reads unambiguously as <em>fewer tokens this week</em>, not more.</p>
+<p><code>Priced floor (5 full + 0 partial)</code> distinguishes complete observed pricing from sessions where only some request components had a trustworthy model/date/price join. <code>Pricing coverage</code> reports loaded sessions as <code>full</code>, <code>partial</code>, or <code>none</code>; an additional <code>Unreadable</code> row appears when an in-window summary cannot be fully loaded. Those unreadable summaries remain in the <code>Sessions</code> denominator instead of disappearing. When a whole request envelope is outside the dollar floor, an exact <code>Known unpriced tokens</code> subtotal appears. <code>Tokens (observable)</code> includes every trusted token subtotal, whether priced or not — a coverage gap cannot masquerade as a complete spend number. A <code>Cache-rate gaps</code> row means a priced session had a cached component with no cited applicable rate; that session is <code>partial</code>, never <code>full</code>. The exact unpriced-token subtotal is not padded with an invented cache quantity when the trace does not expose one.</p>
+
+<p>The digest is deliberately top-level-only. Child/subagent transcripts are not rolled into <code>week</code>; the human output says so, and JSON carries <code>scope.childSessionsIncluded: false</code>. Use the single-session or PR receipt when you need the child-rollup path.</p>
+
+<p>The deltas at the bottom are reported <strong>per category, never blended</strong>: the dollar delta only appears when both weeks have comparable priced coverage; it is labeled approximate because subtracting two floors is not itself a bound. The token delta always appears, and <code>Excluded</code> counts unpriced sessions in each window separately. Each delta carries a plain-language direction — <code>(more)</code>, <code>(less)</code>/<code>(fewer)</code>, or <code>(flat)</code> — read against the <code>vs. prior 7 days</code> header, so a negative figure like <code>-93,700 tok (fewer)</code> reads unambiguously as <em>fewer tokens this week</em>, not more.</p>
 
 <h2 id="the-window">The window</h2>
 
@@ -382,9 +389,9 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
 <p>adds a breakdown keyed by the working directory each session ran in:</p>
 
 <pre class="doc-code"><code>By project
-  form..............................$0.18 · 1 sess
-  (unknown).........................$0.03 · 3 sess
-  qa................................$0.01 · 1 sess</code></pre>
+  form............................≥ $0.18 · 1 sess
+  (unknown).......................≥ $0.03 · 3 sess
+  qa..............................≥ $0.01 · 1 sess</code></pre>
 
 <p>Sessions whose project can't be determined (some agents don't record it) roll up under <code>(unknown)</code> rather than being dropped.</p>
 
@@ -400,7 +407,7 @@ vs. prior 7 days (Jun 11 2026 → Jun 18 2026)
 
 <ul>
   <li><strong><a href="08-budget.html">Set a budget</a></strong> — turn the weekly total into an exit code.</li>
-  <li><strong><a href="09-handoff.html">Fix it next time</a></strong> — act on the <code>Top waste</code> lines.</li>
+  <li><strong><a href="09-handoff.html">Fix it next time</a></strong> — inspect the <code>Flagged patterns</code> lines.</li>
 </ul>
     </article>
   </main>

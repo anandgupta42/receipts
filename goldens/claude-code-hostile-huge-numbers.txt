@@ -7,10 +7,12 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-Bash..........................$12,500.00  (1 call)
+Bash........................≥ $12,500.00  (1 call)
 --------------------------------------------------
-TOTAL...................................$12,500.00
-same tokens on claude-haik…...$2,500.00 (80% less)
+TOTAL.................................≥ $12,500.00
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5........≥ $2,500.00
+  (80% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

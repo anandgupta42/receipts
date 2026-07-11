@@ -36,20 +36,32 @@ describe("renderMiniReceipt (R4)", () => {
     expect(out).toContain("tok");
   });
 
-  it("shows a `$` total when the session priced (I2)", async () => {
+  it("shows a visibly floored `$` total when the session priced (I2)", async () => {
     const out = renderMiniReceipt(await modelOf(PRICED));
-    expect(out).toContain("total  $");
+    expect(out).toContain("total  ≥ $");
   });
 
-  it("surfaces the top waste line when one fired", async () => {
+  it("surfaces the top flagged-pattern line when one fired", async () => {
     const out = renderMiniReceipt(await modelOf(LOOP));
     expect(out).toContain("⚠");
-    expect(out).toContain("loop ×5");
+    expect(out).toMatch(/loop ×5 · ≈ \$/);
   });
 
-  it("says 'no waste detected' on a clean session", async () => {
+  it("labels trivial-span repricing as heuristic rather than a savings floor", async () => {
+    const model = await modelOf(PRICED);
+    model.wasteLines = [{
+      kind: "trivial-spans",
+      eligibleTurnCount: 2,
+      usd: 0.01,
+      tokens: model.totalTokens,
+      cheaperModel: "claude-haiku-4-5",
+    }];
+    expect(renderMiniReceipt(model)).toMatch(/trivial spans.*≈ \$0\.01/);
+  });
+
+  it("says no flagged pattern was detected on a clean session", async () => {
     const out = renderMiniReceipt(await modelOf(PRICED));
-    expect(out).toContain("no waste detected");
+    expect(out).toContain("no flagged pattern detected");
     expect(out).not.toContain("⚠");
   });
 

@@ -6,7 +6,7 @@
 // renderer emits exactly 6 lines of plain text (no ANSI — the hook/statusline
 // context is not guaranteed to interpret it), deterministic and golden-gated
 // (I5), obeying the same $-honesty rules as the full receipt (I2).
-import { formatDuration, formatInt, formatUsd } from "./format.js";
+import { formatDuration, formatInt, formatUsdFloor, formatUsdLowerBound } from "./format.js";
 import type { ReceiptModel, ToolRow, WasteLine } from "./model.js";
 
 export interface MiniTopTool {
@@ -33,7 +33,7 @@ export interface MiniSummary {
   totalTokens: number;
   /** `null` when the session recorded no tool calls. */
   topTool: MiniTopTool | null;
-  /** The session's first waste line, already ordered by the model builder; `null` → "no waste detected". */
+  /** The session's first flagged-pattern line, already ordered by the model builder; `null` → "no flagged pattern detected". */
   topWaste: WasteLine | null;
   /** Cursor's degraded mode: session totals only, no per-turn model/usage. */
   unpriceable: boolean;
@@ -75,7 +75,7 @@ function totalLine(s: MiniSummary): string {
   // SPEC-0061 R4 — say when the total covers more than the parent transcript.
   const suffix = s.subagentCount > 0 ? ` (incl. ${formatInt(s.subagentCount)} subagent${s.subagentCount === 1 ? "" : "s"})` : "";
   if (!s.unpriceable && s.totalUsd !== null) {
-    return `total  $${formatUsd(s.totalUsd)}${suffix}`;
+    return `total  ${formatUsdLowerBound(s.totalUsd)}${suffix}`;
   }
   return `total  ${formatInt(s.totalTokens)} tok${suffix}`;
 }
@@ -89,22 +89,22 @@ function topToolLine(s: MiniSummary): string {
     // Cursor: per-tool tokens are unavailable — call counts are the only real number.
     return `top    ${t.tool} · ${callLabel(t.callCount, t.tool)}`;
   }
-  const value = t.usd !== null ? `$${formatUsd(t.usd)}` : `${formatInt(t.tokens)} tok`;
+  const value = t.usd !== null ? formatUsdLowerBound(t.usd) : `${formatInt(t.tokens)} tok`;
   return `top    ${t.tool} · ${value} (${callLabel(t.callCount, t.tool)})`;
 }
 
 function wasteValue(waste: WasteLine): string {
   if (waste.kind === "trivial-spans") {
-    return `$${formatUsd(waste.usd)}`;
+    return `≈ $${formatUsdFloor(waste.usd)}`;
   }
   // stuck-loop and context-thrash both carry a nullable usd → tokens when unpriced (I2).
-  return waste.usd !== null ? `$${formatUsd(waste.usd)}` : `${formatInt(waste.tokens.total)} tok`;
+  return waste.usd !== null ? `≈ $${formatUsdFloor(waste.usd)}` : `≈ ${formatInt(waste.tokens.total)} tok`;
 }
 
 function wasteLine(s: MiniSummary): string {
   const waste = s.topWaste;
   if (!waste) {
-    return "no waste detected";
+    return "no flagged pattern detected";
   }
   if (waste.kind === "stuck-loop") {
     return `⚠ ${waste.tool} loop ×${waste.runLength} · ${wasteValue(waste)}`;
@@ -118,7 +118,7 @@ function wasteLine(s: MiniSummary): string {
 /**
  * Render `model` as the 6-line session-end receipt (SPEC-0006 R4). Exactly six
  * lines, in order: brand header, agent · model · duration, total, top tool,
- * waste line (or "no waste detected"), footer pointing at the full receipt.
+ * flagged-pattern line (or "no flagged pattern detected"), footer pointing at the full receipt.
  */
 export function renderMiniReceipt(model: ReceiptModel): string {
   return renderMiniSummary(buildMiniSummary(model));

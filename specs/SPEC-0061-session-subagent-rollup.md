@@ -194,3 +194,10 @@ its own terms.
   many-children fixture, the statusline half is reworked (cap or cache) before ship —
   measured by the R3 latency matrix row. **Verdict: build now.**
 - **S4:** `node scripts/spec-lint.mjs` — pass.
+## 2026-07-10 strict-floor and caveat amendment
+
+Supersedes the displayed-row reconciliation clauses: parent/tool/subagent rows
+and TOTAL round down independently so each `≥` claim is true. A GPT-5.6 Codex
+child also propagates `unobserved-cache-write-tokens` into the parent receipt and
+PR confidence summary; the combined floor explicitly excludes any unpersisted
+cache-write premium.

@@ -69,6 +69,14 @@ async function load(records: unknown[]) {
   return session!;
 }
 
+async function loadLines(lines: string[]) {
+  const file = path.join(dir, `rollout-${seq++}.jsonl`);
+  writeFileSync(file, `${lines.join("\n")}\n`);
+  const session = await adapter.loadSession(file);
+  expect(session).not.toBeNull();
+  return session!;
+}
+
 function summedTurns(session: Awaited<ReturnType<typeof load>>): TokenUsage {
   return session.turns.reduce((sum, turn) => addUsage(sum, turn.usage ?? emptyUsage()), emptyUsage());
 }
@@ -94,18 +102,131 @@ describe("Codex cumulative usage envelopes", () => {
     expect(codexFidelity.validate(session)).toEqual([]);
   });
 
-  it("uses the cumulative difference when a changed snapshot's last_token_usage disagrees", async () => {
+  it("safe-stops request pricing when a changed snapshot's last_token_usage disagrees", async () => {
     const session = await load([
       envelope(raw(200, 50, 20), raw(200, 50, 20), 0),
       envelope(raw(260, 70, 30), raw(90, 40, 15), 1),
     ]);
 
-    // Second cumulative delta is input=40, cache=20, output=10, while the
-    // reported `last_token_usage` claims input=50, cache=40, output=15. The
-    // cumulative envelope is authoritative after baseline establishment.
-    expect(summedTurns(session)).toMatchObject({ input: 190, output: 30, cacheRead: 70, cacheCreation: 0, total: 290 });
+    // The final local envelope is still observable, but the changed event no
+    // longer proves a request boundary. Keep it unattributed and never price it.
+    expect(summedTurns(session).total).toBe(0);
     expect(session.totals.tokens).toMatchObject({ input: 190, output: 30, cacheRead: 70, cacheCreation: 0, total: 290 });
-    expect(codexFidelity.validate(session)).toEqual([]);
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(codexFidelity.validate(session)).toContainEqual(expect.objectContaining({ check: "codex-request-boundaries" }));
+    const receipt = await buildReceiptModel(session);
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("pricing disabled") }),
+    );
+  });
+
+  it("safe-stops when a missing intermediate envelope would merge two base-tier requests into one long-context delta", async () => {
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(200_000, 0, 1_000), raw(200_000, 0, 1_000), 1),
+      // The 400K cumulative snapshot is absent/torn. The next visible delta is
+      // 400K, but last_token_usage proves the actual final request was 200K.
+      envelope(raw(600_000, 0, 3_000), raw(200_000, 0, 1_000), 3),
+    ]);
+
+    expect(session.totals.tokens.total).toBe(603_000);
+    expect(session.unattributedUsage?.total).toBe(603_000);
+    expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined)).toBe(true);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
+  });
+
+  it("safe-stops when the first reported request exceeds its cumulative total or a later cumulative component decreases", async () => {
+    const impossibleFirst = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(100, 0, 10), raw(200, 0, 20), 1),
+    ]);
+    expect(impossibleFirst.usageReconciliationFailed).toBe(true);
+    expect((await buildReceiptModel(impossibleFirst)).totalUsd).toBeNull();
+
+    const reset = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(200, 0, 20), raw(200, 0, 20), 1),
+      envelope(raw(150, 0, 30), raw(10, 0, 10), 2),
+    ]);
+    expect(reset.usageReconciliationFailed).toBe(true);
+    expect((await buildReceiptModel(reset)).totalUsd).toBeNull();
+  });
+
+  it("safe-stops when legacy per-message usage precedes a cumulative envelope", async () => {
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      {
+        timestamp: "2026-07-10T12:00:01.000Z",
+        type: "response_item",
+        payload: { type: "message", role: "assistant", content: [], usage: raw(200_000, 0, 1_000) },
+      },
+      envelope(raw(400_000, 0, 2_000), raw(200_000, 0, 1_000), 2),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.unattributedUsage?.total).toBe(201_000);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
+  });
+
+  it("safe-stops request pricing after any malformed Codex record", async () => {
+    const first = envelope(raw(200_000, 0, 1_000), raw(200_000, 0, 1_000), 1);
+    const second = envelope(raw(400_000, 0, 2_000), raw(200_000, 0, 1_000), 3);
+    const session = await loadLines([
+      JSON.stringify(context("gpt-5.6-sol", 0, "openai")),
+      JSON.stringify(first),
+      "{\"truncated\":",
+      JSON.stringify(second),
+    ]);
+
+    expect(session.droppedRecords).toBe(1);
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.unattributedUsage?.total).toBe(402_000);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
+  });
+
+  it("rejects cached_input_tokens greater than input_tokens instead of clamping the request", async () => {
+    const malformedLast = {
+      ...raw(100, 20, 10),
+      input_tokens: 20,
+      cached_input_tokens: 21,
+    };
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(200, 50, 20), raw(200, 50, 20), 1),
+      envelope(raw(300, 70, 30), malformedLast, 2),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.totals.tokens).toMatchObject({ input: 230, output: 30, cacheRead: 70, total: 330 });
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined)).toBe(true);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
+  });
+
+  it("rejects a negative value in every raw Codex usage field", async () => {
+    const fields: Array<keyof RawUsage> = [
+      "input_tokens",
+      "cached_input_tokens",
+      "output_tokens",
+      "reasoning_output_tokens",
+      "total_tokens",
+    ];
+
+    for (const field of fields) {
+      const malformedLast = { ...raw(100, 20, 10), [field]: -1 };
+      const session = await load([
+        context("gpt-5.6-sol", 0, "openai"),
+        envelope(raw(200, 50, 20), raw(200, 50, 20), 1),
+        envelope(raw(300, 70, 30), malformedLast, 2),
+      ]);
+
+      expect(session.usageReconciliationFailed, field).toBe(true);
+      expect(session.unattributedUsage, field).toEqual(session.totals.tokens);
+      expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined), field).toBe(true);
+      expect((await buildReceiptModel(session)).totalUsd, field).toBeNull();
+    }
   });
 
   it("attributes each usage delta to the model active for that turn", async () => {
@@ -124,6 +245,43 @@ describe("Codex cumulative usage envelopes", () => {
     // Independent oracle: turn 1 = $0.0001725 at 5.4-mini; turn 2 =
     // $0.0007875 at 5.3-codex. Freezing the first model would fail this.
     expect(receipt.totalUsd).toBeCloseTo(0.00096, 12);
+  });
+
+  it("preserves request units inside one turn so GPT-5.6 tiers never use the turn aggregate", async () => {
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(200_000, 100_000, 1_000), raw(200_000, 100_000, 1_000), 1),
+      envelope(raw(400_000, 200_000, 2_000), raw(200_000, 100_000, 1_000), 2),
+    ]);
+
+    expect(session.turns).toHaveLength(1);
+    expect(session.turns[0].pricingUnits).toHaveLength(2);
+    expect(session.turns[0].usage).toMatchObject({ input: 200_000, cacheRead: 200_000, output: 2_000 });
+    const receipt = await buildReceiptModel(session);
+    // Each 200K request costs 0.58 at the base tier. Pricing the 400K turn
+    // aggregate would incorrectly apply the long tier and produce 2.29.
+    expect(receipt.totalUsd).toBeCloseTo(1.16, 12);
+  });
+
+  it("accumulates every legacy per-message usage record inside one user turn", async () => {
+    const session = await load([
+      context("gpt-5.3-codex", 0, "openai"),
+      {
+        timestamp: "2026-07-10T12:00:01.000Z",
+        type: "response_item",
+        payload: { type: "message", role: "assistant", content: [], usage: raw(200, 100, 20) },
+      },
+      {
+        timestamp: "2026-07-10T12:00:02.000Z",
+        type: "response_item",
+        payload: { type: "message", role: "assistant", content: [], usage: raw(300, 100, 30) },
+      },
+    ]);
+
+    expect(session.turns).toHaveLength(1);
+    expect(session.turns[0].pricingUnits).toHaveLength(2);
+    expect(session.turns[0].usage).toMatchObject({ input: 300, cacheRead: 200, output: 50, total: 550 });
+    expect(session.totals.tokens).toEqual(session.turns[0].usage);
   });
 
   it("prices direct model_provider turns and keeps routed Codex turns tokens-only", async () => {

@@ -1,4 +1,14 @@
-import type { AgentSource, Compaction, ListSessionsOptions, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
+import type {
+  AgentSource,
+  Compaction,
+  ListSessionsOptions,
+  Session,
+  SessionAdapter,
+  SessionSummary,
+  TokenUsage,
+  ToolCall,
+  Turn,
+} from "./types.js";
 import { claudeCodeFidelity } from "./fidelity/claudeCode.js";
 import { isUnderSubagents, parseChildPath } from "./children.js";
 import { lazyClaudeCodeSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
@@ -12,7 +22,9 @@ import {
   pathExists,
   readJsonl,
   truncate,
-  withTotal, sanitizeText } from "./util.js";
+  sanitizeText,
+  withTotal,
+} from "./util.js";
 
 /** Raw shapes from a Claude Code `.jsonl` transcript line. Only the fields we use. */
 interface RawUsage {
@@ -40,7 +52,7 @@ interface RawContentBlock {
 
 interface RawMessage {
   role?: string;
-  /** The API message id (`msg_…`). One billed response = one id, even when the CLI writes several records for it. */
+  /** The API message id (`msg_…`). One observable response group = one id, even when the CLI writes several records for it. */
   id?: string;
   model?: string;
   content?: unknown;
@@ -173,6 +185,25 @@ function mapUsage(usage: RawUsage | undefined) {
   });
 }
 
+/**
+ * Claude Code can emit several records for one API response. Most repeat the
+ * same usage, but the Agent SDK documents that later records can carry a
+ * higher output count. Anthropic's documented rule is specifically to retain
+ * the response carrying the highest output count. Keep that record's complete
+ * usage vector together; independently maximizing input/cache buckets could
+ * fabricate a combination that no trace record ever reported. On an output
+ * tie, the later record wins as the final coherent snapshot.
+ */
+function mergeUsageSnapshot(current: TokenUsage | undefined, next: TokenUsage | undefined): TokenUsage | undefined {
+  if (!current) {
+    return next;
+  }
+  if (!next) {
+    return current;
+  }
+  return next.output >= current.output ? next : current;
+}
+
 async function parseTranscript(filePath: string, withTurns: boolean) {
   let model: string | undefined;
   let aiTitle: string | undefined;
@@ -182,19 +213,16 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let cwd: string | undefined;
   let gitBranch: string | undefined;
   let rawSidechain = false;
-  let totalUsage = emptyUsage();
-  let toolCallCount = 0;
   const turns: Turn[] = [];
+  let anonymousUsage = emptyUsage();
   const toolCallById = new Map<string, ToolCall>();
-  // One billed API response = one turn, keyed by `message.id`. Claude Code
-  // writes one `assistant` record per content block, and EVERY record of the
-  // same response repeats the same `message.id` and the same `usage` snapshot
-  // — so counting per record multiplies real cost by the block count (audited
-  // 2026-07-08 over 19 local transcripts: up to 12 records per id, usage
-  // byte-identical across them, ~2.8× session-cost inflation; see
-  // docs/internal/cost-attribution-evidence.md). The first record of an id
-  // opens the turn and books its usage once; follow-up records only add their
-  // tool_use blocks to that turn.
+  // One observable assistant response group = one turn, keyed by `message.id`. Claude Code
+  // writes one `assistant` record per content block. Records of the same
+  // response repeat the id, but usage snapshots are not guaranteed identical:
+  // the Agent SDK explicitly says to retain the highest cumulative value when
+  // duplicate ids disagree. The coherent snapshot with the highest output is
+  // retained; counting records would multiply cost, while keeping the first
+  // would miss later output. Tool blocks still merge into the single turn.
   const turnByMessageId = new Map<string, Turn>();
   // SPEC-0017 R1/R2 — one entry per distinct next-assistant-turn index that a
   // compact summary/boundary record precedes. Keyed by `turnIndex` so an echo +
@@ -239,9 +267,8 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
       turns.length = 0;
       toolCallById.clear();
       turnByMessageId.clear();
+      anonymousUsage = emptyUsage();
       compactionByTurn.clear();
-      totalUsage = emptyUsage();
-      toolCallCount = 0;
       model = undefined;
       firstUserText = undefined;
       aiTitle = undefined;
@@ -279,21 +306,30 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         }
       }
       turn.model ??= msg.model;
-      // Book the response's usage exactly once — duplicate records repeat the
-      // same snapshot, so the first one seen is the billed figure.
-      if (!turn.usage) {
-        const usage = mapUsage(msg.usage);
+      const mappedUsage = mapUsage(msg.usage);
+      if (msg.id === undefined) {
+        // Without the provider response id, repeated content snapshots cannot
+        // be distinguished from separate requests. Retain one coherent
+        // highest-output usage vector as unattributed tokens and never attach
+        // a price to these anonymous records.
+        anonymousUsage = mergeUsageSnapshot(anonymousUsage, mappedUsage) ?? anonymousUsage;
+      } else {
+        const usage = mergeUsageSnapshot(turn.usage, mappedUsage);
         if (usage) {
           turn.usage = usage;
           turn.outputTokens = usage.output;
-          totalUsage = addUsage(totalUsage, usage);
         }
       }
 
       if (Array.isArray(msg.content)) {
         for (const block of msg.content as RawContentBlock[]) {
           if (block.type === "tool_use") {
-            toolCallCount++;
+            // Cumulative/parallel snapshots may repeat a previously emitted
+            // tool block. A provider tool-use id identifies the logical call;
+            // id-less blocks cannot be matched safely and remain distinct.
+            if (block.id && toolCallById.has(block.id)) {
+              continue;
+            }
             const call: ToolCall = {
               name: sanitizeText(block.name ?? "tool"),
               input: block.input,
@@ -342,6 +378,15 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     }
   });
 
+  // Totals are derived only after every duplicate snapshot has been merged.
+  // This also makes a fork reset authoritative: pre-marker turns are removed
+  // before either usage or tool counts are accumulated.
+  const itemizedUsage = turns.reduce(
+    (total, turn) => (turn.usage ? addUsage(total, turn.usage) : total),
+    emptyUsage(),
+  );
+  const totalUsage = addUsage(itemizedUsage, anonymousUsage);
+  const toolCallCount = turns.reduce((total, turn) => total + turn.toolCalls.length, 0);
   const totals = {
     tokens: totalUsage,
     durationMs: startedAt !== undefined && endedAt !== undefined ? endedAt - startedAt : undefined,
@@ -376,7 +421,13 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     .map(([turnIndex, atMs]) => (atMs === undefined ? { turnIndex } : { turnIndex, atMs }));
 
   return withTurns
-    ? { summary, turns, compactions, droppedRecords }
+    ? {
+        summary,
+        turns,
+        compactions,
+        droppedRecords,
+        ...(anonymousUsage.total > 0 ? { unattributedUsage: anonymousUsage } : {}),
+      }
     : { summary, turns: [] as Turn[], compactions: [] as Compaction[], droppedRecords: 0 };
 }
 
@@ -448,10 +499,16 @@ export class ClaudeCodeAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns, compactions, droppedRecords } = await parseTranscript(id, true);
+      const { summary, turns, compactions, droppedRecords, unattributedUsage } = await parseTranscript(id, true);
       // SPEC-0044 B3: only present when > 0 (absent → clean), so a clean
       // session's shape is unchanged.
-      return { ...summary, turns, compactions, ...(droppedRecords > 0 ? { droppedRecords } : {}) };
+      return {
+        ...summary,
+        turns,
+        compactions,
+        ...(unattributedUsage ? { unattributedUsage } : {}),
+        ...(droppedRecords > 0 ? { droppedRecords } : {}),
+      };
     } catch {
       return null;
     }

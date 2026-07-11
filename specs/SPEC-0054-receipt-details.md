@@ -51,7 +51,7 @@ Default-output changes (deliberate, scoped golden regeneration):
   counts from `attributeByTool` (turn-level, not per-tool-row: a row mixing a
   priced and an unpriced turn still shows a `$`, so only the turn count can
   disclose the gap — S2 round 3):
-  `caveat: N of M turns unpriced — TOTAL excludes their tokens`.
+  `caveat: N of M usage turns include unpriced tokens — TOTAL excludes those tokens`.
   Integer counts, no `$` in the text. New `CaveatFinding.kind`
   `"partial-priced-coverage"` (`src/receipt/caveats.ts:17`), added to the
   `--json` export schema's caveat enum (`src/receipt/exportSchema.ts:123`).
@@ -265,7 +265,8 @@ product) is honored by keeping the section strictly opt-in with zero default chu
 (1) `--json` export schema lacked the new caveat kind → enum + docs + test.
 (2) row-level R3 missed a same-tool priced/unpriced mix (row shows `$`, tokens
 silently excluded) → caveat recomputed at turn level in `attributeByTool`
-(`usageTurnCount`/`unpricedUsageTurnCount`), text now `N of M turns unpriced`.
+(`usageTurnCount`/`unpricedUsageTurnCount`), text now
+`N of M usage turns include unpriced tokens`.
 (3) the added command-path telemetry test leaked a mocked stdout via
 beforeEach re-capture → originals captured once at module scope.
 
@@ -273,3 +274,9 @@ beforeEach re-capture → originals captured once at module scope.
 ("come up with ideas and implement them as well … take decision on your own",
 3-hour autonomous window). Status set `approved` under that authority; flips to
 `building` when the PR opens.
+## 2026-07-10 strict-floor amendment
+
+Supersedes cent-reconciled BY MODEL display requirements: every model row and
+the TOTAL independently round down, so a row labeled `≥` can never receive a
+cent its raw lower-bound scalar did not reach. Machine values remain unrounded;
+visible rows are not required to sum after conservative display flooring.

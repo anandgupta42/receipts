@@ -189,15 +189,64 @@ function mapTokens(tokens: RawTokens | undefined): TokenUsage | undefined {
 }
 
 function usageFromSessionColumns(row: SessionRow): TokenUsage {
-  return withTotal({
-    input: numberOrZero(row.message_input) || numberOrZero(row.tokens_input),
-    output:
-      (numberOrZero(row.message_output) + numberOrZero(row.message_reasoning)) ||
-      (numberOrZero(row.tokens_output) + numberOrZero(row.tokens_reasoning)),
-    cacheRead: numberOrZero(row.message_cache_read) || numberOrZero(row.tokens_cache_read),
-    cacheCreation: numberOrZero(row.message_cache_write) || numberOrZero(row.tokens_cache_write),
+  const sessionProjection = withTotal({
+    input: numberOrZero(row.tokens_input),
+    output: numberOrZero(row.tokens_output) + numberOrZero(row.tokens_reasoning),
+    cacheRead: numberOrZero(row.tokens_cache_read),
+    cacheCreation: numberOrZero(row.tokens_cache_write),
     total: 0,
   });
+  const messageProjection = withTotal({
+    input: numberOrZero(row.message_input),
+    output: numberOrZero(row.message_output) + numberOrZero(row.message_reasoning),
+    cacheRead: numberOrZero(row.message_cache_read),
+    cacheCreation: numberOrZero(row.message_cache_write),
+    total: 0,
+  });
+  // Keep each projection coherent and retain the larger observed envelope;
+  // independently maximizing its buckets could create a vector no row ever
+  // reported. Per-component reconciliation with itemized turns happens below
+  // and any excess remains explicitly unattributed.
+  return sessionProjection.total >= messageProjection.total ? sessionProjection : messageProjection;
+}
+
+/** Usage present in the reconciled session envelope but absent from itemized messages. */
+function aggregateResidual(envelope: TokenUsage, itemized: TokenUsage): TokenUsage {
+  return withTotal({
+    input: Math.max(0, envelope.input - itemized.input),
+    output: Math.max(0, envelope.output - itemized.output),
+    cacheRead: Math.max(0, envelope.cacheRead - itemized.cacheRead),
+    cacheCreation: Math.max(0, envelope.cacheCreation - itemized.cacheCreation),
+    total: 0,
+  });
+}
+
+function componentwiseDominates(envelope: TokenUsage, itemized: TokenUsage): boolean {
+  return (
+    envelope.input >= itemized.input &&
+    envelope.output >= itemized.output &&
+    envelope.cacheRead >= itemized.cacheRead &&
+    envelope.cacheCreation >= itemized.cacheCreation
+  );
+}
+
+/** Preserve aggregate-only usage without fabricating a request, model, or tool. */
+function reconcileAggregateResidual(
+  itemized: TokenUsage,
+  envelope: TokenUsage,
+): { total: TokenUsage; unattributed?: TokenUsage; conflicting?: TokenUsage } {
+  const residual = aggregateResidual(envelope, itemized);
+  if (residual.total === 0) {
+    return { total: itemized };
+  }
+  // A residual is additive only when the aggregate dominates the itemized
+  // vector in every component. Crossed vectors can be alternate or stale
+  // projections; taking their component-wise maximum would fabricate a usage
+  // vector that neither source reported.
+  if (!componentwiseDominates(envelope, itemized)) {
+    return { total: itemized, conflicting: residual };
+  }
+  return { total: envelope, unattributed: residual };
 }
 
 function modelId(value: unknown): string | undefined {
@@ -223,21 +272,19 @@ function pricingProviderFromModel(value: unknown): Turn["pricingProvider"] {
   return normalizePricingProvider(parsed.providerID);
 }
 
-function pricingProviderForMessage(msg: RawMessageData, fallback: Turn["pricingProvider"]): Turn["pricingProvider"] {
+function pricingProviderForMessage(msg: RawMessageData): Turn["pricingProvider"] {
   if (Object.prototype.hasOwnProperty.call(msg, "providerID")) {
-    return normalizePricingProvider(msg.providerID);
+    return normalizePricingProvider(msg.providerID) ?? null;
   }
   const fromModel = pricingProviderFromModel(msg.model);
   if (fromModel !== undefined) {
     return fromModel;
   }
   const fromModelId = pricingProviderFromModel(msg.modelID);
-  return fromModelId !== undefined ? fromModelId : fallback;
-}
-
-function pricingProviderFromSessionRow(row: SessionRow): Turn["pricingProvider"] {
-  const first = pricingProviderFromModel(row.first_model);
-  return first !== undefined ? first : pricingProviderFromModel(row.model);
+  // Current OpenCode assistant messages require their own model/provider
+  // identity. Missing request identity is not repaired from session metadata:
+  // doing so can retroactively price an earlier routed/unknown request.
+  return fromModelId !== undefined ? fromModelId : null;
 }
 
 function makeId(dbPath: string, sessionId: string): string {
@@ -583,7 +630,6 @@ export class OpenCodeAdapter implements SessionAdapter {
       return null;
     }
     const summary = summaryFromRow(dbPath, summaryRow);
-    const sessionPricingProvider = pricingProviderFromSessionRow(summaryRow);
     const sid = summaryRow.id;
     const messages = db.all(
       `SELECT id, type, seq, time_created, time_updated, data FROM session_message WHERE session_id = ${sqlString(sid)} ORDER BY seq`,
@@ -625,11 +671,11 @@ export class OpenCodeAdapter implements SessionAdapter {
       if (usage) {
         totalUsage = addUsage(totalUsage, usage);
       }
-      const pricingProvider = pricingProviderForMessage(msg, sessionPricingProvider);
+      const pricingProvider = pricingProviderForMessage(msg);
       turns.push({
         index: turns.length,
         timestamp: ts,
-        model: modelId(msg.modelID) ?? modelId(msg.model) ?? summary.model,
+        model: modelId(msg.modelID) ?? modelId(msg.model),
         ...(pricingProvider !== undefined ? { pricingProvider } : {}),
         usage,
         outputTokens: usage?.output,
@@ -640,19 +686,22 @@ export class OpenCodeAdapter implements SessionAdapter {
     const sessionStarted = startedAt ?? summary.startedAt;
     const sessionEnded = endedAt ?? summary.endedAt ?? sessionStarted;
     const toolCallCount = turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0);
+    const reconciled = reconcileAggregateResidual(totalUsage, summary.totals.tokens);
     return {
       ...summary,
       title: summary.title ?? (firstUserText ? truncate(firstUserText) : undefined),
       startedAt: sessionStarted,
       endedAt: sessionEnded,
       totals: {
-        tokens: totalUsage.total > 0 ? totalUsage : summary.totals.tokens,
+        tokens: reconciled.total.total > 0 ? reconciled.total : summary.totals.tokens,
         durationMs:
           sessionStarted !== undefined && sessionEnded !== undefined ? Math.max(0, sessionEnded - sessionStarted) : undefined,
-        turnCount: turns.length,
+        turnCount: summary.totals.turnCount,
         toolCallCount,
       },
       turns,
+      ...(reconciled.unattributed ? { unattributedUsage: reconciled.unattributed } : {}),
+      ...(reconciled.conflicting ? { conflictingAggregateUsage: reconciled.conflicting } : {}),
       // SPEC-0044 B3: present only when > 0 (absent → clean).
       ...(droppedRecords > 0 ? { droppedRecords } : {}),
     };
@@ -665,7 +714,6 @@ export class OpenCodeAdapter implements SessionAdapter {
       return null;
     }
     const summary = summaryFromRow(dbPath, summaryRow);
-    const sessionPricingProvider = pricingProviderFromSessionRow(summaryRow);
     const sid = summaryRow.id;
     const messages = db.all(
       `SELECT id, time_created, time_updated, data FROM message WHERE session_id = ${sqlString(sid)} ORDER BY time_created, id`,
@@ -715,11 +763,11 @@ export class OpenCodeAdapter implements SessionAdapter {
       if (usage) {
         totalUsage = addUsage(totalUsage, usage);
       }
-      const pricingProvider = pricingProviderForMessage(msg, sessionPricingProvider);
+      const pricingProvider = pricingProviderForMessage(msg);
       turns.push({
         index: turns.length,
         timestamp: ts,
-        model: modelId(msg.modelID) ?? modelId(msg.model) ?? summary.model,
+        model: modelId(msg.modelID) ?? modelId(msg.model),
         ...(pricingProvider !== undefined ? { pricingProvider } : {}),
         usage,
         outputTokens: usage?.output,
@@ -730,18 +778,21 @@ export class OpenCodeAdapter implements SessionAdapter {
     const sessionStarted = startedAt ?? summary.startedAt;
     const sessionEnded = endedAt ?? summary.endedAt ?? sessionStarted;
     const toolCallCount = turns.reduce((sum, turn) => sum + turn.toolCalls.length, 0);
+    const reconciled = reconcileAggregateResidual(totalUsage, summary.totals.tokens);
     return {
       ...summary,
       startedAt: sessionStarted,
       endedAt: sessionEnded,
       totals: {
-        tokens: totalUsage.total > 0 ? totalUsage : summary.totals.tokens,
+        tokens: reconciled.total.total > 0 ? reconciled.total : summary.totals.tokens,
         durationMs:
           sessionStarted !== undefined && sessionEnded !== undefined ? Math.max(0, sessionEnded - sessionStarted) : undefined,
-        turnCount: turns.length,
+        turnCount: summary.totals.turnCount,
         toolCallCount,
       },
       turns,
+      ...(reconciled.unattributed ? { unattributedUsage: reconciled.unattributed } : {}),
+      ...(reconciled.conflicting ? { conflictingAggregateUsage: reconciled.conflicting } : {}),
       // SPEC-0044 B3: present only when > 0 (absent → clean).
       ...(droppedRecords > 0 ? { droppedRecords } : {}),
     };

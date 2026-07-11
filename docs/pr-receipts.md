@@ -258,6 +258,12 @@ hooks above or manually with:
 npx aireceipts-cli pr --store ref --push-ref
 ```
 
+The ref's internal producer/CI payload remains
+`PR_RECEIPT_SCHEMA_VERSION = 1`. It is not the public `--json`/`--csv` schema
+(currently v2), and it intentionally has no `costSemantics` field: it stores
+renderer inputs, while the rendered comment itself qualifies dollar floors
+with `≥`. See the [export schema](json-schema.md#versioning-semver-discipline-r4).
+
 Codex hooks are best-effort. Current Codex `PreToolUse` interception does not cover every
 shell path, including some `unified_exec` calls, so the `AGENTS.md` finalizer is a second
 chance and CI enforcement is the merge-time backstop. For the strongest agent-independent
@@ -320,8 +326,11 @@ decision record is [SPEC-0052](../specs/SPEC-0052-github-app-deferral.md).
   session (`<role> · <model mix> · <cost>`), a muted provenance line under each
   (session id + `session slice: turns A–B of N`, or `entire session (slice
   unavailable)` when the work can't be cut cleanly — ambiguity is labeled, never
-  presented as PR cost), and one indented `SUBAGENTS (N)` aggregate row summing
-  any subagent sessions a contributor launched (SPEC-0060).
+  presented as PR cost), and one indented `SUBAGENTS (N)` aggregate row for
+  child sessions whose observable intervals overlap that parent scope
+  (SPEC-0060). A sliced parent with no observable time range has an unknown
+  child window: readable child costs are excluded instead of being claimed
+  whole, while unreadable child evidence remains counted.
 - One combined total. Priced and unpriced sessions are never blended: dollars and
   tokens total separately.
 - An honest note counting any plausible-but-unproven sessions that were **not**
@@ -330,6 +339,10 @@ decision record is [SPEC-0052](../specs/SPEC-0052-github-app-deferral.md).
   full receipt, and — for a session that launched subagents — a `subagents (N)`
   table under its receipt, sorted by cost and capped at 20 rows where the last
   row carries the remainder's sum (a capped list never silently drops value).
+- When a counted session fires a detector, a collapsed `handoff — flagged
+  pattern cost ≈ …` section. Its headline is an overlap-safe heuristic subtotal
+  with the explicit line `not proven savings`; it is not a savings floor or
+  ceiling.
 
 ## How sessions are matched to a PR
 
@@ -350,3 +363,8 @@ Zero credited sessions → `aireceipts pr` refuses to guess and asks for `--sess
 One selector is an exact override; two or more are additive to this auto set.
 The `cwd`/branch/SHA signals used for matching are attribution-only: they never enter
 the rendered receipt, `--json`/`--csv`, or telemetry.
+
+Child rollups use true interval intersection, not endpoint containment: a
+child is included whole when `child.start <= parent.end` and
+`child.end >= parent.start`, including a child that spans the parent range. No
+readable child is included when a sliced parent lacks both usable bounds.

@@ -16,6 +16,7 @@ import { MANIFEST_MARKER } from "../../src/aggregate/backfill.js";
 import { backfillJsonSchema } from "../../src/receipt/exportSchema.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
 import { renderReceipt } from "../../src/receipt/render.js";
+import { loadById } from "../../src/parse/load.js";
 import { toCommandTelemetry } from "../../src/telemetry/helpers.js";
 import { COMMAND_VALUES, EXPORT_FORMAT_VALUES, EXPORT_SURFACE_VALUES } from "../../src/telemetry/schemas.js";
 import type { AgentSource, Session, SessionSummary, TokenUsage, Turn } from "../../src/parse/types.js";
@@ -215,6 +216,16 @@ describe("backfill without --out (R2)", () => {
 });
 
 describe("backfill --out (R3/R5/R9)", () => {
+  it("writes a full-session receipt with each discovered subagent included once", async () => {
+    const parent = await loadById("claude-code", "test/fixtures/claude-code/clean-with-subagents.jsonl");
+    expect(parent).not.toBeNull();
+    const dir = await tempDir();
+    const { ctx, writes } = fakeContext(["backfill", "--out", dir]);
+    expect(await runBackfill(ctx, deps([parent!]))).toBe(0);
+    const receipt = [...writes.entries()].find(([file]) => file.endsWith(".txt") && !file.endsWith("index.txt"))?.[1];
+    expect(receipt?.match(/SUBAGENTS \(2\)/gu)).toHaveLength(1);
+  });
+
   it("writes one renderer-byte receipt per session plus a marker manifest", async () => {
     const dir = await tempDir();
     const { ctx, out, writes, exports, milestones } = fakeContext(["backfill", "--out", dir]);

@@ -52,6 +52,21 @@ export function formatInt(n: number): string {
   return commaGroup(Math.round(n));
 }
 
+/**
+ * Round a 0..1 share without turning a real minority into `0%` or a real mix
+ * into `100%`. Exact endpoints keep their exact labels.
+ */
+export function formatSharePercent(share: number): string {
+  const pct = Math.round(share * 100);
+  if (pct <= 0 && share > 0) {
+    return "<1%";
+  }
+  if (pct >= 100 && share < 1) {
+    return ">99%";
+  }
+  return `${pct}%`;
+}
+
 /** `$`-free comma-grouped dollar amount (e.g. `"1,234.56"`) — callers prepend `$`; keeps zero-`$`-bytes callers (tokens-only mode) from having to strip a symbol back out. */
 export function formatUsd(n: number): string {
   const sign = n < 0 ? "-" : "";
@@ -61,6 +76,75 @@ export function formatUsd(n: number): string {
   const rem = cents % 100;
   return `${sign}${commaGroup(dollars)}.${pad2(rem)}`;
 }
+
+/**
+ * `$`-free, downward-rounded amount for a nonnegative lower-bound claim.
+ * Cents are used normally; sub-cent values retain four decimals so a real
+ * observable component does not collapse to a useless zero. Unlike
+ * `formatUsd`, this function never rounds a claim above its input.
+ */
+export type UsdFloorDecimals = 2 | 4;
+
+/** One downward precision for an additive display ledger. */
+export function usdFloorDecimals(values: Iterable<number | null | undefined>): UsdFloorDecimals {
+  for (const value of values) {
+    if (value !== null && value !== undefined && value > 0) {
+      const nearestCent = Math.round(value * 100) / 100;
+      const tolerance = Number.EPSILON * Math.max(1, Math.abs(value)) * 8;
+      // A tiny positive sum residue such as 0.1 + 0.2 may safely render at
+      // the lower exact cent. A value microscopically below the cent cannot:
+      // keep four decimals rather than rounding a `≥` claim upward.
+      if (nearestCent > value || Math.abs(nearestCent - value) > tolerance) {
+        return 4;
+      }
+    }
+  }
+  return 2;
+}
+
+function floorUsdUnits(n: number, decimals: UsdFloorDecimals): number {
+  const safe = Number.isFinite(n) && n > 0 ? n : 0;
+  const scale = 10 ** decimals;
+  const scaled = safe * scale;
+  let units = Math.floor(scaled);
+  const nearest = Math.round(scaled);
+  if (nearest / scale <= safe) {
+    units = nearest;
+  }
+  // Multiplication can round the float immediately below a decimal boundary
+  // up to that boundary (for example nextDown(0.10) * 100 === 10). Correct
+  // the candidate against the original value so a displayed `≥` amount can
+  // never exceed the numeric lower bound it represents.
+  if (units > 0 && units / scale > safe) {
+    units--;
+  }
+  return units;
+}
+
+function formatUsdUnits(units: number, decimals: UsdFloorDecimals): string {
+  const scale = 10 ** decimals;
+  const dollars = Math.floor(units / scale);
+  const remainder = String(units % scale).padStart(decimals, "0");
+  return `${commaGroup(dollars)}.${remainder}`;
+}
+
+export function formatUsdFloor(n: number, precision?: UsdFloorDecimals): string {
+  const safe = Number.isFinite(n) && n > 0 ? n : 0;
+  const decimals = precision ?? usdFloorDecimals([safe]);
+  return formatUsdUnits(floorUsdUnits(safe, decimals), decimals);
+}
+
+/** Human-facing cost claim: observable tokens at the cited global Standard API list price. It is a floor, never an invoice. */
+export function formatUsdLowerBound(n: number, precision?: UsdFloorDecimals): string {
+  return `≥ $${formatUsdFloor(n, precision)}`;
+}
+
+/** Compact form for status lines where an extra separator column is expensive. */
+export function formatUsdLowerBoundCompact(n: number, precision?: UsdFloorDecimals): string {
+  return `≥$${formatUsdFloor(n, precision)}`;
+}
+
+export const STANDARD_API_LOWER_BOUND_NOTE = "standard API-equivalent floor; not an invoice";
 
 /** `label` left-aligned, `value` right-aligned, `.` leaders filling the gap — the till-receipt line style. Falls back to a single-space gap if `label`+`value` already meet/exceed `width`. */
 export const MIN_LEADER = 3;

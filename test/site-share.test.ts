@@ -299,7 +299,7 @@ describe("SPEC-0035 R3 — intent-URL share targets", () => {
     const href = elems.get("share-x")!.href;
     const u = new URL(href);
     expect(u.origin + u.pathname).toBe("https://twitter.com/intent/tweet");
-    expect(u.searchParams.get("text")).toBe("An aireceipts cost receipt — what the AI agents actually cost.");
+    expect(u.searchParams.get("text")).toBe("An aireceipts cost receipt — an observable Standard API cost floor, not an invoice.");
     expect(u.searchParams.get("url")).toBe(
       "https://anandgupta42.github.io/receipts/view.html?src=" + encodeURIComponent(ARTIFACT_URL),
     );
@@ -323,7 +323,7 @@ describe("SPEC-0035 R3 — intent-URL share targets", () => {
     const m = /var SHARE_TEXT = "([^"]*)";/.exec(scriptSrc);
     expect(m, "SHARE_TEXT declaration not found in site/view.html").not.toBeNull();
     expect(m![1]).toBe(CLI_SHARE_TEXT);
-    expect(m![1]).toBe("An aireceipts cost receipt — what the AI agents actually cost.");
+    expect(m![1]).toBe("An aireceipts cost receipt — an observable Standard API cost floor, not an invoice.");
   });
 });
 
