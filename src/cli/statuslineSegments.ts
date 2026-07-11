@@ -1,10 +1,11 @@
 // SPEC-0062 — the statusline segments engine. One renderer for the default
-// line and `--format`: the default IS the format `brand,cost,tokens,waste,quota5h`
-// (no duplicated truths). Every segment is an official payload passthrough, an
-// existing SPEC-0007/0061 value, or the R4 labeled `≈` interpolation — a segment
-// with nothing honest to say returns `null` and is omitted, never zero-filled
-// (I2/I3). Unknown segment names fail fast: a typo'd format must not silently
-// render a partial line.
+// line and `--format`: the default IS the format
+// `brand,model,cost,burn,tokens,context,waste,quota5h` (SPEC-0076 — identity
+// before the numbers; no duplicated truths). Every segment is an official
+// payload passthrough, an existing SPEC-0007/0061 value, or the R4 labeled `≈`
+// interpolation — a segment with nothing honest to say returns `null` and is
+// omitted, never zero-filled (I2/I3). Unknown segment names fail fast: a typo'd
+// format must not silently render a partial line.
 import type { MiniSummary } from "../receipt/mini.js";
 import { statuslineWasteFlag } from "../receipt/mini.js";
 import { formatShortTokens, formatUsd } from "../receipt/format.js";
@@ -16,9 +17,9 @@ import {
   type QuotaReading,
 } from "./quotaWindow.js";
 
-export const DEFAULT_FORMAT = "brand,cost,burn,tokens,context,waste,quota5h";
+export const DEFAULT_FORMAT = "brand,model,cost,burn,tokens,context,waste,quota5h";
 
-export const SEGMENT_NAMES = ["brand", "cost", "burn", "tokens", "context", "waste", "quota5h", "quota7d", "quotaEta"] as const;
+export const SEGMENT_NAMES = ["brand", "model", "cost", "burn", "tokens", "context", "waste", "quota5h", "quota7d", "quotaEta"] as const;
 export type SegmentName = (typeof SEGMENT_NAMES)[number];
 
 export interface SegmentContext {
@@ -88,6 +89,55 @@ function contextPct(payload: unknown): number | null {
   return typeof pct === "number" && Number.isFinite(pct) && pct >= 0 && pct <= 100 ? pct : null;
 }
 
+/** C0/C1/DEL scan (`0x00–0x1f`, `0x7f–0x9f`) plus the Unicode line separators (`U+2028`/`U+2029` — not C1, but they still break a one-line bar) for the model-name guard — a codepoint loop, not a control-char regex literal (keeps `no-control-regex` clean). */
+function hasControlChar(s: string): boolean {
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i);
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * SPEC-0076 R2 — the one shared guard for both model-name sources (the payload's
+ * `display_name` and the fallback `MiniSummary.model`): trim, then require a
+ * non-empty, ≤ 64-char string with no C0/C1/DEL control characters or Unicode
+ * line separators. The
+ * statusline is a one-line contract, so neither a garbled payload nor a garbage
+ * transcript model id may break it. Returns the trimmed name, or `null` so the
+ * caller moves to the next source (payload → summary → omitted).
+ */
+function cleanModelName(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (trimmed.length === 0 || trimmed.length > 64 || hasControlChar(trimmed)) {
+    return null;
+  }
+  return trimmed;
+}
+
+/**
+ * SPEC-0076 R1 — Claude Code's documented statusLine payload names the
+ * **current** model (`model: { id, display_name }`), read with the same guarded
+ * object pattern as `quotaWindow`/`contextPct`. Returns the cleaned
+ * `display_name`, or `null` when the field is absent or fails the guard so the
+ * caller falls back to the session's dominant model.
+ */
+function payloadModelName(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
+  const model = (payload as Record<string, unknown>).model;
+  if (typeof model !== "object" || model === null) {
+    return null;
+  }
+  return cleanModelName((model as Record<string, unknown>).display_name);
+}
+
 /** A 5h/7d window never resets more than ~8 days out — a remaining time beyond this means a garbage `resets_at` (e.g. a ms value sent as seconds, or the CC epoch bug), so omit rather than render an absurd countdown (Codex #2). */
 const MAX_RESET_COUNTDOWN_MS = 8 * 24 * 60 * 60 * 1000;
 
@@ -139,6 +189,16 @@ const SEGMENTS: Record<SegmentName, (ctx: SegmentContext) => string | null> = {
   // R1 — inside Claude Code's own status bar the host name is redundant; in
   // disk-fallback mode the newest session may be another agent's, so say whose.
   brand: (ctx) => (ctx.inputMode === "stdin_payload" ? "[aireceipts]" : `[aireceipts · ${ctx.summary.agentLabel}]`),
+  // SPEC-0076 R1 — identity before the numbers. In stdin mode the host's
+  // current model wins (a mid-session switch shows on the next render); its
+  // guard failure, and disk-fallback mode (a stale payload must never sit
+  // beside another session's numbers), use the session's dominant model — the
+  // same value the mini receipt prints. Neither → omitted (I2/I3), never
+  // guessed.
+  model: (ctx) =>
+    ctx.inputMode === "stdin_payload"
+      ? (payloadModelName(ctx.payload) ?? cleanModelName(ctx.summary.model))
+      : cleanModelName(ctx.summary.model),
   cost: (ctx) =>
     !ctx.summary.unpriceable && ctx.summary.totalUsd !== null ? `$${formatUsd(ctx.summary.totalUsd)}` : null,
   tokens: (ctx) => formatShortTokens(ctx.summary.totalTokens),

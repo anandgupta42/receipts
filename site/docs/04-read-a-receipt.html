@@ -305,7 +305,7 @@ footer{
         <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
         <li><a href="05-compare.html">Compare two sessions</a></li>
         <li><a href="06-week.html">Aggregate the week</a></li>
-        <li><a href="07-statusline.html">Show a statusline in your shell</a></li>
+        <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
@@ -317,7 +317,7 @@ footer{
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
         <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
-        <li><a href="statusline.html">Statusline</a></li>
+        <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
@@ -359,7 +359,8 @@ TOTAL........................................$0.18
 same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
+         github.com/anandgupta42/receipts
 - - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
 
 <p>Reading it top to bottom: the <strong>title</strong> is your opening prompt; the header line gives the <strong>agent, start time, and duration</strong>; then the <strong>model mix</strong> (share of tokens per model) and how much of the input was served from <strong>cache</strong>. The body lists <strong>cost per tool</strong>, highest first. <code>(thinking/reply)</code> is the model's own output on turns that called no tool. <code>TOTAL</code> is the sum; <code>same tokens on …</code> re-prices those exact tokens on a cheaper model as a reference point — the <code>(78% less)</code> is the same arithmetic as a percentage, never a prediction.</p>

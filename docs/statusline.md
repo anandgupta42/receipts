@@ -1,9 +1,10 @@
-# Statusline
+# Statusline — the meter
 
-`aireceipts statusline` prints one line — the last-completed session's cost (or
-tokens, if unpriced) plus a waste flag if one fired — meant for Claude Code's
-`statusLine` command config, so a number is visible on every prompt without
-running `aireceipts` manually.
+`aireceipts statusline` is the meter: one line in your status bar while the agent
+works — the model that's running, cost so far, burn rate, and the quota countdown —
+updated as the session runs. When the ride ends, `aireceipts` prints the receipt.
+Wired into Claude Code's `statusLine` command config, the fare is visible on every
+prompt without running anything yourself.
 
 ## Setup
 
@@ -267,12 +268,16 @@ in tmux or another shell UI.
 ## Output
 
 ```
-[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
-[aireceipts] $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
+[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+[aireceipts] Opus · $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
+[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k
 [aireceipts · Cursor] 8k
 aireceipts: no sessions detected
 ```
 
+- `Opus` (after the brand) is the model — in stdin mode, Claude Code's own current
+  model name (a mid-session switch shows on the next render); in disk fallback, the
+  session's dominant model by token share. Omitted when neither is known.
 - `$X.XX` is the session's priced cost (aireceipts' own cited-price figure, incl.
   subagents); omitted when it can't be priced — never a fabricated `$` amount.
 - `$X/hr` is the session-average burn rate (that same priced cost over the session
@@ -294,7 +299,7 @@ aireceipts: no sessions detected
 
 ## Custom formats (`--format`)
 
-The default line is the format `brand,cost,burn,tokens,context,waste,quota5h`. Pick your own
+The default line is the format `brand,model,cost,burn,tokens,context,waste,quota5h`. Pick your own
 segments with `--format` (comma-separated; a segment with nothing honest to say
 is omitted, and an unknown name exits 1 with the valid list on stderr):
 
@@ -326,6 +331,7 @@ select known segments — it cannot inject text, colors, paths, or values.
 | Segment | Renders | Source |
 |---|---|---|
 | `brand` | `[aireceipts]` (stdin) / `[aireceipts · <agent>]` (disk fallback) | — |
+| `model` | `Opus` / `claude-opus-4-8` | stdin: Claude Code's own `model.display_name` (the **current** model, so a mid-session switch shows on the next render); disk fallback: the session's dominant model by token share (the mini receipt's value); omitted when neither exists (e.g. Cursor). Guarded: trimmed, ≤ 64 chars, no control characters. |
 | `cost` | `$X.XX` | priced session total incl. subagents; omitted when unpriced (I2) |
 | `burn` | `$X/hr` | session-average burn (priced cost ÷ wall-clock); omitted when unpriced or no duration |
 | `tokens` | `Nk` / `NM` | session + subagent tokens, abbreviated |

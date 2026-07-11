@@ -305,7 +305,7 @@ footer{
         <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
         <li><a href="05-compare.html">Compare two sessions</a></li>
         <li><a href="06-week.html">Aggregate the week</a></li>
-        <li><a href="07-statusline.html">Show a statusline in your shell</a></li>
+        <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
         <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
@@ -317,7 +317,7 @@ footer{
         <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
         <li><a href="faq.html">FAQ</a></li>
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
-        <li><a href="statusline.html">Statusline</a></li>
+        <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
@@ -370,9 +370,9 @@ footer{
     <p>Goal: total every session from the last seven days, across every agent, with an honest comparison to the week before.</p>
   </li>
   <li>
-    <a href="07-statusline.html">Show a statusline in your shell</a>
+    <a href="07-statusline.html">Keep the meter running</a>
     <span class="path">docs/guide/07-statusline.md</span>
-    <p>Goal: see the current session's cost on *every* Claude Code prompt, without running a command yourself.</p>
+    <p>Goal: the meter on *every* Claude Code prompt — model, cost so far, burn rate — without running a command yourself.</p>
   </li>
   <li>
     <a href="08-budget.html">Set and watch a budget</a>
@@ -418,9 +418,9 @@ footer{
     <p>aireceipts can emit a session receipt as machine-readable JSON (--json) or CSV (--csv) instead of the text receipt, for FinOps tooling and spreadsheet ingestion.</p>
   </li>
   <li>
-    <a href="statusline.html">Statusline</a>
+    <a href="statusline.html">Statusline — the meter</a>
     <span class="path">docs/statusline.md</span>
-    <p>aireceipts statusline prints one line — the last-completed session's cost (or tokens, if unpriced) plus a waste flag if one fired — meant for Claude Code's statusLine command…</p>
+    <p>aireceipts statusline is the meter: one line in your status bar while the agent works — the model that's running, cost so far, burn rate, and the quota countdown — updated as the…</p>
   </li>
   <li>
     <a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a>

@@ -1,16 +1,16 @@
-# Show a statusline in your shell
+# Keep the meter running
 
-Goal: see the current session's cost on *every* Claude Code prompt, without
-running a command yourself.
+Goal: the meter on *every* Claude Code prompt — model, cost so far, burn
+rate — without running a command yourself.
 
 `aireceipts statusline` prints exactly one line, meant to be wired into Claude
 Code's `statusLine` config:
 
 ```
-[aireceipts] $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
 ```
 
-![Terminal recording: piping a Claude Code statusLine payload through aireceipts statusline prints one line — session cost, burn rate, tokens, context fullness, a waste flag, and the 5-hour window countdown; --format trims it to chosen segments.](../../site/assets/statusline.gif)
+![An agent session replayed in a Claude Code-shaped terminal — tool rows scrolling above the input box, the aireceipts meter highlighted beneath it, ticking up as the session runs; host-supplied payload fields simulated.](../../site/assets/statusline.gif)
 
 ## Set it up
 
@@ -54,10 +54,13 @@ Code itself, the native stdin hook above stays the richer, recommended setup.
 
 ## What the line shows
 
-The default line is the segment set `brand,cost,burn,tokens,context,waste,quota5h`
-— cost, burn rate, tokens, context fullness, a waste flag, and your rate-limit
-window:
+The default line is the segment set `brand,model,cost,burn,tokens,context,waste,quota5h`
+— the model, cost, burn rate, tokens, context fullness, a waste flag, and your
+rate-limit window:
 
+- `Opus` (after the brand) is the model — in stdin mode, Claude Code's own current
+  model name (a mid-session switch shows on the next render); in disk fallback, the
+  session's dominant model by token share. Omitted when neither is known.
 - `$X.XX` is the session's priced cost (`Nk`/`NM` tokens alone when it can't be
   priced — never a fabricated dollar amount), and `$X/hr` its session-average
   burn rate.

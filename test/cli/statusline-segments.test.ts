@@ -110,7 +110,8 @@ describe("SPEC-0062 R3 — renderSegments", () => {
   });
 
   it("the default format constant matches the spec-pinned list", () => {
-    expect(DEFAULT_FORMAT).toBe("brand,cost,burn,tokens,context,waste,quota5h");
+    expect(DEFAULT_FORMAT).toBe("brand,model,cost,burn,tokens,context,waste,quota5h");
+    expect(SEGMENT_NAMES).toContain("model");
     expect(SEGMENT_NAMES).toContain("quotaEta");
   });
 });
@@ -173,6 +174,94 @@ describe("SPEC-0071 — rich statusline (burn, context, quota countdown, M/B tok
     const summary = buildMiniSummary(model({ totalUsd: 40, durationMs: 1_800_000, totalTokens: usage(501_368_000) }));
     const payload = { context_window: { used_percentage: 42 }, rate_limits: { five_hour: { used_percentage: 26, resets_at: WINDOW.resets_at } } };
     expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ summary, payload, nowMs: 0 }))).not.toContain(String.fromCharCode(27));
+  });
+});
+
+describe("SPEC-0076 R1/R2 — the model segment", () => {
+  /** A summary whose dominant model is `m` (or none, for the Cursor/omit case). */
+  function summaryWithModel(m: string | null) {
+    return buildMiniSummary(model({ modelMix: m === null ? [] : [{ model: m, tokens: usage(1000), tokenShare: 1 }] }));
+  }
+
+  it("R3 default: a full stdin payload renders the current model between brand and cost", () => {
+    // $4.20 / (1_680_000ms = 0.4666h) = $9/hr; 2h13m before the window reset.
+    const summary = buildMiniSummary(
+      model({ totalUsd: 4.2, durationMs: 1_680_000, totalTokens: usage(128_000), modelMix: [{ model: "claude-opus-4-8", tokens: usage(128_000), tokenShare: 1 }] }),
+    );
+    const payload = {
+      model: { id: "claude-opus-4-8", display_name: "Opus" },
+      context_window: { used_percentage: 42 },
+      rate_limits: { five_hour: { used_percentage: 24, resets_at: WINDOW.resets_at } },
+    };
+    const nowMs = RESETS_AT_MS - (2 * 3600 + 13 * 60) * 1000;
+    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ summary, payload, nowMs }))).toBe(
+      "[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m",
+    );
+  });
+
+  it("R1 precedence: the payload display_name beats the summary model in stdin mode", () => {
+    const payload = { model: { display_name: "Opus" } };
+    expect(renderSegments(segs("brand,model"), ctx({ summary: summaryWithModel("claude-sonnet-5"), payload }))).toBe("[aireceipts] Opus");
+  });
+
+  it("R2 trim: a padded display_name renders trimmed", () => {
+    expect(renderSegments(segs("brand,model"), ctx({ payload: { model: { display_name: " Opus " } } }))).toBe("[aireceipts] Opus");
+  });
+
+  it("R2 64-char boundary: exactly 64 chars is accepted", () => {
+    const name = "a".repeat(64);
+    expect(renderSegments(segs("model"), ctx({ payload: { model: { display_name: name } } }))).toBe(name);
+  });
+
+  it.each([
+    ["absent model", {}],
+    ["non-string", { model: { display_name: 42 } }],
+    ["empty", { model: { display_name: "" } }],
+    ["whitespace-only", { model: { display_name: "   " } }],
+    ["65 chars", { model: { display_name: "a".repeat(65) } }],
+    ["C0 newline", { model: { display_name: "Opus\nX" } }],
+    ["DEL", { model: { display_name: "Opus\u007fX" } }],
+    ["C1 NEL", { model: { display_name: "Opus\u0085X" } }],
+    ["U+2028 line separator", { model: { display_name: "Opus\u2028X" } }],
+    ["U+2029 paragraph separator", { model: { display_name: "Opus\u2029X" } }],
+  ])("R1/R2 fallback: stdin %s falls back to the summary model", (_case, payload) => {
+    expect(renderSegments(segs("brand,model"), ctx({ summary: summaryWithModel("claude-opus-4-8"), payload }))).toBe("[aireceipts] claude-opus-4-8");
+  });
+
+  it("R1 stale-payload gate: disk fallback ignores a parseable payload model, uses the summary model", () => {
+    const payload = { model: { display_name: "Opus" } };
+    expect(
+      renderSegments(segs("brand,model"), ctx({ inputMode: "disk_fallback", summary: summaryWithModel("claude-opus-4-8"), payload })),
+    ).toBe("[aireceipts · Claude Code] claude-opus-4-8");
+  });
+
+  it("R3 disk fallback: a priced Codex session with duration renders the spec's exact line", () => {
+    // $1.10 / (990_000ms = 0.275h) = $4/hr.
+    const summary = buildMiniSummary(
+      model({
+        agentLabel: "Codex",
+        source: "codex",
+        totalUsd: 1.1,
+        durationMs: 990_000,
+        totalTokens: usage(84_000),
+        sessionTotalTokens: usage(84_000),
+        modelMix: [{ model: "gpt-5.2-codex", tokens: usage(84_000), tokenShare: 1 }],
+      }),
+    );
+    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ inputMode: "disk_fallback", summary, payload: null }))).toBe(
+      "[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k",
+    );
+  });
+
+  it("R1 omitted: no payload model and a null summary model omits the segment entirely (Cursor)", () => {
+    const cursor = ctx({ summary: summaryWithModel(null), payload: null });
+    expect(renderSegments(segs("brand,model"), cursor)).toBe("[aireceipts]");
+    expect(renderSegments(segs("model"), cursor)).toBe("");
+  });
+
+  it("R2 fallback guarded: an over-long or control-bearing summary model is omitted, not rendered", () => {
+    expect(renderSegments(segs("model"), ctx({ summary: summaryWithModel("a".repeat(65)), payload: null }))).toBe("");
+    expect(renderSegments(segs("model"), ctx({ summary: summaryWithModel("bad\u0007model"), payload: null }))).toBe("");
   });
 });
 

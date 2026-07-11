@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>aireceipts — your agent works, you get the receipt</title>
 <meta name="description" content="Local, deterministic cost receipts for AI coding agents. One command, no account, no server — it reads the transcripts already on your disk, and they stay there.">
-<meta name="theme-color" content="#0e1417">
+<meta name="theme-color" content="#faf9f6">
 <meta property="og:type" content="website">
 <meta property="og:title" content="aireceipts — your agent works, you get the receipt">
 <meta property="og:description" content="Every session, itemized and priced — locally. No account. Transcripts never leave your machine.">
@@ -14,494 +14,375 @@
 <meta name="twitter:image" content="assets/hero-receipt.png">
 <style>
   :root{
-    --stage:#0e1417;      /* near-black stage: the object rests here */
-    --stage-2:#0b1013;    /* deeper black for the closing bookend */
-    --paper:#eceff1;      /* cool light field */
-    --sheet:#ffffff;      /* the sheet */
-    --ink:#12171b;        /* near-black ink, cool */
-    --muted:#5a6771;      /* cool gray body */
-    --faint:#8a949c;      /* fainter labels */
-    --rule:#e2e7ea;       /* hairline */
-    --rule-strong:#c4cdd3;/* structural rule */
-    --seal:#bb392f;       /* vermillion: the single waste mark */
-    --ledger:#2f5d3a;     /* forest green: totals */
-    /* on the dark stage */
-    --stage-fg:#eef2f5;
-    --stage-muted:#9aa8b1;
-    --stage-faint:#66757f;
-    --stage-line:#233037;
-    /* terminal chrome, as it prints */
-    --term-bg:#0f1518;
-    --term-fg:#d6dde2;
-    --term-dim:#84939c;
-    --term-green:#7fd08a;
-    --term-red:#f0897d;
-    --term-head:#9fb1bc;
-    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-    --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+    --paper:#faf9f6;      /* warm receipt paper */
+    --sheet:#ffffff;      /* the receipt card */
+    --ink:#17181a;        /* near-black ink */
+    --muted:#585d63;      /* body gray */
+    --faint:#70757b;      /* labels */
+    --rule:#e7e4dd;       /* hairline */
+    --rule-strong:#cfccc4;
+    --seal:#c03a2e;       /* the red: waste, the second line, nothing else */
+    --ledger:#2f5d3a;     /* totals green */
+    --dark:#141517;       /* terminal / dark cards */
+    --dark-fg:#e8eaec;
+    --dark-dim:#8a9096;
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
-  body{
-    margin:0;background:var(--paper);color:var(--ink);
-    font-family:var(--sans);font-size:16px;line-height:1.5;
-    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
-  }
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+  body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.7 var(--mono);-webkit-font-smoothing:antialiased}
   a{color:inherit}
-  a:focus-visible,button:focus-visible{outline:2px solid var(--ledger);outline-offset:3px;border-radius:3px}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 28px}
 
-  .wrap{width:100%;max-width:1080px;margin:0 auto;padding:0 clamp(20px,5vw,40px)}
+  /* ---- nav ---- */
+  .nav{position:sticky;top:0;z-index:10;background:rgba(250,249,246,.92);backdrop-filter:blur(6px);border-bottom:1px solid var(--rule)}
+  .nav-in{display:flex;align-items:center;gap:22px;height:56px}
+  .brand{font-weight:700;letter-spacing:.02em;text-decoration:none;font-size:15px}
+  .brand::after{content:"_";color:var(--seal);animation:blink 1.2s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media (prefers-reduced-motion: reduce){ .brand::after{animation:none} }
+  .nav-links{margin-left:auto;display:flex;align-items:center;gap:18px;font-size:12.5px}
+  .nav-links a{color:var(--muted);text-decoration:none}
+  .nav-links a:hover{color:var(--ink)}
+  .nav-cta{background:var(--ink);color:var(--paper) !important;border:0;border-radius:7px;padding:8px 13px;font:600 12.5px var(--mono);cursor:pointer}
+  @media (max-width:760px){ .nav-links a:not(.nav-cta){display:none} }
 
-  /* ---- masthead ---- */
-  .mast{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:clamp(20px,3vw,30px) 0;gap:16px;
-  }
-  .brand{
-    font-family:var(--sans);font-weight:800;font-size:14px;
-    letter-spacing:.30em;color:var(--ink);text-transform:uppercase;
-  }
-  .mnav{display:flex;gap:22px;font-size:12.5px;font-weight:600;letter-spacing:.10em;text-transform:uppercase}
-  .mnav a{color:var(--faint);text-decoration:none}
-  .mnav a:hover{color:var(--ink)}
+  /* ---- hero ---- */
+  .hero{padding:84px 0 64px}
+  .hero-in{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+  @media (max-width:900px){ .hero-in{grid-template-columns:1fr} }
+  h1.display{font:800 clamp(38px,5.2vw,64px)/1.06 var(--sans);letter-spacing:-.02em;margin:0 0 22px;text-wrap:balance}
+  h1.display .seal{color:var(--seal)}
+  .hero-sub{color:var(--muted);max-width:46ch;margin:0 0 10px}
+  .hero-note{color:var(--faint);font-size:12.5px;margin:0 0 26px}
+  .cta-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:18px}
+  .cmd-btn{display:inline-flex;align-items:center;gap:8px;background:var(--ink);color:var(--paper);border:0;border-radius:8px;padding:12px 18px;font:600 13.5px var(--mono);cursor:pointer}
+  .cmd-btn .p{color:var(--faint)}
+  .cta-link{font-size:12.5px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
 
-  /* ---- the stage: near-black, the object rests on it ---- */
-  .stage{background:var(--stage);color:var(--stage-fg)}
-  .stage-in{
-    max-width:1080px;margin:0 auto;
-    padding:clamp(56px,9vw,120px) clamp(20px,5vw,40px) clamp(40px,7vw,84px);
-    text-align:center;
-  }
-  .display{
-    font-family:var(--sans);font-weight:800;
-    font-size:clamp(38px,8.6vw,72px);line-height:1.02;
-    letter-spacing:-.032em;margin:0 auto;max-width:15ch;
-    color:var(--stage-fg);
-  }
-  .display .soft{color:var(--stage-muted)}
-  .stage-sub{
-    margin:clamp(20px,3vw,28px) auto 0;max-width:52ch;
-    font-size:clamp(15px,2.2vw,19px);line-height:1.55;color:var(--stage-muted);
-  }
+  /* the paper receipt */
+  .paper{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;box-shadow:0 30px 60px -38px rgba(23,24,26,.35), 0 2px 6px rgba(23,24,26,.05);padding:30px 30px 26px;max-width:420px;margin-left:auto}
+  @media (max-width:900px){ .paper{margin:0 auto} }
+  .paper pre{margin:0;font:12.5px/2 var(--mono);white-space:pre;overflow-x:auto}
+  .paper .dim{color:var(--faint)} .paper .red{color:var(--seal)} .paper .grn{color:var(--ledger);font-weight:700}
+  .paper .b{font-weight:700}
 
-  /* ---- copybox: the one CTA, reused verbatim ---- */
-  .cta-hold{display:flex;justify-content:center;margin:clamp(26px,3.4vw,34px) 0 0}
-  .copybox{
-    display:inline-flex;align-items:stretch;
-    border:1.5px solid var(--ink);border-radius:9px;overflow:hidden;
-    background:var(--sheet);box-shadow:0 10px 30px -18px rgba(0,0,0,.55);
-  }
-  .copybox code{
-    font-family:var(--mono);font-size:clamp(14px,2vw,16px);color:var(--ink);
-    padding:13px clamp(14px,2vw,20px);white-space:nowrap;
-    display:inline-flex;align-items:center;gap:.6ch;
-  }
-  .copybox code .p{color:var(--faint)}
-  .copybox button{
-    font-family:var(--sans);font-size:12px;font-weight:700;
-    text-transform:uppercase;letter-spacing:.09em;
-    border:0;border-left:1.5px solid var(--ink);
-    background:var(--ink);color:#fff;padding:0 clamp(16px,2.2vw,22px);cursor:pointer;
-  }
-  .copybox button:hover{background:#000}
+  /* ---- ticker ---- */
+  .ticker{border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);overflow:hidden;background:var(--sheet)}
+  .ticker-track{display:flex;gap:0;width:max-content;animation:tick 38s linear infinite}
+  @media (prefers-reduced-motion: reduce){ .ticker-track{animation:none} }
+  .ticker:hover .ticker-track{animation-play-state:paused}
+  .ticker ul{display:flex;list-style:none;margin:0;padding:12px 0;gap:44px;padding-right:44px}
+  .ticker li{white-space:nowrap;font-size:12px;color:var(--muted)}
+  .ticker li b{color:var(--ink)} .ticker li .red{color:var(--seal)}
+  @keyframes tick{to{transform:translateX(-50%)}}
 
-  /* ---- the object ---- */
-  .object{
-    margin:clamp(46px,7vw,84px) auto 0;max-width:640px;
-    perspective:1700px;
-  }
-  .object img{
-    display:block;width:100%;height:auto;border-radius:14px;
-    border:1px solid #05090b;
-    transform:rotateX(3deg) rotateY(-3deg) rotate(-.4deg);
-    box-shadow:
-      0 2px 0 rgba(255,255,255,.04) inset,
-      0 60px 90px -48px rgba(0,0,0,.85),
-      0 30px 60px -40px rgba(0,0,0,.7);
-  }
+  /* ---- sections ---- */
+  section{padding:88px 0;border-top:1px solid var(--rule)}
+  .eyebrow{font-size:11px;letter-spacing:.22em;color:var(--faint);text-transform:uppercase;margin:0 0 14px}
+  .eyebrow .red{color:var(--seal)}
+  h2.head{font:800 clamp(26px,3.4vw,40px)/1.12 var(--sans);letter-spacing:-.015em;margin:0 0 16px;text-wrap:balance}
+  .lede{color:var(--muted);max-width:56ch;margin:0 0 28px}
+  .lede code, .cap code{background:var(--sheet);border:1px solid var(--rule);border-radius:4px;padding:1px 6px;font-size:.9em}
+  .split{display:grid;grid-template-columns:1fr 1.15fr;gap:52px;align-items:start}
+  @media (max-width:900px){ .split{grid-template-columns:1fr} }
+  .cap{font-size:12px;color:var(--faint);margin:10px 2px 0;max-width:70ch}
+  .cap a{color:var(--muted)}
 
-  /* ---- light sections ---- */
-  section{padding:clamp(56px,9vw,110px) 0}
-  .lede{
-    font-family:var(--sans);font-weight:800;
-    font-size:clamp(26px,4.4vw,44px);line-height:1.06;letter-spacing:-.028em;
-    margin:0 0 clamp(30px,5vw,52px);max-width:20ch;color:var(--ink);
-  }
+  /* meter */
+  .gifframe{border-radius:10px;overflow:hidden;border:1px solid var(--rule-strong);box-shadow:0 26px 54px -40px rgba(23,24,26,.5);background:var(--dark)}
+  .gifframe img{display:block;width:100%;height:auto}
+  .pill{margin-top:16px;background:var(--dark);color:var(--dark-fg);border-radius:9px;padding:12px 16px;font-size:12.5px;white-space:nowrap;overflow-x:auto}
+  .pill .b{color:#9fb4c2} .pill .m{color:var(--dark-dim)} .pill .w{color:#f0a12b}
+  .legend{margin-top:14px;font-size:12px;color:var(--muted);line-height:1.9}
+  .legend b{color:var(--ink);font-weight:600}
 
-  /* three scenarios */
-  .scenarios{
-    display:grid;grid-template-columns:minmax(0,1fr);
-    gap:clamp(28px,3vw,36px);
-  }
-  @media (min-width:820px){.scenarios{grid-template-columns:repeat(3,minmax(0,1fr))}}
-  .scn{min-width:0;border-top:2px solid var(--ink);padding-top:20px}
-  .scn h3{
-    font-family:var(--sans);font-weight:700;
-    font-size:clamp(20px,2.6vw,25px);line-height:1.14;letter-spacing:-.016em;
-    margin:0 0 12px;color:var(--ink);
-  }
-  .scn p{margin:0;font-size:16px;line-height:1.55;color:var(--muted);max-width:34ch}
-  .scn .n{font-family:var(--mono);font-size:.92em;color:var(--ink)}
-  .scn .flag{color:var(--seal);font-weight:600}
+  /* terminal / dark card */
+  .darkcard{background:var(--dark);color:var(--dark-fg);border-radius:10px;padding:18px 20px;overflow-x:auto;box-shadow:0 26px 54px -40px rgba(23,24,26,.5)}
+  .darkcard pre{margin:0;font:12.5px/1.9 var(--mono);white-space:pre}
+  .darkcard .dim{color:var(--dark-dim)} .darkcard .red{color:#e88579} .darkcard .grn{color:#7fbf8e}
+
+  /* the real PR receipt */
+  .prshot{display:block;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;overflow:hidden;box-shadow:0 26px 54px -40px rgba(23,24,26,.35)}
+  .prshot img{display:block;width:100%;height:auto}
+
+  /* handoff cards */
+  .hands{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media (max-width:760px){ .hands{grid-template-columns:1fr} }
+  .hand{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:16px 18px}
+  .hand h4{margin:0 0 10px;font:600 11px var(--mono);letter-spacing:.18em;color:var(--faint)}
+  .hand pre{margin:0;font:12.5px/1.9 var(--mono);white-space:pre-wrap}
+  .hand .red{color:var(--seal)} .hand .grn{color:var(--ledger);font-weight:700}
 
   /* rules */
-  .band{background:var(--sheet);border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
-  .rules{
-    display:grid;grid-template-columns:minmax(0,1fr);
-    gap:0;margin:0;padding:0;list-style:none;counter-reset:clause;
-  }
-  @media (min-width:720px){.rules{grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:clamp(32px,5vw,64px)}}
-  .rules li{
-    position:relative;padding:22px 0 22px 58px;
-    border-top:1px solid var(--rule);
-    font-family:var(--sans);font-weight:600;
-    font-size:clamp(16px,2.1vw,19px);line-height:1.4;color:var(--ink);
-    letter-spacing:-.008em;
-  }
-  .rules li::before{
-    counter-increment:clause;content:"§" counter(clause,decimal-leading-zero);
-    position:absolute;left:0;top:24px;
-    font-family:var(--mono);font-size:13px;font-weight:600;
-    color:var(--ledger);letter-spacing:.02em;
-  }
+  .rules{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:0 0 34px;padding:0;list-style:none}
+  @media (max-width:760px){ .rules{grid-template-columns:1fr} }
+  .rules li{background:var(--sheet);border:1px solid var(--rule);border-radius:9px;padding:13px 16px;display:flex;gap:12px;align-items:baseline;font-size:13px}
+  .rules .rn{font-size:10.5px;color:var(--seal);border:1px solid var(--seal);border-radius:3px;padding:1px 5px;flex:none}
+  .proofrow{display:grid;grid-template-columns:1fr 1fr;gap:36px;align-items:center}
+  @media (max-width:900px){ .proofrow{grid-template-columns:1fr} }
 
-  /* stepper */
-  .steps{
-    display:grid;grid-template-columns:minmax(0,1fr);
-    gap:clamp(24px,3vw,32px);counter-reset:step;
-  }
-  @media (min-width:820px){.steps{grid-template-columns:repeat(3,minmax(0,1fr))}}
-  .step{min-width:0}
-  .step .k{
-    font-family:var(--mono);font-size:13px;font-weight:600;
-    color:var(--faint);letter-spacing:.14em;display:block;margin:0 0 12px;
-  }
-  .step p{
-    margin:0;font-family:var(--sans);font-weight:600;
-    font-size:clamp(17px,2.2vw,20px);line-height:1.34;letter-spacing:-.012em;color:var(--ink);
-  }
-  .step code{font-family:var(--mono);font-weight:600;font-size:.9em;color:var(--ledger);white-space:nowrap}
-  .step .grow{color:var(--muted);font-weight:400}
+  /* agents */
+  .aglogos{display:flex;gap:14px;flex-wrap:wrap}
+  .agtile{display:inline-flex;align-items:center;gap:10px;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:12px 18px;font-weight:600;text-decoration:none;font-size:13.5px}
+  .agtile:hover{border-color:var(--rule-strong)}
+  .agtile img{display:block}
+  .agmark{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:5px;background:var(--ink);color:var(--paper);font:700 10px var(--mono)}
 
-  /* proof */
-  .agents{
-    display:flex;flex-wrap:wrap;align-items:baseline;gap:0 clamp(14px,2vw,22px);
-    margin:0 0 clamp(28px,4vw,40px);
-    font-family:var(--sans);font-weight:700;font-size:clamp(16px,2.2vw,20px);
-    letter-spacing:-.01em;color:var(--ink);
-  }
-  .agents .sep{color:var(--rule-strong);font-weight:400}
-  .agents .deg{color:var(--faint);font-weight:400;font-size:.8em;font-style:italic;letter-spacing:0}
-  .proof-term{
-    background:var(--term-bg);border:1px solid #1c272d;border-radius:11px;overflow:hidden;
-    box-shadow:0 30px 60px -44px rgba(9,14,18,.9);max-width:560px;
-  }
-  .bar{
-    display:flex;align-items:center;gap:9px;padding:10px 14px;
-    background:#141c21;border-bottom:1px solid #1f2b31;
-    font-family:var(--mono);font-size:11.5px;color:var(--term-dim);
-  }
-  .dots{display:inline-flex;gap:5px;flex:0 0 auto}
-  .dots i{width:9px;height:9px;border-radius:50%;background:#37454c;display:block}
-  .bar .cmd{color:var(--term-head)}
-  .bar .cmd .p{color:var(--term-dim)}
-  pre.render{
-    margin:0;min-width:0;overflow-x:auto;max-width:100%;
-    padding:16px 18px;background:var(--term-bg);
-    font-family:var(--mono);font-size:11.5px;line-height:1.46;color:var(--term-fg);
-    -webkit-overflow-scrolling:touch;
-  }
-  .render .g{color:var(--term-green)}
-  .render .d{color:var(--term-dim)}
-  .render .h{color:var(--term-head)}
+  /* closing */
+  .closing{background:var(--paper);border-top:1px solid var(--rule);color:var(--ink);padding:96px 0;text-align:center}
+  .closing h2{font:800 clamp(30px,4vw,52px)/1.1 var(--sans);letter-spacing:-.02em;margin:0 0 28px}
+  .closing .soft{color:var(--faint)}
+  .closing .cmd-btn{margin:0 auto 22px}
+  .closing-note{color:var(--muted);font-size:12.5px;margin:0 0 30px}
+  .foot{display:flex;justify-content:center;gap:14px;font-size:12.5px}
+  .foot a{color:var(--muted)} .foot a:hover{color:var(--ink)}
+  .foot .sep{color:var(--faint)}
 
-  /* ---- closing bookend ---- */
-  .closing{background:var(--stage-2);color:var(--stage-fg)}
-  .closing-in{
-    max-width:1080px;margin:0 auto;text-align:center;
-    padding:clamp(64px,10vw,120px) clamp(20px,5vw,40px);
-  }
-  .closing .display{max-width:16ch}
-  .closing-note{
-    margin:clamp(26px,3.4vw,34px) 0 0;
-    font-size:14px;color:var(--stage-muted);letter-spacing:.01em;
-  }
-  .closing-note b{color:var(--stage-fg);font-weight:600}
-  .foot{
-    display:flex;flex-wrap:wrap;justify-content:center;align-items:center;
-    gap:0 clamp(14px,2vw,20px);
-    margin:clamp(40px,6vw,60px) 0 0;
-    font-size:13.5px;color:var(--stage-muted);
-  }
-  .foot a{color:var(--stage-muted);text-decoration:none}
-  .foot a:hover{color:var(--stage-fg)}
-  .foot .sep{color:var(--stage-line)}
-  .foot .samosa-glyph{vertical-align:middle;margin-right:4px}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--seal);outline-offset:2px;border-radius:4px}
 
-  @media (prefers-reduced-motion:reduce){
-    *{transition:none!important;animation:none!important}
-    .object img{transform:none}
-  }
-.scnic{display:block;margin-bottom:12px;color:#14181c;opacity:.85}
-@media (prefers-color-scheme: dark){}
-.art{margin-top:14px;background:#14181c;color:#c8d0d4;border-radius:10px;padding:12px 14px;font:11px/1.6 ui-monospace,Menlo,monospace;overflow-x:auto;box-shadow:0 8px 24px rgba(0,0,0,.12)}
-.stepbox{margin-top:14px}
-.ruleswrap{display:grid;grid-template-columns:minmax(0,1fr);gap:28px}
-@media (min-width:900px){.ruleswrap{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);align-items:start}}
-.proof{max-width:480px}
-.proofcard{font-size:12px;line-height:1.7}
-.proofcap{font-size:13.5px;color:#5a6068;margin:10px 0 0}
-.agrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;margin:22px 0 28px}
-.ag{border:1px solid #d8dbd6;border-radius:12px;padding:14px 16px;background:#fff}
-.ag strong{display:block;font-size:15px;margin-bottom:4px}
-.ag span{font-size:12.5px;color:#5a6068;line-height:1.45}
-.agq{border-style:dashed}
-.darkstage{background:#14181c;color:#e8eaec;padding-top:72px;padding-bottom:72px;margin-inline:calc(50% - 50vw);padding-inline:calc(50vw - 50%)}
-.darkstage .lede{color:#fff}
-.agwrap{display:grid;grid-template-columns:minmax(0,1fr);gap:32px;align-items:center}
-@media (min-width:960px){.agwrap{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}}
-.aglist{font:14px/2.1 ui-monospace,Menlo,monospace;color:#c8d0d4;margin:0;overflow-x:auto}
-.aglist{background:transparent;border:0;padding:0}
-.agterm{margin:0;box-shadow:0 24px 64px rgba(0,0,0,.5);border:1px solid #2a3138;border-radius:12px}
-.scnimg{border-radius:16px;margin-bottom:14px;box-shadow:0 10px 28px rgba(0,0,0,.25)}
-.cardart{margin-top:14px;font-size:11.5px;padding:10px 12px}
-.bignum{margin-top:12px;font-weight:800;font-size:34px;letter-spacing:-.02em;color:#14181c}
-.bignum .cents{font-size:20px;color:#5a6068}
-.numcap{display:block;font-weight:400;font-size:12px;color:#5a6068;margin-top:2px}
-.prmock{margin-top:14px;border:1px solid #d8dbd6;border-radius:10px;padding:10px 12px;background:#fff}
-.prmock .prav{display:inline-block;width:18px;height:18px;border-radius:50%;background:#14181c;vertical-align:middle;margin-right:7px}
-.prmock .prname{font-size:12.5px;font-weight:600}
-.prmock .prname em{font-style:normal;font-weight:400;color:#5a6068;border:1px solid #d8dbd6;border-radius:4px;padding:0 4px;font-size:10.5px;margin-left:4px}
-.prmock .cardart{margin-top:8px}
-.scn{display:flex;flex-direction:column}
-.scn .cardart,.scn .bignum{margin-top:auto}
-.cardart .dim{color:#7a838a}
-.cardart .redl{color:#e0705f}
-.cardart .grnl{color:#5bbd8b}
-.stageline{font-size:14px;color:#c8d0d4;margin:18px 0 0}
-.stageline strong{color:#fff}
-.prmock{margin-top:auto;border:1px solid #d8dbd6;border-radius:10px;padding:10px 12px;background:#fff}
-.prhead{margin-bottom:8px}
-.prmock .prav{display:inline-block;width:18px;height:18px;border-radius:50%;background:#14181c;vertical-align:middle;margin-right:7px}
-.prmock .prname{font-size:12.5px;font-weight:600}
-.prmock .prname em{font-style:normal;font-weight:400;color:#5a6068;border:1px solid #d8dbd6;border-radius:4px;padding:0 4px;font-size:10.5px;margin-left:4px}
-.prmock .cardart{margin-top:0}
-.aglist2{list-style:none;margin:0;padding:0;font:14px/1.5 ui-monospace,Menlo,monospace;color:#c8d0d4}
-.aglist2 li{display:flex;align-items:baseline;gap:10px;padding:9px 0}
-.agtile{flex:none;width:26px;height:26px;border-radius:7px;background:#232a31;color:#e8e4da;font-size:11px;display:inline-flex;align-items:center;justify-content:center;align-self:center}
-.agtile.agdim{background:transparent;border:1px dashed #3a424a}
-.agname{color:#fff}
-.lead{flex:1;border-bottom:1px dotted #3a424a;transform:translateY(-4px);min-width:16px}
-.agval{color:#9aa4ac;font-size:12.5px;text-align:right}
-.agfoot{display:block;color:#6b747c;font-size:11px}
-.agtx{font-size:10px;letter-spacing:.5px}
-.agmark{display:block}
-.scnimg{border-radius:18px}
-.scnrow{align-items:stretch}
-.scn>p{margin-bottom:18px}
-.steps{position:relative}
-.step{position:relative}
-@media (min-width:720px){
-  .step:not(:last-child)::after{content:"→";position:absolute;right:-9%;top:44px;font-size:22px;color:#b6bdc3}
-}
-.step .art,.step .copybox.stepbox{margin-top:16px}
-.payoff{font:12.5px/1.5 ui-monospace,Menlo,monospace;color:#5a6068;margin:10px 0 0}
-.grn2{color:#3d8f68;font-weight:600;white-space:nowrap}
-.agterm{width:fit-content;max-width:100%;justify-self:center}
-.agterm pre{padding-right:28px}
-.agterm-gif{display:block;height:auto;max-width:100%}
-section.statusstrip{padding:0;margin:calc(-1*clamp(28px,5vw,64px)) 0 0}
-.statusstrip .cap{margin:0 0 12px;font-size:16px;line-height:1.55;color:var(--muted)}
-.statusstrip .cap code{font-family:var(--mono);font-size:.9em;color:var(--ledger);white-space:nowrap}
-.statusline{margin:0;background:var(--term-bg);border:1px solid #1c272d;border-radius:11px;padding:13px 16px;font-family:var(--mono);font-size:12.5px;line-height:1.5;color:var(--term-fg);white-space:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;box-shadow:0 24px 64px -44px rgba(9,14,18,.9)}
-.statusline .b{color:var(--term-head)}
-.statusline .m{color:var(--term-dim)}
+  /* reveal */
+  .rv{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+  .rv.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion: reduce){ .rv{opacity:1;transform:none;transition:none} }
 </style>
+<noscript><style>.rv{opacity:1;transform:none}</style></noscript>
 </head>
 <body>
 
-  <div class="wrap">
-    <header class="mast">
-      <span class="brand">Aireceipts</span>
-      <nav class="mnav">
-        <a href="docs/index.html">Docs</a>
-        <a href="https://github.com/anandgupta42/receipts">GitHub</a>
-      </nav>
-    </header>
-  </div>
-
-  <!-- ============ HERO STAGE ============ -->
-  <div class="stage">
-    <div class="stage-in">
-      <h1 class="display">Your agent works. <span class="soft">You get the receipt.</span></h1>
-      <p class="stage-sub">Every session, itemized and priced — locally. No account. Transcripts never leave your machine.</p>
-      <div class="cta-hold">
-        <div class="copybox">
-          <code><span class="p" aria-hidden="true">$</span>npx aireceipts-cli</code>
-          <button type="button" class="copy-btn" data-cmd="npx aireceipts-cli" aria-label="Copy the command npx aireceipts-cli to the clipboard">Copy</button>
-        </div>
-      </div>
-      <figure class="object">
-        <img src="assets/hero-receipt.png" width="1280" height="1028"
-             alt="A dark aireceipts receipt for a real Claude Code session on claude-sonnet-5, run 33m 31s on Jul 02 2026. Itemized: thinking/reply $5.36, Bash $3.93, Read $1.88, Write $0.66, Edit $0.38, TaskList $0.05, SendMessage $0.04. A red line notes $2.68 recoverable by re-pricing 101 trivial turns to claude-haiku-4-5. TOTAL $12.30; the same tokens on claude-haiku-4-5 would be $6.15. Stamped LOCAL · DETERMINISTIC.">
-      </figure>
+<nav class="nav" aria-label="Site">
+  <div class="wrap nav-in">
+    <a class="brand" href="#">aireceipts</a>
+    <div class="nav-links">
+      <a href="#meter">The meter</a>
+      <a href="#pr">PR receipts</a>
+      <a href="docs/index.html">Docs</a>
+      <a href="https://github.com/anandgupta42/receipts">GitHub</a>
+      <button type="button" class="nav-cta copy-btn" data-cmd="npx aireceipts-cli" aria-label="Copy the command npx aireceipts-cli">$ npx aireceipts-cli</button>
     </div>
   </div>
+</nav>
 
-  <!-- ============ THREE SCENARIOS ============ -->
-  <div class="wrap">
-    <section aria-label="What a receipt catches">
-      <div class="scenarios">
-        <div class="scn">
-          <img class="scnimg" src="assets/scn-loop.png" alt="" width="76" height="76">
-          <h3>The waste you didn't see</h3>
-          <p>Agents get stuck — retrying failed commands, re-reading context. The receipt flags every loop, in dollars.</p>
-          <pre class="art cardart">⚠ re-ran failing command ×5 · <span class="redl">wasted</span>
-<span class="redl">$156.28</span> caught in one day · 45 sessions</pre>
-        </div>
-        <div class="scn">
-          <img class="scnimg" src="assets/scn-week.png" alt="" width="76" height="76">
-          <h3>The week, in one number</h3>
-          <p>Totals, per-agent split, honest deltas — your supported agents, one number.</p>
-          <div class="bignum">$10,056<span class="cents">.63</span><span class="numcap">one real week · 319 sessions</span></div>
-        </div>
-        <div class="scn">
-          <img class="scnimg" src="assets/scn-pr.png" alt="" width="76" height="76">
-          <h3>Receipts on your PRs</h3>
-          <p>What the change cost to make, across the sessions behind it. A hook attaches it, an Action posts it — no manual step. <a href="https://github.com/anandgupta42/receipts/pulls">This repo runs on it</a>.</p>
-          <div class="prmock"><div class="prhead"><span class="prav"></span><span class="prname">aireceipts <em>bot</em> commented</span></div><pre class="art cardart">orchestrator · fable ······ $12.30
-builder · opus ············ $43.80
-TOTAL ····················· <span class="grnl">$56.10</span></pre></div>
-        </div>
+<!-- ============ HERO ============ -->
+<header class="hero">
+  <div class="wrap hero-in">
+    <div>
+      <h1 class="display">Every agent session is a blank check. <span class="seal">Here&rsquo;s the receipt.</span></h1>
+      <p class="hero-sub">The meter runs while the agent drives &middot; the receipt prints when the ride ends &middot; and it sticks with the PR.</p>
+      <p class="hero-note">Local and deterministic. No account; transcripts never leave your machine.</p>
+      <div class="cta-row">
+        <button type="button" class="cmd-btn copy-btn" data-cmd="npx aireceipts-cli"><span class="p">$</span>npx aireceipts-cli</button>
+        <a class="cta-link" href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">See a real receipt on a real PR &rarr;</a>
       </div>
-    </section>
+    </div>
+    <figure class="paper" aria-label="A real aireceipts receipt for a Claude Code session that cost $12.30">
+<pre><span class="dim">- - - - - - - - - - - - - - - -</span>
+          <span class="b">AIRECEIPTS</span>
+<span class="dim"> Claude Code · Jul 02 2026 · 33m</span>
+<span class="dim">- - - - - - - - - - - - - - - -</span>
+(thinking/reply)..........$5.36
+Bash......................$3.93
+Read......................$1.88
+Write.....................$0.66
+Edit......................$0.38
+TaskList..................$0.05
+SendMessage...............$0.04
+<span class="red">⚠ $2.68 recoverable</span>
+<span class="red">  101 trivial turns</span>
+<span class="dim">--------------------------------</span>
+<span class="b">TOTAL....................<span class="grn">$12.30</span></span>
+<span class="dim">(arithmetic, not a prediction)</span></pre>
+    </figure>
   </div>
+</header>
 
-  <!-- ============ STATUSLINE STRIP ============ -->
-  <div class="wrap">
-    <section class="statusstrip" aria-label="The statusline while you work">
-      <p class="cap">The meter while you work — burn rate, context, and quota countdown in your agent's status bar: <code>aireceipts statusline</code></p>
-      <pre class="statusline" tabindex="0" aria-label="An aireceipts statusline: session cost $31.01, burn rate $96 per hour, 21M tokens, context 41% full, and the 5-hour quota at 62% resetting in 1h 54m."><span class="b">[aireceipts]</span> $31.01 · $96/hr · 21M · ctx 41% · <span class="m">5h 62% ↺1h54m</span></pre>
-    </section>
+<!-- ============ TICKER ============ -->
+<div class="ticker" role="list" aria-label="Real numbers from real receipts">
+  <div class="ticker-track">
+    <ul>
+      <li><b class="red">$156.28</b> caught in one day &middot; 45 sessions</li>
+      <li><b>$10,056.63</b> &middot; one real week &middot; 319 sessions</li>
+      <li>same tokens on claude-haiku-4-5 &middot; <b>78% less</b></li>
+      <li><b>$3.13</b> &middot; the receipt on PR #189 &middot; live</li>
+      <li>every price cited &middot; URL, date, excerpt</li>
+    </ul>
+    <ul aria-hidden="true">
+      <li><b class="red">$156.28</b> caught in one day &middot; 45 sessions</li>
+      <li><b>$10,056.63</b> &middot; one real week &middot; 319 sessions</li>
+      <li>same tokens on claude-haiku-4-5 &middot; <b>78% less</b></li>
+      <li><b>$3.13</b> &middot; the receipt on PR #189 &middot; live</li>
+      <li>every price cited &middot; URL, date, excerpt</li>
+    </ul>
   </div>
+</div>
 
-  <!-- ============ HONESTY RULES ============ -->
-  <div class="band">
-    <div class="wrap">
-      <section aria-label="Your numbers, your rules">
-        <h2 class="lede">Your numbers, your rules.</h2>
-        <div class="ruleswrap">
-        <ol class="rules">
-          <li>No fabricated dollars, ever.</li>
-          <li>Every price cited: URL, date, excerpt.</li>
-          <li>Comparisons are arithmetic, not predictions.</li>
-          <li>Same transcript in, byte-identical receipt out.</li>
-          <li>Telemetry is the only unprompted network call — content-free, one variable from off.</li>
-          <li>Facts, not rankings. No “model X would have done it better.”</li>
-        </ol>
-        <div class="proof">
-          <pre class="art proofcard" aria-label="A real cited price-table row">"claude-fable-5": {
-  "input": 10.0, "output": 50.0,
-  "sources": [{
-    "url": "platform.claude.com/…/pricing",
-    "observed_at": "2026-07-02",
-    "excerpt": "Base Input $10 / MTok …"
-  }]
-}</pre>
-          <p class="proofcap">A real row from the price table. Every dollar on every receipt traces to one — checked and live-verified in CI.</p>
-        </div>
-        </div>
-      </section>
+<!-- ============ 01 · THE METER ============ -->
+<section id="meter">
+  <div class="wrap split rv">
+    <div>
+      <p class="eyebrow"><span class="red">// 01</span> &middot; while the agent works</p>
+      <h2 class="head">View the meter running.</h2>
+      <p class="lede">One settings line pins <code>aireceipts statusline</code> under Claude Code&rsquo;s
+      input box — which model is billing you, cost so far, burn rate, context, and your
+      5-hour cap. tmux keeps it live for Codex and OpenCode too; starship and PowerShell
+      refresh per prompt.</p>
+      <div class="legend">
+        <b>Opus</b> — the model billing you right now<br>
+        <b>$23.78 · $14/hr</b> — cost so far, and what an hour costs<br>
+        <b>⚠ Bash loop ×5</b> — waste, flagged the moment it happens
+      </div>
+    </div>
+    <div>
+      <div class="gifframe">
+        <img src="assets/statusline.gif" width="1040" height="360" loading="lazy"
+             alt="An agent session replayed in a Claude Code-shaped terminal — tool rows scrolling above the input box, the aireceipts meter highlighted beneath it, cost ticking up as the session runs; host-supplied payload fields (context, quota) are simulated.">
+      </div>
+      <div class="pill" role="img" aria-label="The statusline: model Opus, $23.78 so far, $14 per hour, 17 million tokens, context 41 percent, Bash loop times 5 waste flag, 5-hour window 63 percent, resets in 2 hours 12 minutes"><span class="b">[aireceipts]</span> Opus · $23.78 · $14/hr · 17M · ctx 41% · <span class="w">⚠ Bash loop ×5</span> · <span class="m">5h 63% ↺2h12m</span></div>
+      <p class="cap">A replayed session — cost, tokens, and the waste flag re-priced by the real CLI
+      at each step; host payload fields simulated. <a href="docs/statusline.html">Set it up &rarr;</a></p>
     </div>
   </div>
+</section>
 
-  <!-- ============ STEPPER + CTA ============ -->
-  <div class="wrap">
-    <section aria-label="Three steps">
-        <h2 class="lede">Sixty seconds to your first receipt.</h2>
-      <div class="steps">
-        <div class="step">
-          <span class="k">01</span>
-          <p>Run <code>npx aireceipts-cli</code></p>
-          <div class="copybox stepbox"><span class="ps">$</span><input type="text" value="npx aireceipts-cli" readonly><button class="copy" data-copy="npx aireceipts-cli">COPY</button></div>
-        </div>
-        <div class="step">
-          <span class="k">02</span>
-          <p>Read the receipt</p>
-          <pre class="art" aria-label="Receipt excerpt">⚠ re-ran failing command ×5 · <span class="redl">$0.08</span>
-──────────────────────────────
-TOTAL ····················· $0.09</pre>
-        </div>
-        <div class="step">
-          <span class="k">03</span>
-          <p>Paste the handoff <span class="grow">— your agent works cheaper tomorrow.</span></p>
-          <pre class="art" aria-label="Handoff excerpt"><span class="dim"># every receipt ends with this block
-# paste it into CLAUDE.md</span>
+<!-- ============ 02 · THE RECEIPT ============ -->
+<section id="receipt">
+  <div class="wrap split rv">
+    <div>
+      <p class="eyebrow"><span class="red">// 02</span> &middot; when the ride ends</p>
+      <h2 class="head">The receipt prints.</h2>
+      <p class="lede">One command. No install, no account, no upload. aireceipts reads the
+      transcripts your agent already writes to disk and prices the session tool by tool —
+      waste flagged, and the cheaper-model line is arithmetic on the same tokens, never a
+      prediction. New machine? <code>--demo</code> prints a bundled example.</p>
+    </div>
+    <div>
+      <div class="darkcard">
+<pre><span class="dim">$</span> npx aireceipts-cli
+
+            AIRECEIPTS
+<span class="dim">Claude Code · 10m 30s · claude-opus-4-8 87%</span>
+Bash.......................$0.05  (3 calls)
+Edit.......................$0.05  (2 calls)
+(thinking/reply)...........$0.03  (2 turns)
+Write......................$0.03  (2 calls)
+Read........................$0.02  (1 call)
+<span class="dim">-------------------------------------------</span>
+TOTAL.................................<span class="grn">$0.18</span>
+same tokens on claude-haiku-4-5....$0.04 <span class="dim">(78% less)</span>
+<span class="dim">  (arithmetic, not a prediction)</span></pre>
+      </div>
+      <p class="cap">Abridged from a golden-tested receipt — the terminal prints the full
+      itemization, cache tiers and all.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 03 · THE PR ============ -->
+<section id="pr">
+  <div class="wrap split rv">
+    <div>
+      <p class="eyebrow"><span class="red">// 03</span> &middot; when the PR ships</p>
+      <h2 class="head">The receipt sticks with the PR.</h2>
+      <p class="lede"><code>aireceipts pr --post</code> attaches the cost of the sessions behind
+      a branch to its pull request — one comment, kept current across pushes. A drop-in CI
+      check can require every PR to carry one. What a change cost becomes as visible as
+      what it changed.</p>
+    </div>
+    <div>
+      <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222" class="prshot">
+        <img src="assets/pr-receipt-189.png" width="1176" height="870" loading="lazy"
+             alt="The real aireceipts receipt comment on merged PR #189: three sessions — a Claude orchestrator sliced to this PR's turns plus two Codex helpers — $3.13 total.">
+      </a>
+      <p class="cap">Not a mockup — the receipt on PR #189 of this repo, $3.13.
+      <a href="https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222">Read it live &rarr;</a></p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ HANDOFF ============ -->
+<section id="handoff">
+  <div class="wrap split rv">
+    <div>
+      <p class="eyebrow"><span class="red">//</span> the handoff</p>
+      <h2 class="head">Tomorrow doesn&rsquo;t repeat today.</h2>
+      <p class="lede">Every receipt ends with flags a machine can act on. <code>--handoff</code>
+      turns them into a paste-ready block for your agent&rsquo;s memory file — the Bash loop
+      that burned money today becomes a standing rule tonight.</p>
+    </div>
+    <div class="hands">
+      <div class="hand">
+        <h4>TODAY</h4>
+        <pre><span class="red">⚠ Bash loop ×5 · $0.08</span>
+# paste into CLAUDE.md:
 - Bash loop ×5: change the input
   before a 3rd retry.</pre>
-          <p class="payoff">→ tomorrow's receipt: <span class="grn2">no retries · $0.00</span></p>
-        </div>
       </div>
-      
-    </section>
+      <div class="hand">
+        <h4>TOMORROW</h4>
+        <pre>Bash loop ............. none
+wasted ................ <span class="grn">$0.00</span></pre>
+      </div>
+    </div>
   </div>
+</section>
 
-  <!-- ============ PROOF ============ -->
-  <div class="band">
-    <div class="wrap">
-      <section class="darkstage" aria-label="Works with the agents you already run">
-        <h2 class="lede">Works with the agents you already run.</h2>
-        <div class="agwrap">
-        <div class="agleft">
-<ul class="aglist2" aria-label="Supported agents and their fidelity">
-          <li><span class="agtile"><img class="agmark" src="assets/agents/claudecode.svg" alt="" width="14" height="14"></span><span class="agname">Claude Code</span><span class="lead"></span><span class="agval">full per-turn, cache tiers</span></li>
-          <li><span class="agtile agtx">cx</span><span class="agname">Codex</span><span class="lead"></span><span class="agval">full per-turn</span></li>
-          <li><span class="agtile"><img class="agmark" src="assets/agents/gemini.svg" alt="" width="14" height="14"></span><span class="agname">Gemini CLI</span><span class="lead"></span><span class="agval">full per-turn, priced</span></li>
-          <li><span class="agtile"><img class="agmark" src="assets/agents/opencode.svg" alt="" width="14" height="14"></span><span class="agname">opencode</span><span class="lead"></span><span class="agval">full per-turn</span></li>
-          <li><span class="agtile agdim"><img class="agmark" src="assets/agents/cursor.svg" alt="" width="14" height="14"></span><span class="agname">Cursor</span><span class="lead"></span><span class="agval">totals only<span class="agfoot"> — its logs stop there, so we do too</span></span></li>
-        </ul>
+<!-- ============ AGENTS ============ -->
+<section id="agents">
+  <div class="wrap rv">
+    <p class="eyebrow"><span class="red">//</span> your agents</p>
+    <h2 class="head">Works with the agents you already run.</h2>
+    <div class="aglogos">
+      <a class="agtile" href="https://github.com/anandgupta42/receipts/blob/main/docs/agents/claude-code.md"><img src="assets/agents/claudecode.svg" alt="" width="22" height="22">Claude Code</a>
+      <a class="agtile" href="https://github.com/anandgupta42/receipts/blob/main/docs/agents/codex.md"><span class="agmark" aria-hidden="true">cx</span>Codex</a>
+      <a class="agtile" href="https://github.com/anandgupta42/receipts/blob/main/docs/agents/gemini.md"><img src="assets/agents/gemini.svg" alt="" width="22" height="22">Gemini CLI</a>
+      <a class="agtile" href="https://github.com/anandgupta42/receipts/blob/main/docs/agents/opencode.md"><img src="assets/agents/opencode.svg" alt="" width="22" height="22">OpenCode</a>
+      <a class="agtile" href="https://github.com/anandgupta42/receipts/blob/main/docs/agents/cursor.md"><img src="assets/agents/cursor.svg" alt="" width="22" height="22">Cursor</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CLOSING ============ -->
+<div class="closing">
+  <div class="wrap">
+    <h2>Your agent works. <span class="soft">You get the receipt.</span></h2>
+    <button type="button" class="cmd-btn copy-btn" data-cmd="npx aireceipts-cli"><span class="p">$</span>npx aireceipts-cli</button>
+    <p class="closing-note"><b>Apache-2.0</b></p>
+    <nav class="foot" aria-label="Footer">
+      <a href="https://github.com/anandgupta42/receipts">GitHub</a><span class="sep" aria-hidden="true">·</span>
+      <a href="docs/index.html">docs</a><span class="sep" aria-hidden="true">·</span>
+      <a href="samosa.html">buy me a samosa</a>
+    </nav>
+  </div>
 </div>
-        <img class="agterm agterm-gif" src="assets/quickstart.gif" width="620" height="640" alt="A terminal recording: typing the aireceipts command prints an itemized receipt for a synthetic 10m 30s Claude Code session — Bash $0.05, Edit $0.05, thinking/reply $0.03, Write $0.03, Read $0.02, TOTAL $0.18, and the arithmetic line: same tokens on claude-haiku-4-5 $0.04 (78% less).">
-      </div>
-      </section>
-    </div>
-  </div>
-
-  <!-- ============ CLOSING BOOKEND ============ -->
-  <div class="closing">
-    <div class="closing-in">
-      <h2 class="display">Your agent works. <span class="soft">You get the receipt.</span></h2>
-      <div class="cta-hold">
-        <div class="copybox">
-          <code><span class="p" aria-hidden="true">$</span>npx aireceipts-cli</code>
-          <button type="button" class="copy-btn" data-cmd="npx aireceipts-cli" aria-label="Copy the command npx aireceipts-cli to the clipboard">Copy</button>
-        </div>
-      </div>
-      <p class="closing-note"><b>Apache-2.0</b> · transcripts never leave your machine · telemetry is content-free — one env var ends it.</p>
-      <nav class="foot">
-        <a href="https://github.com/anandgupta42/receipts">GitHub</a><span class="sep" aria-hidden="true">·</span>
-        <a href="docs/index.html">docs</a><span class="sep" aria-hidden="true">·</span>
-        <a href="samosa.html"><svg class="samosa-glyph" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><path d="M22 10 L38.5 39.5 Q40 42 37 42 H7 Q4 42 5.5 39.5 Z"/><path d="M9.5 37 q2.2 -2.8 4.4 0 t4.4 0 t4.4 0 t4.4 0 t4.4 0 t4.4 0"/><path d="M32 12 q3 -3 1 -6"/><path d="M38 17 q3 -3 1 -6"/></g></svg>buy me a samosa</a>
-      </nav>
-    </div>
-  </div>
 
 <script>
   (function () {
     var btns = document.querySelectorAll(".copy-btn");
     if (!navigator.clipboard || !navigator.clipboard.writeText) {
       for (var i = 0; i < btns.length; i++) btns[i].hidden = true;
-      return;
-    }
-    btns.forEach(function (b) {
-      b.addEventListener("click", function () {
-        navigator.clipboard.writeText(b.getAttribute("data-cmd")).then(function () {
-          var prev = b.textContent;
-          b.textContent = "Copied";
-          setTimeout(function () { b.textContent = prev; }, 1200);
-        }).catch(function () {});
+    } else {
+      btns.forEach(function (b) {
+        b.addEventListener("click", function () {
+          navigator.clipboard.writeText(b.getAttribute("data-cmd")).then(function () {
+            var prev = b.textContent;
+            b.textContent = "Copied";
+            setTimeout(function () { b.textContent = prev; }, 1200);
+          }).catch(function () {});
+        });
       });
-    });
+    }
+    if ("IntersectionObserver" in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+        });
+      }, { rootMargin: "0px 0px 12% 0px" });
+      document.querySelectorAll(".rv").forEach(function (el) { io.observe(el); });
+    } else {
+      document.querySelectorAll(".rv").forEach(function (el) { el.classList.add("in"); });
+    }
   })();
 </script>
 </body>

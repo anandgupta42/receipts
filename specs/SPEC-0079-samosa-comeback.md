@@ -1,12 +1,12 @@
 ---
-id: SPEC-0078
+id: SPEC-0079
 title: "The samosa story page: a live tip jar, on the project's own surfaces only"
 status: building
 milestone: M5
 depends: [SPEC-0034, SPEC-0070]
 ---
 
-# SPEC-0078: the samosa story page
+# SPEC-0079: the samosa story page
 
 Invariants: I4 (the story page stays self-contained — zero scripts, zero trackers, works
 offline except the one outbound link), I5 (no receipt or golden byte changes — this spec

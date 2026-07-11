@@ -73,8 +73,8 @@ export type Block =
   | { kind: "footnote"; text: string; spaceBefore?: boolean }
   /** Grocery's deterministic pipe-barcode. */
   | { kind: "barcode"; pattern: string }
-  /** The closing line (SPEC-0055: plain text — the receipt card draws no samosa glyph or mark). */
-  | { kind: "footer"; text: string };
+  /** The closing line (SPEC-0055: plain text — the receipt card draws no samosa glyph or mark). The SVG stamp is emitted unless `stamp: false`; terminal rendering is unaffected. */
+  | { kind: "footer"; text: string; stamp?: boolean };
 
 /** The layout-agnostic receipt: an ordered block list every renderer interprets. */
 export interface ReceiptView {

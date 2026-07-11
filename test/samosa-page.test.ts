@@ -1,4 +1,4 @@
-// SPEC-0078 — the samosa story page contract and the own-surface link pins.
+// SPEC-0079 — the samosa story page contract and the own-surface link pins.
 // R1: the page is self-contained (zero scripts, embedded photo, exactly two
 // external hrefs — Wikipedia and the Ko-fi jar, ask-last) and carries the
 // Design-section copy verbatim. R3: FUNDING.yml offers the Ko-fi row. R4: the
@@ -12,7 +12,7 @@ const page = readFileSync("site/samosa.html", "utf8");
 const KOFI = 'href="https://ko-fi.com/anandgupta42"';
 const WIKI = 'href="https://en.wikipedia.org/wiki/Samosa"';
 
-describe("SPEC-0078 R1 · the story page contract", () => {
+describe("SPEC-0079 R1 · the story page contract", () => {
   it("has zero <script> tags and no analytics hooks", () => {
     expect(page).not.toContain("<script");
     expect(page).not.toContain("analytics");
@@ -62,7 +62,7 @@ describe("SPEC-0078 R1 · the story page contract", () => {
   });
 });
 
-describe("SPEC-0078 R3 · FUNDING.yml offers the tip jar", () => {
+describe("SPEC-0079 R3 · FUNDING.yml offers the tip jar", () => {
   it("carries the ko_fi row alongside the samosa-page custom entry", () => {
     const funding = readFileSync(".github/FUNDING.yml", "utf8");
     expect(funding).toContain("ko_fi: anandgupta42");
@@ -70,7 +70,7 @@ describe("SPEC-0078 R3 · FUNDING.yml offers the tip jar", () => {
   });
 });
 
-describe("SPEC-0078 R4 · own-surface samosa links are pinned", () => {
+describe("SPEC-0079 R4 · own-surface samosa links are pinned", () => {
   const SURFACES = [
     "site/index.html",
     "site/view.html",

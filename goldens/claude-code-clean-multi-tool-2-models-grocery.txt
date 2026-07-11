@@ -22,3 +22,6 @@ CARDHOLDER: claude-opus-4-8
       THANK YOU FOR VIBING WITH Claude Code       
            || |||| |||| ||| || ||| | ||           
 - - - - - - - - - - - - - - - - - - - - - - - - -
+                npx aireceipts-cli                
+         github.com/anandgupta42/receipts         
+- - - - - - - - - - - - - - - - - - - - - - - - -

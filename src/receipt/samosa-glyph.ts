@@ -7,7 +7,7 @@
 // SVG exporter (the card is plain text everywhere); the remaining consumers are
 // the clickable HTML surfaces, and the static site copies are pinned to PATH
 // byte-for-byte by test/receipt/svg.test.ts.
-// SPEC-0078 R5 — the "hot & fresh" redesign, maintainer-picked: crimped pastry
+// SPEC-0079 R5 — the "hot & fresh" redesign, maintainer-picked: crimped pastry
 // base + steam wisps, replacing the earlier face-like marks.
 const PATH =
   '<path d="M22 10 L38.5 39.5 Q40 42 37 42 H7 Q4 42 5.5 39.5 Z"/>' +

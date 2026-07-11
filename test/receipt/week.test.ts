@@ -8,6 +8,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { assembleWeekDigest, windowBounds } from "../../src/aggregate/week.js";
 import { renderWeek, weekToJson } from "../../src/receipt/week.js";
+import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "../../src/receipt/branding.js";
 import type { AgentSource, Session, SessionTotals, TokenUsage, Turn } from "../../src/parse/types.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
@@ -47,6 +48,7 @@ describe("renderWeek (R7 text)", () => {
     // current (1.5M tok / higher $) exceeds prior (0.8M tok) → both read "(more)".
     expect(out).toMatch(/Priced \$ Δ.+\(more\)/);
     expect(out).toMatch(/Tokens Δ\.+\+700,000 tok \(more\)/);
+    expect(out.split("\n").slice(-2).map((line) => line.trim())).toEqual([INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY]);
   });
 
   it("labels a drop vs prior as (fewer)/(less), not a bare minus sign", async () => {

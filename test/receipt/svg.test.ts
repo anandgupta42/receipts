@@ -290,7 +290,7 @@ describe("R4 — field-set parity between the terminal and SVG renderers", () =>
 
 describe("renderReceiptSvg — no samosa glyph on the receipt card (SPEC-0055)", () => {
   // The glyph's signature anchor — the module's first path, derived rather
-  // than hardcoded so the SPEC-0078 R5 redesign (or any future one) can't
+  // than hardcoded so the SPEC-0079 R5 redesign (or any future one) can't
   // leave this negative test asserting against a glyph that no longer ships.
   const GLYPH_ANCHOR = `d="${/<path d="([^"]+)"/.exec(samosaGlyphMarkup())![1]}`;
 
@@ -317,12 +317,12 @@ describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't im
   // site/*.html are hand-authored static files and build-docs-site.mjs is a
   // plain .mjs script; none of them can import the TS glyph module at
   // runtime. Their inlined copies must stay byte-identical to the module's
-  // <path> literals (four since SPEC-0078 R5), or the surfaces drift apart
-  // silently.
+  // <path> literals (four since SPEC-0079 R5), or the surfaces drift apart
+  // silently. site/index.html no longer inlines the glyph in its samosa
+  // footer link (post-redesign), so only surfaces that do inline it are pinned.
   const DUPLICATING_FILES = [
     "site/samosa.html",
     "site/view.html",
-    "site/index.html",
     "scripts/build-docs-site.mjs",
   ];
 
@@ -331,12 +331,12 @@ describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't im
     expect(paths).toHaveLength(4);
     // The full adjacent sequence, not per-path contains: proves order and
     // completeness, so a copy can't smuggle extra/legacy paths between the
-    // module's own (Codex review of SPEC-0078 R5).
+    // module's own (Codex review of SPEC-0079 R5).
     const sequence = paths.join("");
     for (const file of DUPLICATING_FILES) {
       const html = readFileSync(file, "utf8");
       expect(html, `${file} drifted from samosa-glyph.ts`).toContain(sequence);
-      // The retired face marks (pre-SPEC-0078 glyph) must be gone everywhere.
+      // The retired face marks (pre-SPEC-0079 glyph) must be gone everywhere.
       expect(html, `${file} still carries a retired glyph mark`).not.toContain('<path d="M17 29');
       expect(html, `${file} still carries a retired glyph mark`).not.toContain('<path d="M21 20');
     }

@@ -11,6 +11,7 @@ import type { ModelMixEntry, WasteLine } from "../receipt/model.js";
 import { couldHaveSavedOf, couldHaveSavedValue, prCoverageLine, savingsSlipLines } from "../receipt/handoff.js";
 import { formatCentsAmount, formatInt, formatUsd, reconcileCents } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
+import { INSTALL_FOOTER_TEXT, PR_ATTRIBUTION_LINE, REPOSITORY_DISPLAY } from "../receipt/branding.js";
 import { MESSAGE_BASIS_LABEL } from "./messageAnchor.js";
 import { formatDuration } from "../receipt/format.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
@@ -60,7 +61,6 @@ const COMMENT_SIZE_CAP = 65_000;
 const OMITTED_NOTE = "full receipt omitted (comment size limit)";
 
 const WORDMARK = "AIRECEIPTS";
-const FOOTER_TEXT = "aireceipts · local · npx aireceipts-cli";
 const NOTE_INDENT = 2;
 
 /** The R1e(e) header line: the turn range, or the honesty label for a full-session fallback. */
@@ -435,7 +435,8 @@ function prBlocks(input: PrBodyInput): Block[] {
   });
   blocks.push(...helperGroupBlocks(helpers, authors.length === 0, rows));
   blocks.push(...totalBlocks(input));
-  blocks.push({ kind: "footer", text: FOOTER_TEXT });
+  blocks.push({ kind: "footer", text: INSTALL_FOOTER_TEXT });
+  blocks.push({ kind: "note", text: REPOSITORY_DISPLAY, align: "center", muted: true });
   return blocks;
 }
 
@@ -650,6 +651,7 @@ export function renderPrBodyDetailed(
     const used =
       [...[DOGFOOD_MARKER, FENCE, budgetFence, FENCE].join("\n")].length +
       (linkLine === undefined ? 0 : [...linkLine].length + 1) +
+      [...PR_ATTRIBUTION_LINE].length + 1 +
       3;
     section = detailsSection(extras.details, COMMENT_SIZE_CAP - used, extras.samosa === true);
     // SPEC-0059 R5 — a sibling of the full-receipts section, decided against
@@ -674,6 +676,7 @@ export function renderPrBodyDetailed(
   if (linkLine !== undefined) {
     lines.push(linkLine);
   }
+  lines.push(PR_ATTRIBUTION_LINE);
   lines.push("");
   return { body: lines.join("\n"), handoffSectionIncluded: handoff !== null };
 }

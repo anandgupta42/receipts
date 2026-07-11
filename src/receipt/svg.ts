@@ -332,12 +332,15 @@ function layoutBlock(block: Block, cur: Cursor, p: Paints, els: string[]): void 
       return;
     case "footer": {
       cur.y += 12;
-      els.push(stampElement(cur.y, p.accent));
-      const footerBaseline = cur.y + 22 + 18 + SZ_FOOTER;
+      if (block.stamp !== false) {
+        els.push(stampElement(cur.y, p.accent));
+        cur.y += 22 + 18;
+      }
+      const footerBaseline = cur.y + SZ_FOOTER;
       els.push(textEl(WIDTH / 2, footerBaseline, block.text, { size: SZ_FOOTER, anchor: "middle", fill: p.muted }));
       // Advance past the footer text (not just record a height) so a later block
       // — grocery's barcode is the last line — lays out BELOW it, never over the
-      // stamp. Height is then cur.y + PAD_BOTTOM for every template.
+      // stamp when one is present. Height is then cur.y + PAD_BOTTOM for every template.
       cur.y = footerBaseline + 6;
       return;
     }
