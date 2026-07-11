@@ -63,12 +63,12 @@ describe("SPEC-0080 R3 · JSON-LD, facts only", () => {
   });
 });
 
-describe("SPEC-0080 R4 · crawler files, test-pinned", () => {
-  it("robots.txt allows all and names the sitemap", () => {
-    const robots = readFileSync("site/robots.txt", "utf8");
-    expect(robots).toContain("User-agent: *");
-    expect(robots).toContain("Allow: /");
-    expect(robots).toContain(`Sitemap: ${BASE}sitemap.xml`);
+describe("SPEC-0080 R4 · sitemap, test-pinned", () => {
+  // No robots.txt: a project-Pages site serves under /receipts/, and crawlers
+  // only read origin-root /robots.txt — absence defaults to allow-all, which
+  // is the intended policy (S6 finding; see the spec's R4).
+  it("no robots.txt ships (it would be undiscoverable theater)", () => {
+    expect(existsSync("site/robots.txt")).toBe(false);
   });
 
   it("sitemap.xml lists exactly the landing, samosa, and every docs page — and no <lastmod>", () => {
@@ -103,9 +103,17 @@ describe("SPEC-0080 kill criterion · no new scripts or fetches", () => {
     expect(samosa).not.toMatch(/src="https?:\/\//);
   });
 
-  it("the landing gained no executable script: every script is the copy-button JS or inert JSON-LD", () => {
-    const scripts = landing.match(/<script(?![^>]*application\/ld\+json)[^>]*>/g) ?? [];
-    // The pre-existing copy-button block is the only executable script.
-    expect(scripts).toHaveLength(1);
+  it("the landing has exactly two <script tags total: the copy-button JS and the inert JSON-LD", () => {
+    // Total-count gate (S6: an exclusion regex was spoofable by a decoy
+    // attribute) — ANY added script tag fails this, whatever its attributes.
+    expect(landing.match(/<script/g)).toHaveLength(2);
+    expect(landing.match(/<script type="application\/ld\+json">/g)).toHaveLength(1);
+  });
+
+  it("the landing initiates no network calls: no fetch/XHR/beacon, no external src", () => {
+    expect(landing).not.toContain("fetch(");
+    expect(landing).not.toContain("XMLHttpRequest");
+    expect(landing).not.toContain("sendBeacon");
+    expect(landing).not.toMatch(/src="https?:\/\//);
   });
 });

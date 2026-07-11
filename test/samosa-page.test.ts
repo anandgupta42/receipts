@@ -20,8 +20,9 @@ describe("SPEC-0079 R1 · the story page contract", () => {
 
   it("has exactly two external anchors: Wikipedia and the Ko-fi jar", () => {
     // Anchor count, not raw href count — SPEC-0080 R2 adds head-only
-    // canonical/OG metadata (crawler bytes, not clickable links).
-    const external = page.match(/<a href="https?:\/\//g) ?? [];
+    // canonical/OG metadata (crawler bytes, not clickable links). Attribute-
+    // aware regex: `<a class="x" href=…>` counts too (Codex S6).
+    const external = page.match(/<a\b[^>]*href="https?:\/\//g) ?? [];
     expect(external).toHaveLength(2);
     expect(page).toContain(WIKI);
     expect(page).toContain(KOFI);
@@ -55,7 +56,8 @@ describe("SPEC-0079 R1 · the story page contract", () => {
   it("asks last: the Ko-fi anchor is the final external anchor before the relative back link", () => {
     expect(page.indexOf(KOFI)).toBeGreaterThan(page.indexOf(WIKI));
     expect(page.indexOf('href="index.html"')).toBeGreaterThan(page.indexOf(KOFI));
-    expect(page.lastIndexOf('<a href="https')).toBe(page.indexOf(`<a ${KOFI}`));
+    const anchors = [...page.matchAll(/<a\b[^>]*href="https?:\/\/[^"]*"/g)];
+    expect(anchors[anchors.length - 1][0]).toContain("ko-fi.com/anandgupta42");
   });
 
   it("the Unicode-emoji story is gone (maintainer directive)", () => {

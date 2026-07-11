@@ -57,19 +57,26 @@ consumer requires fabricated fields, it is not served.
   `https://github.com/anandgupta42/receipts`, `description` byte-equal to the page's
   meta description. Field allowlist enforced by test; `aggregateRating`/`review` keys
   banned by test.
-- **R4 — crawler files, static + test-pinned.** `site/robots.txt`: `User-agent: *`,
-  `Allow: /`, absolute `Sitemap:` line. `site/sitemap.xml`: a checked-in static file
+- **R4 — sitemap, static + test-pinned.** `site/sitemap.xml`: a checked-in static file
   listing the landing, `samosa.html`, and every `site/docs/*.html`; **a test derives the
   expected URL set from the `site/docs` directory listing and asserts exact equality**,
   so adding/removing a docs page fails CI until the sitemap is updated (staleness gated
   by test, not by a generator). No `<lastmod>` (nothing deterministic to put there).
+  **No `robots.txt`** — Codex S6 caught that a project-Pages site serves under
+  `/receipts/`, and crawlers only read origin-root `/robots.txt` (owned by an
+  `anandgupta42.github.io` repo, not this one); absence defaults to allow-all, which is
+  the intended policy, so the file was theater and is cut. Sitemap discovery is manual
+  submission (Search Console) or the meta reference on the landing.
 - **R5 — `llms.txt` for answer engines.** `site/llms.txt` per the llmstxt.org convention
   (the shape GPTBot/ClaudeBot/PerplexityBot-era crawlers consume): H1 `aireceipts`, a
   blockquote summary drawn from the landing's meta description, then sections linking the
   docs index, key docs pages (getting started, PR receipts, trust/telemetry), the GitHub
   repo, and the samosa page — each with a one-line factual description. A test asserts
   every relative link resolves to a shipped file and every absolute link stays on the
-  two known hosts (github.com repo, the Pages origin).
+  two known hosts (github.com repo, the Pages origin). *Honesty caveat (S6): the
+  llmstxt.org convention reads origin-root `/llms.txt`; under a project-Pages path this
+  file is fetchable at `/receipts/llms.txt` and linkable, but not auto-discoverable —
+  stated, not hidden.*
 - *(Deferred — recorded, not built: per-docs-page `<meta description>`/canonical needs a
   second excerpt extractor in `build-docs-site.mjs` and a docs-index decision; parked
   until the docs surface is next touched. Codex S2 finding accepted.)*
@@ -102,13 +109,12 @@ consumer requires fabricated fields, it is not served.
 | R1 asset exists | site/assets/hero-receipt.png | file exists |
 | R2 tag set | site/samosa.html | og:title/og:description/og:image/og:url/twitter:card/twitter:image/canonical present; og:description byte-equal to the lede |
 | R2 card asset | site/assets/samosa-card.jpg | exists; ≤120KB |
-| R2 contract kept | site/samosa.html | zero `<script>`; no external `src=`; exactly two `<a href="https` anchors |
+| R2 contract kept | site/samosa.html | zero `<script>`; no external `src=`; exactly two external `<a>` anchors (attribute-aware regex) |
 | R3 json-ld | landing | exactly one ld+json block; parses; `@type` SoftwareApplication; fields ⊆ allowlist; no `aggregateRating`/`review` |
 | R3 honesty | ld+json description | byte-equal to the meta description |
-| R4 robots | site/robots.txt | `User-agent: *` + `Allow: /` + absolute `Sitemap:` |
 | R4 sitemap parity | sitemap vs `site/docs/*.html` listing | exact URL-set equality + landing + samosa; no `<lastmod>` |
 | R5 llms links | site/llms.txt | every relative link → shipped file; absolute links on known hosts only |
-| Kill criterion | all touched pages | no new `<script>` beyond the one inert ld+json data block; no new external `src=`/fetch |
+| Kill criterion | all touched pages | landing: exactly two `<script` total (copy-button + inert ld+json), no `fetch(`/`XMLHttpRequest`/`sendBeacon`, no external `src=`; samosa: zero scripts |
 
 ## Success criteria
 
@@ -158,3 +164,14 @@ build now** (maintainer-directed; mechanism de-risked per S2).
 **2026-07-10 · approved (button 1, in-session):** the maintainer's directive ("have you
 made this page seo and aeo compatible") is the build ask; scope corrections welcome as
 with SPEC-0079's amendment history.
+
+**2026-07-10 · S6 (Codex code review, commit `c9469db`): REWORK → reworked, 4 findings,
+all accepted.** (1) `robots.txt` undiscoverable under project Pages (origin-root rule) —
+cut, with allow-all-by-default noted as the intended policy anyway; R4 reworded, matrix
+row removed. (2) The script kill gate was bypassable by a spoofed `data-kind` attribute —
+now counts ALL `<script` occurrences on the landing (exactly two) and pins the exact
+ld+json opening tag. (3) The landing fetch criterion wasn't enforced — bytes now asserted free
+of `fetch(`/`XMLHttpRequest`/`sendBeacon` and external `src=`. (4) The anchor regex
+missed `<a class=… href=…>` — attribute-aware regex in both test files. Codex verified
+the rest: head tags unique and valid, JSON-LD claims repo-backed, sitemap exact vs 25
+docs pages, llms.txt syntax valid.
