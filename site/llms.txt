@@ -1,0 +1,19 @@
+# aireceipts
+
+> Local, deterministic cost receipts for AI coding agents. One command, no account, no server — it reads the transcripts already on your disk, and they stay there. Covers Claude Code, Codex, Cursor, Gemini, and opencode; prints a per-tool cost breakdown, waste lines, and a PR-ready receipt. Apache-2.0.
+
+## Docs
+
+- [Docs index](https://anandgupta42.github.io/receipts/docs/index.html): every guide, one page
+- [Getting started](https://anandgupta42.github.io/receipts/docs/01-getting-started.html): install and print your first receipt with `npx aireceipts-cli`
+- [PR receipts](https://anandgupta42.github.io/receipts/docs/pr-receipts.html): attach the session's cost receipt to the pull request it built
+- [Trust](https://anandgupta42.github.io/receipts/docs/trust.html): determinism, price citations, and what never leaves your machine
+- [Telemetry](https://anandgupta42.github.io/receipts/docs/telemetry.html): the content-free payload and every kill switch
+
+## Source
+
+- [GitHub repository](https://github.com/anandgupta42/receipts): source, issues, releases (npm package `aireceipts-cli`)
+
+## Optional
+
+- [Buy me a samosa](https://anandgupta42.github.io/receipts/samosa.html): the project's tip page — why a samosa and not a coffee

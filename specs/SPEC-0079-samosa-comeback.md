@@ -276,3 +276,8 @@ carrying the quotable subversion line ("Every open-source project asks you to bu
 maintainer a coffee. Not this one — buy me a samosa, and I'll explain."). R2's guard
 assertion (lowercase `[buy me a samosa](SAMOSA_URL)`) still pins the link; line count 247
 of the guard's 260 cap (trailing newline counts); badge row untouched.
+
+**2026-07-10 · contract refinement (SPEC-0080 R2):** the page's external-link contract is
+counted over **anchors** (`<a href="https`) rather than raw `href=` occurrences, so
+SPEC-0080's head-only canonical/OG crawler metadata (not clickable, not fetched by the
+page) doesn't trip it. Still exactly two anchors: Wikipedia and the Ko-fi jar, ask-last.
