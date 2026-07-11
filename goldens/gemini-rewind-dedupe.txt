@@ -15,5 +15,6 @@ TOTAL........................................$0.00
 same tokens on gemini-2.5-flas…...$0.00 (76% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
+         github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

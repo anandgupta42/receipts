@@ -78,9 +78,14 @@ TOTAL........................................$0.18
 same tokens on claude-haiku-4-5...$0.04 (78% less)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
+         github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
+
+The final line identifies the open-source project that generated the receipt; the line
+above it is the install command. PR comments and their HTML artifacts make the same
+source-and-install destination clickable.
 
 <sub>`pre-edit` is the share of cost spent before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 
@@ -234,3 +239,5 @@ welcome and run the same gates: [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 Apache-2.0.
+
+Support the project: [buy me a samosa](https://anandgupta42.github.io/receipts/samosa.html).

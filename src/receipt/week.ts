@@ -8,6 +8,7 @@ import type { WasteClassAggregate } from "../aggregate/waste.js";
 import type { TokenUsage } from "../parse/types.js";
 import { colorEnabled, makeColorizer } from "./color.js";
 import { center, dottedLine, formatDateUtc, formatInt, formatUsd } from "./format.js";
+import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "./branding.js";
 
 const WIDTH = 50;
 const INNER = WIDTH - 2;
@@ -128,7 +129,8 @@ export function renderWeek(digest: WeekDigest, opts: RenderWeekOptions = {}): st
   lines.push(...deltaBody(digest));
 
   lines.push(dim("-".repeat(WIDTH)));
-  lines.push(center("aireceipts · local · npx aireceipts-cli", WIDTH));
+  lines.push(center(INSTALL_FOOTER_TEXT, WIDTH));
+  lines.push(center(REPOSITORY_DISPLAY, WIDTH));
 
   return lines.join("\n");
 }

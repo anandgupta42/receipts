@@ -32,5 +32,6 @@ BY MODEL
 claude-opus-4-8........................87% · $0.17
 claude-sonnet-5........................13% · $0.01
 - - - - - - - - - - - - - - - - - - - - - - - - -
-     aireceipts · local · npx aireceipts-cli      
+                npx aireceipts-cli                
+         github.com/anandgupta42/receipts         
 - - - - - - - - - - - - - - - - - - - - - - - - -

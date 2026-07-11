@@ -12,6 +12,7 @@ import { buildReceiptModel, type ReceiptModel } from "../../src/receipt/model.js
 import { buildReceiptView, detailsBlocks } from "../../src/receipt/present.js";
 import { renderReceipt, renderReceiptLines } from "../../src/receipt/render.js";
 import { renderReceiptSvg } from "../../src/receipt/svg.js";
+import { INSTALL_FOOTER_TEXT } from "../../src/receipt/branding.js";
 import { validateReceiptBlocks } from "../../src/receipt/blocks.js";
 import type { Block } from "../../src/receipt/blocks.js";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
@@ -100,7 +101,7 @@ describe("SPEC-0054 R4 — the DETAILS section", () => {
     const lines = await pricedDetailsLines();
     const details = lines.findIndex((l) => l.trim() === "DETAILS");
     const deltaNote = lines.findIndex((l) => l.includes("(arithmetic, not a prediction)"));
-    const footer = lines.findIndex((l) => l.includes("aireceipts · local"));
+    const footer = lines.findIndex((l) => l.trim() === INSTALL_FOOTER_TEXT);
     expect(details).toBeGreaterThan(deltaNote);
     expect(details).toBeLessThan(footer);
   });
