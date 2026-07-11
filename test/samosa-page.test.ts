@@ -18,8 +18,10 @@ describe("SPEC-0079 R1 · the story page contract", () => {
     expect(page).not.toContain("analytics");
   });
 
-  it("has exactly two external hrefs: Wikipedia and the Ko-fi jar", () => {
-    const external = page.match(/href="https?:\/\//g) ?? [];
+  it("has exactly two external anchors: Wikipedia and the Ko-fi jar", () => {
+    // Anchor count, not raw href count — SPEC-0080 R2 adds head-only
+    // canonical/OG metadata (crawler bytes, not clickable links).
+    const external = page.match(/<a href="https?:\/\//g) ?? [];
     expect(external).toHaveLength(2);
     expect(page).toContain(WIKI);
     expect(page).toContain(KOFI);
@@ -50,10 +52,10 @@ describe("SPEC-0079 R1 · the story page contract", () => {
     expect(page).toContain("the dip");
   });
 
-  it("asks last: the Ko-fi link is the final href before the relative back link", () => {
+  it("asks last: the Ko-fi anchor is the final external anchor before the relative back link", () => {
     expect(page.indexOf(KOFI)).toBeGreaterThan(page.indexOf(WIKI));
     expect(page.indexOf('href="index.html"')).toBeGreaterThan(page.indexOf(KOFI));
-    expect(page.lastIndexOf('href="https')).toBe(page.indexOf(KOFI));
+    expect(page.lastIndexOf('<a href="https')).toBe(page.indexOf(`<a ${KOFI}`));
   });
 
   it("the Unicode-emoji story is gone (maintainer directive)", () => {

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://anandgupta42.github.io/receipts/sitemap.xml
