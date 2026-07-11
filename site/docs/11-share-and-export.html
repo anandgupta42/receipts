@@ -348,6 +348,47 @@ aireceipts --png -o receipt.png          # rasterized PNG (receipt only)</code><
 
 <p>(PNG is receipt-only; compare exports to SVG.)</p>
 
+<h2 id="as-a-shareable-card-card">As a shareable card (<code>--card</code>)</h2>
+
+<p><code>--card</code> re-renders a receipt as a 1200×630 social card — the OG/Twitter ratio — built to leave the terminal and travel on social media. It covers two scopes:</p>
+
+<pre class="doc-code"><code class="language-sh">aireceipts --card                 # this session, as a PNG card (default)
+aireceipts --card --svg           # the deterministic card SVG
+aireceipts --card --theme dark    # dark palette
+aireceipts pr 189 --card          # the PR, aggregated across every session</code></pre>
+
+<p>Two layouts, same idiom:</p>
+
+<ul>
+  <li><strong>Session card</strong> — total, agent + date, model-mix bar, per-tool line-items, cache line, and the labeled cheaper-model arithmetic.</li>
+  <li><strong>PR card</strong> — the same rich breakdown, aggregated across every contributor and readable subagent the PR receipt counts: a token-weighted model mix, summed per-tool costs, aggregate cache, and the session/role counts. (The cheaper-model line is session-only — an aggregate repricing can't keep the per-model price provenance the honesty rules require.)</li>
+</ul>
+
+<h3 id="the-share-step-local-one-gesture">The share step (local, one gesture)</h3>
+
+<p>After writing the image, <code>--card</code> runs a fully-local share step:</p>
+
+<ul>
+  <li>copies the <strong>image</strong> onto your OS clipboard (best-effort; if your platform's clipboard tool is missing it prints one line and the image is still on disk);</li>
+  <li>prints the <strong>caption</strong> — a fixed template, e.g. <code>$0.18 · Claude Code · 12 tools</code> or <code>PR #189 — $3.13 across 3 sessions</code>;</li>
+  <li>prints <strong>X</strong> and <strong>LinkedIn</strong> web-intent URLs with the caption prefilled;</li>
+  <li>prints the honest note: <code>drag the image in — composers can't attach it for you</code>.</li>
+</ul>
+
+<p>Nothing is uploaded, fetched, or hosted, and no browser is launched — the only subprocess is your local clipboard tool. Web composers can't attach an image for you, so &quot;easy&quot; is one paste, or one drag.</p>
+
+<h3 id="always-sanitized-card-privacy-defaults">Always sanitized (<code>--card</code> privacy defaults)</h3>
+
+<p>There is exactly one card image, and it is always sanitized — the same contract as <code>--no-details</code>. It carries figures only: cost, tokens, cache-hit rate, model mix, tool breakdown, session/agent counts, dates, and the cheaper-model line. It <strong>never</strong> carries prompts or replies, source or file contents, <strong>session titles</strong>, or <strong>repo / branch / project names</strong>. Because there is one shared image, <code>--include-titles</code>, <code>--include-projects</code>, and <code>--by-project</code> are a usage error with <code>--card</code> (the card is always sanitized, not a toggle).</p>
+
+<h3 id="the-opt-in-pr-link-link">The opt-in PR link (<code>--link</code>)</h3>
+
+<p>A single image can't carry a full multi-session PR receipt, so the card is the hook and the full receipt lives on a surface you own. The full-receipt URL contains <code>owner/repo/pull</code> (a &quot;never&quot; field on the image), so linking is opt-in and lands in the editable <strong>caption only, never the image</strong>:</p>
+
+<pre class="doc-code"><code class="language-sh">aireceipts pr 189 --post --card --link   # public repo, after the post lands</code></pre>
+
+<p><code>--link</code> requires <code>--post</code> (a dry-run card is always linkless), reuses the sticky-comment permalink the same <code>--post</code> just created — never a separate fetch — and is refused on private or unknown-visibility repos (the public viewer 404s there). Card render itself never touches the network; only your <code>--post</code> does.</p>
+
 <h2 id="as-data-json-csv">As data (JSON / CSV)</h2>
 
 <p>For FinOps tooling, dashboards, and spreadsheets, emit structured data instead of the text receipt.</p>

@@ -3,9 +3,59 @@
 // upserts via gh; without it, a dry run prints the body.
 import { runPrDetailed } from "../../pr/index.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import type { CliOptions } from "../options.js";
 import { receiptTelemetryFromModels } from "../common/telemetry.js";
+import { renderCardSvg } from "../../receipt/card.js";
+import { rasterizeSvgToPng } from "../../receipt/png.js";
+import { writePng, writeSvg } from "../common/output.js";
+import { defaultCardShareDeps, runCardShare } from "../../receipt/shareCard.js";
+
+/**
+ * SPEC-0077 R2 — the PR number for the card's fixed `PR #<n>` scope label. Taken
+ * LOCALLY (`aireceipts pr <n> --card`, or `--pr <n>`) so the card render never
+ * touches the network (I1): a positive integer positional/flag, else undefined.
+ */
+function cardPrNumber(options: CliOptions): number | undefined {
+  const raw = options.positional[1] ?? options.prNumber;
+  if (raw === undefined) {
+    return undefined;
+  }
+  const n = Number(raw);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
+
+/** SPEC-0077 R1/R4 — reject the illegal `--card` combinations before any work. Returns the usage message, or `null` when the combination is legal. */
+function cardUsageError(options: CliOptions): string | null {
+  if (options.svg && options.png) {
+    return "--card writes one file — use --card (PNG) or --card --svg, not both";
+  }
+  if (options.byProject) {
+    return "--card is always sanitized — --by-project cannot combine with it";
+  }
+  return null;
+}
 
 async function run(ctx: CommandContext): Promise<number> {
+  // SPEC-0077 R1/R4 — validate the card combinations and resolve its PR number
+  // up front, before the (possibly networked) `--post` flow runs.
+  let cardPr: number | undefined;
+  // SPEC-0077 R5 — `--link` is a card-caption opt-in; reject it without `--card`.
+  if (ctx.options.link && !ctx.options.card) {
+    ctx.stderr.write("--link only applies to pr --card\n");
+    return 1;
+  }
+  if (ctx.options.card) {
+    const cardError = cardUsageError(ctx.options);
+    if (cardError) {
+      ctx.stderr.write(`${cardError}\n`);
+      return 1;
+    }
+    cardPr = cardPrNumber(ctx.options);
+    if (cardPr === undefined) {
+      ctx.stderr.write("pr --card needs the PR number locally: aireceipts pr <n> --card\n");
+      return 1;
+    }
+  }
   const result = await runPrDetailed({
     post: ctx.options.post,
     session: ctx.options.prSession,
@@ -15,7 +65,35 @@ async function run(ctx: CommandContext): Promise<number> {
     store: ctx.options.store,
     pushRef: ctx.options.pushRef,
     samosa: ctx.options.samosa,
+    card: ctx.options.card,
+    prNumber: cardPr,
+    link: ctx.options.link,
   });
+  // SPEC-0077 R1/R6 — write the shareable card (`--card` → PNG default, `--card
+  // --svg` → the deterministic SVG), then run the local share step: image on the
+  // clipboard, caption + intent URLs printed. The pasteable body still prints
+  // first (R3 spine). No browser, no network from the card path (I1).
+  if (ctx.options.card && result.cardModel) {
+    const format = ctx.options.svg ? "svg" : "png";
+    const imagePath = ctx.options.output ?? (ctx.options.svg ? "card.svg" : "card.png");
+    const svg = renderCardSvg(result.cardModel, { theme: ctx.options.theme });
+    if (ctx.options.svg) {
+      await writeSvg(ctx, svg, imagePath);
+    } else {
+      await writePng(ctx, rasterizeSvgToPng(svg, 1200), imagePath);
+    }
+    const share = runCardShare(
+      { model: result.cardModel, imagePath, format, link: result.cardLink },
+      defaultCardShareDeps((line) => ctx.stdout.write(`${line}\n`)),
+    );
+    ctx.telemetry.recordCardGenerated({
+      scope: "pr",
+      theme: ctx.options.theme,
+      format,
+      linkIncluded: share.linkIncluded,
+      clipboardImageCopied: share.clipboardImageCopied,
+    });
+  }
   if (result.bodyRendered && result.receipt) {
     await ctx.telemetry.noteReceiptGenerated(
       receiptTelemetryFromModels({

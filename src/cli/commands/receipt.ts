@@ -9,6 +9,8 @@ import { buildReceiptModel } from "../../receipt/model.js";
 import { attachSubagentRollup } from "../../receipt/subagents.js";
 import { renderReceipt } from "../../receipt/render.js";
 import { renderReceiptSvg } from "../../receipt/svg.js";
+import { buildSessionCardModel, renderCardSvg } from "../../receipt/card.js";
+import { defaultCardShareDeps, runCardShare } from "../../receipt/shareCard.js";
 import { rasterizeSvgToPng } from "../../receipt/png.js";
 import { toJsonModel } from "../../receipt/json.js";
 import type { CommandContext, CommandDef } from "../types.js";
@@ -27,8 +29,36 @@ function isDefaultHumanTextReceipt(ctx: CommandContext): boolean {
     !options.json &&
     options.csvMode === undefined &&
     !options.svg &&
-    !options.png
+    !options.png &&
+    !options.card
   );
+}
+
+/**
+ * SPEC-0077 R1/R4 — reject the illegal `--card` combinations before any render.
+ * The card is one always-sanitized image: it never rides alongside a data
+ * surface (`--json`/`--csv`), never writes two files (`--svg --png`), and never
+ * carries the project-revealing `--by-project` split. Returns the usage message,
+ * or `null` when the combination is legal.
+ */
+function cardUsageError(ctx: CommandContext): string | null {
+  const { options } = ctx;
+  if (options.json) {
+    return "--card cannot combine with --json (the card is an image, not data)";
+  }
+  if (options.csvMode !== undefined) {
+    return "--card cannot combine with --csv (the card is an image, not data)";
+  }
+  if (options.svg && options.png) {
+    return "--card writes one file — use --card (PNG) or --card --svg, not both";
+  }
+  if (options.byProject) {
+    return "--card is always sanitized — --by-project cannot combine with it";
+  }
+  if (options.link) {
+    return "--link only applies to pr --card (session cards are image-only)";
+  }
+  return null;
 }
 
 async function recordReceiptExport(ctx: CommandContext, format: ExportFormatValue, wroteFile: boolean): Promise<void> {
@@ -38,6 +68,14 @@ async function recordReceiptExport(ctx: CommandContext, format: ExportFormatValu
 
 async function run(ctx: CommandContext): Promise<number> {
   const { options } = ctx;
+  // SPEC-0077 R1/R4 — validate `--card` combinations up front, before any I/O.
+  if (options.card) {
+    const cardError = cardUsageError(ctx);
+    if (cardError) {
+      ctx.stderr.write(`${cardError}\n`);
+      return 1;
+    }
+  }
   const resolvedTemplate = resolveTemplate(options.template);
   if ("error" in resolvedTemplate) {
     ctx.stderr.write(`${resolvedTemplate.error}\n`);
@@ -67,6 +105,47 @@ async function run(ctx: CommandContext): Promise<number> {
   }
   // SPEC-0061 — fold the session's subagents into the model before any format renders.
   const model = await attachSubagentRollup(await buildReceiptModel(session), session.filePath);
+  // SPEC-0077 — the shareable card reinterprets --svg/--png: `--card` → PNG,
+  // `--card --svg` → the deterministic card SVG. Always the sanitized session
+  // projection (R4); never `renderReceiptSvg`'s tall layout.
+  if (options.card) {
+    const cardModel = buildSessionCardModel(model);
+    const outputMode = options.svg ? "svg" : "png";
+    const imagePath = options.output ?? (options.svg ? "card.svg" : "card.png");
+    const svg = renderCardSvg(cardModel, { theme: options.theme });
+    if (options.svg) {
+      await writeSvg(ctx, svg, imagePath);
+    } else {
+      await writePng(ctx, rasterizeSvgToPng(svg, 1200), imagePath);
+    }
+    // SPEC-0077 R6 — the local share step: image on the clipboard, caption +
+    // intent URLs printed. Session cards are always linkless (image-only, R5).
+    const share = runCardShare(
+      { model: cardModel, imagePath, format: outputMode, agentLabel: model.agentLabel },
+      defaultCardShareDeps((line) => ctx.stdout.write(`${line}\n`)),
+    );
+    ctx.telemetry.recordCardGenerated({
+      scope: "session",
+      theme: options.theme,
+      format: outputMode,
+      linkIncluded: share.linkIncluded,
+      clipboardImageCopied: share.clipboardImageCopied,
+    });
+    await ctx.telemetry.noteReceiptGenerated(
+      receiptTelemetryFromModels({
+        surface: "receipt",
+        models: [model],
+        outputMode,
+        template: templateTelemetryValue(options.template),
+        turnCount: session.totals.turnCount,
+        toolCallCount: session.totals.toolCallCount,
+        detailsView: false,
+      }),
+      "receipt",
+    );
+    await recordReceiptExport(ctx, outputMode, true);
+    return 0;
+  }
   const svgOut = svgOutOf(options);
   if (svgOut.svg) {
     await writeSvg(ctx, renderReceiptSvg(model, { theme: svgOut.theme, template, details: options.details }), svgOut.output ?? "receipt.svg");

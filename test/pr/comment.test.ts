@@ -103,6 +103,46 @@ describe("upsertPrComment", () => {
   });
 });
 
+describe("upsertPrComment — SPEC-0077 R5 html_url validated against the expected permalink shape (finding 5)", () => {
+  // gh mock: no existing comment (POST create), returning `writeJson` for the write.
+  function ghWithWrite(writeJson: string): CommandRunner {
+    return (_cmd, args) => {
+      if (args[0] === "pr" && args[1] === "view") {
+        return ok('{"number": 42, "url": "https://github.com/o/r/pull/42"}');
+      }
+      if (args[0] === "api" && args.includes("--paginate")) {
+        return ok("[]");
+      }
+      if (args[0] === "api") {
+        return ok(writeJson);
+      }
+      return { stdout: "", stderr: "unexpected", code: 1, missing: false };
+    };
+  }
+
+  it("surfaces a well-formed sticky-comment permalink for THIS owner/repo/PR", () => {
+    const url = "https://github.com/o/r/pull/42#issuecomment-555";
+    const result = upsertPrComment(body, ghWithWrite(`{"id":555,"html_url":"${url}"}`));
+    expect(result).toMatchObject({ ok: true, action: "created", htmlUrl: url });
+  });
+
+  it("falls back to linkless (undefined) for a mismatched or hostile html_url", () => {
+    const cases = [
+      "https://github.com/evil/repo/pull/42#issuecomment-555", // wrong repo
+      "https://github.com/o/r/pull/99#issuecomment-555", // wrong PR number
+      "https://evil.example.com/o/r/pull/42#issuecomment-555", // wrong host
+      "https://github.com/o/r/pull/42", // no #issuecomment anchor
+      "https://github.com/o/r/pull/42#issuecomment-555 evil", // trailing junk (anchored regex)
+      "javascript:alert(1)", // not even https
+    ];
+    for (const url of cases) {
+      const result = upsertPrComment(body, ghWithWrite(`{"id":555,"html_url":${JSON.stringify(url)}}`));
+      expect(result).toMatchObject({ ok: true });
+      expect((result as { htmlUrl?: string }).htmlUrl).toBeUndefined();
+    }
+  });
+});
+
 describe("repoVisibility — SPEC-0035 R5 visibility guard (PR #87 review + its Codex round)", () => {
   it("'private' on a positive answer, via exactly one repos/<ownerRepo> call", () => {
     const calls: Call[] = [];

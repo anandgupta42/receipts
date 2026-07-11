@@ -125,6 +125,18 @@ export interface ReceiptModel {
 }
 
 /**
+ * SPEC-0077 R2 — true when a model priced but left some usage-carrying turns
+ * unpriced, so its `totalUsd` is a lower bound of the atom's real cost (the
+ * SPEC-0054 R3 `partial-priced-coverage` caveat, set from
+ * `attribution.unpricedUsageTurnCount`). A PR card aggregating such an atom must
+ * carry the `≥` floor on its one headline — an exact-looking `$` that is
+ * actually a lower bound is the same undercount the comment's caveat discloses.
+ */
+export function isPartiallyPriced(model: ReceiptModel): boolean {
+  return model.totalUsd !== null && model.caveats.some((c) => c.kind === "partial-priced-coverage");
+}
+
+/**
  * SPEC-0019 R1e(g) — recompute a session's totals/timestamps/tool counts over a
  * contiguous turn range `[startTurn, endTurn]` (0-based, inclusive) so a
  * PR-scoped receipt reflects only the work in that slice. Returns a new

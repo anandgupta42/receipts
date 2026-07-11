@@ -11,6 +11,8 @@ import type { ReceiptModel } from "../src/receipt/model.js";
 import { attachSubagentRollup } from "../src/receipt/subagents.js";
 import { renderReceipt } from "../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../src/receipt/svg.js";
+import { buildSessionCardModel, renderCardSvg } from "../src/receipt/card.js";
+import { buildPrCardModel } from "../src/pr/cardModel.js";
 import { renderMiniReceipt } from "../src/receipt/mini.js";
 import { renderHandoff } from "../src/receipt/handoff.js";
 import { TEMPLATE_NAMES } from "../src/receipt/blocks.js";
@@ -81,6 +83,60 @@ for (const theme of ["light", "dark"] as const) {
 }
 const loopModel = await modelFor(LOOP.source, LOOP.path);
 check(`goldens/svg/compare-${nameOf(PRICED.path)}-vs-${nameOf(LOOP.path)}.svg`, renderCompareSvg(pricedModel, loopModel));
+
+// SPEC-0077 R3 — the shareable session card SVG, golden-pinned in both themes
+// (the byte-stable artifact; the PNG raster is asserted for dims/decode only).
+const sessionCard = buildSessionCardModel(pricedModel);
+for (const theme of ["light", "dark"] as const) {
+  check(`goldens/svg/card-session-${nameOf(PRICED.path)}-${theme}.svg`, renderCardSvg(sessionCard, { theme }));
+}
+
+// SPEC-0077 R2/R3 — the PR card SVG: an orchestrator (with one readable subagent
+// carrying the R2a-widened breakdown) plus a builder contributor. Pins the
+// token-weighted PR model mix, the per-tool roll-up (contributors + subagents),
+// the aggregate cache line, and the `PR #<n>` scope label — no cheaper-model
+// line on the PR card (R2), golden-pinned in both themes.
+const prCardEntries = [
+  {
+    view: {
+      role: "orchestrator" as const,
+      sessionId: "golden-orchestrator",
+      slice: { kind: "full" as const, startTurn: 0, endTurn: 0, turnCount: 1, label: "entire session" },
+      modelMix: pricedModel.modelMix,
+      usd: pricedModel.totalUsd,
+      tokens: pricedModel.totalTokens,
+      subagents: [
+        {
+          name: "golden-subagent",
+          model: loopModel.modelMix[0]?.model,
+          usd: loopModel.totalUsd,
+          tokens: loopModel.totalTokens,
+          unreadable: false,
+          filePath: "golden/subagents/agent-1.jsonl",
+          modelMix: loopModel.modelMix,
+          toolRows: loopModel.toolRows,
+        },
+      ],
+    },
+    model: pricedModel,
+  },
+  {
+    view: {
+      role: "builder" as const,
+      sessionId: "golden-builder",
+      slice: { kind: "full" as const, startTurn: 0, endTurn: 0, turnCount: 1, label: "entire session" },
+      modelMix: loopModel.modelMix,
+      usd: loopModel.totalUsd,
+      tokens: loopModel.totalTokens,
+      subagents: [],
+    },
+    model: loopModel,
+  },
+];
+const prCard = buildPrCardModel(prCardEntries, 189, { excludedCount: 0 });
+for (const theme of ["light", "dark"] as const) {
+  check(`goldens/svg/card-pr-${nameOf(PRICED.path)}-${theme}.svg`, renderCardSvg(prCard, { theme }));
+}
 
 // SPEC-0042 R1/R2 — the resume packet's state-header + coverage wording is
 // golden-pinned on the loop fixture (has waste, so the packet renders).

@@ -78,7 +78,8 @@ const SECTION_GAP = 10;
 const FOOT_LH = 15; // footnote line box
 const META_LH = 16;
 
-const FONT_STACK = '"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace';
+/** The monospace font stack every receipt/card SVG renders with (exported so the SPEC-0077 card renderer shares one stack, not a divergent copy). */
+export const FONT_STACK = '"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace';
 
 // Type sizes.
 const SZ_WORDMARK = 15;
@@ -107,23 +108,25 @@ const STAMP_TEXT = "LOCAL · DETERMINISTIC";
 
 // --- Primitives --------------------------------------------------------------
 
-/** Deterministic number → string: integers bare, else 2dp with trailing zeros stripped. Keeps golden bytes stable across platforms. */
-function n(v: number): string {
+/** Deterministic number → string: integers bare, else 2dp with trailing zeros stripped. Keeps golden bytes stable across platforms. Exported for the SPEC-0077 card renderer (shared coordinate formatter). */
+export function n(v: number): string {
   if (Number.isInteger(v)) {
     return String(v);
   }
   return String(Math.round(v * 100) / 100);
 }
 
-function esc(s: string): string {
+/** XML-escape untrusted text before it enters SVG bytes. Exported so the card renderer escapes transcript-derived tool/model strings through the same path. */
+export function esc(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function charW(size: number, safe = false): number {
+/** Monospace advance for one glyph at `size` (+10% safety margin when `safe`). Exported for the card's font-safe column math. */
+export function charW(size: number, safe = false): number {
   return size * CHAR_RATIO * (safe ? GLYPH_SAFETY : 1);
 }
 
-interface TextOpts {
+export interface TextOpts {
   size: number;
   fill: string;
   anchor?: "start" | "middle" | "end";
@@ -131,15 +134,16 @@ interface TextOpts {
   letterSpacing?: number;
 }
 
-function textEl(x: number, baseline: number, s: string, o: TextOpts): string {
+/** One `<text>` element on the shared monospace grid. Exported so the SPEC-0077 card renderer emits identical text primitives (same escaping, same attribute order → same golden idiom). */
+export function textEl(x: number, baseline: number, s: string, o: TextOpts): string {
   const anchor = o.anchor ?? "start";
   const weight = o.weight !== undefined ? ` font-weight="${o.weight}"` : "";
   const ls = o.letterSpacing !== undefined ? ` letter-spacing="${n(o.letterSpacing)}"` : "";
   return `<text x="${n(x)}" y="${n(baseline)}" font-size="${n(o.size)}" fill="${o.fill}" text-anchor="${anchor}"${weight}${ls}>${esc(s)}</text>`;
 }
 
-/** A dotted leader stroke (never dot glyphs): round-capped dashes in the muted token. */
-function leaderEl(x1: number, x2: number, y: number, muted: string): string {
+/** A dotted leader stroke (never dot glyphs): round-capped dashes in the muted token. Exported so the card's tool line-items draw the SAME dot-leader primitive (SPEC-0077). */
+export function leaderEl(x1: number, x2: number, y: number, muted: string): string {
   return `<line x1="${n(x1)}" y1="${n(y)}" x2="${n(x2)}" y2="${n(y)}" stroke="${muted}" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="0.1 7"/>`;
 }
 

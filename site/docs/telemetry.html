@@ -339,7 +339,7 @@ footer{
 <h2 id="tldr">tl;dr</h2>
 
 <ul>
-  <li><strong>On by default</strong>, but every event is one of a fixed nine-event catalog: <code>cli_run</code>, <code>cli_error</code>, <code>parse_failure</code>, <code>receipt_generated</code>, <code>export_generated</code>, <code>pr_flow_completed</code>, <code>hook_configured</code>, <code>integration_surface_rendered</code>, <code>activation_milestone</code>.</li>
+  <li><strong>On by default</strong>, but every event is one of a fixed ten-event catalog: <code>cli_run</code>, <code>cli_error</code>, <code>parse_failure</code>, <code>receipt_generated</code>, <code>export_generated</code>, <code>pr_flow_completed</code>, <code>hook_configured</code>, <code>integration_surface_rendered</code>, <code>activation_milestone</code>, <code>card_generated</code>.</li>
   <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.</li>
   <li><strong>Pseudonymous install identity</strong>: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete <code>~/.aireceipts/state.json</code> to reset it.</li>
   <li><strong>Disable anytime</strong>: <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code>. Either one results in <strong>zero network calls</strong> and prevents install-id creation on a fresh install.</li>
@@ -483,6 +483,19 @@ footer{
     <tr><td><code>milestone</code></td><td>enum</td><td><code>first_run</code> | <code>first_receipt</code> | <code>third_receipt</code> | <code>tenth_receipt</code> | <code>first_export</code> | <code>first_compare</code> | <code>first_week</code> | <code>first_hook_install</code> | <code>first_pr</code> | <code>first_pr_post</code> | <code>first_artifact</code></td><td></td></tr>
     <tr><td><code>command</code></td><td>enum</td><td>same command enum as <code>cli_run.commandClass</code></td><td>Command that caused the milestone.</td></tr>
     <tr><td><code>installAgeBucket</code></td><td>enum</td><td><code>first_day</code> | <code>2-7d</code> | <code>8-30d</code> | <code>31-90d</code> | <code>&gt;90d</code> | <code>unavailable</code></td><td>Derived locally from <code>firstRunAt</code>; raw date is not sent.</td></tr>
+  </tbody>
+</table></div>
+
+<h3 id="cardgenerated-one-per-rendered-shareable-card-spec-0077"><code>card_generated</code> — one per rendered shareable card (SPEC-0077)</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>scope</code></td><td>enum</td><td><code>session</code> | <code>pr</code></td><td>Which card was rendered.</td></tr>
+    <tr><td><code>theme</code></td><td>enum</td><td><code>light</code> | <code>dark</code></td><td>The palette.</td></tr>
+    <tr><td><code>format</code></td><td>enum</td><td><code>png</code> | <code>svg</code></td><td>The written image format.</td></tr>
+    <tr><td><code>linkIncluded</code></td><td>boolean</td><td></td><td>The caption carried the opt-in PR permalink (<code>--link</code>). The boolean only — never the URL.</td></tr>
+    <tr><td><code>clipboardImageCopied</code></td><td>boolean</td><td></td><td>The image landed on the clipboard. The boolean only — never the path.</td></tr>
   </tbody>
 </table></div>
 

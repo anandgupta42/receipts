@@ -4,7 +4,7 @@
 
 ## tl;dr
 
-- **On by default**, but every event is one of a fixed nine-event catalog: `cli_run`, `cli_error`, `parse_failure`, `receipt_generated`, `export_generated`, `pr_flow_completed`, `hook_configured`, `integration_surface_rendered`, `activation_milestone`.
+- **On by default**, but every event is one of a fixed ten-event catalog: `cli_run`, `cli_error`, `parse_failure`, `receipt_generated`, `export_generated`, `pr_flow_completed`, `hook_configured`, `integration_surface_rendered`, `activation_milestone`, `card_generated`.
 - **Never sent**: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.
 - **Pseudonymous install identity**: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete `~/.aireceipts/state.json` to reset it.
 - **Disable anytime**: `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`) or `DO_NOT_TRACK=1`. Either one results in **zero network calls** and prevents install-id creation on a fresh install.
@@ -125,6 +125,16 @@ network events.
 | `milestone` | enum | `first_run` \| `first_receipt` \| `third_receipt` \| `tenth_receipt` \| `first_export` \| `first_compare` \| `first_week` \| `first_hook_install` \| `first_pr` \| `first_pr_post` \| `first_artifact` | |
 | `command` | enum | same command enum as `cli_run.commandClass` | Command that caused the milestone. |
 | `installAgeBucket` | enum | `first_day` \| `2-7d` \| `8-30d` \| `31-90d` \| `>90d` \| `unavailable` | Derived locally from `firstRunAt`; raw date is not sent. |
+
+### `card_generated` — one per rendered shareable card (SPEC-0077)
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `scope` | enum | `session` \| `pr` | Which card was rendered. |
+| `theme` | enum | `light` \| `dark` | The palette. |
+| `format` | enum | `png` \| `svg` | The written image format. |
+| `linkIncluded` | boolean | | The caption carried the opt-in PR permalink (`--link`). The boolean only — never the URL. |
+| `clipboardImageCopied` | boolean | | The image landed on the clipboard. The boolean only — never the path. |
 
 ## Install identifier
 

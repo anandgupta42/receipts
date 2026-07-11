@@ -5,6 +5,7 @@ import {
   COMMAND_VALUES,
   EVENT_NAMES,
   activationMilestonePropertiesSchema,
+  cardGeneratedPropertiesSchema,
   cliErrorPropertiesSchema,
   cliRunPropertiesSchema,
   exportGeneratedPropertiesSchema,
@@ -22,11 +23,12 @@ import {
 
 const INSTALL_HASH = "a".repeat(64);
 
-describe("SPEC-0043 R1: exactly nine event names", () => {
-  it("is exhaustive over the v2 catalog — no more, no less", () => {
+describe("SPEC-0043 R1 + SPEC-0077 R8: exactly ten event names", () => {
+  it("is exhaustive over the v2 catalog + card_generated — no more, no less", () => {
     expect([...EVENT_NAMES].sort()).toEqual(
       [
         "activation_milestone",
+        "card_generated",
         "cli_error",
         "cli_run",
         "export_generated",
@@ -79,6 +81,7 @@ describe("SPEC-0043 R9: docs parity", () => {
     hook_configured: ["operation", "promptOutcome", "result"],
     integration_surface_rendered: ["integration", "inputMode", "payloadValid", "customFormat", "scoped", "configFile", "result"],
     activation_milestone: ["milestone", "command", "installAgeBucket"],
+    card_generated: ["scope", "theme", "format", "linkIncluded", "clipboardImageCopied"],
   } as const;
 
   it("documents every event and field", () => {
@@ -217,6 +220,7 @@ describe("SPEC-0043 R1-R5: valid events pass their schema", () => {
       },
     ],
     ["activation_milestone", { milestone: "first_receipt", command: "receipt", installAgeBucket: "first_day" }],
+    ["card_generated", { scope: "pr", theme: "dark", format: "png", linkIncluded: true, clipboardImageCopied: false }],
   ] as const)("accepts a well-formed %s event", (name, properties) => {
     expect(validateEvent({ name, properties } as TelemetryEvent)).toBe(true);
   });
@@ -319,6 +323,7 @@ describe("SPEC-0043 R9: leakage fixtures — banned content is structurally reje
       { integration: "quota", inputMode: "none", payloadValid: false, result: "no_data" },
     ],
     [activationMilestonePropertiesSchema, { milestone: "first_run", command: "stats", installAgeBucket: "2-7d" }],
+    [cardGeneratedPropertiesSchema, { scope: "session", theme: "light", format: "svg", linkIncluded: false, clipboardImageCopied: true }],
   ] as const;
 
   it.each([

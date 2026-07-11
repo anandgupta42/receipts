@@ -262,7 +262,7 @@ function totalParts(model: ReceiptModel): TotalParts {
  * suffix — arithmetic on the already-traced `usd`/`actualUsd` pair, not a new
  * dollar figure, so the honesty battery's allowlist needs no change.
  */
-function priceDeltaParts(model: ReceiptModel): { label: string; value: string } | undefined {
+export function priceDeltaParts(model: ReceiptModel): { label: string; value: string } | undefined {
   if (!model.priceDelta) {
     return undefined;
   }

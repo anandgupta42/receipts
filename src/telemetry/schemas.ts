@@ -121,6 +121,16 @@ export type InputModeValue = (typeof INPUT_MODE_VALUES)[number];
 export const PR_MODE_VALUES = ["dry_run", "post"] as const;
 export type PrModeValue = (typeof PR_MODE_VALUES)[number];
 
+/** SPEC-0077 R8 — card scope, theme, and image format. Enum-only; no repo/title/project/dollar/token ever accompanies them. */
+export const CARD_SCOPE_VALUES = ["session", "pr"] as const;
+export type CardScopeValue = (typeof CARD_SCOPE_VALUES)[number];
+
+export const CARD_THEME_VALUES = ["light", "dark"] as const;
+export type CardThemeValue = (typeof CARD_THEME_VALUES)[number];
+
+export const CARD_FORMAT_VALUES = ["png", "svg"] as const;
+export type CardFormatValue = (typeof CARD_FORMAT_VALUES)[number];
+
 export const STEP_RESULT_VALUES = ["success", "failed", "skipped"] as const;
 export type StepResultValue = (typeof STEP_RESULT_VALUES)[number];
 
@@ -262,6 +272,19 @@ export const integrationSurfaceRenderedPropertiesSchema = z
   .strict();
 export type IntegrationSurfaceRenderedProperties = z.infer<typeof integrationSurfaceRenderedPropertiesSchema>;
 
+export const cardGeneratedPropertiesSchema = z
+  .object({
+    scope: z.enum(CARD_SCOPE_VALUES),
+    theme: z.enum(CARD_THEME_VALUES),
+    format: z.enum(CARD_FORMAT_VALUES),
+    /** SPEC-0077 R5/R8 — the caption carried the opt-in PR permalink (boolean only — never the URL). */
+    linkIncluded: z.boolean(),
+    /** SPEC-0077 R6/R8 — the image landed on the clipboard (boolean only — never the path). */
+    clipboardImageCopied: z.boolean(),
+  })
+  .strict();
+export type CardGeneratedProperties = z.infer<typeof cardGeneratedPropertiesSchema>;
+
 export const activationMilestonePropertiesSchema = z
   .object({
     milestone: z.enum(MILESTONE_VALUES),
@@ -271,7 +294,7 @@ export const activationMilestonePropertiesSchema = z
   .strict();
 export type ActivationMilestoneProperties = z.infer<typeof activationMilestonePropertiesSchema>;
 
-/** Exactly nine event names exist (SPEC-0043 R1) — this array is the single source of truth other modules and tests assert against. */
+/** Exactly ten event names exist (SPEC-0043 R1 + SPEC-0077 R8) — this array is the single source of truth other modules and tests assert against. */
 export const EVENT_NAMES = [
   "cli_run",
   "cli_error",
@@ -282,6 +305,7 @@ export const EVENT_NAMES = [
   "hook_configured",
   "integration_surface_rendered",
   "activation_milestone",
+  "card_generated",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
@@ -321,6 +345,10 @@ export interface ActivationMilestoneEvent {
   name: "activation_milestone";
   properties: ActivationMilestoneProperties;
 }
+export interface CardGeneratedEvent {
+  name: "card_generated";
+  properties: CardGeneratedProperties;
+}
 export type TelemetryEvent =
   | CliRunEvent
   | CliErrorEvent
@@ -330,7 +358,8 @@ export type TelemetryEvent =
   | PrFlowCompletedEvent
   | HookConfiguredEvent
   | IntegrationSurfaceRenderedEvent
-  | ActivationMilestoneEvent;
+  | ActivationMilestoneEvent
+  | CardGeneratedEvent;
 
 /** `event.name` → its properties schema, exhaustive over `EVENT_NAMES`. */
 export const PROPERTIES_SCHEMA_BY_EVENT_NAME = {
@@ -343,6 +372,7 @@ export const PROPERTIES_SCHEMA_BY_EVENT_NAME = {
   hook_configured: hookConfiguredPropertiesSchema,
   integration_surface_rendered: integrationSurfaceRenderedPropertiesSchema,
   activation_milestone: activationMilestonePropertiesSchema,
+  card_generated: cardGeneratedPropertiesSchema,
 } as const satisfies Record<EventName, z.ZodTypeAny>;
 
 /** Validates a full envelope (name + properties) against its schema. Never throws — returns `false` on any mismatch, including an unrecognized `name`. */

@@ -8,7 +8,7 @@ import type { CommandRunner } from "./git.js";
 import { DOGFOOD_MARKER } from "./body.js";
 
 export type UpsertOutcome =
-  | { ok: true; action: "created" | "updated"; prNumber: number; ownerRepo: string; commentId?: number }
+  | { ok: true; action: "created" | "updated"; prNumber: number; ownerRepo: string; commentId?: number; htmlUrl?: string }
   | { ok: false; error: string; missing?: boolean };
 
 /** SPEC-0027 R3 — the one base-repo resolution the publish URL and blob URL both derive from. */
@@ -70,6 +70,33 @@ interface RawComment {
   body?: string;
 }
 
+/** Escape a string for literal use inside a `RegExp` (ownerRepo carries `/`, and may carry `.`/`-`). */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * SPEC-0077 R5 — the `html_url` GitHub returns for the created/updated comment
+ * (the sticky-comment permalink the card `--link` caption surfaces). Never
+ * fetched separately: it rides the create/update response the `--post` already
+ * made. Validated against the EXPECTED sticky-comment permalink shape for THIS
+ * `owner/repo` and PR number — `https://github.com/<owner>/<repo>/pull/<n>#issuecomment-<id>`
+ * — so an unexpected or wrong-repo `html_url` never lands in the caption; a
+ * mismatch (or an unparseable/absent value) falls back to linkless.
+ */
+function parseCommentHtmlUrl(json: string, ownerRepo: string, prNumber: number): string | undefined {
+  try {
+    const parsed = JSON.parse(json) as { html_url?: unknown };
+    if (typeof parsed.html_url !== "string") {
+      return undefined;
+    }
+    const expected = new RegExp(`^https://github\\.com/${escapeRegExp(ownerRepo)}/pull/${prNumber}#issuecomment-\\d+$`);
+    return expected.test(parsed.html_url) ? parsed.html_url : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Find the existing aireceipts comment id, if any (body starts with the marker). */
 function findMarkerCommentId(json: string): number | undefined {
   let parsed: unknown;
@@ -121,7 +148,7 @@ export function upsertPrComment(body: string, run: CommandRunner): UpsertOutcome
     if (patch.code !== 0) {
       return { ok: false, error: `could not update PR comment: ${patch.stderr.trim()}` };
     }
-    return { ok: true, action: "updated", prNumber, ownerRepo, commentId: existingId };
+    return { ok: true, action: "updated", prNumber, ownerRepo, commentId: existingId, htmlUrl: parseCommentHtmlUrl(patch.stdout, ownerRepo, prNumber) };
   }
 
   const create = run("gh", ["api", `repos/${ownerRepo}/issues/${prNumber}/comments`, "-X", "POST", "--input", "-"], {
@@ -130,5 +157,5 @@ export function upsertPrComment(body: string, run: CommandRunner): UpsertOutcome
   if (create.code !== 0) {
     return { ok: false, error: `could not create PR comment: ${create.stderr.trim()}` };
   }
-  return { ok: true, action: "created", prNumber, ownerRepo };
+  return { ok: true, action: "created", prNumber, ownerRepo, htmlUrl: parseCommentHtmlUrl(create.stdout, ownerRepo, prNumber) };
 }
