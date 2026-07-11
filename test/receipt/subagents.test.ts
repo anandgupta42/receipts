@@ -96,6 +96,11 @@ describe("SPEC-0061 foldSubagentRows", () => {
     const agg = foldSubagentRows([childRow({ usd: null }), childRow({ usd: null })]);
     expect(agg?.pricedUsd).toBeNull();
   });
+
+  it("counts a partially-priced child in both the dollar and unpriced ledgers", () => {
+    const agg = foldSubagentRows([childRow({ usd: 0.25, tokens: usage(1000), unpricedTokens: usage(300) })]);
+    expect(agg).toEqual({ count: 1, pricedUsd: 0.25, tokensTotal: 1000, unpricedCount: 1, unreadableCount: 0 });
+  });
 });
 
 describe("SPEC-0061 R2 caveats — floors, dollars and tokens never blended", () => {
@@ -111,6 +116,14 @@ describe("SPEC-0061 R2 caveats — floors, dollars and tokens never blended", ()
     const agg = foldSubagentRows(rows)!;
     const caveats = subagentCaveats(rows, agg, true);
     expect(caveats).toEqual([{ kind: "subagents-unpriced", text: "1 subagent unpriced (4,321 tok) — total is a floor" }]);
+  });
+
+  it("partial child pricing names only the exact unpriced turn tokens", () => {
+    const rows = [childRow({ usd: 0.3, tokens: usage(1000), unpricedTokens: usage(275) })];
+    const agg = foldSubagentRows(rows)!;
+    expect(subagentCaveats(rows, agg, true)).toEqual([
+      { kind: "subagents-unpriced", text: "1 subagent had unpriced usage (275 tok) — total is a floor" },
+    ]);
   });
 
   it("unpriced parent + priced children: whole receipt tokens-only, caveat carries the child $, --json keeps pricedUsd", () => {

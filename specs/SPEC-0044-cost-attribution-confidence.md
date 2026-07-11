@@ -440,3 +440,31 @@ outcome) and partly covered by existing basis-label assertions — the remaining
 subtle ones are a mutation follow-up, not a correctness gap (the gate now
 catches gross regressions). Goldens byte-identical; the CI mutation run
 verifies the combined score clears the floor.
+
+**2026-07-10 · matrix and partial-coverage correction.** The three hero cells
+now pin independently calculated exact USD—not merely `priced: true`—and the
+built artifact stages native Claude Code JSONL, Codex JSONL, and opencode SQLite
+homes through discovery → parse → price → JSON. A separate PR aggregation audit
+found that a mixed-price contributor/subagent collapsed into one `$` atom, so
+its unpriced turns vanished from `TOTAL unpriced`. `AttributionResult` now
+carries exact `unpricedTokens` through `ReceiptModel`, contributor and subagent
+views; `partial-priced-coverage` joins the typed event contract, floors the
+known-dollar total, and renders the exact unpriced-token subtotal plus a counted
+note. Fully priced output and all 102 goldens remain byte-identical.
+
+**2026-07-10 · adversarial pricing-domain follow-up.** `priceTurn` now refuses
+non-finite, negative, fractional, component-total-mismatched, or out-of-subset
+cache-tier usage rather than allowing negative/NaN/fabricated dollars. The same
+validator guards the two direct `costOf` side paths (trivial spans and price
+delta), and partial-price sessions no longer compute a whole-session price delta
+from tokens their actual dollar excluded. Fast-check proves arbitrary valid
+integer/cache-tier combinations still equal `costOf` exactly and arbitrary
+invalid domains stay unpriced.
+
+**2026-07-10 · provider-identity safe stop.** Explicit provider evidence is now
+part of every turn's pricing decision. Codex `model_provider` and opencode
+`providerID` select a recognized direct table or block routed/custom traffic to
+tokens-only; only absent evidence retains legacy inference. Focused regressions
+cover nested/string/session metadata, direct and blocked providers, provider
+switches, and every pricing consumer so a routed turn cannot regain a dollar in
+waste, attribution, price-delta, or receipt-model side paths.

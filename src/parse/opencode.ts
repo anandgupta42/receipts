@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { promises as fs } from "node:fs";
 import { openReadOnly, type SqliteReader } from "./sqlite.js";
+import { normalizePricingProvider } from "./provider.js";
 import type {
   AgentSource,
   ListSessionsOptions,
@@ -51,6 +52,7 @@ interface RawMessageData {
   text?: string;
   model?: string | { id?: unknown; providerID?: unknown; variant?: unknown };
   modelID?: string;
+  providerID?: unknown;
   tokens?: RawTokens;
   content?: unknown;
   time?: {
@@ -207,6 +209,35 @@ function modelId(value: unknown): string | undefined {
     return (value as { id: string }).id;
   }
   return undefined;
+}
+
+function pricingProviderFromModel(value: unknown): Turn["pricingProvider"] {
+  const parsed = typeof value === "string"
+    ? parseJsonObject<{ providerID?: unknown }>(value)
+    : value && typeof value === "object"
+      ? (value as { providerID?: unknown })
+      : null;
+  if (!parsed || !Object.prototype.hasOwnProperty.call(parsed, "providerID")) {
+    return undefined;
+  }
+  return normalizePricingProvider(parsed.providerID);
+}
+
+function pricingProviderForMessage(msg: RawMessageData, fallback: Turn["pricingProvider"]): Turn["pricingProvider"] {
+  if (Object.prototype.hasOwnProperty.call(msg, "providerID")) {
+    return normalizePricingProvider(msg.providerID);
+  }
+  const fromModel = pricingProviderFromModel(msg.model);
+  if (fromModel !== undefined) {
+    return fromModel;
+  }
+  const fromModelId = pricingProviderFromModel(msg.modelID);
+  return fromModelId !== undefined ? fromModelId : fallback;
+}
+
+function pricingProviderFromSessionRow(row: SessionRow): Turn["pricingProvider"] {
+  const first = pricingProviderFromModel(row.first_model);
+  return first !== undefined ? first : pricingProviderFromModel(row.model);
 }
 
 function makeId(dbPath: string, sessionId: string): string {
@@ -552,6 +583,7 @@ export class OpenCodeAdapter implements SessionAdapter {
       return null;
     }
     const summary = summaryFromRow(dbPath, summaryRow);
+    const sessionPricingProvider = pricingProviderFromSessionRow(summaryRow);
     const sid = summaryRow.id;
     const messages = db.all(
       `SELECT id, type, seq, time_created, time_updated, data FROM session_message WHERE session_id = ${sqlString(sid)} ORDER BY seq`,
@@ -593,10 +625,12 @@ export class OpenCodeAdapter implements SessionAdapter {
       if (usage) {
         totalUsage = addUsage(totalUsage, usage);
       }
+      const pricingProvider = pricingProviderForMessage(msg, sessionPricingProvider);
       turns.push({
         index: turns.length,
         timestamp: ts,
         model: modelId(msg.modelID) ?? modelId(msg.model) ?? summary.model,
+        ...(pricingProvider !== undefined ? { pricingProvider } : {}),
         usage,
         outputTokens: usage?.output,
         toolCalls: toolsFromContent(msg.content),
@@ -631,6 +665,7 @@ export class OpenCodeAdapter implements SessionAdapter {
       return null;
     }
     const summary = summaryFromRow(dbPath, summaryRow);
+    const sessionPricingProvider = pricingProviderFromSessionRow(summaryRow);
     const sid = summaryRow.id;
     const messages = db.all(
       `SELECT id, time_created, time_updated, data FROM message WHERE session_id = ${sqlString(sid)} ORDER BY time_created, id`,
@@ -680,10 +715,12 @@ export class OpenCodeAdapter implements SessionAdapter {
       if (usage) {
         totalUsage = addUsage(totalUsage, usage);
       }
+      const pricingProvider = pricingProviderForMessage(msg, sessionPricingProvider);
       turns.push({
         index: turns.length,
         timestamp: ts,
-        model: msg.modelID || summary.model,
+        model: modelId(msg.modelID) ?? modelId(msg.model) ?? summary.model,
+        ...(pricingProvider !== undefined ? { pricingProvider } : {}),
         usage,
         outputTokens: usage?.output,
         toolCalls: partsByMessage.get(row.id) ?? [],

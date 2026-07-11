@@ -80,6 +80,13 @@ export interface Turn {
   /** epoch milliseconds */
   timestamp?: number;
   model?: string;
+  /**
+   * Explicit provider evidence for pricing. `undefined` means the transcript did
+   * not name a provider, so legacy model/source inference remains available;
+   * `null` means it explicitly named a routed/custom provider and dollar pricing
+   * is blocked; a string is a recognized direct vendor id.
+   */
+  pricingProvider?: DirectPricingProvider | null;
   usage?: TokenUsage;
   /** approximate output token count for this turn, when known independently of
    * `usage.output` (e.g. before usage is attached) — used by the R4b trivial-span
@@ -88,6 +95,8 @@ export interface Turn {
   outputTokens?: number;
   toolCalls: ToolCall[];
 }
+
+export type DirectPricingProvider = "anthropic" | "openai" | "google" | "deepseek";
 
 export interface SessionTotals {
   tokens: TokenUsage;

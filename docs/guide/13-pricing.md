@@ -60,7 +60,11 @@ Every row is cited and checked:
 
 Some agents, especially opencode, can run any provider or local model the user
 configures. aireceipts does not treat the agent name as the vendor for those
-sessions. It prices each assistant turn from the turn's model id:
+sessions. When the transcript names a provider, that identity is the pricing
+gate: direct Anthropic/OpenAI/Google/DeepSeek traffic selects that provider's
+cited table, while OpenRouter, Bedrock, Azure, local, and custom providers stay
+tokens-only. Only older transcript rows with no provider field fall back to the
+turn's model id:
 
 - `claude-*` resolves to the Anthropic price table.
 - `gpt-*` resolves to the OpenAI price table.
@@ -68,9 +72,9 @@ sessions. It prices each assistant turn from the turn's model id:
 - `deepseek-*` resolves to the DeepSeek price table.
 
 After that, the usual rule still applies: the exact model id and session date must
-match a cited `data/prices/<vendor>.json` row. If the model id is custom, local,
-OpenRouter-style, or simply not in the tables yet, that turn contributes tokens
-only. Mixed sessions can therefore have priced rows for known turns and
+match a cited `data/prices/<vendor>.json` row. If the provider is routed/custom,
+or the model is simply not in the tables yet, that turn contributes tokens only.
+Mixed sessions can therefore have priced rows for known direct turns and
 tokens-only rows for unknown turns; a fully unknown session renders `no price
 table matched`.
 

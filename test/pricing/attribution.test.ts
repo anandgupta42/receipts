@@ -109,6 +109,20 @@ describe("attributeByTool", () => {
     expect(result.totalUsd).toBeCloseTo(0.002, 10);
   });
 
+  it("keeps transcript token totals exact across a three-way tool split", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 5400, output: 420, cacheRead: 3200, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }, { name: "read" }, { name: "grep" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalTokens).toEqual(turn.usage);
+    expect(Object.values(result.totalTokens).every((value) => value === undefined || Number.isSafeInteger(value))).toBe(true);
+  });
+
   it("accumulates tokens but leaves usd null when a turn's model has no matching price row", async () => {
     const turn: Turn = {
       index: 0,
@@ -125,6 +139,34 @@ describe("attributeByTool", () => {
     expect(entry.tokens).toMatchObject({ input: 800, output: 200, total: 1000 });
     // Nothing priced anywhere in the session -> total is null, not 0.
     expect(result.totalUsd).toBeNull();
+  });
+
+  it("tracks the exact tokens excluded from a partial dollar total", async () => {
+    const priced: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 1000, output: 0, cacheRead: 0, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const unpriced: Turn = {
+      index: 1,
+      timestamp: JUNE_15_2026,
+      model: "claude-unknown-model-xyz",
+      usage: usage({ input: 300, output: 100, cacheRead: 50, cacheCreation: 25 }),
+      toolCalls: [{ name: "bash" }, { name: "grep" }],
+    };
+
+    const result = await attributeByTool(session({ turns: [priced, unpriced] }), dataDir);
+
+    expect(result.totalUsd).toBeCloseTo(0.001, 10);
+    expect(result.unpricedTokens).toEqual({
+      input: 300,
+      output: 100,
+      cacheRead: 50,
+      cacheCreation: 25,
+      total: 475,
+    });
   });
 
   it("forces vendor resolution off for an unpriceable session even when source would otherwise resolve one", async () => {

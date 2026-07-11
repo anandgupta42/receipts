@@ -77,6 +77,9 @@ describe("SPEC-0044 · cost matrix — every populated cell reconciles + matches
         expect(m.unpriceable, "unpriceable flag").toBe(exp.unpriceable);
         expect(m.totalUsd !== null, "priced (has a $ total)").toBe(exp.priced);
         expect(reconciles(m), "total$ == Σ tool-row $").toBe(true);
+        if (exp.expectedUsd !== undefined) {
+          expect(m.totalUsd, "exact USD vs raw-token × cited-rate oracle").toBeCloseTo(exp.expectedUsd, 12);
+        }
         if (exp.rawTokens) {
           // Independent-oracle arithmetic: the receipt's totals equal the raw
           // per-turn sums computed straight from the fixture bytes.

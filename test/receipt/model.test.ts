@@ -100,6 +100,8 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     const model = await buildReceiptModel(session({ turns }), dataDir);
 
     expect(model.totalUsd).not.toBeNull();
+    expect(model.unpricedTokens).toMatchObject({ input: 500, output: 0, total: 500 });
+    expect(model.priceDelta).toBeNull();
     const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
     expect(coverage).toHaveLength(1);
     expect(coverage[0].text).toBe("caveat: 1 of 2 turns unpriced — TOTAL excludes their tokens");
@@ -117,6 +119,7 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     expect(model.totalUsd).not.toBeNull();
     expect(model.toolRows).toHaveLength(1);
     expect(model.toolRows[0].usd).not.toBeNull();
+    expect(model.unpricedTokens).toMatchObject({ input: 500, output: 0, total: 500 });
     // ...but the caveat still fires: row-level coverage would miss this.
     const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
     expect(coverage).toHaveLength(1);
@@ -131,7 +134,23 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     const model = await buildReceiptModel(session({ turns }), dataDir);
 
     expect(model.totalUsd).not.toBeNull();
+    expect(model.unpricedTokens).toBeUndefined();
+    expect(model.priceDelta).not.toBeNull();
     expect(model.caveats.some((c) => c.kind === "partial-priced-coverage")).toBe(false);
+  });
+
+  it("keeps price-delta arithmetic for a fully priced three-tool turn", async () => {
+    const turns = [
+      turn(0, {
+        model: "claude-haiku-4-5",
+        usage: usage({ input: 5400, output: 420, cacheRead: 3200 }),
+        toolCalls: [call("Bash"), call("Read"), call("Grep")],
+      }),
+    ];
+    const model = await buildReceiptModel(session({ turns }), dataDir);
+
+    expect(model.totalTokens).toEqual(turns[0].usage);
+    expect(model.priceDelta).not.toBeNull();
   });
 
   it("stays silent when nothing priced at all (totalUsd null — a partial-coverage claim would be meaningless without a total to bound)", async () => {
@@ -142,6 +161,7 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     const model = await buildReceiptModel(session({ turns }), dataDir);
 
     expect(model.totalUsd).toBeNull();
+    expect(model.unpricedTokens).toBeUndefined();
     expect(model.caveats.some((c) => c.kind === "partial-priced-coverage")).toBe(false);
   });
 });

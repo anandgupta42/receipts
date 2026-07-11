@@ -8,6 +8,10 @@ compactions surfaced as a waste signal. (SPEC-0058; depth facts match
 
 - **Per-turn parsing.** Each turn's model and token usage, tool-by-tool cost
   attribution (`exec_command`, MCP tools, …), cache-read visibility.
+- **Provider-safe pricing.** Explicit `model_provider` is retained per turn;
+  recognized direct OpenAI traffic uses the cited table, while Azure, routed,
+  or custom providers remain tokens-only. Older rows without the field keep
+  model-id inference.
 - **Compaction detection.** Codex's context compactions are parsed and priced
   as context-thrash waste lines (SPEC-0040) — repeated compactions in one
   session are called out with their cost.

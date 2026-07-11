@@ -14,8 +14,6 @@ Bash...........................2,160 tok  (1 call)
 caveat: 2 of 3 turns unpriced — TOTAL excludes their tokens
 --------------------------------------------------
 TOTAL........................................$0.01
-same tokens on claude-haiku-4-5...$0.01 (12% less)
-  (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                
          github.com/anandgupta42/receipts         

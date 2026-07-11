@@ -179,6 +179,14 @@ async function stageClaudeSession(home: string, fixtureName: string, destName = 
   return dest;
 }
 
+async function stageCodexSession(home: string, fixtureName: string, destName = `rollout-${fixtureName}`): Promise<string> {
+  const root = path.join(home, ".codex", "sessions", "2026", "06", "20");
+  await mkdir(root, { recursive: true });
+  const dest = path.join(root, destName);
+  await copyFile(path.join(fixturesDir, "codex", fixtureName), dest);
+  return dest;
+}
+
 function opencodeRoot(home: string): string {
   if (process.platform === "win32") {
     return path.join(home, "AppData", "Local", "opencode");
@@ -257,6 +265,44 @@ describe("built CLI e2e", () => {
     expect(result.stdout).toContain("npx aireceipts-cli");
     expect(result.stdout).not.toContain("Per-turn cost split");
     expect(result.stdout).not.toContain("buy me a samosa");
+  });
+
+  it("prices Claude Code raw usage to the independent exact-cost oracle through the built CLI", async () => {
+    const home = await makeHome();
+    await stageClaudeSession(home, "clean-multi-tool-2-models.jsonl");
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+
+    expect(receipt.source).toBe("claude-code");
+    expect(receipt.totalTokens).toMatchObject({
+      input: 19680,
+      output: 897,
+      cacheRead: 124200,
+      cacheCreation: 2100,
+      total: 146877,
+    });
+    expect(receipt.sessionTotalTokens).toEqual(receipt.totalTokens);
+    expect(receipt.totalUsd).toBeCloseTo(0.1767, 12);
+    expect(receipt.priceRowsUsed.map((row) => row.model).sort()).toEqual(["claude-opus-4-8", "claude-sonnet-5"]);
+  });
+
+  it("prices Codex normalized cache usage to the independent exact-cost oracle through the built CLI", async () => {
+    const home = await makeHome();
+    await stageCodexSession(home, "clean-session.jsonl");
+
+    const receipt = readJson<ReceiptJson>(await runCli(["--json"], home));
+
+    expect(receipt.source).toBe("codex");
+    expect(receipt.totalTokens).toMatchObject({
+      input: 3700,
+      output: 640,
+      cacheRead: 6100,
+      cacheCreation: 0,
+      total: 10440,
+    });
+    expect(receipt.sessionTotalTokens).toEqual(receipt.totalTokens);
+    expect(receipt.totalUsd).toBeCloseTo(0.0165025, 12);
+    expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`)).toEqual(["openai:gpt-5.3-codex"]);
   });
 
   // SPEC-0054 R9 e2e: `--details` through real argv parsing renders the

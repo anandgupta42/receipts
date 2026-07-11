@@ -93,4 +93,28 @@ describe("R1c rollup (window overlap + honest count)", () => {
     });
     expect(rows).toHaveLength(1);
   });
+
+  it("carries the exact unpriced portion of a partially-priced child", async () => {
+    const mixedStart = Date.UTC(2026, 5, 15, 10, 0, 0);
+    const child = childSession("mixed", mixedStart, mixedStart + 2);
+    const unpricedUsage = withTotal({ ...emptyUsage(), input: 300, output: 75, cacheRead: 25 });
+    child.turns.push({
+      index: 1,
+      timestamp: mixedStart + 1,
+      model: "claude-unknown-model-xyz",
+      usage: unpricedUsage,
+      toolCalls: [],
+    });
+    child.totals.tokens = withTotal({ ...emptyUsage(), input: 800, output: 175, cacheRead: 25 });
+    child.totals.turnCount = 2;
+
+    const rows = await rollupChildren(PARENT, { start: mixedStart, end: mixedStart + 2 }, {
+      discover: async () => ["mixed"],
+      load: async () => child,
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].usd).not.toBeNull();
+    expect(rows[0].unpricedTokens).toEqual(unpricedUsage);
+  });
 });

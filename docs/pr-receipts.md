@@ -29,6 +29,35 @@ from `aireceipts --list`):
 npx aireceipts-cli pr --post --session <id>
 ```
 
+One `--session` keeps the exact-session override. To attach work that fell
+outside the conservative auto window while retaining auto-found authors and
+helpers, repeat the flag for every explicit attachment:
+
+```sh
+npx aireceipts-cli pr --post --session <lead-id> --session <retry-id>
+```
+
+Two or more occurrences form `auto-selected ∪ explicitly listed`, deduplicated
+by transcript file. A missing id fails before anything is rendered or posted;
+flags never silently overwrite one another.
+
+### Evidence a PR receipt cannot recover
+
+- **Work not present on disk.** A deleted/moved transcript or missing
+  `subagents/` tree is indistinguishable from work that never happened. There is
+  no honest floor the CLI can emit without evidence; `--session` helps only while
+  the transcript still exists.
+- **A commit result still in flight.** If the agent invokes `git commit` and
+  `aireceipts pr --post` before that same tool call's result has been persisted,
+  the final SHA is not yet available for attribution. Run the receipt after the
+  committing call returns.
+- **A rewritten commit with no surviving proof.** A content-changing amend or
+  squash cannot be tied back to a session by patch-id unless the transcript also
+  captured the final branch SHA. It is excluded/floored rather than guessed in.
+
+These are local-evidence limits, not arithmetic fallbacks. See
+[what a receipt proves](trust.md) for the full list.
+
 The receipt always prints to stdout first, so even with no `gh` or no PR yet you can
 copy the body straight into a comment.
 
@@ -318,5 +347,6 @@ conservatively:
   credited — and never guessed in.
 
 Zero credited sessions → `aireceipts pr` refuses to guess and asks for `--session <id>`.
+One selector is an exact override; two or more are additive to this auto set.
 The `cwd`/branch/SHA signals used for matching are attribution-only: they never enter
 the rendered receipt, `--json`/`--csv`, or telemetry.

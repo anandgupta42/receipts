@@ -72,10 +72,14 @@ directive is not advisory.
   optional per-adapter surface on `SessionAdapter` (absent means no validator), each returning
   named findings:
   - **codex** — self-consistency: our summed per-turn `TokenUsage` must
-    equal the rollout's final cumulative `total_token_usage` envelope, the
-    same stream the adapter derives deltas from
-    (`src/parse/codex.ts:145-155`); any dropped/double-counted event shows
-    as drift. Tolerance 0 — same stream, so exact equality is the contract.
+    equal the rollout's **local** cumulative envelope: final
+    `total_token_usage` minus any inherited baseline established by the first
+    snapshot and its `last_token_usage`. Identical cumulative snapshots are
+    replay records, not new billed turns, even when they retain a stale
+    non-zero `last_token_usage`; after the first snapshot, a changed cumulative
+    vector books its own component-wise difference rather than trusting a
+    disagreeing `last` field. Any dropped/double-counted event still shows as
+    drift. Tolerance 0 — same stream, so exact equality is the contract.
   - **claude-code** — usage-shape invariants provable from the normalized
     `Session`: per-turn `TokenUsage` components are non-negative, `total`
     equals the component sum (`src/parse/util.ts` `withTotal` discipline
@@ -265,3 +269,15 @@ time (src/telemetry/notice.ts). Not an assertion change — the failing
 tests were right.
 
 **2026-07-04 · shipped:** merged via #65; ledger sweep pre-release.
+
+**2026-07-10 · live Codex reconciliation correction.** A content-free scan of
+754 local rollouts found 535 repeated cumulative snapshots across 114 files,
+five forked/subagent rollouts with inherited parent-inclusive baselines, and
+five sessions that switched models mid-stream. The adapter now (1) ignores an
+unchanged cumulative vector, (2) subtracts the first snapshot's inherited
+baseline from the final envelope, (3) derives every later turn from cumulative
+differences, and (4) stamps usage with the currently active `turn_context` model
+instead of freezing the first model. Fixed regressions and
+two fast-check properties cover arbitrary duplicate counts and inherited
+baselines. `node scripts/cost-reconcile.mjs` then reconciled 40/40 recent Codex
+sessions with zero drift (previous run: 30 reconciled, 10 failed).

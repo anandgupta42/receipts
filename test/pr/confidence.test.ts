@@ -29,12 +29,14 @@ describe("SPEC-0044 · summarizeConfidence", () => {
       { kind: "silenced-git-write", sessionId: "c" },
       { kind: "unanchored-git-write", sessionId: "e" },
       { kind: "cost-lower-bound-cache-tier", sessionId: "d" },
+      { kind: "partial-priced-coverage", sessionId: "p" },
     ];
     const s = summarizeConfidence(events);
     expect(s.unattributableAnchorPool).toBe(2);
     expect(s.silencedGitWrite).toBe(1);
     expect(s.unanchoredGitWrite).toBe(1);
     expect(s.costLowerBoundCacheTier).toBe(1);
+    expect(s.partialPricedCoverage).toBe(1);
     expect(s.unreadableSubagent).toBe(0);
   });
 
@@ -48,6 +50,20 @@ describe("SPEC-0044 · summarizeConfidence", () => {
     expect(isFloored(summarizeConfidence([{ kind: "unreadable-subagent", sessionId: "sub" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "unreadable-session", sessionId: "u" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "dropped-transcript-records", sessionId: "d" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "partial-priced-coverage", sessionId: "p" }]))).toBe(true);
+  });
+});
+
+describe("partial-priced-coverage renders (not silent)", () => {
+  it("floors the priced total and names the excluded unpriced turns", () => {
+    const body = renderPrReceiptText({
+      contributors: [builder({ unpricedTokens: tokens(200, 50) })],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "partial-priced-coverage", sessionId: "mixed.jsonl" }]),
+    });
+    expect(body).toMatch(/TOTAL priced\.+≥/);
+    expect(body).toMatch(/TOTAL unpriced\.+≥ 250 tokens/);
+    expect(body).toContain("1 session had partial price coverage");
   });
 });
 

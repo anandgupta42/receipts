@@ -1,7 +1,7 @@
 # Receipts for opencode
 
 Full-depth support: per-message models, tools, and cache read/write, with
-multi-provider pricing resolved per turn from the model id. (SPEC-0058; depth
+multi-provider pricing gated per turn by explicit provider identity. (SPEC-0058; depth
 facts match `src/parse/opencode.ts`.)
 
 ## What you get
@@ -9,8 +9,10 @@ facts match `src/parse/opencode.ts`.)
 - **Per-message parsing.** Models, token usage (cache read and write), and
   tool parts from opencode's local store.
 - **Multi-provider pricing.** opencode routes to many providers; each turn's
-  cost resolves from its own model id against the cited price tables. Unknown
-  models stay tokens-only — never a guessed dollar (I2).
+  explicit `providerID` selects a recognized direct-vendor table or blocks
+  dollar pricing for routed/custom traffic. Older rows with no provider field
+  retain model-id inference. Unknown models stay tokens-only — never a guessed
+  dollar (I2).
 - **Schema resilience.** Both opencode's current `session_message` schema and
   the legacy message/part rows are parsed; mixed-schema databases resolve per
   session.

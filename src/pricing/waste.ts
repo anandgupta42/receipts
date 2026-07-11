@@ -2,7 +2,16 @@ import { posix as posixPath } from "node:path";
 import type { Compaction, Session, TokenUsage, ToolCallStatus, Turn } from "../parse/types.js";
 import { addUsage, emptyUsage, scaleUsage, withTotal } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
-import { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForSource, vendorForTurn } from "./resolve.js";
+import {
+  cheapestCurrentRow,
+  costOf,
+  isoDateOf,
+  isPriceableUsage,
+  priceTurn,
+  resolvePrice,
+  vendorForSource,
+  vendorForTurn,
+} from "./resolve.js";
 
 /** Deterministically stringify `value` with object keys sorted, so structurally-identical tool inputs compare equal regardless of key order. */
 function stableStringify(value: unknown): string {
@@ -64,7 +73,7 @@ async function flattenCalls(session: Session, dataDir: string): Promise<FlatCall
     }
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
+    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model, turn.pricingProvider);
     const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const share = 1 / turn.toolCalls.length;
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
@@ -262,11 +271,11 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
   if (session.unpriceable) {
     return null;
   }
-  const vendor = vendorForSource(session.source);
-  if (!vendor) {
+  const sourceVendor = vendorForSource(session.source);
+  if (!sourceVendor) {
     return null;
   }
-  const cheapest = await cheapestCurrentRow(vendor, dataDir);
+  const cheapest = await cheapestCurrentRow(sourceVendor, dataDir);
   if (!cheapest) {
     return null;
   }
@@ -286,9 +295,13 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
     if (!turn.usage) {
       continue;
     }
+    if (!isPriceableUsage(turn.usage)) {
+      continue;
+    }
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    if (!model || !dateISO) {
+    const vendor = vendorForTurn(session.source, model, turn.pricingProvider);
+    if (!model || !dateISO || vendor !== sourceVendor) {
       continue;
     }
     const row = await resolvePrice(vendor, model, dateISO, dataDir);
@@ -434,7 +447,7 @@ export async function detectContextThrash(session: Session, dataDir: string = de
       tokens = addUsage(tokens, sliced);
       const model = turn.model ?? session.model;
       const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-      const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
+      const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model, turn.pricingProvider);
       const priced = await priceTurn(vendor, model, dateISO, sliced, dataDir);
       if (priced === null) {
         usd = null;
@@ -476,12 +489,20 @@ export async function priceDeltaFootnote(
   actualUsd: number,
   dataDir: string = defaultDataDir(),
 ): Promise<PriceDeltaFootnote | null> {
-  if (session.unpriceable) {
+  if (session.unpriceable || !isPriceableUsage(totalTokens)) {
     return null;
   }
   const vendor = vendorForSource(session.source);
   if (!vendor) {
     return null;
+  }
+  for (const turn of session.turns) {
+    if (turn.usage && turn.usage.total > 0) {
+      const model = turn.model ?? session.model;
+      if (vendorForTurn(session.source, model, turn.pricingProvider) !== vendor) {
+        return null;
+      }
+    }
   }
   const cheapest = await cheapestCurrentRow(vendor, dataDir);
   if (!cheapest) {

@@ -1,6 +1,7 @@
 import type { AgentSource, Compaction, ListSessionsOptions, Session, SessionAdapter, SessionSummary, TokenUsage, ToolCall, Turn } from "./types.js";
 import { codexFidelity } from "./fidelity/codex.js";
 import { lazyCodexSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
+import { normalizePricingProvider } from "./provider.js";
 import {
   addUsage,
   emptyUsage,
@@ -43,6 +44,29 @@ function mapUsage(usage: CodexUsage | undefined) {
     output: usage.output_tokens ?? 0,
     cacheRead: usage.cached_input_tokens ?? 0,
     cacheCreation: 0,
+    total: 0,
+  });
+}
+
+function sameUsage(a: TokenUsage, b: TokenUsage): boolean {
+  return (
+    a.input === b.input &&
+    a.output === b.output &&
+    a.cacheRead === b.cacheRead &&
+    a.cacheCreation === b.cacheCreation &&
+    a.total === b.total
+  );
+}
+
+/** Component-wise envelope subtraction; malformed negative deltas stay
+ * visible to fidelity validation instead of entering receipts as negative
+ * tokens or dollars. */
+function subtractUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return withTotal({
+    input: Math.max(0, a.input - b.input),
+    output: Math.max(0, a.output - b.output),
+    cacheRead: Math.max(0, a.cacheRead - b.cacheRead),
+    cacheCreation: Math.max(0, a.cacheCreation - b.cacheCreation),
     total: 0,
   });
 }
@@ -110,12 +134,15 @@ function parseMaybeJson(raw: unknown): unknown {
  */
 async function parseTranscript(filePath: string, withTurns: boolean) {
   let model: string | undefined;
+  let currentModel: string | undefined;
+  let currentPricingProvider: Turn["pricingProvider"];
   let userPrompt: string | undefined;
   let firstUserText: string | undefined;
   let startedAt: number | undefined;
   let endedAt: number | undefined;
   let cwd: string | undefined;
   let cumulativeUsage: TokenUsage | undefined;
+  let cumulativeBaseline: TokenUsage | undefined;
   let perTurnUsage = emptyUsage();
   let sawCumulative = false;
   let toolCallCount = 0;
@@ -144,6 +171,9 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     if (!current) {
       current = { index: turns.length, timestamp: ts, toolCalls: [] };
       turns.push(current);
+    }
+    if (currentPricingProvider !== undefined && current.pricingProvider === undefined) {
+      current.pricingProvider = currentPricingProvider;
     }
     return current;
   }
@@ -183,8 +213,25 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
       return;
     }
 
+    const providerOwner = Object.prototype.hasOwnProperty.call(item, "model_provider")
+      ? item
+      : Object.prototype.hasOwnProperty.call(top, "model_provider")
+        ? top
+        : undefined;
+    if (providerOwner) {
+      currentPricingProvider = normalizePricingProvider(providerOwner.model_provider);
+      if (currentPricingProvider !== undefined) {
+        for (const turn of turns) {
+          if (turn.pricingProvider === undefined) {
+            turn.pricingProvider = currentPricingProvider;
+          }
+        }
+      }
+    }
+
     if (typeof item.model === "string") {
-      model ??= item.model;
+      currentModel = item.model;
+      model ??= currentModel;
     }
     // R1a: first-seen cwd (attribution-only), reported on session_meta/turn_context.
     if (cwd === undefined && typeof item.cwd === "string" && item.cwd) {
@@ -198,14 +245,33 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     if (info) {
       const total = mapUsage(info.total_token_usage as CodexUsage);
       if (total && total.total > 0) {
-        cumulativeUsage = total;
         sawCumulative = true;
-        const delta = mapUsage(info.last_token_usage as CodexUsage);
-        if (delta && delta.total > 0) {
+        const reportedDelta = mapUsage(info.last_token_usage as CodexUsage);
+        // Codex's cumulative envelope is allowed to repeat unchanged while
+        // retaining the prior turn's non-zero `last_token_usage`. Treating
+        // every record as a new turn bills that stale delta twice. A changed
+        // cumulative snapshot is the independent evidence that a new local
+        // usage event completed.
+        const previousCumulative = cumulativeUsage;
+        const changed = previousCumulative === undefined || !sameUsage(total, previousCumulative);
+        if (previousCumulative === undefined && reportedDelta && reportedDelta.total > 0) {
+          cumulativeBaseline = subtractUsage(total, reportedDelta);
+        }
+        cumulativeUsage = total;
+        // After the first snapshot, the cumulative vector itself is the
+        // authoritative independent accounting. Derive the billed turn from
+        // its component delta so a stale/malformed `last_token_usage` cannot
+        // emit a knowingly wrong dollar in normal receipts (the fidelity
+        // harness is not part of that product path). The first local delta is
+        // still needed to identify an inherited parent baseline.
+        const delta = previousCumulative === undefined
+          ? reportedDelta
+          : subtractUsage(total, previousCumulative);
+        if (changed && delta && delta.total > 0) {
           const t = ensureTurn(ts);
           t.usage = addUsage(t.usage ?? emptyUsage(), delta);
           t.outputTokens = t.usage.output;
-          t.model ??= model;
+          t.model ??= currentModel;
         }
       }
     }
@@ -217,7 +283,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         if (!t.usage) {
           t.usage = perMsg;
           t.outputTokens = perMsg.output;
-          t.model ??= model;
+          t.model ??= currentModel;
         }
       }
     }
@@ -237,7 +303,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
       }
       if (role === "assistant") {
         const t = ensureTurn(ts);
-        t.model ??= model;
+        t.model ??= currentModel;
       }
       return;
     }
@@ -275,7 +341,14 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     }
   });
 
-  const totalUsage = sawCumulative ? (cumulativeUsage ?? emptyUsage()) : perTurnUsage;
+  // Forked/resumed Codex rollouts can inherit a parent-inclusive cumulative
+  // baseline. The first local `last_token_usage` identifies exactly how much
+  // of the first snapshot belongs to this file. Subtract that fixed baseline
+  // from the final envelope so session totals describe the local rollout and
+  // remain an independent fidelity oracle for all later deltas.
+  const totalUsage = sawCumulative
+    ? subtractUsage(cumulativeUsage ?? emptyUsage(), cumulativeBaseline ?? emptyUsage())
+    : perTurnUsage;
 
   const totals = {
     tokens: totalUsage,

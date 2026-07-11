@@ -68,6 +68,11 @@ function expectedUsage(sim: SimulatedOpenCodeSession) {
   };
 }
 
+function simulatedProvider(sim: SimulatedOpenCodeSession): string {
+  if (!sim.priced) return "local";
+  return sim.model.startsWith("claude-") ? "anthropic" : "openai";
+}
+
 function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void {
   const db = new DatabaseSync(dbPath);
   db.exec(`
@@ -141,7 +146,7 @@ function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void
       sim.reasoning,
       sim.cacheRead,
       sim.cacheWrite,
-      JSON.stringify({ id: sim.model, providerID: sim.priced ? "known" : "local" }),
+      JSON.stringify({ id: sim.model, providerID: simulatedProvider(sim) }),
       sim.startedAt,
       sim.endedAt,
     );
@@ -165,7 +170,7 @@ function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void
         sim.startedAt + 1_000,
         sim.endedAt,
         JSON.stringify({
-          model: { id: sim.model, providerID: sim.priced ? "known" : "local" },
+          model: { id: sim.model, providerID: simulatedProvider(sim) },
           tokens,
           time: { created: sim.startedAt + 1_000, completed: sim.endedAt },
           content:
@@ -192,7 +197,7 @@ function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void
       JSON.stringify({
         role: "assistant",
         modelID: sim.model,
-        providerID: sim.priced ? "known" : "local",
+        providerID: simulatedProvider(sim),
         tokens,
         time: { created: sim.startedAt + 1_000, completed: sim.endedAt },
       }),
@@ -297,6 +302,39 @@ function makeSessionMessageDb(dbPath: string): void {
       ],
     }),
   );
+  db.close();
+}
+
+function addProviderRoutingMessages(dbPath: string): void {
+  const db = new DatabaseSync(dbPath);
+  const insert = db.prepare(
+    "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  );
+  const t0 = Date.parse("2026-06-30T12:00:00.000Z");
+  const messages = [
+    { id: "msg_direct_openai", model: JSON.stringify({ id: "gpt-5.3-codex", providerID: "openai" }) },
+    { id: "msg_openrouter", modelID: "gpt-5.3-codex", providerID: "openrouter" },
+    { id: "msg_bedrock", model: { id: "claude-sonnet-5", providerID: "amazon-bedrock" } },
+    { id: "msg_azure", modelID: "gpt-5.3-codex", providerID: "azure" },
+    { id: "msg_custom", model: JSON.stringify({ id: "claude-sonnet-5", providerID: "company-proxy" }) },
+  ];
+  messages.forEach((message, index) => {
+    const ts = t0 + 21_000 + index * 1_000;
+    insert.run(
+      message.id,
+      "ses_current_shape",
+      "assistant",
+      index + 3,
+      ts,
+      ts + 500,
+      JSON.stringify({
+        ...message,
+        tokens: { input: 100, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+        time: { created: ts, completed: ts + 500 },
+        content: [{ type: "text", text: "synthetic provider routing" }],
+      }),
+    );
+  });
   db.close();
 }
 
@@ -405,6 +443,7 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     const session = await adapter.loadSession(dbPath);
     expect(session).not.toBeNull();
     expect(session!.turns).toHaveLength(2);
+    expect(session!.turns.map((turn) => turn.pricingProvider)).toEqual(["anthropic", "openai"]);
     expect(session!.turns[0]).toMatchObject({
       model: "claude-haiku-4-5",
       usage: { input: 1200, output: 350, cacheRead: 100, cacheCreation: 40, total: 1690 },
@@ -462,6 +501,47 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       output: "ok",
       status: "ok",
     });
+  });
+
+  it("prices only explicit direct providers and blocks routed/custom provider IDs", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-providers.db");
+    makeSessionMessageDb(dbPath);
+    addProviderRoutingMessages(dbPath);
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+
+    expect(session).not.toBeNull();
+    expect(session!.turns.map((turn) => turn.pricingProvider)).toEqual([
+      "anthropic",
+      "openai",
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(session!.turns.map((turn) => turn.model)).toEqual([
+      "claude-sonnet-5",
+      "gpt-5.3-codex",
+      "gpt-5.3-codex",
+      "claude-sonnet-5",
+      "gpt-5.3-codex",
+      "claude-sonnet-5",
+    ]);
+
+    const receipt = await buildReceiptModel(session!, dataDir);
+    // Direct Claude = $0.002285; direct OpenAI = $0.000315. The four
+    // routed/custom turns retain 440 tokens but contribute no guessed dollars.
+    expect(receipt.totalUsd).toBeCloseTo(0.0026, 12);
+    expect(receipt.totalTokens.total).toBe(1_235);
+    expect(receipt.unpricedTokens?.total).toBe(440);
+    expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`).sort()).toEqual([
+      "anthropic:claude-sonnet-5",
+      "openai:gpt-5.3-codex",
+    ]);
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "partial-priced-coverage", text: expect.stringContaining("4 of 6 turns unpriced") }),
+    );
   });
 
   it("falls back to legacy message/part rows when session_message exists but is empty", async () => {

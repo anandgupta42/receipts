@@ -106,6 +106,7 @@ const subagentRowSchema = z
     model: str().optional(),
     usd: finiteNum().nullable(),
     tokens: tokenUsageSchema,
+    unpricedTokens: tokenUsageSchema.optional(),
     unreadable: z.boolean(),
     droppedRecords: finiteNum().optional(),
     filePath: str(),
@@ -116,10 +117,14 @@ const confidenceSummarySchema = z
   .object({
     unattributableAnchorPool: finiteNum(),
     silencedGitWrite: finiteNum(),
+    // Additive optional fields keep older v1 refs valid while accepting the
+    // current producer's richer confidence summary.
+    unanchoredGitWrite: finiteNum().optional(),
     unreadableSubagent: finiteNum(),
     costLowerBoundCacheTier: finiteNum(),
     unreadableSession: finiteNum(),
     droppedTranscriptRecords: finiteNum(),
+    partialPricedCoverage: finiteNum().optional(),
   })
   .strict();
 
@@ -131,6 +136,7 @@ const contributorViewSchema = z
     modelMix: boundedArray(modelMixEntrySchema),
     usd: finiteNum().nullable(),
     tokens: tokenUsageSchema,
+    unpricedTokens: tokenUsageSchema.optional(),
     subagents: boundedArray(subagentRowSchema),
     basis: z.enum(["anchor", "helper", "message"]).optional(),
     durationMs: finiteNum().optional(),

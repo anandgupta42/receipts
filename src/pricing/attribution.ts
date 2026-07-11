@@ -35,6 +35,8 @@ export interface AttributionResult {
   /** Sum of `byTool[].usd` over priced entries only, so this total holds by construction — never a separately-computed figure that could drift from the rows above it. `null` when nothing in the session priced. */
   totalUsd: number | null;
   totalTokens: TokenUsage;
+  /** Exact usage from turns that had no matching dated price row. A partial `totalUsd` excludes these tokens (I2). */
+  unpricedTokens: TokenUsage;
   methodology: string;
   /**
    * SPEC-0044 A3 — true when at least one PRICED turn's cache-write cost took
@@ -88,6 +90,11 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
   let cacheReadAtInputRateUsd = 0;
   let usageTurnCount = 0;
   let unpricedUsageTurnCount = 0;
+  let unpricedTokens = emptyUsage();
+  // Preserve the exact transcript-domain integers. Reconstructing this from
+  // per-tool fractional shares (for example, a three-way split) can introduce
+  // IEEE-754 residue and make a valid total fail the pricing-domain guard.
+  let totalTokens = emptyUsage();
   // SPEC-0054 R4 — starts true; any cacheRead-carrying turn that can't cite
   // both rates flips it false, making the counterfactual all-or-null (I2).
   let cacheReadCounterfactualComplete = true;
@@ -97,14 +104,18 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
     const share = 1 / units.length;
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
+    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model, turn.pricingProvider);
     const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
 
+    if (turn.usage) {
+      totalTokens = addUsage(totalTokens, turn.usage);
+    }
     if (turn.usage && turn.usage.total > 0) {
       usageTurnCount++;
       if (priced === null) {
         unpricedUsageTurnCount++;
+        unpricedTokens = addUsage(unpricedTokens, turn.usage);
       }
     }
     if (priced !== null && priced.cacheWriteLowerBound) {
@@ -144,13 +155,13 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
 
   const pricedEntries = byTool.filter((t) => t.usd !== null);
   const totalUsd = pricedEntries.length > 0 ? pricedEntries.reduce((sum, t) => sum + (t.usd as number), 0) : null;
-  const totalTokens = byTool.reduce((sum, t) => addUsage(sum, t.tokens), emptyUsage());
   const byModelUsd = [...modelUsdAcc.entries()].map(([model, usd]) => ({ model, usd }));
 
   return {
     byTool,
     totalUsd,
     totalTokens,
+    unpricedTokens,
     methodology: METHODOLOGY,
     costLowerBoundCacheTier,
     byModelUsd,

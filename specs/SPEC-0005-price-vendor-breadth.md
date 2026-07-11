@@ -71,3 +71,19 @@ success criterion; cite-check URL-liveness implemented as part of this spec + re
 excerpts (closing the shape-only gap); table-driven per-vendor resolution tests.
 **S3:** cheap-model efficiency zeitgeist evidence (cost-wave research); compare demand.
 **S4:** spec-lint green.
+
+**2026-07-10 · R1 enforcement correction.** The flat `gpt-5.5` and
+`gpt-5.6-{sol,terra,luna}` rows violated R1: official model pages state that a
+request above 272K input tokens bills the full request at 2× input/cached-input
+and 1.5× output, and GPT-5.6 separately bills cache writes at 1.25× uncached
+input. The current row and Codex usage schemas cannot select both dimensions
+honestly. All four models therefore move to OpenAI's `omitted` list and render
+tokens-only until a reviewed context-tier/provider/cache-write schema exists.
+Focused resolver tests prove no `$` can escape through these model ids.
+
+**2026-07-10 · explicit-provider safe stop.** Model-family resolution is now a
+legacy fallback only when the transcript has no provider evidence. Codex
+`model_provider` and opencode `providerID` pin recognized direct-vendor tables;
+an explicit router, cloud intermediary, local endpoint, malformed value, or
+custom provider blocks dollar pricing and remains tokens-only. This preserves
+the aggregator non-goal without accidentally applying first-party rates.

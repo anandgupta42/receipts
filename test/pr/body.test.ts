@@ -13,6 +13,7 @@ import { cacheServedText } from "../../src/receipt/present.js";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 import { FULL_FALLBACK_LABEL } from "../../src/pr/slice.js";
 import { SAMOSA_URL } from "../../src/pr/publish.js";
+import { summarizeConfidence } from "../../src/pr/confidence.js";
 
 const tokens = (input: number, output = 0) => withTotal({ ...emptyUsage(), input, output });
 const mix = (model: string, share: number): ModelMixEntry => ({ model, tokens: tokens(100), tokenShare: share });
@@ -130,6 +131,44 @@ describe("renderPrBody combined total (SPEC-0008 honesty)", () => {
     expect(body).toContain("TOTAL priced.................................$3.00");
     expect(body).toContain("TOTAL unpriced.......................45,000 tokens");
     expect(body).not.toContain("priced +");
+  });
+
+  it("counts the exact unpriced tokens inside a partially-priced contributor", () => {
+    const partial = builder({
+      usd: 3.0,
+      tokens: tokens(1500, 100),
+      unpricedTokens: tokens(500, 100),
+    });
+    const body = renderPrBody({
+      contributors: [partial],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "partial-priced-coverage", sessionId: "partial.jsonl" }]),
+    });
+
+    expect(body).toContain("TOTAL priced...............................≥ $3.00");
+    expect(body).toMatch(/TOTAL unpriced[.]+≥ 600 tokens/);
+    expect(body).toContain("1 session had partial price coverage");
+    expect(body).toContain("priced total excludes the unpriced tokens above");
+  });
+
+  it("counts the exact unpriced tokens inside a partially-priced subagent", () => {
+    const partialChild: SubagentRow = {
+      name: "mixed-child",
+      usd: 0.25,
+      tokens: tokens(900, 100),
+      unpricedTokens: tokens(200, 50),
+      unreadable: false,
+      filePath: "child.jsonl",
+    };
+    const body = renderPrBody({
+      contributors: [builder({ subagents: [partialChild] })],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "partial-priced-coverage", sessionId: "child.jsonl" }]),
+    });
+
+    expect(body).toContain("TOTAL priced...............................≥ $1.75");
+    expect(body).toMatch(/TOTAL unpriced[.]+≥ 250 tokens/);
+    expect(body).toContain("1 session had partial price coverage");
   });
 
   it("renders a tokens-only combined total when nothing priced", () => {

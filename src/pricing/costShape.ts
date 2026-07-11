@@ -84,7 +84,7 @@ async function perTurnCosts(session: Session, dataDir: string): Promise<TurnCost
     }
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
+    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model, turn.pricingProvider);
     const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
     out.push({ index: turn.index, usd: priced ? priced.usd : null, tokens: turn.usage.total });
   }

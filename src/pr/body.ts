@@ -35,6 +35,8 @@ export interface ContributorView {
   /** The session's own slice cost — `null` → tokens-only (I2). */
   usd: number | null;
   tokens: TokenUsage;
+  /** Exact contributor tokens excluded from a partial `usd`; absent unless some turns priced and some did not. */
+  unpricedTokens?: TokenUsage;
   subagents: SubagentRow[];
   /** SPEC-0026 R3 — how selection credited this session; `helper` rows render grouped, not top-level (round 2). */
   basis?: "anchor" | "helper" | "message";
@@ -175,6 +177,7 @@ function contributorBlocks(view: ContributorView, spaceBefore: boolean, showRole
 interface Atom {
   usd: number | null;
   tokens: TokenUsage;
+  unpricedTokens?: TokenUsage;
   unreadable: boolean;
 }
 
@@ -182,9 +185,9 @@ function collectAtoms(contributors: ContributorView[]): { atoms: Atom[]; childCo
   const atoms: Atom[] = [];
   let childCount = 0;
   for (const c of contributors) {
-    atoms.push({ usd: c.usd, tokens: c.tokens, unreadable: false });
+    atoms.push({ usd: c.usd, tokens: c.tokens, unpricedTokens: c.unpricedTokens, unreadable: false });
     for (const s of c.subagents) {
-      atoms.push({ usd: s.usd, tokens: s.tokens, unreadable: s.unreadable });
+      atoms.push({ usd: s.usd, tokens: s.tokens, unpricedTokens: s.unpricedTokens, unreadable: s.unreadable });
       childCount++;
     }
   }
@@ -203,11 +206,23 @@ interface Totals {
 function totalsFor(contributors: ContributorView[]): Totals {
   const { atoms, childCount } = collectAtoms(contributors);
   const priced = atoms.filter((a) => a.usd !== null);
-  const tokensOnly = atoms.filter((a) => a.usd === null && !a.unreadable);
+  // A mixed-price atom contributes to BOTH ledgers: its known dollars belong
+  // in `priced`, while only the exact turns that failed price resolution
+  // belong in `tokensOnly`. A fully-unpriced atom keeps its established all-
+  // tokens behavior. Unreadable atoms remain counted absence, never guessed.
+  const tokensOnly = atoms.flatMap((a) => {
+    if (a.unreadable) {
+      return [];
+    }
+    if (a.usd === null) {
+      return [a.tokens];
+    }
+    return a.unpricedTokens && a.unpricedTokens.total > 0 ? [a.unpricedTokens] : [];
+  });
   return {
     pricedSubtotal: priced.reduce((sum, a) => sum + (a.usd ?? 0), 0),
     pricedCount: priced.length,
-    tokenSubtotal: tokensOnly.reduce((sum, a) => sum + a.tokens.total, 0),
+    tokenSubtotal: tokensOnly.reduce((sum, tokens) => sum + tokens.total, 0),
     tokensOnlyCount: tokensOnly.length,
     unreadableCount: atoms.filter((a) => a.unreadable).length,
     childCount,
@@ -384,6 +399,20 @@ function totalBlocks(input: PrBodyInput): Block[] {
       spaceBefore: true,
     });
     blocks.push({ kind: "note", text: "(total is a lower bound — see docs/trust.md)", muted: true });
+  }
+  // A mixed-price contributor/subagent used to collapse into one `$` atom,
+  // silently hiding the unpriced turns from the token subtotal. The exact
+  // excluded tokens now render above; this note makes the priced floor's
+  // reason explicit without blending dollars and tokens (I2/I3).
+  const partialCoverage = input.confidence?.partialPricedCoverage ?? 0;
+  if (partialCoverage > 0) {
+    blocks.push({
+      kind: "note",
+      text: `${plural(partialCoverage, "session")} had partial price coverage`,
+      muted: true,
+      spaceBefore: true,
+    });
+    blocks.push({ kind: "note", text: "(priced total excludes the unpriced tokens above)", muted: true });
   }
   // SPEC-0026 R4 (round 2) — the route to the full per-tool story, always the
   // last note: point at the details section when one follows, else the command.

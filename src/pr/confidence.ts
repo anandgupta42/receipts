@@ -51,7 +51,10 @@ export type ConfidenceEvent =
   // B3: a CREDITED session whose transcript had malformed/truncated records
   // silently skipped at parse time — its cost is a lower bound (the dropped
   // records carried real, now-missing token usage) (honesty red-team B3).
-  | { kind: "dropped-transcript-records"; sessionId: string };
+  | { kind: "dropped-transcript-records"; sessionId: string }
+  // A credited session/subagent has both priced and unpriced usage turns. Its
+  // known `$` and exact unpriced tokens both render, and the `$` is a floor.
+  | { kind: "partial-priced-coverage"; sessionId: string };
 
 export interface ConfidenceSummary {
   /** A1 — anchor-pool sessions dropped as unattributable (distinct sessions). */
@@ -68,6 +71,8 @@ export interface ConfidenceSummary {
   unreadableSession: number;
   /** B3 — credited sessions whose transcript had records skipped at parse time. */
   droppedTranscriptRecords: number;
+  /** Credited contributors/subagents whose priced total excludes known unpriced turns. Omitted at zero for payload byte stability. */
+  partialPricedCoverage?: number;
 }
 
 const distinctSessions = (events: readonly ConfidenceEvent[], kind: ConfidenceEvent["kind"]): number =>
@@ -89,6 +94,7 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
       case "cost-lower-bound-cache-tier":
       case "unreadable-session":
       case "dropped-transcript-records":
+      case "partial-priced-coverage":
         break;
       default: {
         const never: never = e;
@@ -96,6 +102,7 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
       }
     }
   }
+  const partialPricedCoverage = distinctSessions(events, "partial-priced-coverage");
   return {
     unattributableAnchorPool: distinctSessions(events, "unattributable-anchor-pool"),
     silencedGitWrite: distinctSessions(events, "silenced-git-write"),
@@ -104,6 +111,7 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
     costLowerBoundCacheTier: distinctSessions(events, "cost-lower-bound-cache-tier"),
     unreadableSession: distinctSessions(events, "unreadable-session"),
     droppedTranscriptRecords: distinctSessions(events, "dropped-transcript-records"),
+    ...(partialPricedCoverage > 0 ? { partialPricedCoverage } : {}),
   };
 }
 
@@ -116,6 +124,7 @@ export function isFloored(summary: ConfidenceSummary): boolean {
     summary.unreadableSubagent > 0 ||
     summary.costLowerBoundCacheTier > 0 ||
     summary.unreadableSession > 0 ||
-    summary.droppedTranscriptRecords > 0
+    summary.droppedTranscriptRecords > 0 ||
+    (summary.partialPricedCoverage ?? 0) > 0
   );
 }

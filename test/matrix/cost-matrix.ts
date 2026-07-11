@@ -37,6 +37,8 @@ export interface CellExpectation {
   unpriceable: boolean;
   /** Does the session price to a `$` total, or render tokens-only (I2)? */
   priced: boolean;
+  /** Exact USD independently calculated from raw tokens × cited price rows. */
+  expectedUsd?: number;
   /** Waste kinds the scenario must surface (scenario-derived). */
   waste?: ReadonlyArray<"stuck-loop" | "context-thrash" | "trivial-spans">;
   /** ConfidenceEvent kinds the receipt must carry for this cell. */
@@ -73,12 +75,21 @@ export const MATRIX: Record<string, Cell> = {
     expected: {
       unpriceable: false,
       priced: true,
+      expectedUsd: 0.1767,
       rawTokens: { input: 19680, output: 897, cacheRead: 124200, cacheCreation: 2100 },
     },
   },
   "clean-multi-tool::codex": {
     fixture: `${f}/codex/clean-session.jsonl`,
-    expected: { unpriceable: false, priced: true },
+    // Raw input_tokens=9,800 includes cached_input_tokens=6,100, so the
+    // billable uncached input oracle is 3,700. gpt-5.3-codex's cited rates
+    // (1.75 / .175 / 14 per million) produce exactly $0.0165025.
+    expected: {
+      unpriceable: false,
+      priced: true,
+      expectedUsd: 0.0165025,
+      rawTokens: { input: 3700, output: 640, cacheRead: 6100, cacheCreation: 0 },
+    },
   },
   "clean-multi-tool::opencode": {
     fixture: `${f}/opencode/clean-multi-vendor.db`,
@@ -88,7 +99,13 @@ export const MATRIX: Record<string, Cell> = {
     // input_cache_write_5m/1h → falls back to base input). The row-aware
     // trigger fires because of the openai turn specifically, not because
     // opencode lacks a split-tier concept in general.
-    expected: { unpriceable: false, priced: true, events: ["cost-lower-bound-cache-tier"] },
+    expected: {
+      unpriceable: false,
+      priced: true,
+      expectedUsd: 0.00975625,
+      rawTokens: { input: 2200, output: 700, cacheRead: 150, cacheCreation: 90 },
+      events: ["cost-lower-bound-cache-tier"],
+    },
   },
   "clean-multi-tool::cursor": na("Cursor records session totals only — 'clean multi-tool' priced anatomy is unpriceable by construction; covered by the unpriceable cell."),
 

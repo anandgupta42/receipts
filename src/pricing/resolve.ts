@@ -1,4 +1,4 @@
-import type { AgentSource, TokenUsage } from "../parse/types.js";
+import type { AgentSource, DirectPricingProvider, TokenUsage } from "../parse/types.js";
 import { adapterFor } from "../parse/registry.js";
 import { defaultDataDir, loadPriceTable } from "./priceTable.js";
 import type { PriceRow, ResolvedPrice } from "./types.js";
@@ -32,6 +32,37 @@ export async function resolvePrice(
 
 function rate(perMillion: number, tokens: number): number {
   return (tokens / 1_000_000) * perMillion;
+}
+
+function isTokenCount(value: number): boolean {
+  return Number.isSafeInteger(value) && value >= 0;
+}
+
+/**
+ * A price is only defensible when the normalized usage is internally valid.
+ * Reject malformed transcript data at the shared pricing boundary instead of
+ * clamping it: clamping would invent a different token count (I2).
+ */
+export function isPriceableUsage(usage: TokenUsage): boolean {
+  if (
+    !isTokenCount(usage.input) ||
+    !isTokenCount(usage.output) ||
+    !isTokenCount(usage.cacheRead) ||
+    !isTokenCount(usage.cacheCreation) ||
+    !isTokenCount(usage.total) ||
+    (usage.cacheCreation5m !== undefined && !isTokenCount(usage.cacheCreation5m)) ||
+    (usage.cacheCreation1h !== undefined && !isTokenCount(usage.cacheCreation1h))
+  ) {
+    return false;
+  }
+
+  const componentTotal = usage.input + usage.output + usage.cacheRead + usage.cacheCreation;
+  if (usage.total !== componentTotal) {
+    return false;
+  }
+
+  const cacheTierTotal = (usage.cacheCreation5m ?? 0) + (usage.cacheCreation1h ?? 0);
+  return cacheTierTotal <= usage.cacheCreation;
 }
 
 /**
@@ -173,12 +204,22 @@ export function vendorForModel(modelId: string): string | undefined {
 }
 
 /**
- * Vendor id for one concrete turn. Model-id resolution wins so aggregator
- * agents such as opencode price each turn from the true vendor table. The
- * source-level fallback preserves existing single-vendor agents whose model ids
- * are not covered by prefix rules. Unknown prefixes stay unpriced (I2).
+ * Vendor id for one concrete turn. Explicit provider evidence wins: a direct
+ * vendor pins that table, while `null` means a routed/custom provider and blocks
+ * dollar pricing. Only absent evidence (`undefined`) keeps the legacy model-id
+ * then source fallback, preserving older transcripts.
  */
-export function vendorForTurn(source: AgentSource, modelId: string | undefined): string | undefined {
+export function vendorForTurn(
+  source: AgentSource,
+  modelId: string | undefined,
+  pricingProvider?: DirectPricingProvider | null,
+): string | undefined {
+  if (pricingProvider === null) {
+    return undefined;
+  }
+  if (pricingProvider !== undefined) {
+    return pricingProvider;
+  }
   return (modelId ? vendorForModel(modelId) : undefined) ?? vendorForSource(source);
 }
 
@@ -204,12 +245,16 @@ export async function priceTurn(
   usage: TokenUsage | undefined,
   dataDir: string,
 ): Promise<{ usd: number; cacheWriteLowerBound: boolean } | null> {
-  if (!vendor || !modelId || !dateISO || !usage) {
+  if (!vendor || !modelId || !dateISO || !usage || !isPriceableUsage(usage)) {
     return null;
   }
   const row = await resolvePrice(vendor, modelId, dateISO, dataDir);
   if (!row) {
     return null;
   }
-  return { usd: costOf(usage, row), cacheWriteLowerBound: cacheWriteIsLowerBound(usage, row) };
+  const usd = costOf(usage, row);
+  if (!Number.isFinite(usd) || usd < 0) {
+    return null;
+  }
+  return { usd, cacheWriteLowerBound: cacheWriteIsLowerBound(usage, row) };
 }

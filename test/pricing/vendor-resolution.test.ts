@@ -13,7 +13,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { resolvePrice, vendorForModel, vendorForTurn } from "../../src/pricing/resolve.js";
+import { priceTurn, resolvePrice, vendorForModel, vendorForTurn } from "../../src/pricing/resolve.js";
 import type { PriceTable } from "../../src/pricing/types.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
@@ -99,5 +99,42 @@ describe("vendorForModel — landed families and unknowns", () => {
     expect(vendorForTurn("claude-code", "gpt-5.3-codex")).toBe("openai");
     expect(vendorForTurn("codex", "claude-haiku-4-5")).toBe("anthropic");
     expect(vendorForTurn("claude-code", "unknown-model")).toBe("anthropic");
+  });
+
+  it("uses tri-state explicit provider evidence without weakening legacy inference", () => {
+    expect(vendorForTurn("opencode", "gpt-5.3-codex", "openai")).toBe("openai");
+    expect(vendorForTurn("opencode", "claude-haiku-4-5", "anthropic")).toBe("anthropic");
+    expect(vendorForTurn("codex", "gpt-5.3-codex", null)).toBeUndefined();
+    expect(vendorForTurn("opencode", "gpt-5.3-codex", null)).toBeUndefined();
+    expect(vendorForTurn("opencode", "gpt-5.3-codex", undefined)).toBe("openai");
+    // Explicit provider evidence pins the table; a contradictory model id does
+    // not fall back to its prefix's vendor and therefore cannot price.
+    expect(vendorForTurn("opencode", "claude-haiku-4-5", "openai")).toBe("openai");
+  });
+});
+
+describe("OpenAI tiered-model safety (I2)", () => {
+  const openai = loadTable("openai.json");
+  const tieredModels = [
+    ["gpt-5.5", "https://developers.openai.com/api/docs/models/gpt-5.5"],
+    ["gpt-5.6-sol", "https://developers.openai.com/api/docs/models/gpt-5.6-sol"],
+    ["gpt-5.6-terra", "https://developers.openai.com/api/docs/models/gpt-5.6-terra"],
+    ["gpt-5.6-luna", "https://developers.openai.com/api/docs/models/gpt-5.6-luna"],
+  ] as const;
+
+  it.each(tieredModels)("keeps %s tokens-only while the flat schema cannot select its exact rate", async (model, source) => {
+    expect(openai.models[model]).toBeUndefined();
+    expect(openai.omitted).toContainEqual(expect.objectContaining({ model, source }));
+    expect(vendorForModel(model)).toBe("openai");
+    expect(await resolvePrice("openai", model, "2026-07-10", dataDir)).toBeNull();
+    expect(
+      await priceTurn(
+        "openai",
+        model,
+        "2026-07-10",
+        { input: 300_000, output: 1_000, cacheRead: 250_000, cacheCreation: 0, total: 551_000 },
+        dataDir,
+      ),
+    ).toBeNull();
   });
 });

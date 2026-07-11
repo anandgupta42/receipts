@@ -17,6 +17,8 @@ export interface SubagentRow {
   /** `null` → the child priced to nothing renderable; show tokens instead (I2). */
   usd: number | null;
   tokens: TokenUsage;
+  /** Exact child tokens excluded from a partial `usd`; absent unless the child has both priced and unpriced turns. */
+  unpricedTokens?: TokenUsage;
   /** The child transcript could not be parsed — usd/tokens are unknown. */
   unreadable: boolean;
   /** SPEC-0044 B3 — malformed records skipped in this child's transcript; `> 0` → its cost is a lower bound. */
@@ -89,6 +91,7 @@ export async function rollupChildren(
       model: session.model,
       usd: model.totalUsd,
       tokens: model.totalTokens,
+      ...(model.unpricedTokens ? { unpricedTokens: model.unpricedTokens } : {}),
       unreadable: false,
       ...(((session.droppedRecords ?? 0) > 0) ? { droppedRecords: session.droppedRecords } : {}),
       filePath: childFile,

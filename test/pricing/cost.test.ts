@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import fc from "fast-check";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   cacheWriteIsLowerBound,
@@ -34,6 +35,75 @@ function usage(overrides: Partial<TokenUsage> & Pick<TokenUsage, "input" | "outp
   const total = overrides.total ?? overrides.input + overrides.output + overrides.cacheRead + overrides.cacheCreation;
   return { total, ...overrides };
 }
+
+const validUsageArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .record({
+    input: fc.integer({ min: 0, max: 1_000_000 }),
+    output: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheRead: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation5m: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation1h: fc.integer({ min: 0, max: 1_000_000 }),
+    unsplitCacheCreation: fc.integer({ min: 0, max: 1_000_000 }),
+    reports5m: fc.boolean(),
+    reports1h: fc.boolean(),
+  })
+  .map(({ input, output, cacheRead, cacheCreation5m, cacheCreation1h, unsplitCacheCreation, reports5m, reports1h }) => {
+    const cacheCreation = cacheCreation5m + cacheCreation1h + unsplitCacheCreation;
+    return {
+      input,
+      output,
+      cacheRead,
+      cacheCreation,
+      cacheCreation5m: reports5m ? cacheCreation5m : undefined,
+      cacheCreation1h: reports1h ? cacheCreation1h : undefined,
+      total: input + output + cacheRead + cacheCreation,
+    };
+  });
+
+const invalidComponentArbitrary = fc.oneof(
+  fc.integer({ min: -1_000_000, max: -1 }),
+  fc.integer({ min: 0, max: 1_000_000 }).map((value) => value + 0.5),
+  fc.constantFrom(Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY),
+);
+
+const malformedComponentUsageArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .tuple(
+    validUsageArbitrary,
+    fc.constantFrom<keyof TokenUsage>(
+      "input",
+      "output",
+      "cacheRead",
+      "cacheCreation",
+      "cacheCreation5m",
+      "cacheCreation1h",
+      "total",
+    ),
+    invalidComponentArbitrary,
+  )
+  .map(([valid, component, invalid]) => ({ ...valid, [component]: invalid }));
+
+const mismatchedTotalUsageArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .tuple(validUsageArbitrary, fc.integer({ min: 1, max: 1_000_000 }))
+  .map(([valid, extra]) => ({ ...valid, total: valid.total + extra }));
+
+const invalidCacheTierSubsetArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .record({
+    input: fc.integer({ min: 0, max: 1_000_000 }),
+    output: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheRead: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation5m: fc.integer({ min: 0, max: 1_000_000 }),
+    excess: fc.integer({ min: 1, max: 1_000_000 }),
+  })
+  .map(({ input, output, cacheRead, cacheCreation, cacheCreation5m, excess }) => ({
+    input,
+    output,
+    cacheRead,
+    cacheCreation,
+    cacheCreation5m,
+    cacheCreation1h: cacheCreation + excess,
+    total: input + output + cacheRead + cacheCreation,
+  }));
 
 describe("costOf / cacheWriteCost fallback chain", () => {
   it("prices an unsplit cache-write at the 5m rate (default-TTL assumption) plus cited input/output/cached rates", () => {
@@ -176,6 +246,16 @@ describe("cheapestCurrentRow", () => {
 
 describe("priceTurn", () => {
   const validUsage = usage({ input: 1_000_000, output: 0, cacheRead: 0, cacheCreation: 0 });
+  const invalidRateDir = mkdtempSync(path.join(tmpdir(), "aireceipts-invalid-rate-"));
+  afterAll(() => rmSync(invalidRateDir, { recursive: true, force: true }));
+  const invalidRateTable: PriceTable = {
+    vendor: "invalid-rate",
+    models: {
+      negative: { price_history: [row({ input: -1, output: 1 })] },
+      overflow: { price_history: [row({ input: 1e308, output: 1e308 })] },
+    },
+  };
+  writeFileSync(path.join(invalidRateDir, "invalid-rate.json"), JSON.stringify(invalidRateTable));
 
   it("returns null when vendor, modelId, dateISO, or usage is missing", async () => {
     expect(await priceTurn(undefined, "claude-haiku-4-5", "2026-06-15", validUsage, realDataDir)).toBeNull();
@@ -193,6 +273,17 @@ describe("priceTurn", () => {
     expect(result?.usd).toBeCloseTo(1.0, 10);
   });
 
+  it("preserves an exact zero-dollar result for valid zero usage", async () => {
+    const zeroUsage = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 0 });
+    expect((await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", zeroUsage, realDataDir))?.usd).toBe(0);
+  });
+
+  it("returns null if a malformed row would make the computed dollar negative or non-finite", async () => {
+    expect(await priceTurn("invalid-rate", "negative", "2026-06-15", validUsage, invalidRateDir)).toBeNull();
+    const overflowUsage = usage({ input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheCreation: 0 });
+    expect(await priceTurn("invalid-rate", "overflow", "2026-06-15", overflowUsage, invalidRateDir)).toBeNull();
+  });
+
   it("carries cacheWriteLowerBound: false for a turn with no cache-write at all", async () => {
     const result = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", validUsage, realDataDir);
     expect(result?.cacheWriteLowerBound).toBe(false);
@@ -202,6 +293,47 @@ describe("priceTurn", () => {
     const withCacheWrite = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000 });
     const result = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", withCacheWrite, realDataDir);
     expect(result?.cacheWriteLowerBound).toBe(false);
+  });
+
+  it("returns null when the reported cache tiers exceed the cache-write total", async () => {
+    const impossibleSplit = usage({
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheCreation: 1_000,
+      cacheCreation5m: 700,
+      cacheCreation1h: 400,
+    });
+    expect(await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", impossibleSplit, realDataDir)).toBeNull();
+  });
+
+  it("returns null when total disagrees with the sum of the priced components", async () => {
+    const mismatchedTotal = usage({ input: 100, output: 20, cacheRead: 10, cacheCreation: 5, total: 136 });
+    expect(await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", mismatchedTotal, realDataDir)).toBeNull();
+  });
+
+  it("keeps valid integer usage priced exactly as costOf across cache-tier combinations", async () => {
+    const resolved = await resolvePrice("anthropic", "claude-haiku-4-5", "2026-06-15", realDataDir);
+    expect(resolved).not.toBeNull();
+    await fc.assert(
+      fc.asyncProperty(validUsageArbitrary, async (candidate) => {
+        const priced = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", candidate, realDataDir);
+        expect(priced?.usd).toBe(costOf(candidate, resolved!));
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("never prices non-finite, negative, fractional, or out-of-subset usage", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.oneof(malformedComponentUsageArbitrary, mismatchedTotalUsageArbitrary, invalidCacheTierSubsetArbitrary),
+        async (candidate) => {
+          expect(await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", candidate, realDataDir)).toBeNull();
+        },
+      ),
+      { numRuns: 150 },
+    );
   });
 });
 

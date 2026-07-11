@@ -266,6 +266,22 @@ describe("detectTrivialSpans guard chain", () => {
     expect(result).toBeNull();
   });
 
+  it("skips malformed usage instead of emitting a dollar through direct costOf", async () => {
+    const turn: Turn = {
+      ...eligibleTurn,
+      usage: usage({
+        input: 100,
+        output: 50,
+        cacheRead: 0,
+        cacheCreation: 100,
+        cacheCreation5m: 70,
+        cacheCreation1h: 40,
+      }),
+    };
+    const result = await detectTrivialSpans(session({ turns: [turn] }), dataDir);
+    expect(result).toBeNull();
+  });
+
   it("skips a turn whose model cannot be resolved (no turn.model and no session.model)", async () => {
     const turn: Turn = { index: 0, timestamp: JUNE_15_2026, outputTokens: 10, usage: usage({ input: 10, output: 10, cacheRead: 0, cacheCreation: 0 }), toolCalls: [] };
     const result = await detectTrivialSpans(session({ turns: [turn] }), dataDir);
@@ -373,5 +389,10 @@ describe("priceDeltaFootnote", () => {
     // Same arithmetic as the comprehensive detectTrivialSpans case: rate(1,500) + rate(5,220) = 0.0016.
     expect(result?.usd).toBeCloseTo(0.0016, 10);
     expect(result?.actualUsd).toBe(1.23);
+  });
+
+  it("returns null for internally inconsistent totals instead of pricing them through direct costOf", async () => {
+    const malformed = usage({ input: 500, output: 220, cacheRead: 0, cacheCreation: 0, total: 721 });
+    expect(await priceDeltaFootnote(session({ turns: [] }), malformed, 1.23, dataDir)).toBeNull();
   });
 });

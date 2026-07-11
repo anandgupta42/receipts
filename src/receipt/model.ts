@@ -96,6 +96,8 @@ export interface ReceiptModel {
   /** `null` when nothing in the session priced — render tokens-only, zero `$` bytes (I2). */
   totalUsd: number | null;
   totalTokens: TokenUsage;
+  /** Exact tokens excluded from a partial `totalUsd`; absent for fully-priced and fully-unpriced sessions so established output stays byte-stable. */
+  unpricedTokens?: TokenUsage;
   /** Session-level totals reported by the adapter — the only real number available for Cursor, whose per-turn usage is always absent. */
   sessionTotalTokens: TokenUsage;
   wasteLines: WasteLine[];
@@ -238,11 +240,11 @@ async function collectPriceRowsUsed(
   for (const turn of session.turns) {
     const model = turn.model ?? session.model;
     const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = vendorForTurn(session.source, model);
+    const vendor = vendorForTurn(session.source, model, turn.pricingProvider);
     if (!vendor || !model || !dateISO) {
       continue;
     }
-    const key = `${model}|${dateISO}`;
+    const key = `${vendor}|${model}|${dateISO}`;
     if (seen.has(key)) {
       continue;
     }
@@ -260,7 +262,7 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
   const trivialSpans = await detectTrivialSpans(session, dataDir);
   const contextThrash = await detectContextThrash(session, dataDir);
   const priceDelta =
-    attribution.totalUsd !== null
+    attribution.totalUsd !== null && attribution.unpricedUsageTurnCount === 0
       ? await priceDeltaFootnote(session, attribution.totalTokens, attribution.totalUsd, dataDir)
       : null;
 
@@ -362,6 +364,9 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
     toolRows,
     totalUsd: attribution.totalUsd,
     totalTokens: attribution.totalTokens,
+    ...(attribution.totalUsd !== null && attribution.unpricedTokens.total > 0
+      ? { unpricedTokens: attribution.unpricedTokens }
+      : {}),
     sessionTotalTokens: session.totals.tokens,
     wasteLines,
     caveats,

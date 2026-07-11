@@ -30,6 +30,9 @@ export function foldSubagentRows(rows: SubagentRow[]): SubagentAggregate | undef
     tokensTotal += row.tokens.total;
     if (row.usd !== null) {
       pricedUsd = (pricedUsd ?? 0) + row.usd;
+      if ((row.unpricedTokens?.total ?? 0) > 0) {
+        unpricedCount += 1;
+      }
     } else {
       unpricedCount += 1;
     }
@@ -57,10 +60,18 @@ export function subagentCaveats(rows: SubagentRow[], agg: SubagentAggregate, par
     });
   }
   if (agg.unpricedCount > 0) {
-    const unpricedTokens = rows.reduce((sum, r) => (!r.unreadable && r.usd === null ? sum + r.tokens.total : sum), 0);
+    const unpricedTokens = rows.reduce((sum, r) => {
+      if (r.unreadable) {
+        return sum;
+      }
+      return sum + (r.usd === null ? r.tokens.total : (r.unpricedTokens?.total ?? 0));
+    }, 0);
+    const hasPartial = rows.some((r) => !r.unreadable && r.usd !== null && (r.unpricedTokens?.total ?? 0) > 0);
     findings.push({
       kind: "subagents-unpriced",
-      text: `${formatInt(agg.unpricedCount)} subagent${plural(agg.unpricedCount)} unpriced (${formatInt(unpricedTokens)} tok) — total is a floor`,
+      text: hasPartial
+        ? `${formatInt(agg.unpricedCount)} subagent${plural(agg.unpricedCount)} had unpriced usage (${formatInt(unpricedTokens)} tok) — total is a floor`
+        : `${formatInt(agg.unpricedCount)} subagent${plural(agg.unpricedCount)} unpriced (${formatInt(unpricedTokens)} tok) — total is a floor`,
     });
   }
   if (!parentPriced && agg.pricedUsd !== null) {

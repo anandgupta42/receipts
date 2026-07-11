@@ -167,6 +167,7 @@ worktree.)*
 | R4 not-attributed note | ≥1 excluded candidate | `K … not attributed …` line present |
 | R4 marker | rendered body | starts with `<!-- aireceipts-dogfood -->`, fenced |
 | R5 explicit one | `--session <id>` | single-contributor body |
+| R5 repeated explicit | two or more `--session <id>` flags | auto-selected contributors ∪ every explicit session; file-path dedup; invalid selector fails before render |
 | R5 render-first | gh missing / post fails (mock) | stdout body FIRST, stderr diagnostic, exit 1 (SPEC-0019) |
 | R6 codex parity | codex fixture w/ branch-SHA commit output | classified own-anchor |
 | R6 codex cwd | codex fixture w/ cwd | cwd on the model (already retained) |
@@ -205,3 +206,13 @@ the "not attributed" note counts only *plausible* (this-worktree) exclusions, so
 sibling-worktree candidates are silently ignored rather than reported as noise.
 A separate codex-review finding (SHA-less git writes miscounted as "no writes")
 was fixed the same round via output-independent `writeCount`.
+
+**2026-07-10 · repeated-selector amendment (issues #234/#237).** R5's
+single-selector replacement behavior remains byte-compatible. The previously
+unspecified repeated-flag case no longer silently keeps only the last value:
+zero flags uses conservative auto-selection, one flag selects exactly that one
+session, and two or more flags form the deterministic union of auto-selected
+contributors plus every explicit attachment. File paths deduplicate; any bad
+selector fails before rendering. This supplies an honest correction path for
+failed/early helper sessions outside the auto window without widening that
+window and over-crediting unrelated work.

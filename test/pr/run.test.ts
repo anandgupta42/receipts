@@ -304,6 +304,73 @@ describe("R1d selection outcomes", () => {
     expect(out).toHaveLength(0);
     expect(err.join("\n")).toContain('no session matched "missing-child"');
   });
+
+  it("repeated --session selectors append explicit sessions without replacing auto-selection", async () => {
+    const fixture = (await loadById("claude-code", ANCHORS))!;
+    const auto = { ...fixture, id: "auto", filePath: "auto.jsonl" };
+    // Same repo/window, but no git-write evidence: auto-selection declines it.
+    // Repeating --session is the user's explicit attribution claim and must add
+    // both declined sessions while keeping the unlisted auto contributor.
+    const manualOne = {
+      ...fixture,
+      id: "manual-one",
+      filePath: "manual-one.jsonl",
+      turns: fixture.turns.map((turn) => ({ ...turn, toolCalls: [] })),
+    };
+    const manualTwo = { ...manualOne, id: "manual-two", filePath: "manual-two.jsonl" };
+    const byId = new Map([
+      [auto.id, auto],
+      [manualOne.id, manualOne],
+      [manualTwo.id, manualTwo],
+    ]);
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [auto, manualOne, manualTwo],
+      loadSession: async (summary) => byId.get(summary.id) ?? null,
+    });
+
+    const code = await runPr({ post: false, sessions: [manualOne.id, manualTwo.id] }, deps);
+
+    expect(code).toBe(0);
+    expect(out[0]).toContain("3 sessions behind this PR");
+    expect(out[0]).toContain("counted: 3 sessions");
+    expect(out[0]).not.toContain("not attributed");
+  });
+
+  it("repeated --session deduplicates a transcript that auto-selection already found", async () => {
+    const fixture = (await loadById("claude-code", ANCHORS))!;
+    const auto = { ...fixture, id: "auto", filePath: "auto.jsonl" };
+    const manual = {
+      ...fixture,
+      id: "manual",
+      filePath: "manual.jsonl",
+      turns: fixture.turns.map((turn) => ({ ...turn, toolCalls: [] })),
+    };
+    const byId = new Map([
+      [auto.id, auto],
+      [manual.id, manual],
+    ]);
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [auto, manual],
+      loadSession: async (summary) => byId.get(summary.id) ?? null,
+    });
+
+    const code = await runPr({ post: false, sessions: [auto.id, manual.id] }, deps);
+
+    expect(code).toBe(0);
+    expect(out[0]).toContain("2 sessions behind this PR");
+    expect(out[0]).toContain("counted: 2 sessions");
+  });
+
+  it("repeated --session fails before rendering when any explicit selector is invalid", async () => {
+    const session = (await loadById("claude-code", ANCHORS))!;
+    const { deps, out, err } = await makeDeps();
+
+    const code = await runPr({ post: false, sessions: [session.id, "missing-helper"] }, deps);
+
+    expect(code).toBe(1);
+    expect(out).toHaveLength(0);
+    expect(err.join("\n")).toContain('no session matched "missing-helper"');
+  });
 });
 
 describe("SPEC-0024 attribution widening (e2e)", () => {
