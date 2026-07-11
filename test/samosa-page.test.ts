@@ -1,7 +1,7 @@
 // SPEC-0079 — the samosa story page contract and the own-surface link pins.
 // R1: the page is self-contained (zero scripts, embedded photo, exactly two
 // external hrefs — Wikipedia and the Ko-fi jar, ask-last) and carries the
-// Design-section copy verbatim. R3: FUNDING.yml offers the Ko-fi row. R4: the
+// Design-section copy verbatim. R3 (amended): FUNDING.yml's only active row is the story page. R4: the
 // landing/viewer/docs surfaces keep their samosa.html links — a README rework
 // once silently dropped the link, so these are pinned, not trusted.
 import { readFileSync } from "node:fs";
@@ -62,11 +62,14 @@ describe("SPEC-0079 R1 · the story page contract", () => {
   });
 });
 
-describe("SPEC-0079 R3 · FUNDING.yml offers the tip jar", () => {
-  it("carries the ko_fi row alongside the samosa-page custom entry", () => {
+describe("SPEC-0079 R3 (amended) · the Sponsor block offers only the story page", () => {
+  it("the custom samosa-page entry is the ONLY active line", () => {
     const funding = readFileSync(".github/FUNDING.yml", "utf8");
-    expect(funding).toContain("ko_fi: anandgupta42");
-    expect(funding).toContain('custom: ["https://anandgupta42.github.io/receipts/samosa.html"]');
+    // Allowlist, not denylist (Codex review): any platform key GitHub adds
+    // later must fail this too. Maintainer directive (2026-07-10): one
+    // Sponsor-block entry — the page mediates the tip jar.
+    const active = funding.split("\n").filter((l) => l.trim() !== "" && !l.trim().startsWith("#"));
+    expect(active).toEqual(['custom: ["https://anandgupta42.github.io/receipts/samosa.html"]']);
   });
 });
 

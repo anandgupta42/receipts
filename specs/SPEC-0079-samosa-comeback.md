@@ -28,7 +28,7 @@ buy me one?" — pointing at the maintainer's now-live Ko-fi jar
 (`https://ko-fi.com/anandgupta42`, created and supplied in-session 2026-07-10; Ko-fi
 bot-blocks automated fetches, so the URL is maintainer-attested — the page's current
 `github.com/sponsors` href is dead: GraphQL `hasSponsorsListing: false`). The README gets
-its `buy me a samosa` link back, and FUNDING.yml gains the native Ko-fi row.
+its `buy me a samosa` link back; FUNDING.yml's single row is the story page (R3, amended).
 
 **Kill criterion:** the story page keeps exactly **two** external hrefs — the Wikipedia
 samosa article and the Ko-fi jar — and zero `<script>` tags; the photo is embedded in the
@@ -63,9 +63,12 @@ the artifact golden must pass untouched.
   tests) stays green and gains one assertion: README contains
   `[buy me a samosa](<SAMOSA_URL>)`. The link adds zero emoji; the intentional-emoji set
   stays exact `[]`.
-- **R3 — FUNDING.yml gains the native Ko-fi row.** `ko_fi: anandgupta42` is added alongside
-  the existing `custom:` samosa-page entry (`.github/FUNDING.yml`), so the repo Sponsor
-  button offers both the story page and the tip jar.
+- **R3 (amended 2026-07-10, post-merge) — the Sponsor block offers only the story page.**
+  `.github/FUNDING.yml` carries exactly one entry: the `custom:` samosa-page URL. The
+  originally-shipped `ko_fi:` row was removed at the maintainer's directive after seeing
+  the rendered sidebar ("don't want two links — just the main samosa page link"): the page
+  mediates the tip jar on every surface, which is the kill criterion's own logic extended
+  to the Sponsor block. No direct payment-platform row (`ko_fi`/`github`/etc.) may return.
 - **R4 — the existing own-surface links are pinned, not trusted.** The landing page
   (`site/index.html:484`), the viewer chrome (`site/view.html:62`), and the docs-site
   footer template (`scripts/build-docs-site.mjs:820`) already link `samosa.html`; a small
@@ -94,8 +97,8 @@ the artifact golden must pass untouched.
   unchanged by this spec — no samosa link appears (SPEC-0070's tests and the artifact
   golden pass untouched); with opt-in `--samosa`, the artifact footer carries the same
   single link with the R5 glyph paths.
-- **Given** the repo's GitHub page, **then** the Sponsor button offers the Ko-fi row and
-  the samosa-page custom row.
+- **Given** the repo's GitHub page, **then** the Sponsor button offers exactly one row —
+  the samosa-page link (the page carries the Ko-fi ask).
 
 ## Non-goals
 
@@ -104,8 +107,9 @@ the artifact golden must pass untouched.
 - **A `--no-samosa` flag, payload changes, golden churn, or new telemetry** — all were in
   the pre-correction draft and died with the reversal; no CLI or product-path surface
   changes, so SPEC-0043's telemetry-with-every-feature rule has nothing to attach to.
-- **A direct Ko-fi link anywhere but the story page and FUNDING.yml** — README, landing,
-  viewer, and docs link the story page; the page mediates the payment link.
+- **A direct Ko-fi link anywhere but the story page** — README, landing, viewer, docs,
+  and (post-amendment) the Sponsor block all link the story page; the page mediates the
+  payment link.
 - **The terminal receipt card** — plain install footer, unchanged (SPEC-0055).
 
 ## Design — the story page copy (lead-authored; implementer executes, never invents)
@@ -149,7 +153,7 @@ Card structure (existing aesthetic — monospace, paper card, drawn glyph on top
 | R5 propagation | site html + docs template/output | drift guard green; no old paths anywhere (repo grep) |
 | R5 zero churn | `verify-goldens` | passes with no golden regenerated |
 | R2 README | README bytes | `[buy me a samosa](SAMOSA_URL)` present; guard suite green; emoji set exact `[]` |
-| R3 funding | `.github/FUNDING.yml` | `ko_fi: anandgupta42` + the existing `custom:` entry |
+| R3 funding | `.github/FUNDING.yml` | the `custom:` samosa-page entry only; no payment-platform rows |
 | R4 surface pins | index.html, view.html, build-docs-site.mjs | each carries a `samosa.html` href |
 | PR surfaces untouched | SPEC-0070 suite + `verify-goldens` | default comment/artifact link-free; `pr-artifact.html` golden byte-identical |
 
@@ -256,3 +260,19 @@ prove completeness or the absence of the retired face marks; it now pins the ful
 path **sequence** and asserts the two legacy path prefixes are absent from every inlined
 copy. Codex otherwise verified: zero golden churn (102 artifacts), all 25 regenerated docs
 pages carry the four new paths, no old glyph or sponsors URL remains shipped.
+
+**2026-07-10 · button-1 amendment 4 (post-merge, the Sponsor block):** after enabling the
+Sponsorships toggle and seeing the sidebar render two rows, the maintainer directed:
+*"don't want two links — just the main samosa page link."* The `ko_fi:` row is removed from
+FUNDING.yml (follow-up PR); the R3 test now asserts the custom entry is the only row and
+no payment-platform key can silently return. Consistent with the kill criterion: the story
+page is the only door to the tip jar, now including the Sponsor block.
+
+**2026-07-10 · button-1 amendment 5 (post-merge, README placement):** the maintainer's
+rationale, recorded verbatim in intent: the README samosa link is the viral bet — "it has
+a chance of going viral because not many people ask for it." The License-area afterthought
+("Support the project: …") is replaced by a dedicated closing `## Buy me a samosa` section
+carrying the quotable subversion line ("Every open-source project asks you to buy the
+maintainer a coffee. Not this one — buy me a samosa, and I'll explain."). R2's guard
+assertion (lowercase `[buy me a samosa](SAMOSA_URL)`) still pins the link; line count 247
+of the guard's 260 cap (trailing newline counts); badge row untouched.

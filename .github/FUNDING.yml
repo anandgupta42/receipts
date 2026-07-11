@@ -1,3 +1,3 @@
-# The samosa story page (custom) + the Ko-fi tip jar it points at (SPEC-0079).
-ko_fi: anandgupta42
+# The samosa story page is the single Sponsor-block entry (SPEC-0079 amendment:
+# the page mediates the tip jar everywhere — no direct Ko-fi row).
 custom: ["https://anandgupta42.github.io/receipts/samosa.html"]
