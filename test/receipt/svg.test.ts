@@ -326,14 +326,19 @@ describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't im
     "scripts/build-docs-site.mjs",
   ];
 
-  it("every inlined copy carries the module's exact path literals", () => {
+  it("every inlined copy carries the module's exact path sequence, and no legacy marks", () => {
     const paths = samosaGlyphMarkup().match(/<path d="[^"]*"\/>/g) ?? [];
     expect(paths).toHaveLength(4);
+    // The full adjacent sequence, not per-path contains: proves order and
+    // completeness, so a copy can't smuggle extra/legacy paths between the
+    // module's own (Codex review of SPEC-0078 R5).
+    const sequence = paths.join("");
     for (const file of DUPLICATING_FILES) {
       const html = readFileSync(file, "utf8");
-      for (const path of paths) {
-        expect(html, `${file} drifted from samosa-glyph.ts: missing ${path}`).toContain(path);
-      }
+      expect(html, `${file} drifted from samosa-glyph.ts`).toContain(sequence);
+      // The retired face marks (pre-SPEC-0078 glyph) must be gone everywhere.
+      expect(html, `${file} still carries a retired glyph mark`).not.toContain('<path d="M17 29');
+      expect(html, `${file} still carries a retired glyph mark`).not.toContain('<path d="M21 20');
     }
   });
 });

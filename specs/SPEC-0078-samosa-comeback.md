@@ -19,8 +19,10 @@ The maintainer wants the samosa story told and the tip jar real — but **only o
 project's own surfaces**: the story page, the README, the landing page, the docs site, and
 the repo's Sponsor button (directive, 2026-07-10, correcting an earlier in-session answer
 that had asked for a PR-surface reversal — see Validation). SPEC-0070's off-by-default on
-PR-posted surfaces **stands**; nothing aireceipts posts onto another repo's PR changes by
-one byte. What changes: `site/samosa.html` becomes the love-of-samosa story — why a samosa
+PR-posted surfaces **stands**; every *default* posted surface stays byte-identical. (One
+deliberate exception, per Codex's implementation review: an *opt-in* `--samosa` artifact
+footer renders the R5-redesigned glyph, because the glyph is single-sourced — same link,
+same layout, new paths.) What changes: `site/samosa.html` becomes the love-of-samosa story — why a samosa
 and not a coffee, the kept honest-glyph Unicode story, and only at the end "still want to
 buy me one?" — pointing at the maintainer's now-live Ko-fi jar
 (`https://ko-fi.com/anandgupta42`, created and supplied in-session 2026-07-10; Ko-fi
@@ -90,7 +92,8 @@ the artifact golden must pass untouched.
   the new assertion that the `buy me a samosa` link targets `SAMOSA_URL`.
 - **Given** `aireceipts pr --post` (default), **then** the comment and artifact bytes are
   unchanged by this spec — no samosa link appears (SPEC-0070's tests and the artifact
-  golden pass untouched).
+  golden pass untouched); with opt-in `--samosa`, the artifact footer carries the same
+  single link with the R5 glyph paths.
 - **Given** the repo's GitHub page, **then** the Sponsor button offers the Ko-fi row and
   the samosa-page custom row.
 
@@ -242,3 +245,14 @@ samosas, one broken open, both chutneys — it illustrates the fact block exactl
 handling: no photographer credit is fabricated; the caption states `rendered by AI — the
 real ones get eaten too fast to photograph`, keeping the honest-labels ethos on the one
 surface a skeptic would check. No license/attribution obligation attaches.
+
+**2026-07-10 · S6 (Codex code review, commit `81a7c5e`): REWORK → reworked, 2 findings.**
+(1) *Accepted as a spec-wording fix:* "no PR-posted surface changes by one byte"
+over-claimed — an opt-in `--samosa` artifact footer does pick up the R5 glyph (the glyph
+is single-sourced by design); Purpose and the scenario now say "default surfaces
+byte-identical, opt-in glyph intentionally updated". Default artifact golden verified
+unchanged. (2) *Accepted as a test fix:* the drift guard's per-path `contains` couldn't
+prove completeness or the absence of the retired face marks; it now pins the full adjacent
+path **sequence** and asserts the two legacy path prefixes are absent from every inlined
+copy. Codex otherwise verified: zero golden churn (102 artifacts), all 25 regenerated docs
+pages carry the four new paths, no old glyph or sponsors URL remains shipped.
