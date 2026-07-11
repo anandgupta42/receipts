@@ -82,6 +82,7 @@ describe("preflight · checkTarball", () => {
   });
 
   it("rejects an oversized unpacked payload", () => {
+    expect(checkTarball({ ...good, unpackedSize: MAX_UNPACKED_KB * 1024 }, REQ)).toEqual([]);
     expect(checkTarball({ ...good, unpackedSize: (MAX_UNPACKED_KB + 1) * 1024 }, REQ).some((m) => m.includes("KB"))).toBe(true);
   });
 });
