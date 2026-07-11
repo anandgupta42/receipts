@@ -239,3 +239,5 @@ welcome and run the same gates: [CONTRIBUTING.md](CONTRIBUTING.md).
 ## License
 
 Apache-2.0.
+
+Support the project: [buy me a samosa](https://anandgupta42.github.io/receipts/samosa.html).

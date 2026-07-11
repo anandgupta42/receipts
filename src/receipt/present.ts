@@ -530,7 +530,7 @@ function buildGrocery(model: ReceiptModel): Block[] {
   blocks.push({ kind: "note", text: `CARDHOLDER: ${dominantModel}`, spaceBefore: true });
   blocks.push({ kind: "footer", text: `THANK YOU FOR VIBING WITH ${model.agentLabel}` });
   blocks.push({ kind: "barcode", pattern: barcodePattern(token) });
-  blocks.push({ kind: "footer", text: INSTALL_FOOTER_TEXT });
+  blocks.push({ kind: "footer", text: INSTALL_FOOTER_TEXT, stamp: false });
   blocks.push({ kind: "note", text: REPOSITORY_DISPLAY, align: "center", muted: true });
   return blocks;
 }

@@ -41,6 +41,10 @@ describe("SPEC-0027 R1 artifact page", () => {
     expect(html).not.toContain("@import");
     expect(html).not.toContain("@font-face");
     expect(html).not.toContain("url(");
+    const withoutAllowedUrls = html
+      .replace(/<a href="[^"]+"/g, "<a")
+      .replace(/\s+xmlns="[^"]+"/g, "");
+    expect(withoutAllowedUrls.match(/https?:\/\//g) ?? []).toHaveLength(0);
   }
 
   it("is self-contained by default with only the intentional source-and-install anchor", async () => {

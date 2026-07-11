@@ -317,8 +317,8 @@ describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't im
   // plain .mjs script; none of them can import the TS glyph module at
   // runtime. Their inlined copies must stay byte-identical to the module's
   // three <path> literals, or the surfaces drift apart silently.
-  // site/index.html dropped its samosa footer link in the SPEC-0076 landing
-  // redesign (maintainer, 2026-07-10) — only surfaces that still inline the
+  // site/index.html does not inline the glyph in its samosa footer link, so only
+  // surfaces that do inline the glyph are pinned.
   // glyph are pinned.
   const DUPLICATING_FILES = [
     "site/samosa.html",

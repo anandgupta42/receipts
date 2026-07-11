@@ -1,12 +1,12 @@
 ---
-id: SPEC-0076
+id: SPEC-0078
 title: receipt provenance footer
 status: building
 milestone: M5
 depends: [SPEC-0020, SPEC-0055, SPEC-0070]
 ---
 
-# SPEC-0076: Receipt provenance footer
+# SPEC-0078: Receipt provenance footer
 
 ## Purpose
 
@@ -56,8 +56,8 @@ claim that a receipt is "powered by" another product.
   display URL, install footer copy, and the PR attribution copy as
   `REPOSITORY_URL`, `REPOSITORY_DISPLAY`, `INSTALL_FOOTER_TEXT`, and
   `PR_ATTRIBUTION_LINE`. Its test normalizes package metadata by removing `git+` and a
-  trailing `.git`, then requires the resulting URL to equal `REPOSITORY_URL`. No source
-  outside package metadata and this module duplicates the repository URL literal.
+  trailing `.git`, then requires the resulting URL to equal `REPOSITORY_URL`. No receipt,
+  PR, or artifact rendering source outside this module duplicates the repository URL literal.
 - **R3 — PR Markdown attribution.** `aireceipts pr` adds the design's clickable
   attribution after the fenced receipt and after optional details, handoff, and artifact
   lines. Before `detailsSection` and `handoffSection` are budgeted,
@@ -160,7 +160,7 @@ do not replace it with a shorter unverified brand phrase.
   package, so another 32-character line may be visual noise. The kill dry-run survives:
   `github.com/anandgupta42/receipts` is 32 code points, below the 50-column contract;
   implementation must still prove every template. **Verdict: build now.**
-- **S4:** `node scripts/spec-lint.mjs specs/SPEC-0076-receipt-provenance.md` passed.
+- **S4:** `node scripts/spec-lint.mjs specs/SPEC-0078-receipt-provenance.md` passed.
 
 ## Documentation review
 

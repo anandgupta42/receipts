@@ -37,7 +37,7 @@ async function modelFor(source: string, path: string): Promise<ReceiptModel> {
   return buildReceiptModel(session);
 }
 
-describe("SPEC-0076 R1 receipt provenance", () => {
+describe("SPEC-0078 R1 receipt provenance", () => {
   it.each([...TEMPLATE_NAMES])("%s ends with centered provenance inside the 50-column contract", async (template) => {
     const model = await modelFor(PRICED.source, PRICED.path);
     const lines = renderReceiptLines(model, { color: false, template });
@@ -50,6 +50,7 @@ describe("SPEC-0076 R1 receipt provenance", () => {
     const svg = renderReceiptSvg(model, { template });
     expect(svg).toContain(REPOSITORY_DISPLAY);
     expect(svg).not.toContain("<a");
+    expect(svg.match(/class="stamp"/g) ?? []).toHaveLength(1);
   });
 
   it("grocery preserves thank-you then barcode before its provenance footer", async () => {
