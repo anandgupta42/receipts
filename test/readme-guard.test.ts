@@ -154,3 +154,10 @@ describe("SPEC-0029 · README guard", () => {
     }
   });
 });
+
+describe("SPEC-0079 R2 · the samosa link is back and pinned", () => {
+  it("README links the samosa story page (text-only, License area)", async () => {
+    const { SAMOSA_URL } = await import("../src/pr/publish.js");
+    expect(readme).toContain(`[buy me a samosa](${SAMOSA_URL})`);
+  });
+});

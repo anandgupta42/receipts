@@ -7,10 +7,13 @@
 // SVG exporter (the card is plain text everywhere); the remaining consumers are
 // the clickable HTML surfaces, and the static site copies are pinned to PATH
 // byte-for-byte by test/receipt/svg.test.ts.
+// SPEC-0079 R5 — the "hot & fresh" redesign, maintainer-picked: crimped pastry
+// base + steam wisps, replacing the earlier face-like marks.
 const PATH =
-  '<path d="M24 5 L43 39 Q44.5 41.5 41.5 41.5 H6.5 Q3.5 41.5 5 39 Z"/>' +
-  '<path d="M17 29 q3 2.5 7 0"/>' +
-  '<path d="M21 20 l3 -3 3 3"/>';
+  '<path d="M22 10 L38.5 39.5 Q40 42 37 42 H7 Q4 42 5.5 39.5 Z"/>' +
+  '<path d="M9.5 37 q2.2 -2.8 4.4 0 t4.4 0 t4.4 0 t4.4 0 t4.4 0 t4.4 0"/>' +
+  '<path d="M32 12 q3 -3 1 -6"/>' +
+  '<path d="M38 17 q3 -3 1 -6"/>';
 
 /** `currentColor` markup for HTML surfaces (artifact page, site footer, samosa page). */
 export function samosaGlyphMarkup(size = 16): string {
