@@ -1,2 +1,3 @@
-# The README's "buy me a samosa" link, surfaced as the repo's Sponsor button.
+# The samosa story page (custom) + the Ko-fi tip jar it points at (SPEC-0078).
+ko_fi: anandgupta42
 custom: ["https://anandgupta42.github.io/receipts/samosa.html"]

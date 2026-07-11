@@ -289,9 +289,10 @@ describe("R4 — field-set parity between the terminal and SVG renderers", () =>
 });
 
 describe("renderReceiptSvg — no samosa glyph on the receipt card (SPEC-0055)", () => {
-  // The glyph's signature anchor path — unique to samosa-glyph.ts's PATH
-  // constant, so its presence/absence is unambiguous in the raw SVG bytes.
-  const GLYPH_ANCHOR = 'd="M24 5 L43 39';
+  // The glyph's signature anchor — the module's first path, derived rather
+  // than hardcoded so the SPEC-0078 R5 redesign (or any future one) can't
+  // leave this negative test asserting against a glyph that no longer ships.
+  const GLYPH_ANCHOR = `d="${/<path d="([^"]+)"/.exec(samosaGlyphMarkup())![1]}`;
 
   it("no template's SVG carries the glyph path, in either theme", async () => {
     const model = await modelFor(PRICED.source, PRICED.path);
@@ -316,7 +317,8 @@ describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't im
   // site/*.html are hand-authored static files and build-docs-site.mjs is a
   // plain .mjs script; none of them can import the TS glyph module at
   // runtime. Their inlined copies must stay byte-identical to the module's
-  // three <path> literals, or the surfaces drift apart silently.
+  // <path> literals (four since SPEC-0078 R5), or the surfaces drift apart
+  // silently.
   const DUPLICATING_FILES = [
     "site/samosa.html",
     "site/view.html",
@@ -324,9 +326,9 @@ describe("samosa glyph single source (SPEC-0034 R2) — static surfaces can't im
     "scripts/build-docs-site.mjs",
   ];
 
-  it("every inlined copy carries the module's exact three path literals", () => {
+  it("every inlined copy carries the module's exact path literals", () => {
     const paths = samosaGlyphMarkup().match(/<path d="[^"]*"\/>/g) ?? [];
-    expect(paths).toHaveLength(3);
+    expect(paths).toHaveLength(4);
     for (const file of DUPLICATING_FILES) {
       const html = readFileSync(file, "utf8");
       for (const path of paths) {
