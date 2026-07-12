@@ -19,8 +19,8 @@ symlinks point there), and SPEC-0060 already aggregates them for the PR comment 
 explicitly deferring session surfaces. This spec closes that deferral: the default
 receipt, the statusline one-liner, the install-hook mini-receipt, and `--json` include
 one subagent aggregate built from the same priced atoms. Serves **I2/I3** (the
-aggregate is a cent-reconciled sum of already-priced children — nothing fabricated,
-every number traceable to a child transcript on disk) and **I5** (all changes
+aggregate is a strict downward floor of already-priced children — nothing
+fabricated, every number traceable to a child transcript on disk) and **I5** (all changes
 golden-gated). Fixes issue #154.
 
 ## Requirements
@@ -28,10 +28,11 @@ golden-gated). Fixes issue #154.
 - **R1 — Receipt aggregate row.** When `discoverChildFiles(session.filePath)` finds
   `N > 0` descendants, the receipt renders exactly one `SUBAGENTS (N)` row as the last
   spend row — after the per-tool rows, before any waste rows and the caveat/rule/total
-  tail (`src/receipt/present.ts:348,384`) — valued at the cent-reconciled sum of its
+  tail (`src/receipt/present.ts:348,384`) — valued at the downward-floored sum of its
   priced children; when no child is priced the value renders tokens, never `$` (I2).
-  `TOTAL` includes the aggregate, and drawn `$` rows still sum byte-exactly to it
-  (SPEC-0044/B1 reconciliation over the rows the receipt now draws). The row enters via
+  `TOTAL` includes the aggregate, and drawn `$` rows still sum byte-exactly to it:
+  every drawn row floors independently at one shared adaptive precision, then
+  `TOTAL` is the exact sum of those display units (SPEC-0044/B1). The row enters via
   the shared receipt view, so SVG/PNG render it identically — one format, every
   exporter. Sessions with `N = 0` render byte-identically to today across text, mini,
   SVG, and PNG — existing goldens must not change.
@@ -136,7 +137,7 @@ its own terms.
 | R2 unpriced parent + priced children | tokens-only parent, children priced | child `≥ $` row + `KNOWN PRICED SUBTOTAL`; exact parent/child unpriced tokens on a separate row; `--json` keeps both ledgers |
 | R2 dropped records | child with `droppedRecords > 0` | `subagents-dropped-records` floor caveat renders |
 | R1 delta suppression | priced parent + priced children, delta available | no `same tokens on` line renders; `--json` keeps `priceDelta` |
-| R3 statusline totals | parent ($0.18) + children ($9.85) | one-liner `$` = combined reconciled total; tokens combined |
+| R3 statusline totals | parent ($0.18) + children ($9.85) | one-line strict floor covers the same combined atoms; tokens combined |
 | R3 latency | fixture parent with children | existing 200ms budget test passes with rollup on |
 | R3 no-children I/O | fixture without `subagents/` | injected deps record zero child loads; output unchanged |
 | R4 mini suffix | parent + 8 children | total line ends ` (incl. 8 subagents)`; absent when N = 0 |
@@ -194,13 +195,16 @@ its own terms.
   many-children fixture, the statusline half is reworked (cap or cache) before ship —
   measured by the R3 latency matrix row. **Verdict: build now.**
 - **S4:** `node scripts/spec-lint.mjs` — pass.
-## 2026-07-10 strict-floor and caveat amendment
+## 2026-07-11 strict-floor additive and caveat amendment
 
-Supersedes the displayed-row reconciliation clauses: parent/tool/subagent rows
-and TOTAL round down independently so each `≥` claim is true. A GPT-5.6 Codex
-child also propagates `unobserved-cache-write-tokens` into the parent receipt and
-PR confidence summary; the combined floor explicitly excludes any unpersisted
-cache-write premium.
+The displayed-row reconciliation clauses remain in force through a truthful
+shared floor ledger: each parent/tool/subagent row receives a downward floor in
+exact decimal units at one adaptive precision, and TOTAL is their exact displayed-unit
+sum no greater than the raw machine aggregate. A floating-sum excess is removed
+from the largest row; no row is rounded upward to force equality. A GPT-5.6 Codex child also propagates
+`unobserved-cache-write-tokens` into the parent receipt and PR confidence
+summary; the combined floor explicitly excludes any unpersisted cache-write
+premium.
 
 ## 2026-07-10 mixed-coverage surface amendment
 

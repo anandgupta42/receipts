@@ -11,7 +11,7 @@
 // `validateReceiptBlocks` can validate at load time, so the honesty invariants
 // (I2/I3) are non-removable by construction rather than by renderer politeness.
 import { combinedPricedUsd, type ReceiptModel } from "./model.js";
-import { formatUsdFloor, usdFloorDecimals, type UsdFloorDecimals } from "./format.js";
+import { formatUsdFloor, formatUsdFloorLedger, usdFloorDecimals, type UsdFloorDecimals } from "./format.js";
 
 export type TemplateName = "classic" | "grocery" | "datavis";
 
@@ -179,6 +179,18 @@ function tracedDollarAmounts(model: ReceiptModel): Set<string> {
     model.subagents?.pricedUsd,
     combined,
   ]);
+  const displayedLedger = formatUsdFloorLedger([
+    ...model.toolRows.flatMap((row) => row.usd === null ? [] : [row.usd]),
+    ...(model.subagents?.pricedUsd === null || model.subagents?.pricedUsd === undefined
+      ? []
+      : [model.subagents.pricedUsd]),
+  ], ledgerPrecision, combined ?? undefined);
+  for (const amount of displayedLedger.amounts) {
+    out.add(`$${amount}`);
+  }
+  if (combined !== null) {
+    out.add(`$${displayedLedger.total}`);
+  }
   addDollar(out, model.totalUsd, ledgerPrecision);
   for (const row of model.toolRows) {
     addDollar(out, row.usd, ledgerPrecision);

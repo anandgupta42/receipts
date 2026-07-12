@@ -76,7 +76,7 @@ Edit..........................≥ $0.0455  (2 calls)
 Write.........................≥ $0.0290  (2 calls)
 Read...........................≥ $0.0192  (1 call)
 --------------------------------------------------
-TOTAL....................................≥ $0.1767
+TOTAL....................................≥ $0.1764
 standard API-equivalent floor; not an invoice
 same tokens on claude-haiku-4-5..........≥ $0.0392
   (78% lower observable floor)
@@ -91,7 +91,7 @@ The final line identifies the open-source project that generated the receipt; th
 above it is the install command. PR comments and their HTML artifacts make the same
 source-and-install destination clickable.
 
-Every human `≥ $X` is rounded down independently. Exact-cent values use two decimals; fractional-cent values retain four. No cents are redistributed, so rows need not visibly sum to TOTAL; `--json`/`--csv` retain raw precision and lower-bound semantics.
+Every human `≥ $X` is rounded down. Additive spend rows share one adaptive precision — two decimals for exact cents, normally four for fractional cents, and up to twelve for tiny positive evidence — and visibly sum to a `TOTAL` that never exceeds the raw machine aggregate. No row is rounded upward; if floating-point addition serializes just below the row-unit sum, the largest row is lowered by the excess unit(s). `--json`/`--csv` retain raw precision and explicit lower-bound semantics.
 
 <sub>`pre-edit` is the share of the observable priced floor before the first edit-tool call ([reading a receipt](docs/guide/04-read-a-receipt.md)).</sub>
 

@@ -94,12 +94,15 @@ The `--details` section (opt-in; default output untouched):
   - `BY MODEL` rows — only when the session priced and `modelMix.length > 1`:
     `claude-opus-4-8` … `87% · $0.14` per model, from a per-model accumulator in
     the same `attributeByTool` loop, surfaced as `ModelMixEntry.usd`. Dollar
-    strings are cent-reconciled (`reconcileCents`, `src/receipt/format.ts`) so
-    BY MODEL rows sum to TOTAL.
+    strings use the same adaptive strict-floor precision
+    (`formatUsdFloorLedger`, `src/receipt/format.ts`), so no model row can exceed
+    its raw observable scalar. This is an alternate parent-model partition,
+    not the primary tool-row ledger; with subagents it is explicitly labeled
+    `BY PARENT MODEL` and does not purport to reconcile to the combined TOTAL.
 - **R5 — honesty battery covers the new dollars.** Every `$` string R4 can render
   (cache counterfactual, per-model splits) joins `tracedDollarAmounts`
   (`src/receipt/blocks.ts:162-177`), derived from the same model fields the
-  builder formats (reconciled the same way) — one source of truth;
+  builder formats (strict-floored the same way) — one source of truth;
   `validateReceiptBlocks` returns `[]` on details views and still rejects any
   other new `$`.
 - **R6 — template composition.** `--details` composes with `classic` only.
@@ -130,8 +133,8 @@ The `--details` section (opt-in; default output untouched):
 
 - **Given** the priced two-model demo fixture **When** `aireceipts --details`
   **Then** the DETAILS section renders composition, turns/tool calls, peak turn,
-  cache counterfactual, and BY MODEL rows summing (cent-reconciled) to TOTAL,
-  every line ≤50 chars, and `validateReceiptBlocks` returns `[]`.
+  cache counterfactual, and strict-floor BY MODEL rows, every line ≤50 chars,
+  and `validateReceiptBlocks` returns `[]`.
 - **Given** the same fixture **When** `aireceipts` (no flag) **Then** output is
   byte-identical to today except the price-delta row's `(-N%)` suffix.
 - **Given** the stuck-loop fixture **When** `aireceipts` (text and `--svg`)
@@ -188,7 +191,7 @@ The `--details` section (opt-in; default output untouched):
 | R4 peak turn | demo fixture | max usage turn, 1-based; absent when no turn has usage |
 | R4 counterfactual | cacheRead>0 priced fixture | `$` = per-turn cacheRead × (input − cache_read) arithmetic; note line exact |
 | R4 counterfactual omitted | turn with row lacking cache-read rate | line absent (null, not partial) |
-| R4 BY MODEL | 2-model fixture | rows cent-reconciled, sum = TOTAL priced |
+| R4 BY MODEL | 2-model fixture | each row is an adaptive strict floor; no row exceeds its raw model scalar |
 | R4 BY MODEL absent | single-model + unpriced fixtures | no BY MODEL section |
 | R4 width + placement | every details golden | all lines ≤50 chars; section after price-delta, before methodology |
 | R4 Cursor degraded | cursor fixture `--details` | rows from session totals or omitted; no crash, no `$` |
@@ -274,9 +277,13 @@ beforeEach re-capture → originals captured once at module scope.
 ("come up with ideas and implement them as well … take decision on your own",
 3-hour autonomous window). Status set `approved` under that authority; flips to
 `building` when the PR opens.
-## 2026-07-10 strict-floor amendment
+## 2026-07-11 strict-floor amendment
 
-Supersedes cent-reconciled BY MODEL display requirements: every model row and
-the TOTAL independently round down, so a row labeled `≥` can never receive a
-cent its raw lower-bound scalar did not reach. Machine values remain unrounded;
-visible rows are not required to sum after conservative display flooring.
+The primary tool/contributor ledgers retain SPEC-0044 R8 additivity: their
+displayed TOTAL is the exact sum of displayed row floors. BY MODEL is a second,
+independently partitioned parent-only explanation and has no separate displayed
+subtotal; each model row rounds down at the shared adaptive precision and is
+therefore truthful on its own. When subagents contribute to the primary TOTAL,
+the heading changes to `BY PARENT MODEL` so this secondary partition cannot be
+mistaken for a decomposition of combined parent-plus-child spend. Machine
+values remain unrounded.

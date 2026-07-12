@@ -179,7 +179,7 @@ describe("SPEC-0020 R3 — numbers equal classic to the cent", () => {
     };
     expect(totalOf("grocery")).toBe(totalOf("classic"));
     expect(totalOf("datavis")).toBe(totalOf("classic"));
-    expect(totalOf("classic")).toBe("≥ $0.1767");
+    expect(totalOf("classic")).toBe("≥ $0.1764");
   });
 });
 

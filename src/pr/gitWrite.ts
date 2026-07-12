@@ -169,17 +169,31 @@ function resolveInvocations(argvs: string[][], depth = 0): string[][] {
  * the subcommand.
  */
 export function gitWriteVerb(argv: string[]): GitVerb | null {
+  const sub = gitSubcommand(argv);
+  if (sub === "commit" || sub === "push") {
+    return sub;
+  }
+  return null;
+}
+
+/** The real git subcommand in an argv, after env assignments/global options. */
+export function gitSubcommand(argv: string[]): string | null {
   const gitIndex = gitCommandIndex(argv);
   if (gitIndex === null) {
     return null;
   }
   const i = gitSubcommandIndex(argv, gitIndex);
-  if (i === null) return null;
-  const sub = argv[i];
-  if (sub === "commit" || sub === "push") {
-    return sub;
+  return i === null ? null : argv[i];
+}
+
+/** Arguments after the real git subcommand, or null when argv is not a git invocation. */
+export function gitSubcommandArgs(argv: string[]): string[] | null {
+  const gitIndex = gitCommandIndex(argv);
+  if (gitIndex === null) {
+    return null;
   }
-  return null;
+  const i = gitSubcommandIndex(argv, gitIndex);
+  return i === null ? null : argv.slice(i + 1);
 }
 
 function gitCommandIndex(argv: string[]): number | null {

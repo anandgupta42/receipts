@@ -3,7 +3,7 @@
 import { loadBudgetConfig } from "./config.js";
 import { computeBudgetSum, type BudgetSum } from "./compute.js";
 import type { BudgetPeriod, BudgetPeriodConfig } from "./types.js";
-import { formatUsdFloor } from "../receipt/format.js";
+import { formatInt, formatUsdFloor } from "../receipt/format.js";
 
 function exactUsd(n: number): string {
   const raw = String(n);
@@ -35,13 +35,13 @@ export function renderBudgetLine(period: BudgetPeriod, sum: BudgetSum): string {
       caveats.push(`${sum.cacheRatePartialSessionCount} partial with uncited cache rate`);
     }
     if (sum.unpricedTokenCount > 0) {
-      caveats.push(`${sum.unpricedTokenCount.toLocaleString("en-US")} known unpriced tok outside ≥ sum`);
+      caveats.push(`${formatInt(sum.unpricedTokenCount)} known unpriced tok outside ≥ sum`);
     }
     caveats.push("top-level only; child/subagent transcripts excluded");
     return `${base} (${caveats.join("; ")})`;
   }
   const unreadable = sum.excludedUnreadableCount > 0 ? `; ${sum.excludedUnreadableCount} unreadable excluded` : "";
-  return `budget (${label}): ${sum.spentTokens.toLocaleString("en-US")} of ${sum.cap.toLocaleString("en-US")} tokens — ${ADVISORY_SUFFIX} (${sum.sessionCount} summaries${unreadable}; top-level only; child/subagent transcripts excluded)`;
+  return `budget (${label}): ${formatInt(sum.spentTokens)} of ${formatInt(sum.cap)} tokens — ${ADVISORY_SUFFIX} (${sum.sessionCount} summaries${unreadable}; top-level only; child/subagent transcripts excluded)`;
 }
 
 /** R3: "exceeded" is a strict `>` — a sum exactly at the cap is not yet over it. */

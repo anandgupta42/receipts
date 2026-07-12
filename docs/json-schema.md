@@ -130,7 +130,7 @@ An additive interpretation beside legacy numeric dollar fields. Receipts current
 |---|---|---|
 | `kind` | string | Always `lower-bound`. |
 | `basis` | string | Always `standard-api-list-price-equivalent`; this is price-table arithmetic, not a claim about a subscription invoice. |
-| `minUsd` | number | Four-decimal downward floor of the adjacent non-null legacy USD scalar; it never exceeds that scalar and does not imply invoice precision. |
+| `minUsd` | number | Adaptive downward decimal floor of the adjacent non-null legacy USD scalar: two decimals for exact cents, normally four for fractional cents, and up to twelve to preserve tiny positive evidence. It never exceeds the scalar and does not imply invoice precision; JSON numbers do not retain insignificant trailing zeros. |
 
 ### TokenUsage object
 

@@ -13,7 +13,7 @@ import type {
   ToolCall,
   Turn,
 } from "./types.js";
-import { addUsage, emptyUsage, parseTimestamp, pathExists, truncate, withTotal, sanitizeText } from "./util.js";
+import { addUsage, emptyUsage, parseTimestamp, pathExists, safeTokenSum, truncate, withTotal, sanitizeText } from "./util.js";
 
 /**
  * opencode stores sessions in SQLite DBs under `~/.local/share/opencode`.
@@ -202,17 +202,6 @@ function parseTokenValue(value: unknown, allowNumericString: boolean): ParsedTok
     }
   }
   return { value: 0, valid: false };
-}
-
-function safeTokenSum(values: readonly number[]): number | undefined {
-  let total = 0;
-  for (const value of values) {
-    if (total > Number.MAX_SAFE_INTEGER - value) {
-      return undefined;
-    }
-    total += value;
-  }
-  return total;
 }
 
 /** Preserve valid buckets from malformed message usage, but never price it. */

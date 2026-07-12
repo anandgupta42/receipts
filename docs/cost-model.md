@@ -78,9 +78,11 @@ place:
    unit, not from an aggregate user-facing turn. No row → tokens only; no
    applicable cache rate → that cache component contributes zero with a caveat.
 4. **Attribute** (`src/pricing/attribution.ts`) — split each turn's cost evenly
-   across the tools it called and sum per tool. Raw machine values remain
-   additive; human `≥` amounts are independently floored for honest display and
-   are not forced to visibly sum by redistributing cents.
+   across the tools it called and sum per tool. Raw machine values remain the
+   compatibility arithmetic. Human spend rows use exact `BigInt` decimal units
+   at one adaptive precision and sum visibly to TOTAL. Each starts at its own
+   downward floor; if the serialized IEEE-754 aggregate lies below that unit sum,
+   the excess is removed from the largest row. Nothing is rounded upward.
 
 **The turn-identity rule (step 1) is where a cost can silently multiply, so it
 is pinned per agent:**
@@ -127,12 +129,15 @@ is pinned per agent:**
 
 ### Human lower-bound formatting
 
-Every human-facing dollar is rounded **down independently** so the displayed
-`≥ $X` never exceeds its raw lower bound. Exact-cent values use two decimal
-places; fractional-cent values use four so observable value does not disappear
-or get rounded upward. No cent is moved from one row to another. Consequently,
-displayed rows are not promised to add exactly to the independently floored
-TOTAL; `--json` and `--csv` retain the raw values and explicit lower-bound basis.
+Every human-facing dollar is rounded **down** so the displayed `≥ $X` never
+exceeds its raw lower bound. Exact-cent values use two decimal places;
+fractional-cent values normally use four, and tiny positive evidence can extend
+through twelve places. An additive ledger represents its display units with
+`BigInt`, so huge finite values cannot overflow scaled Number arithmetic. Rows
+sum exactly to TOTAL. If the serialized floating aggregate is below the initial
+row-unit sum, the excess is removed from the largest row; no value is ever
+rounded upward. `--json` and `--csv` retain the raw values and explicit
+lower-bound basis.
 
 ### Provider identity is a pricing gate
 

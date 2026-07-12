@@ -459,7 +459,7 @@ footer{
   <tbody>
     <tr><td><code>kind</code></td><td>string</td><td>Always <code>lower-bound</code>.</td></tr>
     <tr><td><code>basis</code></td><td>string</td><td>Always <code>standard-api-list-price-equivalent</code>; this is price-table arithmetic, not a claim about a subscription invoice.</td></tr>
-    <tr><td><code>minUsd</code></td><td>number</td><td>Four-decimal downward floor of the adjacent non-null legacy USD scalar; it never exceeds that scalar and does not imply invoice precision.</td></tr>
+    <tr><td><code>minUsd</code></td><td>number</td><td>Adaptive downward decimal floor of the adjacent non-null legacy USD scalar: two decimals for exact cents, normally four for fractional cents, and up to twelve to preserve tiny positive evidence. It never exceeds the scalar and does not imply invoice precision; JSON numbers do not retain insignificant trailing zeros.</td></tr>
   </tbody>
 </table></div>
 

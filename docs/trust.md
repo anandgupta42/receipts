@@ -73,13 +73,15 @@ that makes it visible on the receipt.*
    in any tool output — the session is excluded and the total renders as a
    floor (`≥`). Understates; marked by the floor and the
    "not attributed" note. (Observed live on PR #61 and PR #66.)
-2. **Displayed floors never round upward.** Every human `≥ $X` is floored
-   independently: two decimals for an exact-cent value, four when fractional
-   cents remain. No cent is redistributed between rows, so displayed
-   rows are not promised to add exactly to the independently floored TOTAL.
-   Raw `--json`/`--csv` values retain full precision and carry lower-bound
-   semantics explicitly. *Direction:* prevents an over-claim caused solely by
-   rounding. *Marker:* `≥` on every human dollar plus `CostEstimate`/CSV basis.
+2. **Displayed floors never round upward.** Every human `≥ $X` is floored: two
+   decimals for exact cents, normally four for fractional cents, and up to twelve
+   for tiny positive evidence. Additive rows use exact decimal `BigInt` units and
+   sum visibly to a TOTAL no greater than the raw machine aggregate. When binary
+   addition serializes below the initial row-unit sum, excess units are removed
+   from the largest row; none are added elsewhere. Raw `--json`/`--csv` values
+   retain full precision and explicit lower-bound semantics. *Direction:* prevents
+   an over-claim caused solely by formatting or floating addition. *Marker:* `≥`
+   on every human dollar plus `CostEstimate`/CSV basis.
 3. **Unpriced models show tokens, never dollars.** No dated, cited price row →
    tokens only; a mixed receipt renders `$` and token subtotals separately,
    never blended.

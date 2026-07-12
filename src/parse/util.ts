@@ -19,6 +19,18 @@ export function emptyUsage(): TokenUsage {
   return { input: 0, output: 0, cacheRead: 0, cacheCreation: 0, total: 0 };
 }
 
+/** Sum already-validated non-negative token counters without losing integer precision. */
+export function safeTokenSum(values: readonly number[]): number | undefined {
+  let total = 0;
+  for (const value of values) {
+    if (total > Number.MAX_SAFE_INTEGER - value) {
+      return undefined;
+    }
+    total += value;
+  }
+  return total;
+}
+
 /**
  * Sum two optional split-tier fields. `undefined` means "this contributor
  * has no tier breakdown", not zero, so the sum only stays `undefined` when

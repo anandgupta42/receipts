@@ -3,13 +3,13 @@
 // arbitrary receipts, proven end-to-end THROUGH the renderer (parse the
 // rendered text back, never trust the internals that produced it).
 //
-// Every dollar row and total is a downward-rounded view of deterministic raw
-// arithmetic; token totals remain exact to the digit. No row may borrow a cent
-// from another merely to make the human display add up.
+// Every dollar row is a downward-rounded view of deterministic raw arithmetic;
+// the displayed dollar total is the exact sum of those row floors, and token
+// totals remain exact to the digit. No row may borrow a decimal unit.
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
-import { formatUsdFloor, usdFloorDecimals } from "../../src/receipt/format.js";
+import { formatUsdFloorLedger } from "../../src/receipt/format.js";
 import { renderPrBody, type ContributorView } from "../../src/pr/body.js";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 
@@ -56,14 +56,20 @@ const arbInput = fc.record({
 });
 
 /** Every dollar amount rendered on a fence row/sub-row line (never the TOTAL lines). */
-function displayedRowDollars(fence: string): number[] {
+function displayedRowDollarTexts(fence: string): string[] {
   return fence
     .split("\n")
     .filter((l) => !l.includes("TOTAL"))
     .flatMap((l) => {
       const m = /\$([\d,]+\.\d+)\s*$/.exec(l);
-      return m ? [Number(m[1].replace(/,/g, ""))] : [];
+      return m ? [m[1].replace(/,/g, "")] : [];
     });
+}
+
+function decimalUnits(value: string, precision: number): bigint {
+  const [whole, fraction = ""] = value.replace("$", "").split(".");
+  return (BigInt(whole.replaceAll(",", "")) * (10n ** BigInt(precision)))
+    + BigInt(fraction.padEnd(precision, "0"));
 }
 
 function displayedTotal(fence: string, label: string): { floored: boolean; text: string } | null {
@@ -92,13 +98,14 @@ describe("SPEC-0028 · the ledger check (math always maths, through the renderer
             .reduce((sum, child) => sum + (child.usd ?? 0), 0);
           return [contributor.usd, childUsd > 0 ? childUsd : null];
         });
-        const precision = usdFloorDecimals(displayedAtomValues);
+        const displayedValues = displayedAtomValues.filter((value): value is number => value !== null);
+        const ledger = formatUsdFloorLedger(displayedValues, undefined, rawSum);
 
-        // Tier 1 — exact: the shown total IS the formatted raw sum.
+        // Tier 1 — exact: the shown total IS the sum of the shown row floors.
         const total = displayedTotal(body, "TOTAL priced");
         if (priced.length > 0) {
           expect(total).not.toBeNull();
-          expect(total!.text).toBe(`$${formatUsdFloor(rawSum, precision)}`);
+          expect(total!.text).toBe(`$${ledger.total}`);
         }
 
         // Tokens-only subtotal is integer arithmetic — exact to the digit.
@@ -110,12 +117,15 @@ describe("SPEC-0028 · the ledger check (math always maths, through the renderer
           expect(shown).toBe(tokensOnly.reduce((sum, a) => sum + a.tokens.total, 0));
         }
 
-        // Independently floored contributor/aggregate rows cannot exceed the
-        // raw priced atom sum; no row borrows a cent from another.
+        // Independently floored contributor/aggregate rows sum exactly to the
+        // displayed total and cannot exceed the raw priced atom sum.
         if (priced.length > 0 && total !== null) {
-          const rowSum = displayedRowDollars(body).reduce((a, b) => a + b, 0);
-          expect(rowSum).toBeLessThanOrEqual(rawSum + 1e-9);
-          expect(rowSum).toBeLessThanOrEqual(Number(total.text.replace(/[$,]/g, "")) + 0.0001 + 1e-9);
+          const rows = displayedRowDollarTexts(body);
+          const precision = total.text.split(".")[1]?.length ?? 0;
+          expect(rows.every((row) => (row.split(".")[1]?.length ?? 0) === precision)).toBe(true);
+          const rowUnits = rows.reduce((sum, row) => sum + decimalUnits(row, precision), 0n);
+          expect(rowUnits).toBe(decimalUnits(total.text, precision));
+          expect(Number(total.text.replace(/[$,]/g, ""))).toBeLessThanOrEqual(rawSum + 1e-9);
         }
 
         // Human-rendered dollars are always API-equivalent floors. Specific

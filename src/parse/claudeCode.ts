@@ -21,6 +21,7 @@ import {
   parseTimestamp,
   pathExists,
   readJsonl,
+  safeTokenSum,
   truncate,
   sanitizeText,
   withTotal,
@@ -182,17 +183,6 @@ function tokenField(owner: Record<string, unknown>, key: string): ParsedTokenFie
   return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
     ? { value, present: true, valid: true }
     : { value: 0, present: true, valid: false };
-}
-
-function safeTokenSum(values: readonly number[]): number | undefined {
-  let total = 0;
-  for (const value of values) {
-    if (total > Number.MAX_SAFE_INTEGER - value) {
-      return undefined;
-    }
-    total += value;
-  }
-  return total;
 }
 
 /**

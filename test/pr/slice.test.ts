@@ -34,6 +34,13 @@ function propertyTurn(index: number, sha?: string, amend = false): Turn {
   };
 }
 
+function shellTurn(index: number, command: string, output = ""): Turn {
+  return {
+    index,
+    toolCalls: [{ name: "Bash", shell: true, input: { command }, output, status: "ok" }],
+  };
+}
+
 function gitCall(session: Session, turnIndex: number): ToolCall {
   const call = session.turns[turnIndex].toolCalls.find((c) => toolCallGitVerb(c) !== null);
   if (!call) {
@@ -116,6 +123,129 @@ describe("R1e slice + foreign window", () => {
       startTurn: 0,
       endTurn: 3,
       turnCount: 4,
+    });
+  });
+
+  it.each(["git checkout pr-branch", "git switch pr-branch"])(
+    "does not absorb a foreign-branch commit across `%s` before an owned amend",
+    (command) => {
+      const turns = [
+        propertyTurn(0, PROPERTY_FOREIGN),
+        shellTurn(1, command, "Switched to branch 'pr-branch'"),
+        propertyTurn(2, PROPERTY_OWN, true),
+      ];
+
+      expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+        kind: "slice",
+        startTurn: 1,
+        endTurn: 2,
+        turnCount: 3,
+      });
+    },
+  );
+
+  it("maps two commit confirmations around a compound branch switch and starts at that turn", () => {
+    const turns = [
+      propertyTurn(0),
+      shellTurn(
+        1,
+        "git commit -m foreign && git checkout pr-branch && git commit --amend -m owned",
+        `[foreign ${PROPERTY_FOREIGN.slice(0, 7)}] foreign\nSwitched to branch 'pr-branch'\n[pr-branch ${PROPERTY_OWN.slice(0, 7)}] owned`,
+      ),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 1,
+      endTurn: 1,
+      turnCount: 2,
+    });
+  });
+
+  it("preserves commit and push confirmations from one compound call", () => {
+    const turns = [
+      shellTurn(
+        0,
+        "git commit -m owned && git push origin HEAD",
+        `[pr-branch ${PROPERTY_OWN.slice(0, 7)}] owned\n ${PROPERTY_FOREIGN.slice(0, 7)}..${PROPERTY_OWN.slice(0, 7)}  HEAD -> pr-branch`,
+      ),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 0,
+      endTurn: 0,
+      turnCount: 1,
+    });
+  });
+
+  it("fails closed when commit confirmations cannot be assigned to compound commits", () => {
+    const turns = [
+      shellTurn(
+        0,
+        "git commit -m first && git commit -m second",
+        `[pr-branch ${PROPERTY_OWN.slice(0, 7)}] only-one-confirmation`,
+      ),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toMatchObject({ kind: "full" });
+  });
+
+  it.each([
+    "git reset --hard HEAD~1",
+    "git rebase main",
+    "git cherry-pick deadbeef",
+    "git merge main",
+    "git pull --rebase",
+    "git am patch.mbox",
+    "git revert deadbeef",
+    "git bisect start",
+    "git stash branch rescue",
+    "git update-ref HEAD deadbeef",
+    "git symbolic-ref HEAD refs/heads/pr-branch",
+    "git fetch --update-head-ok origin pr-branch:pr-branch",
+    "git filter-branch -- --all",
+  ])("does not cross the HEAD-changing lineage barrier `%s`", (command) => {
+    const turns = [
+      propertyTurn(0, PROPERTY_FOREIGN),
+      shellTurn(1, command),
+      propertyTurn(2, PROPERTY_OWN, true),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 1,
+      endTurn: 2,
+      turnCount: 3,
+    });
+  });
+
+  it.each([
+    "git checkout -- src/pr/slice.ts",
+    "git checkout HEAD -- src/pr/slice.ts",
+    "git checkout --ours -- src/pr/slice.ts",
+    "git checkout --theirs src/pr/slice.ts",
+    "git reset HEAD -- src/pr/slice.ts",
+    "git reset -p",
+    "git cherry-pick --no-commit deadbeef",
+    "git revert -n deadbeef",
+    "git merge --squash feature",
+    "git rebase --show-current-patch",
+    "git am --show-current-patch",
+    "git bisect log",
+    "git symbolic-ref --short HEAD",
+  ])("keeps amend lineage across the path/index-only command `%s`", (command) => {
+    const turns = [
+      propertyTurn(0, PROPERTY_ORPHAN),
+      shellTurn(1, command),
+      propertyTurn(2, PROPERTY_OWN, true),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 0,
+      endTurn: 2,
+      turnCount: 3,
     });
   });
 });

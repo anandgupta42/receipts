@@ -45,11 +45,14 @@ output on turns that called no tool. The raw `TOTAL` is additive; `same tokens o
 re-prices those exact tokens on a cheaper model as a reference point — the
 percentage note compares the two observable floors, never predicts completion.
 
-Each human `≥ $X` is independently rounded down: two decimal places for an
-exact-cent value, four places when fractional cents remain. No cent is redistributed
-between rows, so the displayed tool rows need not add exactly to the separately
-floored `TOTAL`. Use `--json` or `--csv` for raw precision and explicit
-lower-bound semantics.
+Each human `≥ $X` is rounded down. The additive tool ledger uses one adaptive
+precision: two decimal places for exact cents, normally four when fractional
+cents remain, and up to twelve for tiny positive evidence. Its displayed rows
+sum exactly to `TOTAL`, and neither a row nor `TOTAL` exceeds the corresponding
+raw machine value. If IEEE-754 addition serializes just below the exact row-unit
+sum, the largest row is lowered by the excess unit(s); no row is ever rounded
+upward. Use `--json` or `--csv` for raw precision and explicit lower-bound
+semantics.
 
 A few lines appear only when they have something to say:
 
@@ -110,9 +113,9 @@ absent data renders nothing, never a fabricated 0); **turns / tool calls** is
 the session's shape; **peak turn** is the single most context-heavy request;
 **same reads at uncached input rate** re-prices your cache-read tokens at the
 plain input rate — a lower-bound counterfactual on the same cited price rows as
-everything else; **BY MODEL** splits the observable floor per
-model. Its raw values are additive, but its independently floored display rows
-are not promised to sum visibly to `TOTAL`. Every line renders only when its data
+everything else; **BY MODEL** splits the parent session's observable floor per
+model. It is a secondary parent-only partition with no displayed subtotal, so it
+does not purport to decompose a `TOTAL` that may also include subagents. Every line renders only when its data
 exists in the transcript. `--details` composes with the default template only;
 it also works with `--svg`.
 

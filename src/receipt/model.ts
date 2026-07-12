@@ -13,6 +13,7 @@ import type { ResolvedPrice } from "../pricing/types.js";
 import { detectContextThrash, detectSameFileReReads, detectStuckLoops, detectTrivialSpans, priceDeltaFootnote } from "../pricing/waste.js";
 import { detectTimeCaveats, type CaveatFinding } from "./caveats.js";
 import type { PriceDeltaFootnote, SameFileReReadsFinding } from "../pricing/waste.js";
+import { formatInt } from "./format.js";
 
 export interface ModelMixEntry {
   model: string;
@@ -395,19 +396,19 @@ export async function buildReceiptModel(session: Session, dataDir: string = defa
   if (session.unattributedUsage && session.unattributedUsage.total > 0 && !session.usageReconciliationFailed) {
     caveats.push({
       kind: "unattributed-aggregate-usage",
-      text: `caveat: ${session.unattributedUsage.total.toLocaleString("en-US")} unattributed tokens lack a trustworthy request/model join — floor excludes them`,
+      text: `caveat: ${formatInt(session.unattributedUsage.total)} unattributed tokens lack a trustworthy request/model join — floor excludes them`,
     });
   }
   if (session.excludedUnattributedUsage && session.excludedUnattributedUsage.total > 0) {
     caveats.push({
       kind: "unattributed-aggregate-usage",
-      text: `caveat: ${session.excludedUnattributedUsage.total.toLocaleString("en-US")} session-level aggregate-only tokens cannot be assigned to this slice — excluded`,
+      text: `caveat: ${formatInt(session.excludedUnattributedUsage.total)} session-level aggregate-only tokens cannot be assigned to this slice — excluded`,
     });
   }
   if (session.conflictingAggregateUsage && session.conflictingAggregateUsage.total > 0) {
     caveats.push({
       kind: "unattributed-aggregate-usage",
-      text: `caveat: ${session.conflictingAggregateUsage.total.toLocaleString("en-US")} session-aggregate tokens conflict with itemized components — excluded from totals and floor`,
+      text: `caveat: ${formatInt(session.conflictingAggregateUsage.total)} session-aggregate tokens conflict with itemized components — excluded from totals and floor`,
     });
   }
   // SPEC-0044 B3 — the parse layer found malformed/truncated transcript

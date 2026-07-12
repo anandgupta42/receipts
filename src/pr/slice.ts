@@ -5,7 +5,7 @@
 // rebase/amend leaves only a push anchor), we render the labeled full session
 // rather than a confident wrong cut (I3 applied to attribution).
 import type { Turn } from "../parse/types.js";
-import { gitWriteVerb, toolCallGitVerb, toolCallInvocations, writeOutputShas, type GitVerb } from "./gitWrite.js";
+import { gitSubcommand, gitSubcommandArgs, gitWriteVerb, toolCallInvocations, writeOutputShas, type GitVerb } from "./gitWrite.js";
 
 /** The label shown when a slice can't be computed — full-session cost is never presented as PR cost unlabeled. */
 export const FULL_FALLBACK_LABEL = "entire session (slice unavailable)";
@@ -48,34 +48,152 @@ interface GitAnchor {
   own: boolean;
   /** This real commit invocation carried `--amend` (used only after ownership is independently proven). */
   amend: boolean;
+  /** Prior anchor index iff transcript evidence proves it is this amend's pre-image. */
+  amendFrom: number | null;
+}
+
+function hasPathSeparator(args: readonly string[]): boolean {
+  const separator = args.indexOf("--");
+  return separator >= 0 && separator < args.length - 1;
+}
+
+function isCheckoutPathOnly(args: readonly string[]): boolean {
+  if (hasPathSeparator(args) || args.includes("-p") || args.includes("--patch")) {
+    return true;
+  }
+  const conflictSide = args.findIndex((arg) => arg === "--ours" || arg === "--theirs");
+  return conflictSide >= 0 && args.slice(conflictSide + 1).some((arg) => !arg.startsWith("-"));
+}
+
+function isResetPathOnly(args: readonly string[]): boolean {
+  return hasPathSeparator(args) || args.includes("-p") || args.includes("--patch") ||
+    args.some((arg) => arg === "--pathspec-from-file" || arg.startsWith("--pathspec-from-file="));
+}
+
+const HEAD_CHANGING_SUBCOMMANDS = new Set(["pull", "filter-branch"]);
+
+/** True only for a transcript-visible git invocation that can replace/move HEAD. */
+function isLineageBarrierInvocation(argv: string[]): boolean {
+  const subcommand = gitSubcommand(argv);
+  if (subcommand === "switch") {
+    return true;
+  }
+  const args = gitSubcommandArgs(argv) ?? [];
+  if (subcommand === "checkout") {
+    return !isCheckoutPathOnly(args);
+  }
+  if (subcommand === "reset") {
+    return !isResetPathOnly(args);
+  }
+  if (subcommand === "rebase" || subcommand === "am") {
+    return !args.includes("--show-current-patch");
+  }
+  if (subcommand === "cherry-pick" || subcommand === "revert") {
+    return !args.some((arg) => arg === "-n" || arg === "--no-commit");
+  }
+  if (subcommand === "merge") {
+    return !args.includes("--squash");
+  }
+  if (subcommand === "bisect") {
+    const action = args.find((arg) => !arg.startsWith("-"));
+    return action !== undefined && !["help", "log", "terms", "view", "visualize"].includes(action);
+  }
+  if (subcommand === "stash") {
+    return args.find((arg) => !arg.startsWith("-")) === "branch";
+  }
+  if (subcommand === "update-ref") {
+    if (args.includes("--stdin")) {
+      return true;
+    }
+    const positional = args.filter((arg) => !arg.startsWith("-"));
+    const target = positional[0];
+    const targetsHead = target === "HEAD" || target?.startsWith("refs/heads/") === true;
+    return targetsHead && (args.includes("-d") || positional.length > 1);
+  }
+  if (subcommand === "symbolic-ref") {
+    const positional = args.filter((arg) => !arg.startsWith("-"));
+    return positional[0] === "HEAD" && (args.includes("--delete") || positional.length > 1);
+  }
+  if (subcommand === "fetch") {
+    return args.includes("--update-head-ok");
+  }
+  return subcommand !== null && HEAD_CHANGING_SUBCOMMANDS.has(subcommand);
 }
 
 /**
- * Every git-write span whose OUTPUT carries at least one ≥7-hex run. A span
- * with no hex run in its output is neither own nor foreign (unusable for
- * slicing) and is dropped here. `own` distinguishes ours (R1e c) from foreign
- * (R1e d — a sibling PR's commit in a multi-PR session).
+ * Associate write confirmations with their argv in transcript order. A commit
+ * confirms at most one SHA, so equally sized commit/output lists map 1:1.
+ * One push may confirm several updated refs. Multiple pushes (or mismatched
+ * commit counts) are ambiguous and receive no anchors rather than guessed ones.
+ */
+function writeRunsByInvocation(invocations: readonly string[][], output: string): Map<number, string[]> {
+  const runs = new Map<number, string[]>();
+  const commitIndices = invocations.flatMap((argv, index) => gitWriteVerb(argv) === "commit" ? [index] : []);
+  const commitRuns = writeOutputShas("commit", output);
+  if (commitIndices.length === commitRuns.length) {
+    commitIndices.forEach((index, position) => runs.set(index, [commitRuns[position]]));
+  }
+
+  const pushIndices = invocations.flatMap((argv, index) => gitWriteVerb(argv) === "push" ? [index] : []);
+  if (pushIndices.length === 1) {
+    runs.set(pushIndices[0], writeOutputShas("push", output));
+  }
+  return runs;
+}
+
+/**
+ * Every git-write invocation with an unambiguously associated ≥7-hex output
+ * confirmation. An invocation with no mapped run is unusable for slicing and
+ * dropped. `own` distinguishes ours (R1e c) from foreign (R1e d — a sibling
+ * PR's commit in a multi-PR session).
  */
 function classifyAnchors(turns: Turn[], branchShas: readonly string[], aliases?: AnchorAliases): GitAnchor[] {
   const anchors: GitAnchor[] = [];
+  let previousCommitAnchor: number | null = null;
+  let lineageBarrierSinceCommit = false;
   for (const turn of turns) {
     for (const call of turn.toolCalls) {
-      const verb = toolCallGitVerb(call);
-      if (!verb) {
+      if (call.shell !== true) {
         continue;
       }
-      const runs = writeOutputShas(verb, String(call.output ?? ""));
-      if (runs.length === 0) {
-        continue;
+      const invocations = toolCallInvocations(call);
+      const mappedRuns = writeRunsByInvocation(invocations, String(call.output ?? ""));
+      for (let i = 0; i < invocations.length; i++) {
+        const argv = invocations[i];
+        if (isLineageBarrierInvocation(argv)) {
+          lineageBarrierSinceCommit = true;
+        }
+        const invocationVerb = gitWriteVerb(argv);
+        const runs = mappedRuns.get(i) ?? [];
+        if (runs.length > 0 && invocationVerb === "push") {
+          anchors.push({
+            turnIndex: turn.index,
+            verb: invocationVerb,
+            own: runs.some((r) => branchShaForRun(r, branchShas, aliases) !== null),
+            amend: false,
+            amendFrom: null,
+          });
+        }
+        if (invocationVerb !== "commit") {
+          continue;
+        }
+
+        const amend = argv.includes("--amend");
+        if (runs.length > 0) {
+          const anchorIndex = anchors.length;
+          anchors.push({
+            turnIndex: turn.index,
+            verb: invocationVerb,
+            own: runs.some((r) => branchShaForRun(r, branchShas, aliases) !== null),
+            amend,
+            amendFrom: amend && !lineageBarrierSinceCommit ? previousCommitAnchor : null,
+          });
+          previousCommitAnchor = anchorIndex;
+        } else {
+          previousCommitAnchor = null;
+        }
+        lineageBarrierSinceCommit = false;
       }
-      const amend = verb === "commit" && toolCallInvocations(call)
-        .some((argv) => gitWriteVerb(argv) === "commit" && argv.includes("--amend"));
-      anchors.push({
-        turnIndex: turn.index,
-        verb,
-        own: runs.some((r) => branchShaForRun(r, branchShas, aliases) !== null),
-        amend,
-      });
     }
   }
   return anchors;
@@ -83,8 +201,9 @@ function classifyAnchors(turns: Turn[], branchShas: readonly string[], aliases?:
 
 /**
  * A directly-owned `git commit --amend` proves that the immediately preceding
- * commit anchor in this same transcript is its lineage even when the diff
- * changed and patch-id recovery correctly declines. Walk repeated amend chains
+ * commit anchor in this same transcript is its lineage when no transcript-
+ * visible HEAD-changing command made that pre-image unprovable, even when the
+ * diff changed and patch-id recovery correctly declines. Walk repeated chains
  * backwards for slicing only. This never grants contributor ownership: the
  * final branch SHA must already be independently own.
  */
@@ -96,11 +215,8 @@ function applyAmendLineage(anchors: GitAnchor[]): GitAnchor[] {
     }
     let cursor = i;
     while (cursor > 0 && resolved[cursor].verb === "commit" && resolved[cursor].amend) {
-      let previous = cursor - 1;
-      while (previous >= 0 && resolved[previous].verb !== "commit") {
-        previous--;
-      }
-      if (previous < 0) {
+      const previous = resolved[cursor].amendFrom;
+      if (previous === null) {
         break;
       }
       resolved[previous].own = true;
@@ -133,12 +249,16 @@ export function classifyBranchAnchors(
   let writeCount = 0;
   for (const turn of turns) {
     for (const call of turn.toolCalls) {
-      const verb = toolCallGitVerb(call);
-      if (!verb) {
+      if (call.shell !== true) {
+        continue;
+      }
+      const invocations = toolCallInvocations(call);
+      if (!invocations.some((argv) => gitWriteVerb(argv) !== null)) {
         continue;
       }
       writeCount++;
-      if (writeOutputShas(verb, String(call.output ?? "")).some((r) => branchShaForRun(r, branchShas, aliases) !== null)) {
+      const mappedRuns = writeRunsByInvocation(invocations, String(call.output ?? ""));
+      if ([...mappedRuns.values()].flat().some((r) => branchShaForRun(r, branchShas, aliases) !== null)) {
         hasOwn = true;
       }
     }
@@ -166,15 +286,22 @@ export function anchorEvents(turns: Turn[], branchShas: readonly string[], alias
   for (const turn of turns) {
     const shas: string[] = [];
     for (const call of turn.toolCalls) {
-      if (toolCallGitVerb(call) !== "commit") {
+      if (call.shell !== true) {
         continue;
       }
-      for (const run of writeOutputShas("commit", String(call.output ?? ""))) {
-        // A prefix matching MULTIPLE branch commits is ambiguous — attributing
-        // it would guess; skip it (the turn still prices, just unsegmented).
-        const sha = branchShaForRun(run, branchShas, aliases);
-        if (sha !== null && !shas.includes(sha)) {
-          shas.push(sha);
+      const invocations = toolCallInvocations(call);
+      const mappedRuns = writeRunsByInvocation(invocations, String(call.output ?? ""));
+      for (const [index, runs] of mappedRuns) {
+        if (gitWriteVerb(invocations[index]) !== "commit") {
+          continue;
+        }
+        for (const run of runs) {
+          // A prefix matching MULTIPLE branch commits is ambiguous — attributing
+          // it would guess; skip it (the turn still prices, just unsegmented).
+          const sha = branchShaForRun(run, branchShas, aliases);
+          if (sha !== null && !shas.includes(sha)) {
+            shas.push(sha);
+          }
         }
       }
     }
@@ -214,15 +341,20 @@ export function computeSlice(turns: Turn[], branchShas: readonly string[], alias
     return full();
   }
 
-  const firstOwnTurn = Math.min(...own.map((a) => a.turnIndex));
+  const firstOwnIndex = anchors.findIndex((a) => a.own);
+  const firstOwnTurn = anchors[firstOwnIndex].turnIndex;
   const lastOwnTurn = Math.max(...own.map((a) => a.turnIndex));
-  const foreignBefore = anchors
-    .filter((a) => !a.own && a.turnIndex < firstOwnTurn)
-    .reduce<number | undefined>((max, a) => (max === undefined ? a.turnIndex : Math.max(max, a.turnIndex)), undefined);
+  const foreignBefore = anchors.slice(0, firstOwnIndex)
+    .reduce<GitAnchor | undefined>((last, anchor) => anchor.own ? last : anchor, undefined);
+  const startTurn = foreignBefore === undefined
+    ? 0
+    : foreignBefore.turnIndex < firstOwnTurn
+      ? foreignBefore.turnIndex + 1
+      : firstOwnTurn;
 
   return {
     kind: "slice",
-    startTurn: foreignBefore !== undefined ? foreignBefore + 1 : 0,
+    startTurn,
     endTurn: lastOwnTurn,
     turnCount,
   };

@@ -18,7 +18,7 @@ import {
   sessionToken,
 } from "./blocks.js";
 import type { Block, ReceiptView, TemplateName } from "./blocks.js";
-import { formatAbsoluteUtc, formatDuration, formatInt, formatSharePercent, formatShortTokens, formatUsdFloor, formatUsdLowerBound, STANDARD_API_LOWER_BOUND_NOTE, usdFloorDecimals } from "./format.js";
+import { formatAbsoluteUtc, formatDuration, formatInt, formatSharePercent, formatShortTokens, formatUsdFloor, formatUsdFloorLedger, formatUsdLowerBound, STANDARD_API_LOWER_BOUND_NOTE, usdFloorDecimals } from "./format.js";
 import { combinedPricedUsd, type ModelMixEntry, type ReceiptModel, type ToolRow, type WasteLine } from "./model.js";
 import type { TokenUsage } from "../parse/types.js";
 import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "./branding.js";
@@ -164,12 +164,14 @@ function countLabel(row: ToolRow): string {
   return `(${formatInt(row.callCount)} ${unit}${row.callCount === 1 ? "" : "s"})`;
 }
 
-/** Independently downward-rounded row amounts; no displayed floor can exceed its raw value. */
+/** One additive downward-rounded row ledger; no displayed floor can exceed its raw value. */
 interface FloorAmounts {
   /** Keyed by object reference (`buildDatavis` filters `toolRows` into subsets, so a position-based lookup would misalign). */
   rows: Map<ToolRow, string>;
   /** The `SUBAGENTS (N)` row's `$` text; `undefined` when the aggregate renders tokens (I2) or the session has no children. */
   subagents?: string;
+  /** Sum of the displayed row floors; therefore both additive and no greater than the raw combined subtotal. */
+  total?: string;
 }
 
 function receiptFloorPrecision(model: ReceiptModel) {
@@ -187,9 +189,21 @@ function floorRowText(model: ReceiptModel): FloorAmounts {
   const agg = model.subagents;
   const aggPriced = agg !== undefined && agg.pricedUsd !== null;
   const precision = receiptFloorPrecision(model);
+  const values = [
+    ...priced.map((row) => row.usd as number),
+    ...(aggPriced ? [agg.pricedUsd as number] : []),
+  ];
+  const combined = combinedPricedUsd(model);
+  const ledger = formatUsdFloorLedger(values, precision, combined ?? undefined);
   const rows = new Map<ToolRow, string>();
-  priced.forEach((row) => rows.set(row, formatUsdFloor(row.usd as number, precision)));
-  return { rows, ...(aggPriced ? { subagents: formatUsdFloor(agg.pricedUsd as number, precision) } : {}) };
+  priced.forEach((row, index) => rows.set(row, ledger.amounts[index]));
+  const subagents = aggPriced ? ledger.amounts[priced.length] : undefined;
+  const total = combined === null
+    ? undefined
+    : values.length > 0
+      ? ledger.total
+      : formatUsdFloor(combined, precision);
+  return { rows, ...(subagents !== undefined ? { subagents } : {}), ...(total !== undefined ? { total } : {}) };
 }
 
 /** SPEC-0061 R1 — the one `SUBAGENTS (N)` spend row: a readable priced child keeps its visible `$` floor even when the parent is unpriced; otherwise the row renders tokens (I2). */
@@ -246,12 +260,12 @@ function totalParts(model: ReceiptModel): TotalParts {
   const agg = model.subagents;
   const combinedUsd = combinedPricedUsd(model);
   if (combinedUsd !== null) {
-    const precision = receiptFloorPrecision(model);
+    const displayTotal = floorRowText(model).total ?? formatUsdFloor(combinedUsd, receiptFloorPrecision(model));
     if (combinedPricingCoverageOf(model) === "partial") {
       const knownUnpriced = knownCombinedUnpricedTokens(model);
       return {
         label: "KNOWN PRICED SUBTOTAL",
-        value: formatUsdLowerBound(combinedUsd, precision),
+        value: `≥ $${displayTotal}`,
         ...(knownUnpriced.total > 0
           ? {
               knownUnpriced: {
@@ -264,7 +278,7 @@ function totalParts(model: ReceiptModel): TotalParts {
         coverageNote: "partial pricing coverage; invoice total unknown",
       };
     }
-    return { label: "TOTAL", value: formatUsdLowerBound(combinedUsd, precision), note: STANDARD_API_LOWER_BOUND_NOTE };
+    return { label: "TOTAL", value: `≥ $${displayTotal}`, note: STANDARD_API_LOWER_BOUND_NOTE };
   }
   if (model.unpriceable) {
     return {
@@ -371,8 +385,9 @@ function detailsTokens(model: ReceiptModel): TokenUsage {
 function byModelRows(model: ReceiptModel): Block[] {
   const priced = model.modelMix.filter((m) => m.usd !== null);
   const precision = receiptFloorPrecision(model);
+  const ledger = formatUsdFloorLedger(priced.map((m) => m.usd as number), precision);
   const centText = new Map<ModelMixEntry, string>();
-  priced.forEach((m) => centText.set(m, formatUsdFloor(m.usd as number, precision)));
+  priced.forEach((m, index) => centText.set(m, ledger.amounts[index]));
   return model.modelMix.map((m): Block => {
     const pct = formatSharePercent(m.tokenShare);
     const value = m.usd !== null ? `${pct} · ≥ $${centText.get(m)}` : `${pct} · ${formatShortTokens(m.tokens.total)} tok`;

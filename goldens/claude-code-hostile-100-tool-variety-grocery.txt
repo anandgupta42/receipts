@@ -109,7 +109,7 @@ Write_003                           1    ≥ $0.0034
 Edit_002                            1    ≥ $0.0034
 Read_001                            1    ≥ $0.0034
 --------------------------------------------------
-TOTAL                                    ≥ $0.3602
+TOTAL                                    ≥ $0.3552
 standard API-equivalent floor; not an invoice
 same tokens on claude-haiku-4-5..........≥ $0.1801
   (50% lower observable floor)

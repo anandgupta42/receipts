@@ -96,6 +96,13 @@ describe("renderBudgetLine (R2, R4)", () => {
     const line = renderBudgetLine("daily", sum);
     expect(line).toBe("budget (today): 1,500 of 10,000 tokens — advisory only — does not stop the agent (2 summaries; top-level only; child/subagent transcripts excluded)");
   });
+
+  it("uses fixed comma grouping for large token counts on both budget surfaces", () => {
+    expect(renderBudgetLine("daily", tokenSum({ spentTokens: 1_234_567, cap: 9_876_543 })))
+      .toContain("1,234,567 of 9,876,543 tokens");
+    expect(renderBudgetLine("daily", usdSum({ unpricedTokenCount: 1_234_567 })))
+      .toContain("1,234,567 known unpriced tok outside ≥ sum");
+  });
 });
 
 describe("budgetExceeded (R3)", () => {

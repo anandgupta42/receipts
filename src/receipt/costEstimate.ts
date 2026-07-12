@@ -37,16 +37,17 @@ export const STANDARD_API_LOWER_BOUND_SEMANTICS: CostSemantics = {
 };
 
 /**
- * `null` remains unpriced. The structured minimum is a four-decimal downward
- * floor rather than the exact-looking IEEE arithmetic scalar retained by
- * legacy fields. Consumers can therefore print `>= minUsd` without implying
- * invoice precision.
+ * `null` remains unpriced. The structured minimum is a deterministic,
+ * adaptively precise downward floor rather than the exact-looking IEEE
+ * arithmetic scalar retained by legacy fields. Consumers can therefore print
+ * `>= minUsd` without implying invoice precision; positive evidence remains
+ * nonzero when representable within the formatter's 12-decimal cap.
  */
 export function lowerBoundCostEstimate(usd: number | null): CostEstimate | null {
   return usd === null
     ? null
     : {
         ...STANDARD_API_LOWER_BOUND_SEMANTICS,
-        minUsd: Number(formatUsdFloor(usd, 4).replaceAll(",", "")),
+        minUsd: Number(formatUsdFloor(usd).replaceAll(",", "")),
       };
 }

@@ -21,7 +21,7 @@ export function knownUnpricedTokens(model: ReceiptModel): TokenUsage {
     return model.unpricedTokens;
   }
   if (model.totalUsd === null) {
-    return model.unpriceable ? model.sessionTotalTokens : model.totalTokens;
+    return model.totalTokens;
   }
   return ZERO_USAGE;
 }

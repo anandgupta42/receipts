@@ -64,13 +64,16 @@ independent oracles and corrected in this worktree:
 The correction is a narrower and more defensible contract than "exact cost."
 Every computed dollar is a **Standard API list-price-equivalent observable lower
 bound**, rendered with `≥`; it is never described as an invoice. Structured
-`CostEstimate.minUsd` is a downward four-decimal minimum rather than an
-exact-looking IEEE scalar; compatibility dollar fields retain raw arithmetic
-but sit beside explicit lower-bound semantics. Internal
+`CostEstimate.minUsd` is an adaptive downward decimal minimum (two decimals for
+exact cents, normally four for fractional cents, and up to twelve for tiny
+positive evidence) rather than an exact-looking IEEE scalar; compatibility
+dollar fields retain raw arithmetic but sit beside explicit lower-bound semantics. Internal
 raw token×row arithmetic can reconcile perfectly while the commercial bill still
 depends on auth route, tier, region, credits, negotiated pricing, gateway markup,
-or provider-side usage absent from the trace. Human `≥` values are independently
-rounded down; display rows are not cent-reconciled by moving money between them.
+or provider-side usage absent from the trace. Human `≥` values round down. An
+additive ledger uses exact decimal `BigInt` units; rows sum visibly to TOTAL, and
+any unit excess over the serialized floating aggregate is removed from the
+largest row rather than added to another.
 
 ## Recent incident reconstruction
 
@@ -351,9 +354,10 @@ The built CLI now stages native sandbox homes and asserts raw tokens × cited ra
 | opencode `clean-multi-vendor.db` | 2,200 input; 700 output; 150 cache-read; 90 cache-write | raw `0.00966875`; exported `minUsd = 0.0096` |
 
 The values are independent raw arithmetic oracles, not invoice claims. Human
-output floors each value downward (two decimals for exact-cent values, four
-when fractional cents remain) instead of nearest-cent rounding. Structured
-machine minima floor downward to four decimals too. The E2E and machine-export assertions
+output floors each value downward (two decimals for exact-cent values, normally
+four when fractional cents remain, and up to twelve for tiny positive evidence)
+instead of nearest-cent rounding. Structured machine minima use the same adaptive
+downward decimal policy. The E2E and machine-export assertions
 separately require the visible/structured lower-bound qualification rather than
 merely asserting `priced: true`.
 
@@ -453,12 +457,14 @@ applicable read/write rate is absent, the component contributes $0 and triggers
 a caveat. It never falls back to the plain input rate, because an uncited
 fallback could overstate a claimed floor.
 
-Every human `≥ $X` is independently rounded down. Exact-cent values show two
-decimals; fractional-cent values show four. Tiny positive floating residue above
-an exact cent is normalized only when that cent remains below the raw value;
-residue below a cent boundary retains four decimals. No largest-remainder or
-cent redistribution is allowed, so displayed rows need not sum exactly to the
-independently floored TOTAL. Raw JSON/CSV values retain full precision.
+Every human `≥ $X` is rounded down. Exact-cent values show two decimals;
+fractional-cent values normally show four, and tiny positive evidence can extend
+through twelve. Additive ledgers use exact decimal `BigInt` units, so unsafe
+scaled Numbers cannot corrupt huge amounts. Displayed rows sum exactly to TOTAL.
+When IEEE-754 addition serializes the raw aggregate below the initial row-unit
+sum (`0.1 + 0.7` is the minimal example), the excess unit(s) are removed from
+the largest row. Nothing is rounded upward, and TOTAL never exceeds the raw
+JSON/CSV scalar. Raw machine values retain full precision.
 
 The handoff does not call detector cost a waste or savings floor. Stuck-loop and
 context-thrash findings may overlap, trivial-span dollars are a counterfactual
@@ -478,8 +484,9 @@ row. Any missing, routed, or mismatched unit suppresses the entire finding.
 
 The public receipt/compare/handoff/backfill JSON and CSV contract is
 `SCHEMA_VERSION = 2`. Every non-null legacy dollar scalar has adjacent
-`CostEstimate` lower-bound semantics; `minUsd` is a four-decimal downward
-minimum while the legacy scalar preserves raw arithmetic. Receipt/compare JSON
+`CostEstimate` lower-bound semantics; `minUsd` is an adaptive downward decimal
+minimum (two/four decimals normally, up to twelve for tiny positive evidence)
+while the legacy scalar preserves raw arithmetic. Receipt/compare JSON
 adds `pricingCoverage` and exact `unpricedTokens`; session CSV appends their
 component columns. Handoff separates parent totals/detectors from combined
 parent-plus-readable-child totals with explicit scopes. CSV appends `costKind`

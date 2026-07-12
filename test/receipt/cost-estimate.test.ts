@@ -21,4 +21,27 @@ describe("machine-readable cost estimates", () => {
     expect(lowerBoundCostEstimate(0.0165025)?.minUsd).toBe(0.0165);
     expect(lowerBoundCostEstimate(1234.56789)?.minUsd).toBe(1234.5678);
   });
+
+  it("preserves a useful nonzero minimum for a positive $0.00005 observation", () => {
+    const raw = 0.00005;
+    const minUsd = lowerBoundCostEstimate(raw)?.minUsd;
+
+    expect(minUsd).toBe(0.00005);
+    expect(minUsd).toBeGreaterThan(0);
+    expect(minUsd).toBeLessThanOrEqual(raw);
+  });
+
+  it("floors the canonical serialized aggregate at a floating-sum boundary", () => {
+    const raw = 0.1 + 0.7;
+
+    expect(raw).toBe(0.7999999999999999);
+    expect(lowerBoundCostEstimate(raw)?.minUsd).toBe(0.7999);
+  });
+
+  it("does not corrupt a finite amount above safe integer display units", () => {
+    const minUsd = lowerBoundCostEstimate(Number.MAX_VALUE)?.minUsd;
+
+    expect(minUsd).toBe(Number.MAX_VALUE);
+    expect(Number.isFinite(minUsd)).toBe(true);
+  });
 });

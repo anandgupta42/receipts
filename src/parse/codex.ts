@@ -3,7 +3,6 @@ import { codexFidelity } from "./fidelity/codex.js";
 import { lazyCodexSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
 import { normalizePricingProvider } from "./provider.js";
 import {
-  addUsage,
   emptyUsage,
   expandHome,
   listFiles,
@@ -11,6 +10,7 @@ import {
   parseTimestamp,
   pathExists,
   readJsonl,
+  safeTokenSum,
   truncate,
   withTotal, sanitizeText } from "./util.js";
 
@@ -65,15 +65,22 @@ function mapUsage(raw: unknown): MappedCodexUsage {
     return { malformed: true };
   }
 
+  const uncachedInputTokens = inputTokens - cachedInputTokens;
+  const outputTokens = usage.output_tokens ?? 0;
+  const total = safeTokenSum([uncachedInputTokens, outputTokens, cachedInputTokens]);
+  if (total === undefined) {
+    return { malformed: true };
+  }
+
   return {
     malformed: false,
-    usage: withTotal({
-      input: inputTokens - cachedInputTokens,
-      output: usage.output_tokens ?? 0,
+    usage: {
+      input: uncachedInputTokens,
+      output: outputTokens,
       cacheRead: cachedInputTokens,
       cacheCreation: 0,
-      total: 0,
-    }),
+      total,
+    },
   };
 }
 
@@ -85,6 +92,28 @@ function sameUsage(a: TokenUsage, b: TokenUsage): boolean {
     a.cacheCreation === b.cacheCreation &&
     a.total === b.total
   );
+}
+
+/** Keep the largest coherent usage vector that the transcript independently observed. */
+function maxObservedUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return b.total > a.total ? b : a;
+}
+
+/** Add coherent Codex usage vectors without ever crossing JS's exact-integer boundary. */
+function safeAddCodexUsage(a: TokenUsage, b: TokenUsage): TokenUsage | undefined {
+  const input = safeTokenSum([a.input, b.input]);
+  const output = safeTokenSum([a.output, b.output]);
+  const cacheRead = safeTokenSum([a.cacheRead, b.cacheRead]);
+  const cacheCreation = safeTokenSum([a.cacheCreation, b.cacheCreation]);
+  if (input === undefined || output === undefined || cacheRead === undefined || cacheCreation === undefined) {
+    return undefined;
+  }
+  const total = safeTokenSum([input, output, cacheRead, cacheCreation]);
+  const reportedTotal = safeTokenSum([a.total, b.total]);
+  if (total === undefined || reportedTotal === undefined || total !== reportedTotal) {
+    return undefined;
+  }
+  return { input, output, cacheRead, cacheCreation, total };
 }
 
 function componentwiseDominates(a: TokenUsage, b: TokenUsage): boolean {
@@ -181,6 +210,7 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let cwd: string | undefined;
   let cumulativeUsage: TokenUsage | undefined;
   let cumulativeBaseline: TokenUsage | undefined;
+  let observedUsageEnvelope = emptyUsage();
   let perTurnUsage = emptyUsage();
   let sawCumulative = false;
   let sawLegacyUsage = false;
@@ -276,18 +306,32 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     // the delta billed to the turn that just completed.
     const info = item.info as Record<string, unknown> | undefined;
     if (info) {
+      const hasTotalUsage = Object.prototype.hasOwnProperty.call(info, "total_token_usage");
+      const hasReportedDelta = Object.prototype.hasOwnProperty.call(info, "last_token_usage");
       const mappedTotal = mapUsage(info.total_token_usage);
       const mappedReportedDelta = mapUsage(info.last_token_usage);
       if (mappedTotal.malformed || mappedReportedDelta.malformed) {
         requestEvidenceValid = false;
       }
       const total = mappedTotal.usage;
+      const reportedDelta = mappedReportedDelta.usage;
+      if (
+        hasReportedDelta &&
+        (!hasTotalUsage || !total || (total.total === 0 && reportedDelta !== undefined && reportedDelta.total > 0))
+      ) {
+        // `last_token_usage` alone proves an observable request-shaped lower
+        // bound, but not whether repeated records are distinct requests. Keep
+        // the largest coherent observation once and disable request pricing.
+        requestEvidenceValid = false;
+      }
+      if (reportedDelta && reportedDelta.total > 0) {
+        observedUsageEnvelope = maxObservedUsage(observedUsageEnvelope, reportedDelta);
+      }
       if (total && total.total > 0) {
         if (!sawCumulative && sawLegacyUsage) {
           requestEvidenceValid = false;
         }
         sawCumulative = true;
-        const reportedDelta = mappedReportedDelta.usage;
         // Codex's cumulative envelope is allowed to repeat unchanged while
         // retaining the prior turn's non-zero `last_token_usage`. Treating
         // every record as a new turn bills that stale delta twice. A changed
@@ -311,6 +355,10 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
             cumulativeBaseline = emptyUsage();
           }
         }
+        observedUsageEnvelope = maxObservedUsage(
+          observedUsageEnvelope,
+          subtractUsage(total, cumulativeBaseline ?? emptyUsage()),
+        );
         cumulativeUsage = total;
         // After the first snapshot, the cumulative vector itself is the
         // authoritative independent accounting. Derive the billed turn from
@@ -331,15 +379,20 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         }
         if (changed && delta && delta.total > 0) {
           const t = ensureTurn(ts);
-          t.usage = addUsage(t.usage ?? emptyUsage(), delta);
-          t.outputTokens = t.usage.output;
-          t.model ??= currentModel;
-          (t.pricingUnits ??= []).push({
-            usage: delta,
-            timestamp: ts,
-            model: currentModel,
-            pricingProvider: currentPricingProvider,
-          });
+          const combinedUsage = safeAddCodexUsage(t.usage ?? emptyUsage(), delta);
+          if (!combinedUsage) {
+            requestEvidenceValid = false;
+          } else {
+            t.usage = combinedUsage;
+            t.outputTokens = combinedUsage.output;
+            t.model ??= currentModel;
+            (t.pricingUnits ??= []).push({
+              usage: delta,
+              timestamp: ts,
+              model: currentModel,
+              pricingProvider: currentPricingProvider,
+            });
+          }
         }
       }
     }
@@ -351,17 +404,24 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
       const perMsg = mappedPerMsg.usage;
       if (perMsg && perMsg.total > 0) {
         sawLegacyUsage = true;
-        perTurnUsage = addUsage(perTurnUsage, perMsg);
+        observedUsageEnvelope = maxObservedUsage(observedUsageEnvelope, perMsg);
         const t = ensureTurn(ts);
-        t.usage = addUsage(t.usage ?? emptyUsage(), perMsg);
-        t.outputTokens = t.usage.output;
-        t.model ??= currentModel;
-        (t.pricingUnits ??= []).push({
-          usage: perMsg,
-          timestamp: ts,
-          model: currentModel,
-          pricingProvider: currentPricingProvider,
-        });
+        const combinedTotalUsage = safeAddCodexUsage(perTurnUsage, perMsg);
+        const combinedTurnUsage = safeAddCodexUsage(t.usage ?? emptyUsage(), perMsg);
+        if (!combinedTotalUsage || !combinedTurnUsage) {
+          requestEvidenceValid = false;
+        } else {
+          perTurnUsage = combinedTotalUsage;
+          t.usage = combinedTurnUsage;
+          t.outputTokens = combinedTurnUsage.output;
+          t.model ??= currentModel;
+          (t.pricingUnits ??= []).push({
+            usage: perMsg,
+            timestamp: ts,
+            model: currentModel,
+            pricingProvider: currentPricingProvider,
+          });
+        }
       }
     }
 
@@ -423,15 +483,24 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   // of the first snapshot belongs to this file. Subtract that fixed baseline
   // from the final envelope so session totals describe the local rollout and
   // remain an independent fidelity oracle for all later deltas.
-  const totalUsage = sawCumulative
+  const reconciledTotalUsage = sawCumulative
     ? subtractUsage(cumulativeUsage ?? emptyUsage(), cumulativeBaseline ?? emptyUsage())
     : perTurnUsage;
-  const summedTurnUsage = turns.reduce(
-    (sum, turn) => addUsage(sum, turn.usage ?? emptyUsage()),
-    emptyUsage(),
-  );
+  let summedTurnUsage = emptyUsage();
+  let turnSumOverflow = false;
+  for (const turn of turns) {
+    const combined = safeAddCodexUsage(summedTurnUsage, turn.usage ?? emptyUsage());
+    if (!combined) {
+      turnSumOverflow = true;
+      break;
+    }
+    summedTurnUsage = combined;
+  }
   const usageReconciliationFailed =
-    droppedRecords > 0 || !requestEvidenceValid || !sameUsage(summedTurnUsage, totalUsage);
+    droppedRecords > 0 || turnSumOverflow || !requestEvidenceValid || !sameUsage(summedTurnUsage, reconciledTotalUsage);
+  const totalUsage = usageReconciliationFailed
+    ? maxObservedUsage(reconciledTotalUsage, observedUsageEnvelope)
+    : reconciledTotalUsage;
   if (usageReconciliationFailed) {
     // Without a complete, monotone request envelope sequence, a cumulative
     // delta may combine requests and select the wrong context tier. Preserve

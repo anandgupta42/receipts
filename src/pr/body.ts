@@ -9,7 +9,7 @@ import type { TokenUsage } from "../parse/types.js";
 import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry, WasteLine } from "../receipt/model.js";
 import { couldHaveSavedOf, couldHaveSavedValue, prCoverageLine, savingsSlipLines } from "../receipt/handoff.js";
-import { formatInt, formatSharePercent, formatUsdFloor, formatUsdLowerBound, STANDARD_API_LOWER_BOUND_NOTE, type UsdFloorDecimals, usdFloorDecimals } from "../receipt/format.js";
+import { formatInt, formatSharePercent, formatUsdFloor, formatUsdFloorLedger, STANDARD_API_LOWER_BOUND_NOTE, usdFloorDecimals } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
 import { INSTALL_FOOTER_TEXT, PR_ATTRIBUTION_LINE, REPOSITORY_DISPLAY } from "../receipt/branding.js";
 import { MESSAGE_BASIS_LABEL } from "./messageAnchor.js";
@@ -215,14 +215,15 @@ function totalsFor(contributors: ContributorView[]): Totals {
   };
 }
 
-/** Independently downward-rounded display strings for contributor and aggregate rows. */
+/** Additive downward-rounded display strings for contributor and aggregate rows. */
 interface FenceRows {
   reconciled: Map<ContributorView | SubagentAggregate, string>;
   aggregates: Map<ContributorView, SubagentAggregate>;
-  precision: UsdFloorDecimals;
+  /** Exact sum of `reconciled` dollar rows at their shared precision. */
+  total: string;
 }
 
-/** A true `≥` row never receives a redistributed cent from another row. */
+/** A true `≥` row never receives a redistributed unit from another row. */
 function fenceRows(contributors: ContributorView[]): FenceRows {
   const aggregates = new Map<ContributorView, SubagentAggregate>();
   for (const c of contributors) {
@@ -230,22 +231,23 @@ function fenceRows(contributors: ContributorView[]): FenceRows {
       aggregates.set(c, aggregateSubagents(c.subagents));
     }
   }
-  const reconciled: FenceRows["reconciled"] = new Map();
-  const displayedAtomValues = [
-    ...contributors.map((contributor) => contributor.usd),
-    ...[...aggregates.values()].map((aggregate) => aggregate.usd),
-  ];
-  const precision = usdFloorDecimals(displayedAtomValues);
-  for (const c of contributors) {
-    if (c.usd !== null) {
-      reconciled.set(c, formatUsdFloor(c.usd, precision));
+  const entries: Array<{ key: ContributorView | SubagentAggregate; usd: number }> = [];
+  for (const contributor of contributors) {
+    if (contributor.usd !== null) {
+      entries.push({ key: contributor, usd: contributor.usd });
     }
-    const agg = aggregates.get(c);
-    if (agg !== undefined && agg.usd !== null) {
-      reconciled.set(agg, formatUsdFloor(agg.usd, precision));
+    const aggregate = aggregates.get(contributor);
+    if (aggregate?.usd !== null && aggregate?.usd !== undefined) {
+      entries.push({ key: aggregate, usd: aggregate.usd });
     }
   }
-  return { reconciled, aggregates, precision };
+  const displayedAtomValues = entries.map((entry) => entry.usd);
+  const rawTotal = totalsFor(contributors).pricedSubtotal;
+  const precision = usdFloorDecimals([...displayedAtomValues, rawTotal]);
+  const ledger = formatUsdFloorLedger(displayedAtomValues, precision, rawTotal);
+  const reconciled: FenceRows["reconciled"] = new Map();
+  entries.forEach((entry, index) => reconciled.set(entry.key, ledger.amounts[index]));
+  return { reconciled, aggregates, total: ledger.total };
 }
 
 function countLine(sessionCount: number, totals: Totals): string {
@@ -263,7 +265,7 @@ function countLine(sessionCount: number, totals: Totals): string {
  * an explicit floor (`≥`); a known-partial number must say so in the number,
  * never only in a note below it.
  */
-function totalBlocks(input: PrBodyInput, precision: UsdFloorDecimals): Block[] {
+function totalBlocks(input: PrBodyInput, rows: FenceRows): Block[] {
   const totals = totalsFor(input.contributors);
   // SPEC-0044 R1/S2-finding-5 — floor on ANY incompleteness/lower-bound event
   // (not just excludedCount): every ConfidenceEvent kind that can under-state
@@ -272,7 +274,7 @@ function totalBlocks(input: PrBodyInput, precision: UsdFloorDecimals): Block[] {
   const tokenFloor = input.excludedCount > 0 || totals.unreadableCount > 0 || (input.confidence !== undefined && isFloored(input.confidence)) ? "≥ " : "";
   const blocks: Block[] = [{ kind: "rule" }];
   if (totals.pricedCount > 0) {
-    blocks.push({ kind: "total", label: "TOTAL priced", value: formatUsdLowerBound(totals.pricedSubtotal, precision) });
+    blocks.push({ kind: "total", label: "TOTAL priced", value: `≥ $${rows.total}` });
   }
   if (totals.tokensOnlyCount > 0) {
     blocks.push({ kind: "total", label: "TOTAL unpriced", value: `${tokenFloor}${formatInt(totals.tokenSubtotal)} tokens` });
@@ -438,7 +440,7 @@ function prBlocks(input: PrBodyInput): Block[] {
     blocks.push(...contributorBlocks(view, i === 0, showRole, rows));
   });
   blocks.push(...helperGroupBlocks(helpers, authors.length === 0, rows));
-  blocks.push(...totalBlocks(input, rows.precision));
+  blocks.push(...totalBlocks(input, rows));
   blocks.push({ kind: "footer", text: INSTALL_FOOTER_TEXT });
   blocks.push({ kind: "note", text: REPOSITORY_DISPLAY, align: "center", muted: true });
   return blocks;
@@ -461,8 +463,8 @@ function tableCell(s: string): string {
  * SPEC-0060 R3 — the per-child breakdown the fence no longer draws: a markdown
  * table sorted by cost, capped at {@link SUBAGENT_TABLE_CAP} rows where the
  * final row accounts for the remainder's priced dollars, unpriced tokens, and
- * unreadable count (a capped list never silently drops value). Each priced
- * cell rounds down independently; no cell borrows a cent.
+ * unreadable count (a capped list never silently drops value). Priced cells
+ * form their own shared-precision floor ledger; no cell borrows a unit.
  */
 export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_CAP): string {
   const sorted = [...rows].sort((a, b) => (b.usd ?? -1) - (a.usd ?? -1));
@@ -470,6 +472,15 @@ export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_C
   const rest = sorted.slice(shown.length);
   const restPriced = rest.filter((r) => r.usd !== null);
   const restUsd = restPriced.reduce((sum, r) => sum + (r.usd ?? 0), 0);
+  const shownPriced = shown.filter((r) => r.usd !== null);
+  const displayValues = [
+    ...shownPriced.map((row) => row.usd as number),
+    ...(restPriced.length > 0 ? [restUsd] : []),
+  ];
+  const displayLedger = formatUsdFloorLedger(displayValues);
+  const displayedUsd = new Map<SubagentRow, string>();
+  shownPriced.forEach((row, index) => displayedUsd.set(row, displayLedger.amounts[index]));
+  const restUsdText = restPriced.length > 0 ? displayLedger.amounts[shownPriced.length] : undefined;
   const lines = ["| subagent | cost |", "|---|---|"];
   for (const r of shown) {
     let cell: string;
@@ -477,7 +488,7 @@ export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_C
       cell = "(unreadable)";
     } else if (r.usd !== null) {
       const partial = r.unpricedTokens && r.unpricedTokens.total > 0 ? ` + ${formatInt(r.unpricedTokens.total)} unpriced tokens` : "";
-      cell = `≥ $${formatUsdFloor(r.usd)}${partial}`;
+      cell = `≥ $${displayedUsd.get(r)}${partial}`;
     } else {
       cell = `${formatInt(r.tokens.total)} tokens`;
     }
@@ -488,8 +499,8 @@ export function subagentDetailsTable(rows: SubagentRow[], cap = SUBAGENT_TABLE_C
     // tokens never blend into one number; unknowns are counted, not guessed).
     const restUnreadable = rest.filter((r) => r.unreadable);
     const parts: string[] = [];
-    if (restPriced.length > 0) {
-      parts.push(`≥ $${formatUsdFloor(restUsd)}`);
+    if (restUsdText !== undefined) {
+      parts.push(`≥ $${restUsdText}`);
     }
     const restUnpriced = rest.reduce((acc, r) => {
       if (r.unreadable) {

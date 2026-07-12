@@ -172,7 +172,7 @@ describe("R1: --json validates against the current schema", () => {
     const estimate = (minUsd: number) => ({
       kind: "lower-bound" as const,
       basis: STANDARD_API_LIST_PRICE_EQUIVALENT,
-      minUsd: Number(formatUsdFloor(minUsd, 4).replaceAll(",", "")),
+      minUsd: Number(formatUsdFloor(minUsd).replaceAll(",", "")),
     });
 
     expect(json.totalCostEstimate).toEqual(estimate(model.totalUsd as number));

@@ -168,9 +168,11 @@ suppresses the finding instead of pricing a partial turn.
   establish the commercial route that produced the request. Standard list-price
   arithmetic can differ from account billing, which is why the receipt claims
   only an observable floor on that standard basis.
-- **Downward formatting.** Every human `≥ $X` is floored independently: two
-  decimals for an exact-cent value, four when fractional cents remain.
-  Rows need not visibly sum to the separately floored TOTAL; `--json`/`--csv`
+- **Downward formatting.** Every human `≥ $X` is floored: two decimals for an
+  exact-cent value, normally four when fractional cents remain, and up to twelve
+  for tiny positive evidence. Additive spend rows share that precision and sum
+  exactly to a displayed TOTAL no greater than the raw aggregate. A floating-sum
+  excess is removed from the largest row, never added to another. `--json`/`--csv`
   carry the raw values and lower-bound basis.
 - **Cache rates.** An unsplit write uses the documented 5m assumption only when
   the row cites a 5m or generic write rate. Cached reads or writes with no cited

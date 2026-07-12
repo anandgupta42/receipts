@@ -6,6 +6,7 @@
 // the classic footer.
 import { describe, expect, it } from "vitest";
 import { PR_ATTRIBUTION_LINE } from "../../src/receipt/branding.js";
+import { formatUsdFloorLedger } from "../../src/receipt/format.js";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
 import type { ModelMixEntry } from "../../src/receipt/model.js";
 import { DOGFOOD_MARKER, HELPER_FULL_LABEL, renderPrBody, renderPrReceiptText, sliceHeaderLine, subagentDetailsTable, type ContributorView } from "../../src/pr/body.js";
@@ -489,8 +490,23 @@ describe("SPEC-0060 R3 · subagentDetailsTable", () => {
 
   it("every priced cell rounds down, including the capped remainder", () => {
     const table = subagentDetailsTable(Array.from({ length: 21 }, (_, i) => row(`agent-${i}`, 0.335)));
-    const cents = [...table.matchAll(/\$(\d+\.\d\d)/g)].map((m) => Math.round(Number(m[1]) * 100));
-    expect(cents.reduce((a, b) => a + b, 0)).toBe(694);
+    const amounts = [...table.matchAll(/\$(\d+\.\d+)/g)].map((m) => m[1]);
+    expect(amounts).toEqual([
+      ...Array.from({ length: 19 }, () => "0.3350"),
+      "0.6700",
+    ]);
+    expect(amounts.reduce((sum, amount) => sum + Number(amount), 0)).toBeCloseTo(7.035, 12);
+  });
+
+  it("uses one additive strict-floor ledger for awkward visible cells", () => {
+    const raw = [0.00404, 0.00404, 0.00404];
+    const table = subagentDetailsTable(raw.map((usd, index) => row(`agent-${index}`, usd)));
+    const amounts = [...table.matchAll(/\$(\d+\.\d+)/g)].map((match) => match[1]);
+    const ledger = formatUsdFloorLedger(raw);
+
+    expect(amounts).toEqual(ledger.amounts);
+    expect(amounts.reduce((sum, amount) => sum + Number(amount), 0)).toBe(Number(ledger.total));
+    amounts.forEach((amount, index) => expect(Number(amount)).toBeLessThanOrEqual(raw[index]));
   });
 
   it("escapes pipes and flattens newlines in prompt-derived names", () => {
@@ -505,8 +521,9 @@ describe("SPEC-0060 R3 · subagentDetailsTable", () => {
 
   it("never rounds a 33.5-cent child up", () => {
     const table = subagentDetailsTable([row("a", 0.335), row("b", 0.335), row("c", 0.335)]);
-    const cents = [...table.matchAll(/\$(\d+\.\d\d)/g)].map((m) => Math.round(Number(m[1]) * 100));
-    expect(cents.reduce((a, b) => a + b, 0)).toBe(99);
+    const amounts = [...table.matchAll(/\$(\d+\.\d+)/g)].map((m) => m[1]);
+    expect(amounts).toEqual(["0.3350", "0.3350", "0.3350"]);
+    expect(amounts.every((amount) => Number(amount) <= 0.335)).toBe(true);
   });
 });
 

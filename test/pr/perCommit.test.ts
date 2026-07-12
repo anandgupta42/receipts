@@ -36,7 +36,7 @@ function turn(index: number, opts: { commitSha?: string; commitShas?: string[]; 
   const shas = opts.commitShas ?? (opts.commitSha !== undefined ? [opts.commitSha] : []);
   if (shas.length > 0) {
     toolCalls.push({ name: "Bash", shell: true,
-      input: { command: "git commit -m x" },
+      input: { command: shas.map((_, index) => `git commit -m x-${index}`).join(" && ") },
       output: shas.map((s) => `[main ${s.slice(0, 7)}] x`).join("\n"),
       status: "ok" as const,
     });

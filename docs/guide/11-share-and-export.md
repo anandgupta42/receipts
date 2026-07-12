@@ -64,8 +64,9 @@ aireceipts --json "email format"
 (Truncated after the first model — the full object continues with every model, a
 per-tool breakdown, and totals.) Every non-null legacy dollar scalar has an
 adjacent `CostEstimate` with `kind: "lower-bound"`, basis
-`standard-api-list-price-equivalent`, and a four-decimal downward-floored
-`minUsd`; the legacy scalar retains raw arithmetic precision. Parent, readable-child,
+`standard-api-list-price-equivalent`, and an adaptively precise downward-floored
+`minUsd` (two decimals for exact cents, normally four for fractional cents, up
+to twelve for tiny positive evidence); the legacy scalar retains raw arithmetic precision. Parent, readable-child,
 and combined known-unpriced token vectors carry explicit scopes. `sessionId` is
 the transcript's absolute path.
 The complete, field-by-field schema — kept in lockstep with the code by a parity

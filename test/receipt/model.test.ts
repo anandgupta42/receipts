@@ -122,6 +122,22 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     expect(model.priceDelta).toBeNull();
   });
 
+  it("uses deterministic comma grouping in aggregate-usage caveats", async () => {
+    const model = await buildReceiptModel(session({
+      turns: [],
+      unattributedUsage: usage({ input: 1_234_567, output: 0 }),
+      excludedUnattributedUsage: usage({ input: 2_345_678, output: 0 }),
+      conflictingAggregateUsage: usage({ input: 3_456_789, output: 0 }),
+    }), dataDir);
+
+    const aggregateCaveats = model.caveats
+      .filter((c) => c.kind === "unattributed-aggregate-usage")
+      .map((c) => c.text);
+    expect(aggregateCaveats).toContain("caveat: 1,234,567 unattributed tokens lack a trustworthy request/model join — floor excludes them");
+    expect(aggregateCaveats).toContain("caveat: 2,345,678 session-level aggregate-only tokens cannot be assigned to this slice — excluded");
+    expect(aggregateCaveats).toContain("caveat: 3,456,789 session-aggregate tokens conflict with itemized components — excluded from totals and floor");
+  });
+
   it("fires even when one tool row spans a priced AND an unpriced turn (the row shows a $, so only the turn count discloses the gap — S2 round 3)", async () => {
     const turns = [
       turn(0, { model: "claude-haiku-4-5", usage: usage({ input: 1000, output: 0 }), toolCalls: [call("Bash")] }),

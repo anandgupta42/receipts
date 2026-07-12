@@ -48,6 +48,14 @@ function envelope(total: RawUsage, last: RawUsage | undefined, second: number): 
   };
 }
 
+function lastOnly(last: RawUsage, second: number): unknown {
+  return {
+    timestamp: `2026-07-10T12:00:${second.toString().padStart(2, "0")}.000Z`,
+    type: "event_msg",
+    payload: { type: "token_count", info: { last_token_usage: last } },
+  };
+}
+
 function context(model: string, second: number, modelProvider?: string): unknown {
   return {
     timestamp: `2026-07-10T12:00:${second.toString().padStart(2, "0")}.000Z`,
@@ -125,6 +133,23 @@ describe("Codex cumulative usage envelopes", () => {
     );
   });
 
+  it("retains a last_token_usage-only observation as unattributed usage", async () => {
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      lastOnly(raw(200, 50, 20), 1),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.totals.tokens).toMatchObject({ input: 150, output: 20, cacheRead: 50, total: 220 });
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined)).toBe(true);
+    const receipt = await buildReceiptModel(session);
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("pricing disabled") }),
+    );
+  });
+
   it("keeps the full final envelope unattributed when a missing first delta is followed by a valid one", async () => {
     const session = await load([
       context("gpt-5.6-sol", 0, "openai"),
@@ -188,7 +213,57 @@ describe("Codex cumulative usage envelopes", () => {
       envelope(raw(150, 0, 30), raw(10, 0, 10), 2),
     ]);
     expect(reset.usageReconciliationFailed).toBe(true);
+    expect(reset.totals.tokens).toMatchObject({ input: 200, output: 20, cacheRead: 0, total: 220 });
+    expect(reset.unattributedUsage).toEqual(reset.totals.tokens);
     expect((await buildReceiptModel(reset)).totalUsd).toBeNull();
+  });
+
+  it("fails closed when individually safe Codex counters overflow their component sum", async () => {
+    const overflowingComponents: RawUsage = {
+      input_tokens: Number.MAX_SAFE_INTEGER,
+      cached_input_tokens: 0,
+      output_tokens: 1,
+      reasoning_output_tokens: 0,
+      total_tokens: Number.MAX_SAFE_INTEGER,
+    };
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(overflowingComponents, raw(1, 0, 0), 1),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.totals.tokens).toMatchObject({ input: 1, output: 0, cacheRead: 0, total: 1 });
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
+  });
+
+  it("fails closed when individually safe legacy records overflow their aggregate", async () => {
+    const legacyMessage = (usage: RawUsage, second: number): unknown => ({
+      timestamp: `2026-07-10T12:00:${second.toString().padStart(2, "0")}.000Z`,
+      type: "response_item",
+      payload: { type: "message", role: "assistant", content: [], usage },
+    });
+    const session = await load([
+      context("gpt-5.3-codex", 0, "openai"),
+      legacyMessage(raw(Number.MAX_SAFE_INTEGER, 0, 0), 1),
+      legacyMessage(raw(1, 0, 0), 2),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.totals.tokens).toMatchObject({
+      input: Number.MAX_SAFE_INTEGER,
+      output: 0,
+      cacheRead: 0,
+      total: Number.MAX_SAFE_INTEGER,
+    });
+    expect(Number.isSafeInteger(session.totals.tokens.total)).toBe(true);
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined)).toBe(true);
+    const receipt = await buildReceiptModel(session);
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("pricing disabled") }),
+    );
   });
 
   it("safe-stops when legacy per-message usage precedes a cumulative envelope", async () => {
