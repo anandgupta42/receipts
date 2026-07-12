@@ -237,6 +237,22 @@ describe("Codex cumulative usage envelopes", () => {
     expect((await buildReceiptModel(session)).totalUsd).toBeNull();
   });
 
+  it.each([
+    ["total_tokens disagrees with input + output", { ...raw(200, 50, 20), total_tokens: 999 }],
+    ["reasoning_output_tokens exceeds output_tokens", { ...raw(200, 50, 20), reasoning_output_tokens: 21 }],
+  ] as const)("fails closed when %s", async (_label, malformedLast) => {
+    const session = await load([
+      context("gpt-5.6-sol", 0, "openai"),
+      envelope(raw(200, 50, 20), malformedLast, 1),
+    ]);
+
+    expect(session.usageReconciliationFailed).toBe(true);
+    expect(session.totals.tokens).toMatchObject({ input: 150, output: 20, cacheRead: 50, total: 220 });
+    expect(session.unattributedUsage).toEqual(session.totals.tokens);
+    expect(session.turns.every((turn) => turn.usage === undefined && turn.pricingUnits === undefined)).toBe(true);
+    expect((await buildReceiptModel(session)).totalUsd).toBeNull();
+  });
+
   it("fails closed when individually safe legacy records overflow their aggregate", async () => {
     const legacyMessage = (usage: RawUsage, second: number): unknown => ({
       timestamp: `2026-07-10T12:00:${second.toString().padStart(2, "0")}.000Z`,

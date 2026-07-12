@@ -67,8 +67,15 @@ function mapUsage(raw: unknown): MappedCodexUsage {
 
   const uncachedInputTokens = inputTokens - cachedInputTokens;
   const outputTokens = usage.output_tokens ?? 0;
+  const reasoningOutputTokens = usage.reasoning_output_tokens ?? 0;
+  // Codex persists reasoning as a subset of output. A larger reasoning count,
+  // or a reported aggregate that disagrees with input + output, makes the
+  // request internally contradictory and therefore unsafe to price.
+  if (reasoningOutputTokens > outputTokens) {
+    return { malformed: true };
+  }
   const total = safeTokenSum([uncachedInputTokens, outputTokens, cachedInputTokens]);
-  if (total === undefined) {
+  if (total === undefined || (usage.total_tokens !== undefined && usage.total_tokens !== total)) {
     return { malformed: true };
   }
 

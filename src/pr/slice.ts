@@ -66,8 +66,16 @@ function isCheckoutPathOnly(args: readonly string[]): boolean {
 }
 
 function isResetPathOnly(args: readonly string[]): boolean {
-  return hasPathSeparator(args) || args.includes("-p") || args.includes("--patch") ||
-    args.some((arg) => arg === "--pathspec-from-file" || arg.startsWith("--pathspec-from-file="));
+  if (hasPathSeparator(args) || args.includes("-p") || args.includes("--patch") ||
+    args.some((arg) => arg === "--pathspec-from-file" || arg.startsWith("--pathspec-from-file="))) {
+    return true;
+  }
+  // `git reset [<tree-ish>] <pathspec>...` may omit `--`; two positional
+  // arguments prove the second is a pathspec. Modes that can only move HEAD
+  // stay barriers even when followed by an invalid extra argument.
+  const headOnlyMode = args.some((arg) => ["--soft", "--hard", "--merge", "--keep"].includes(arg));
+  const positional = args.filter((arg) => !arg.startsWith("-"));
+  return !headOnlyMode && positional.length > 1;
 }
 
 const HEAD_CHANGING_SUBCOMMANDS = new Set(["pull", "filter-branch"]);

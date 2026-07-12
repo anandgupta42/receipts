@@ -226,6 +226,7 @@ describe("R1e slice + foreign window", () => {
     "git checkout --ours -- src/pr/slice.ts",
     "git checkout --theirs src/pr/slice.ts",
     "git reset HEAD -- src/pr/slice.ts",
+    "git reset HEAD src/pr/slice.ts",
     "git reset -p",
     "git cherry-pick --no-commit deadbeef",
     "git revert -n deadbeef",
