@@ -18,10 +18,19 @@ those places verbatim, so the fix is usually one of:
   receipt is built from the transcript it writes to disk.
 - **Your agent stores logs elsewhere.** aireceipts reads the default locations
   above. Claude Code honors `$CLAUDE_CONFIG_DIR`: if you've set it, aireceipts
-  reads `$CLAUDE_CONFIG_DIR/projects` instead of `~/.claude/projects`.
+  reads `$CLAUDE_CONFIG_DIR/projects` instead of `~/.claude/projects`. For
+  opencode, set `OPENCODE_DATA_DIRS` to a `:`-separated list of roots on macOS/
+  Linux or a `;`-separated list on Windows. The older single-root
+  `OPENCODE_DATA_DIR` override remains supported.
 - **The files aren't readable.** aireceipts silently skips a transcript it can't
   read (wrong owner, restrictive mode) rather than erroring on it. If a directory
   is present but its sessions don't show up, check the file permissions.
+
+For opencode, discovery checks only non-symlink `.db` files directly inside the
+configured roots. It does not recurse. A database is accepted only when its `session`
+and message tables contain the required columns; optional title, model, directory,
+path, version, and aggregate-token columns may be absent. `OPENCODE_DB_PATH` or
+`OPENCODE_DB` forces one database and takes precedence over every root setting.
 
 The default human receipt and `--list` print this as informational guidance and
 exit `0`. Machine exports such as `--json` and `--csv` still exit non-zero with

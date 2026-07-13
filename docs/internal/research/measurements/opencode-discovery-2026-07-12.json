@@ -1,0 +1,26 @@
+{
+  "spec": "SPEC-0082",
+  "baselineSha": "396de73f2d13f05a1334ae82ecaa6a7ca2b93009",
+  "measuredAt": "2026-07-13T05:55:52.451Z",
+  "runtime": {
+    "node": "v22.22.0",
+    "platform": "darwin",
+    "release": "24.6.0",
+    "arch": "arm64"
+  },
+  "configuredRootCount": 2,
+  "candidateDatabaseCount": 23,
+  "nonPrefixedCandidateCount": 1,
+  "nonPrefixedSessionCount": 686,
+  "runs": [
+    {
+      "sessionCount": 4119,
+      "wallTimeMs": 4382.8
+    },
+    {
+      "sessionCount": 4119,
+      "wallTimeMs": 1746.3
+    }
+  ],
+  "maxRssMiB": 381.6
+}

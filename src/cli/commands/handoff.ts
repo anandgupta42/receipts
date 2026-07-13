@@ -9,6 +9,7 @@ import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
 import { partitionWindows, windowBounds } from "../../aggregate/week.js";
 import { aggregateWaste, type WasteClassAggregate } from "../../aggregate/waste.js";
 import { listFullSessions } from "../../index.js";
+import { mapWithConcurrency } from "../../parse/util.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { resolveSelector } from "../common/session.js";
 
@@ -18,11 +19,30 @@ import { resolveSelector } from "../common/session.js";
  * distinct-session recurrence check for standing-rule suggestions. Re-exported
  * from `src/cli/index.js` for the existing handoff-recent test.
  */
-export async function recentWasteAggregates(now: number = Date.now()): Promise<WasteClassAggregate[]> {
+function sessionKey(session: Pick<Session, "source" | "id">): string {
+  return `${session.source}\u0000${session.id}`;
+}
+
+export async function recentWasteAggregates(
+  now: number = Date.now(),
+  preloaded: readonly Session[] = [],
+): Promise<WasteClassAggregate[]> {
   const bounds = windowBounds(now);
   const summaries = await listFullSessions();
   const { current } = partitionWindows(summaries, bounds);
-  const loaded = await Promise.all(current.map((s) => loadSession(s)));
+  const loads = new Map<string, Promise<Session | null>>(
+    preloaded.map((session) => [sessionKey(session), Promise.resolve(session)]),
+  );
+  const loaded = await mapWithConcurrency(current, 8, (summary) => {
+    const key = sessionKey(summary);
+    const existing = loads.get(key);
+    if (existing) {
+      return existing;
+    }
+    const pending = loadSession(summary);
+    loads.set(key, pending);
+    return pending;
+  });
   return aggregateWaste(loaded.filter((s): s is Session => s !== null));
 }
 
@@ -38,7 +58,7 @@ async function run(ctx: CommandContext): Promise<number> {
     ctx.stderr.write(`${resolved.error}\n`);
     return 1;
   }
-  const session = await loadSession(resolved.summary);
+  const session = resolved.session ?? (await loadSession(resolved.summary));
   if (!session) {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
     return 1;
@@ -50,7 +70,7 @@ async function run(ctx: CommandContext): Promise<number> {
     toolCalls: session.totals.toolCallCount,
     compactions: session.compactions?.length ?? 0,
   };
-  const aggregates = await recentWasteAggregates(ctx.now());
+  const aggregates = await recentWasteAggregates(ctx.now(), [session]);
   const suggestions = standingRuleSuggestions(aggregates, threshold);
   // SPEC-0042 R3 — the global `--json` flag is honored (it was previously
   // ignored here). JSON always emits the full structure, empty arrays included.

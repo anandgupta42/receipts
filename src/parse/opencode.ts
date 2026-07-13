@@ -1,8 +1,9 @@
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { delimiter as pathDelimiter, isAbsolute, join, resolve } from "node:path";
 import { promises as fs } from "node:fs";
 import { openReadOnly, type SqliteReader } from "./sqlite.js";
 import { normalizePricingProvider } from "./provider.js";
+import { toSessionSummary } from "./summaryCache.js";
 import type {
   AgentSource,
   ListSessionsOptions,
@@ -87,8 +88,8 @@ interface SessionRow {
   version?: string;
   directory?: string;
   path?: string;
-  time_created?: number;
-  time_updated?: number;
+  time_created?: unknown;
+  time_updated?: unknown;
   tokens_input?: unknown;
   tokens_output?: unknown;
   tokens_reasoning?: unknown;
@@ -106,14 +107,32 @@ interface SessionRow {
 
 interface MessageRow {
   id: string;
-  time_created?: number;
-  time_updated?: number;
+  time_created?: unknown;
+  time_updated?: unknown;
   data?: string;
+}
+
+interface MessageTimeRow {
+  time_created?: unknown;
+  time_updated?: unknown;
+  data_created?: unknown;
+  data_completed?: unknown;
 }
 
 interface PartRow {
   message_id: string;
   data?: string;
+}
+
+interface OpenCodeSchema {
+  sessionColumns: ReadonlySet<string>;
+  current: boolean;
+  legacy: boolean;
+}
+
+interface OpenCodeDatabase {
+  db: SqliteReader;
+  schema: OpenCodeSchema;
 }
 
 function defaultRoot(): string {
@@ -122,6 +141,20 @@ function defaultRoot(): string {
     return join(localAppData, "opencode");
   }
   return join(homedir(), ".local/share/opencode");
+}
+
+export function parseOpenCodeDataDirs(value: string | undefined, delimiter = pathDelimiter): string[] {
+  if (!value?.trim()) {
+    return [];
+  }
+  return value
+    .split(delimiter)
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function normalizeRoots(roots: readonly string[]): string[] {
+  return [...new Set(roots.map((root) => resolve(root)))].sort();
 }
 
 function sqlString(value: string): string {
@@ -463,20 +496,45 @@ function toolsFromContent(content: unknown): ToolCall[] {
     .filter((call): call is ToolCall => call !== null);
 }
 
-function tableExists(db: SqliteReader, name: string): boolean {
+function tableColumns(db: SqliteReader, name: string): ReadonlySet<string> | null {
   try {
-    return db.all(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ${sqlString(name)} LIMIT 1`).length > 0;
+    const rows = db.all(`PRAGMA table_info(${sqlString(name)})`) as unknown as Array<{ name?: unknown }>;
+    if (rows.length === 0) {
+      return null;
+    }
+    return new Set(rows.map((row) => row.name).filter((column): column is string => typeof column === "string"));
   } catch {
-    return false;
+    return null;
   }
 }
 
-function hasLegacyRows(db: SqliteReader): boolean {
-  return tableExists(db, "message") && tableExists(db, "part");
+function includesColumns(actual: ReadonlySet<string> | null, required: readonly string[]): actual is ReadonlySet<string> {
+  return actual !== null && required.every((column) => actual.has(column));
 }
 
-function hasCurrentRows(db: SqliteReader, sessionId: string): boolean {
-  if (!tableExists(db, "session_message")) {
+function qualifyOpenCodeSchema(db: SqliteReader): OpenCodeSchema | null {
+  const sessionColumns = tableColumns(db, "session");
+  if (!includesColumns(sessionColumns, ["id", "time_created", "time_updated"])) {
+    return null;
+  }
+
+  const current = includesColumns(tableColumns(db, "session_message"), [
+    "id",
+    "session_id",
+    "type",
+    "seq",
+    "time_created",
+    "time_updated",
+    "data",
+  ]);
+  const legacy =
+    includesColumns(tableColumns(db, "message"), ["id", "session_id", "time_created", "time_updated", "data"]) &&
+    includesColumns(tableColumns(db, "part"), ["id", "message_id", "session_id", "time_created", "data"]);
+  return current || legacy ? { sessionColumns, current, legacy } : null;
+}
+
+function hasCurrentRows(db: SqliteReader, sessionId: string, schema: OpenCodeSchema): boolean {
+  if (!schema.current) {
     return false;
   }
   try {
@@ -496,13 +554,56 @@ function newestSessionId(db: SqliteReader): string | undefined {
   return sessionIds(db)[0];
 }
 
-function summaryRowFor(db: SqliteReader, sessionId: string, hasLegacy: boolean): SessionRow | undefined {
-  const where = `WHERE s.id = ${sqlString(sessionId)}`;
-  const sql = hasCurrentRows(db, sessionId) || !hasLegacy ? currentSummarySql(where) : summarySql(where);
-  return db.all(`${sql} LIMIT 1`)[0] as unknown as SessionRow | undefined;
+function messageTimeBounds(
+  db: SqliteReader,
+  sessionId: string,
+  branch: "current" | "legacy",
+): { startedAt?: number; endedAt?: number } {
+  const table = branch === "current" ? "session_message" : "message";
+  const assistant = branch === "current" ? "m.type = 'assistant'" : "json_extract(m.data, '$.role') = 'assistant'";
+  const order = branch === "current" ? "m.seq" : "m.time_created, m.id";
+  const rows = db.all(`
+    SELECT
+      m.time_created,
+      m.time_updated,
+      json_extract(m.data, '$.time.created') AS data_created,
+      json_extract(m.data, '$.time.completed') AS data_completed
+    FROM ${table} m
+    WHERE m.session_id = ${sqlString(sessionId)} AND ${assistant}
+    ORDER BY ${order}
+  `) as unknown as MessageTimeRow[];
+  let startedAt: number | undefined;
+  let endedAt: number | undefined;
+  for (const row of rows) {
+    const started = timestampOf(row.data_created, row.time_created);
+    const ended = timestampOf(row.data_completed, row.time_updated, started);
+    if (started !== undefined) {
+      startedAt = startedAt === undefined ? started : Math.min(startedAt, started);
+    }
+    if (ended !== undefined) {
+      endedAt = endedAt === undefined ? ended : Math.max(endedAt, ended);
+    }
+  }
+  return { startedAt, endedAt };
 }
 
-async function openOpencodeDb(dbPath: string): Promise<SqliteReader | null> {
+function summaryRowFor(db: SqliteReader, sessionId: string, schema: OpenCodeSchema): SessionRow | undefined {
+  const where = `WHERE s.id = ${sqlString(sessionId)}`;
+  const branch = hasCurrentRows(db, sessionId, schema) || !schema.legacy ? "current" : "legacy";
+  const sql = branch === "current" ? currentSummarySql(schema.sessionColumns, where) : summarySql(schema.sessionColumns, where);
+  const row = db.all(`${sql} LIMIT 1`)[0] as unknown as SessionRow | undefined;
+  if (!row) {
+    return undefined;
+  }
+  const bounds = messageTimeBounds(db, sessionId, branch);
+  return {
+    ...row,
+    time_created: bounds.startedAt ?? row.time_created,
+    time_updated: bounds.endedAt ?? row.time_updated,
+  };
+}
+
+async function openOpencodeDb(dbPath: string): Promise<OpenCodeDatabase | null> {
   if (!(await pathExists(dbPath))) {
     return null;
   }
@@ -510,31 +611,38 @@ async function openOpencodeDb(dbPath: string): Promise<SqliteReader | null> {
   if (!db) {
     return null;
   }
-  const hasCurrent = tableExists(db, "session_message");
-  const hasLegacy = hasLegacyRows(db);
-  if (!tableExists(db, "session") || (!hasCurrent && !hasLegacy)) {
+  const schema = qualifyOpenCodeSchema(db);
+  if (!schema) {
     db.close();
     return null;
   }
-  return db;
+  return { db, schema };
 }
 
-function currentSummarySql(where = ""): string {
+function optionalSessionColumn(columns: ReadonlySet<string>, name: string, fallback: "NULL" | "0"): string {
+  return columns.has(name) ? `s.${name} AS ${name}` : `${fallback} AS ${name}`;
+}
+
+function optionalSessionInteger(columns: ReadonlySet<string>, name: string): string {
+  return columns.has(name) ? `${safeSqlInteger(`s.${name}`)} AS ${name}` : `0 AS ${name}`;
+}
+
+function currentSummarySql(sessionColumns: ReadonlySet<string>, where = ""): string {
   return `
     SELECT
       s.id,
-      s.title,
-      s.model,
-      s.version,
-      s.directory,
-      s.path,
+      ${optionalSessionColumn(sessionColumns, "title", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "model", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "version", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "directory", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "path", "NULL")},
       s.time_created,
       s.time_updated,
-      ${safeSqlInteger("s.tokens_input")} AS tokens_input,
-      ${safeSqlInteger("s.tokens_output")} AS tokens_output,
-      ${safeSqlInteger("s.tokens_reasoning")} AS tokens_reasoning,
-      ${safeSqlInteger("s.tokens_cache_read")} AS tokens_cache_read,
-      ${safeSqlInteger("s.tokens_cache_write")} AS tokens_cache_write,
+      ${optionalSessionInteger(sessionColumns, "tokens_input")},
+      ${optionalSessionInteger(sessionColumns, "tokens_output")},
+      ${optionalSessionInteger(sessionColumns, "tokens_reasoning")},
+      ${optionalSessionInteger(sessionColumns, "tokens_cache_read")},
+      ${optionalSessionInteger(sessionColumns, "tokens_cache_write")},
       (
         SELECT COUNT(*)
         FROM session_message m
@@ -585,22 +693,22 @@ function currentSummarySql(where = ""): string {
   `;
 }
 
-function summarySql(where = ""): string {
+function summarySql(sessionColumns: ReadonlySet<string>, where = ""): string {
   return `
     SELECT
       s.id,
-      s.title,
-      s.model,
-      s.version,
-      s.directory,
-      s.path,
+      ${optionalSessionColumn(sessionColumns, "title", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "model", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "version", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "directory", "NULL")},
+      ${optionalSessionColumn(sessionColumns, "path", "NULL")},
       s.time_created,
       s.time_updated,
-      ${safeSqlInteger("s.tokens_input")} AS tokens_input,
-      ${safeSqlInteger("s.tokens_output")} AS tokens_output,
-      ${safeSqlInteger("s.tokens_reasoning")} AS tokens_reasoning,
-      ${safeSqlInteger("s.tokens_cache_read")} AS tokens_cache_read,
-      ${safeSqlInteger("s.tokens_cache_write")} AS tokens_cache_write,
+      ${optionalSessionInteger(sessionColumns, "tokens_input")},
+      ${optionalSessionInteger(sessionColumns, "tokens_output")},
+      ${optionalSessionInteger(sessionColumns, "tokens_reasoning")},
+      ${optionalSessionInteger(sessionColumns, "tokens_cache_read")},
+      ${optionalSessionInteger(sessionColumns, "tokens_cache_write")},
       (
         SELECT COUNT(*)
         FROM message m
@@ -656,43 +764,65 @@ export class OpenCodeAdapter implements SessionAdapter {
   readonly label = "opencode";
 
   private readonly root: string;
+  private readonly dataRoots: string[];
   private readonly forcedDbPath?: string;
 
-  constructor(opts: { root?: string; dbPath?: string } = {}) {
-    this.root = opts.root ?? process.env.OPENCODE_DATA_DIR ?? defaultRoot();
+  constructor(opts: { root?: string; roots?: string[]; dbPath?: string } = {}) {
+    const legacyRoot = opts.root ?? process.env.OPENCODE_DATA_DIR ?? defaultRoot();
+    const explicitRoots = opts.roots?.filter((root) => root.trim().length > 0) ?? [];
+    const environmentRoots = parseOpenCodeDataDirs(process.env.OPENCODE_DATA_DIRS);
+    const selectedRoots =
+      explicitRoots.length > 0
+        ? explicitRoots
+        : opts.root !== undefined
+          ? [opts.root]
+          : environmentRoots.length > 0
+            ? environmentRoots
+            : [process.env.OPENCODE_DATA_DIR ?? defaultRoot()];
+    this.root = resolve(legacyRoot);
+    this.dataRoots = normalizeRoots(selectedRoots);
     this.forcedDbPath = opts.dbPath ?? process.env.OPENCODE_DB_PATH ?? process.env.OPENCODE_DB;
   }
 
   roots(): string[] {
-    return [this.forcedDbPath ?? this.root];
+    return this.forcedDbPath ? [this.resolvedForcedDbPath()] : [...this.dataRoots];
+  }
+
+  private resolvedForcedDbPath(): string {
+    if (this.forcedDbPath === ":memory:" || isAbsolute(this.forcedDbPath!)) {
+      return this.forcedDbPath!;
+    }
+    return join(this.root, this.forcedDbPath!);
   }
 
   private async dbPaths(): Promise<string[]> {
     if (this.forcedDbPath) {
-      return [
-        this.forcedDbPath === ":memory:" || isAbsolute(this.forcedDbPath)
-          ? this.forcedDbPath
-          : join(this.root, this.forcedDbPath),
-      ];
+      return [this.resolvedForcedDbPath()];
     }
-    let entries: import("node:fs").Dirent[];
-    try {
-      entries = await fs.readdir(this.root, { withFileTypes: true });
-    } catch {
-      return [];
+    const candidates = new Set<string>();
+    for (const root of this.dataRoots) {
+      let entries: import("node:fs").Dirent[];
+      try {
+        entries = await fs.readdir(root, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        if (entry.isFile() && !entry.isSymbolicLink() && entry.name.endsWith(".db")) {
+          candidates.add(join(root, entry.name));
+        }
+      }
     }
-    return entries
-      .filter((entry) => entry.isFile() && /^opencode.*\.db$/u.test(entry.name))
-      .map((entry) => join(this.root, entry.name))
-      .sort();
+    return [...candidates].sort();
   }
 
   async detect(): Promise<boolean> {
     for (const file of await this.dbPaths()) {
-      const db = await openOpencodeDb(file);
-      if (!db) {
+      const opened = await openOpencodeDb(file);
+      if (!opened) {
         continue;
       }
+      const { db } = opened;
       let hasSession = false;
       try {
         hasSession = db.all("SELECT id FROM session LIMIT 1").length > 0;
@@ -711,14 +841,14 @@ export class OpenCodeAdapter implements SessionAdapter {
   async listSessions(options: ListSessionsOptions = {}): Promise<SessionSummary[]> {
     const out: SessionSummary[] = [];
     for (const dbPath of await this.dbPaths()) {
-      const db = await openOpencodeDb(dbPath);
-      if (!db) {
+      const opened = await openOpencodeDb(dbPath);
+      if (!opened) {
         continue;
       }
+      const { db, schema } = opened;
       try {
-        const hasLegacy = hasLegacyRows(db);
         const rows = sessionIds(db)
-          .map((sessionId) => summaryRowFor(db, sessionId, hasLegacy))
+          .map((sessionId) => summaryRowFor(db, sessionId, schema))
           .filter((row): row is SessionRow => row !== undefined);
         const summaries = rows.map((row) => summaryFromRow(dbPath, row));
         if (!options.full) {
@@ -726,7 +856,8 @@ export class OpenCodeAdapter implements SessionAdapter {
           continue;
         }
         for (const [index, row] of rows.entries()) {
-          out.push(this.loadFromDb(db, dbPath, row.id) ?? summaries[index]);
+          const session = this.loadFromDb(db, schema, dbPath, row.id);
+          out.push(session ? toSessionSummary(session) : summaries[index]);
         }
       } catch {
         // A malformed DB degrades to "no sessions" for this adapter.
@@ -737,9 +868,14 @@ export class OpenCodeAdapter implements SessionAdapter {
     return out;
   }
 
-  private loadCurrent(db: SqliteReader, dbPath: string, sessionId: string | undefined): Session | null {
+  private loadCurrent(
+    db: SqliteReader,
+    schema: OpenCodeSchema,
+    dbPath: string,
+    sessionId: string | undefined,
+  ): Session | null {
     const where = sessionId ? `WHERE s.id = ${sqlString(sessionId)}` : "";
-    const summaryRow = db.all(`${currentSummarySql(where)} LIMIT 1`)[0] as unknown as SessionRow | undefined;
+    const summaryRow = db.all(`${currentSummarySql(schema.sessionColumns, where)} LIMIT 1`)[0] as unknown as SessionRow | undefined;
     if (!summaryRow) {
       return null;
     }
@@ -832,9 +968,9 @@ export class OpenCodeAdapter implements SessionAdapter {
     };
   }
 
-  private loadLegacy(db: SqliteReader, dbPath: string, sessionId: string): Session | null {
+  private loadLegacy(db: SqliteReader, schema: OpenCodeSchema, dbPath: string, sessionId: string): Session | null {
     const where = `WHERE s.id = ${sqlString(sessionId)}`;
-    const summaryRow = db.all(`${summarySql(where)} LIMIT 1`)[0] as unknown as SessionRow | undefined;
+    const summaryRow = db.all(`${summarySql(schema.sessionColumns, where)} LIMIT 1`)[0] as unknown as SessionRow | undefined;
     if (!summaryRow) {
       return null;
     }
@@ -934,26 +1070,31 @@ export class OpenCodeAdapter implements SessionAdapter {
     };
   }
 
-  private loadFromDb(db: SqliteReader, dbPath: string, sessionId: string | undefined): Session | null {
+  private loadFromDb(
+    db: SqliteReader,
+    schema: OpenCodeSchema,
+    dbPath: string,
+    sessionId: string | undefined,
+  ): Session | null {
     const selectedSessionId = sessionId ?? newestSessionId(db);
     if (!selectedSessionId) {
       return null;
     }
-    const hasLegacy = hasLegacyRows(db);
-    if (hasCurrentRows(db, selectedSessionId) || !hasLegacy) {
-      return this.loadCurrent(db, dbPath, selectedSessionId);
+    if (hasCurrentRows(db, selectedSessionId, schema) || !schema.legacy) {
+      return this.loadCurrent(db, schema, dbPath, selectedSessionId);
     }
-    return this.loadLegacy(db, dbPath, selectedSessionId);
+    return this.loadLegacy(db, schema, dbPath, selectedSessionId);
   }
 
   async loadSession(id: string): Promise<Session | null> {
     const { dbPath, sessionId } = splitId(id);
-    const db = await openOpencodeDb(dbPath);
-    if (!db) {
+    const opened = await openOpencodeDb(dbPath);
+    if (!opened) {
       return null;
     }
+    const { db, schema } = opened;
     try {
-      return this.loadFromDb(db, dbPath, sessionId);
+      return this.loadFromDb(db, schema, dbPath, sessionId);
     } catch {
       return null;
     } finally {

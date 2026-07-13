@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 const sqliteMod = await import("node:sqlite").then((m) => m).catch(() => null);
 const DatabaseSync = sqliteMod?.DatabaseSync as typeof import("node:sqlite").DatabaseSync;
 const hasNodeSqlite = sqliteMod !== null;
-import { afterEach, describe, expect, it } from "vitest";
-import { OpenCodeAdapter } from "../../src/parse/opencode.js";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OpenCodeAdapter, parseOpenCodeDataDirs } from "../../src/parse/opencode.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../../src/receipt/model.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
@@ -35,6 +35,97 @@ interface SimulatedOpenCodeSession {
 
 function tempDir(): string {
   return mkdtempSync(path.join(tmpdir(), "aireceipts-opencode-"));
+}
+
+function makeMinimalLegacyDb(
+  dbPath: string,
+  options: { sessionId?: string; updatedAt?: number; invalidPartShape?: boolean } = {},
+): void {
+  const sessionId = options.sessionId ?? "ses_minimal";
+  const updatedAt = options.updatedAt ?? Date.parse("2026-07-12T12:00:00.000Z");
+  const db = new DatabaseSync(dbPath);
+  db.exec(`
+    CREATE TABLE session (
+      id TEXT PRIMARY KEY,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL
+    );
+    CREATE TABLE message (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+    CREATE TABLE part (
+      id TEXT PRIMARY KEY,
+      message_id TEXT NOT NULL,
+      session_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL,
+      ${options.invalidPartShape ? "missing_data TEXT" : "data TEXT NOT NULL"}
+    );
+  `);
+  db.prepare("INSERT INTO session (id, time_created, time_updated) VALUES (?, ?, ?)").run(
+    sessionId,
+    updatedAt - 1_000,
+    updatedAt,
+  );
+  db.prepare("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)").run(
+    `${sessionId}_assistant`,
+    sessionId,
+    updatedAt - 900,
+    updatedAt,
+    JSON.stringify({
+      role: "assistant",
+      modelID: "local-minimal",
+      tokens: { input: 10, output: 2, reasoning: 1, cache: { read: 3, write: 0 } },
+      time: { created: updatedAt - 900, completed: updatedAt },
+    }),
+  );
+  db.close();
+}
+
+function makeMinimalCurrentDb(dbPath: string): void {
+  const updatedAt = Date.parse("2026-07-12T13:00:00.000Z");
+  const db = new DatabaseSync(dbPath);
+  db.exec(`
+    CREATE TABLE session (
+      id TEXT PRIMARY KEY,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL
+    );
+    CREATE TABLE session_message (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      type TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL,
+      data TEXT NOT NULL
+    );
+  `);
+  db.prepare("INSERT INTO session (id, time_created, time_updated) VALUES (?, ?, ?)").run(
+    "ses_current_minimal",
+    updatedAt - 1_000,
+    updatedAt,
+  );
+  db.prepare(
+    "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  ).run(
+    "msg_current_minimal",
+    "ses_current_minimal",
+    "assistant",
+    1,
+    updatedAt - 900,
+    updatedAt,
+    JSON.stringify({
+      model: { id: "local-current" },
+      tokens: { input: 20, output: 4, reasoning: 2, cache: { read: 1, write: 0 } },
+      time: { created: updatedAt - 900, completed: updatedAt },
+      content: [{ type: "text", text: "done" }],
+    }),
+  );
+  db.close();
 }
 
 function createSimulation(index: number): SimulatedOpenCodeSession {
@@ -436,10 +527,142 @@ function addLegacySession(dbPath: string): void {
 
 describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
   const dirs: string[] = [];
+  beforeEach(() => {
+    vi.stubEnv("OPENCODE_DB_PATH", "");
+    vi.stubEnv("OPENCODE_DB", "");
+    vi.stubEnv("OPENCODE_DATA_DIRS", "");
+  });
   afterEach(() => {
+    vi.unstubAllEnvs();
     for (const dir of dirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it("parses configured root lists with platform-independent delimiters", () => {
+    expect(parseOpenCodeDataDirs(" /a::/b:/a ", ":")).toEqual(["/a", "/b", "/a"]);
+    expect(parseOpenCodeDataDirs(" C:\\one;;D:\\two ", ";")).toEqual(["C:\\one", "D:\\two"]);
+    expect(parseOpenCodeDataDirs("  ", ":")).toEqual([]);
+  });
+
+  it("applies root precedence and returns every normalized searched root", () => {
+    const explicitA = tempDir();
+    const explicitB = tempDir();
+    const constructorRoot = tempDir();
+    const environmentA = tempDir();
+    const environmentB = tempDir();
+    const legacyRoot = tempDir();
+    dirs.push(explicitA, explicitB, constructorRoot, environmentA, environmentB, legacyRoot);
+    vi.stubEnv("OPENCODE_DATA_DIRS", [environmentB, environmentA].join(path.delimiter));
+    vi.stubEnv("OPENCODE_DATA_DIR", legacyRoot);
+
+    expect(new OpenCodeAdapter({ roots: [explicitB, "", explicitA, explicitB], root: constructorRoot }).roots()).toEqual(
+      [explicitA, explicitB].sort(),
+    );
+    expect(new OpenCodeAdapter({ roots: [], root: constructorRoot }).roots()).toEqual([constructorRoot]);
+    expect(new OpenCodeAdapter().roots()).toEqual([environmentA, environmentB].sort());
+
+    vi.stubEnv("OPENCODE_DATA_DIRS", "");
+    expect(new OpenCodeAdapter().roots()).toEqual([legacyRoot]);
+  });
+
+  it("keeps forced-database precedence and resolves a relative path against the single-root seam", () => {
+    const root = tempDir();
+    const ignoredRoot = tempDir();
+    dirs.push(root, ignoredRoot);
+    vi.stubEnv("OPENCODE_DB_PATH", "/tmp/environment-winner.db");
+    vi.stubEnv("OPENCODE_DB", "/tmp/older-environment.db");
+
+    expect(new OpenCodeAdapter({ root, roots: [ignoredRoot], dbPath: "forced.db" }).roots()).toEqual([
+      path.join(root, "forced.db"),
+    ]);
+    expect(new OpenCodeAdapter({ root, roots: [ignoredRoot] }).roots()).toEqual(["/tmp/environment-winner.db"]);
+  });
+
+  it("discovers arbitrary top-level database names across roots in stable order and keeps equal vendor ids distinct", async () => {
+    const rootA = tempDir();
+    const rootB = tempDir();
+    dirs.push(rootA, rootB);
+    const dbA = path.join(rootA, "sessions.db");
+    const dbB = path.join(rootB, "history.db");
+    makeMinimalLegacyDb(dbA, { sessionId: "same-id", updatedAt: Date.parse("2026-07-12T12:00:00.000Z") });
+    makeMinimalLegacyDb(dbB, { sessionId: "same-id", updatedAt: Date.parse("2026-07-12T13:00:00.000Z") });
+
+    const adapter = new OpenCodeAdapter({ roots: [rootB, rootA, rootA] });
+    const summaries = await adapter.listSessions();
+    expect(summaries.map((summary) => summary.filePath)).toEqual([dbA, dbB].sort());
+    expect(new Set(summaries.map((summary) => summary.id)).size).toBe(2);
+    expect(summaries.every((summary) => summary.model === "local-minimal")).toBe(true);
+    expect(summaries.every((summary) => summary.title === undefined && summary.cwd === undefined)).toBe(true);
+  });
+
+  it("loads older schemas with no optional session columns from message-level evidence", async () => {
+    const root = tempDir();
+    dirs.push(root);
+    const dbPath = path.join(root, "sessions.db");
+    makeMinimalLegacyDb(dbPath);
+
+    const adapter = new OpenCodeAdapter({ root });
+    const summaries = await adapter.listSessions({ full: true });
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      model: "local-minimal",
+      totals: {
+        turnCount: 1,
+        toolCallCount: 0,
+        tokens: { input: 10, output: 3, cacheRead: 3, cacheCreation: 0, total: 16 },
+      },
+    });
+    expect(summaries[0].title).toBeUndefined();
+    expect(summaries[0].cwd).toBeUndefined();
+    expect(summaries[0]).not.toHaveProperty("turns");
+  });
+
+  it("loads current schemas with no optional session columns from message-level evidence", async () => {
+    const root = tempDir();
+    dirs.push(root);
+    const dbPath = path.join(root, "current.db");
+    makeMinimalCurrentDb(dbPath);
+
+    const summaries = await new OpenCodeAdapter({ root }).listSessions({ full: true });
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0]).toMatchObject({
+      model: "local-current",
+      totals: {
+        turnCount: 1,
+        toolCallCount: 0,
+        tokens: { input: 20, output: 6, cacheRead: 1, cacheCreation: 0, total: 27 },
+      },
+    });
+    expect(summaries[0].title).toBeUndefined();
+    expect(summaries[0].cwd).toBeUndefined();
+  });
+
+  it("keeps lazy summary facts identical to an eager body parse", async () => {
+    for (const name of ["clean-multi-vendor.db", "legacy-empty-session-message.db"]) {
+      const adapter = new OpenCodeAdapter({ dbPath: path.join(fixturesDir, name) });
+      expect(await adapter.listSessions()).toEqual(await adapter.listSessions({ full: true }));
+    }
+  });
+
+  it("skips wrong-column, corrupt, nested, and symlinked databases without hiding a valid sibling", async () => {
+    const root = tempDir();
+    const missingRoot = path.join(root, "missing");
+    dirs.push(root);
+    const valid = path.join(root, "sessions.db");
+    makeMinimalLegacyDb(valid);
+    makeMinimalLegacyDb(path.join(root, "wrong-shape.db"), { sessionId: "wrong", invalidPartShape: true });
+    writeFileSync(path.join(root, "corrupt.db"), "not sqlite");
+    const nested = path.join(root, "nested");
+    mkdirSync(nested);
+    makeMinimalLegacyDb(path.join(nested, "nested.db"), { sessionId: "nested" });
+    symlinkSync(valid, path.join(root, "linked.db"));
+
+    const adapter = new OpenCodeAdapter({ roots: [missingRoot, root] });
+    await expect(adapter.detect()).resolves.toBe(true);
+    const summaries = await adapter.listSessions();
+    expect(summaries).toHaveLength(1);
+    expect(summaries[0].filePath).toBe(valid);
   });
 
   it("parses per-message opencode usage and tool parts into priced turns", async () => {
