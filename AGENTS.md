@@ -81,7 +81,7 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 *Updated only by the `release` skill. Keep this section, and only this section, current
 after each release — don't hand-edit it elsewhere.*
 
-- **Shipped (npm `aireceipts-cli`, v0.9.1):** the receipt engine and its whole surface
+- **Shipped (npm `aireceipts-cli`, v0.10.0):** the receipt engine and its whole surface
   are live — parse adapters (Claude Code, Codex, Cursor, Gemini, opencode), cited price
   tables, per-tool attribution, waste lines (stuck-loop, trivial-spans, context-thrash
   incl. Codex compactions), price-delta + routable-spend (now with `% less`), `compare`,
