@@ -25,12 +25,14 @@ export const COMMAND_VALUES = [
   "handoff",
   "help",
   "install-hook",
+  "integrations",
   "list",
   "methodology",
   "mini",
   "pr",
   "quota",
   "receipt",
+  "setup",
   "stats",
   "statusline",
   "telemetry-show",
@@ -66,6 +68,16 @@ export const ERROR_CLASS_VALUES = [
   "unknown_error",
 ] as const;
 export type ErrorClassValue = (typeof ERROR_CLASS_VALUES)[number];
+
+/** Content-free reasons for deliberate non-zero command returns; thrown errors use `cli_error` instead. */
+export const EXIT_CLASS_VALUES = [
+  "no-session-match",
+  "invalid-arguments",
+  "budget-exceeded",
+  "not-comparable",
+  "other-controlled",
+] as const;
+export type ExitClassValue = (typeof EXIT_CLASS_VALUES)[number];
 
 export const RESULT_VALUES = [
   "success",
@@ -160,10 +172,17 @@ export const cliRunPropertiesSchema = z
     isCI: z.boolean(),
     installHash: installHashSchema,
     runOrdinalBucket: z.enum(ORDINAL_BUCKET_VALUES),
+    /** Present only for controlled non-zero returns; thrown errors are recorded as `cli_error`. */
+    exitClass: z.enum(EXIT_CLASS_VALUES).optional(),
     /** SPEC-0042 R5 — present only on handoff-command runs. */
     handoffFormat: z.enum(HANDOFF_FORMAT_VALUES).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((properties, ctx) => {
+    if (properties.ok && properties.exitClass !== undefined) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["exitClass"], message: "exitClass is allowed only when ok is false" });
+    }
+  });
 export type CliRunProperties = z.infer<typeof cliRunPropertiesSchema>;
 
 export const cliErrorPropertiesSchema = z

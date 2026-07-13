@@ -9,6 +9,7 @@ import { ensureFirstRunNotice, flushTelemetry, noteRunStart, recordCliError, rec
 import { parseOptions } from "./options.js";
 import { loadCommands, selectCommand } from "./registry.js";
 import { createContext } from "./context.js";
+import { exitClassOf } from "./exitClass.js";
 
 export { readStdin, loadFromStdinPayload, loadFromDisk, loadFromCwd, MAX_SCOPED_LOAD_ATTEMPTS, runStatusline } from "./commands/statusline.js";
 export { recentWasteAggregates } from "./commands/handoff.js";
@@ -42,6 +43,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         agentType: undefined,
         durationMs: Date.now() - started,
         ok: code === 0,
+        ...(code === 0 ? {} : { exitClass: exitClassOf(ctx) ?? ("other-controlled" as const) }),
         // SPEC-0042 R5 — emission mode for the handoff command only (enum, never content).
         ...(command.name === "handoff" ? { handoffFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
         ...runTelemetry,

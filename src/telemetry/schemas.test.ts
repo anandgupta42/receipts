@@ -43,7 +43,7 @@ describe("SPEC-0043 R1: exactly nine event names", () => {
 describe("SPEC-0043 R9: docs parity", () => {
   const doc = readFileSync(resolve(process.cwd(), "docs/telemetry.md"), "utf8");
   const fieldsByEvent = {
-    cli_run: ["cliVersion", "os", "nodeMajor", "commandClass", "agentType", "durationBucket", "ok", "isCI", "installHash", "runOrdinalBucket"],
+    cli_run: ["cliVersion", "os", "nodeMajor", "commandClass", "agentType", "durationBucket", "ok", "isCI", "installHash", "runOrdinalBucket", "exitClass"],
     cli_error: ["errorClass", "command", "agentType", "inPackage"],
     parse_failure: ["agentType", "adapterVersion", "signatureHash"],
     receipt_generated: [
@@ -92,7 +92,7 @@ describe("SPEC-0043 R9: docs parity", () => {
 });
 
 describe("SPEC-0043 R2: command enum", () => {
-  it("pins the 20 command files plus stats", () => {
+  it("pins the full catalog, including setup and integrations", () => {
     expect([...COMMAND_VALUES].sort()).toEqual(
       [
         "backfill",
@@ -103,12 +103,14 @@ describe("SPEC-0043 R2: command enum", () => {
         "handoff",
         "help",
         "install-hook",
+        "integrations",
         "list",
         "methodology",
         "mini",
         "pr",
         "quota",
         "receipt",
+        "setup",
         "stats",
         "statusline",
         "telemetry-show",
@@ -385,5 +387,35 @@ describe("SPEC-0042 R5 — handoffFormat allowlist", () => {
   it("rejects any non-enum value (never content)", () => {
     expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "markdown" }).success).toBe(false);
     expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "/home/user/secret" }).success).toBe(false);
+  });
+});
+
+describe("controlled exitClass allowlist", () => {
+  const base = {
+    cliVersion: "0.1.0",
+    os: "linux" as const,
+    nodeMajor: 20,
+    commandClass: "receipt" as const,
+    agentType: "unknown" as const,
+    durationBucket: "<100ms" as const,
+    ok: false,
+    isCI: false,
+    installHash: "unavailable" as const,
+    runOrdinalBucket: "1" as const,
+  };
+
+  it("strictly rejects an out-of-enum value", () => {
+    expect(cliRunPropertiesSchema.safeParse({ ...base, exitClass: "selector:/Users/anand/secret" }).success).toBe(false);
+  });
+
+  it.each(["no-session-match", "invalid-arguments", "budget-exceeded", "not-comparable", "other-controlled"])(
+    "accepts the closed %s class on a failed run",
+    (exitClass) => {
+      expect(cliRunPropertiesSchema.safeParse({ ...base, exitClass }).success).toBe(true);
+    },
+  );
+
+  it("rejects exitClass on a successful run", () => {
+    expect(cliRunPropertiesSchema.safeParse({ ...base, ok: true, exitClass: "other-controlled" }).success).toBe(false);
   });
 });

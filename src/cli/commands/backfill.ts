@@ -16,6 +16,7 @@ import { backfillToJson, renderBackfillSummary } from "../../receipt/backfill.js
 import type { BackfillReport, BackfillReportEntry } from "../../receipt/backfill.js";
 import { noSessionsMessage } from "../common/session.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import { setExitClass } from "../exitClass.js";
 
 /** Injectable seams so tests exercise the full command without real agent dirs. */
 export interface BackfillDeps {
@@ -70,12 +71,14 @@ async function run(ctx: CommandContext, deps: BackfillDeps = defaultDeps): Promi
     const parsed = Date.parse(options.since);
     if (Number.isNaN(parsed)) {
       ctx.stderr.write(`invalid --since date: "${options.since}"\n`);
+      setExitClass(ctx, "invalid-arguments");
       return 1;
     }
     sinceMs = parsed;
   }
   if (options.limit !== undefined && (!Number.isInteger(options.limit) || options.limit <= 0)) {
     ctx.stderr.write("invalid --limit: expected a positive integer\n");
+    setExitClass(ctx, "invalid-arguments");
     return 1;
   }
 
@@ -140,6 +143,7 @@ async function run(ctx: CommandContext, deps: BackfillDeps = defaultDeps): Promi
         `Pick an empty or new directory.\n`,
     );
     ctx.telemetry.recordExportGenerated({ surface: "backfill", format: "text", wroteFile: false, result: "invalid_args" });
+    setExitClass(ctx, "other-controlled");
     return 1;
   }
 

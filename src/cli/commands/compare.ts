@@ -12,6 +12,7 @@ import { noSessionsMessage } from "../common/session.js";
 import { svgOutOf, writeSvg } from "../common/output.js";
 import { receiptTelemetryFromModels } from "../common/telemetry.js";
 import type { ExportFormatValue, OutputModeValue } from "../../telemetry/schemas.js";
+import { setExitClass } from "../exitClass.js";
 
 async function recordCompareTelemetry(
   ctx: CommandContext,
@@ -45,11 +46,13 @@ async function run(ctx: CommandContext): Promise<number> {
   const selectorB = options.positional[2];
   if (!selectorA || !selectorB) {
     ctx.stderr.write("compare requires two selectors: aireceipts compare <a> <b>\n");
+    setExitClass(ctx, "not-comparable");
     return 1;
   }
   // compare CSV is strictly two session rows + a delta (R3) — per-tool granularity has no two-row shape here.
   if (options.csvMode !== undefined && options.csvMode !== "session") {
     ctx.stderr.write(`compare supports --csv=session only (got "${options.csvMode}")\n`);
+    setExitClass(ctx, "invalid-arguments");
     return 1;
   }
   const svgOut = svgOutOf(options);
@@ -57,26 +60,31 @@ async function run(ctx: CommandContext): Promise<number> {
   // native dependency) — checked before any session lookup, same as csvMode above.
   if (svgOut.png) {
     ctx.stderr.write("compare --png is not supported yet — use compare --svg\n");
+    setExitClass(ctx, "invalid-arguments");
     return 1;
   }
   const sessions = await listFullSessions();
   if (sessions.length === 0) {
     ctx.stderr.write(`${await noSessionsMessage()}\n`);
+    setExitClass(ctx, "no-session-match");
     return 1;
   }
   const summaryA = selectSummary(sessions, selectorA);
   const summaryB = selectSummary(sessions, selectorB);
   if (!summaryA) {
     ctx.stderr.write(`no session matched "${selectorA}"\n`);
+    setExitClass(ctx, "no-session-match");
     return 1;
   }
   if (!summaryB) {
     ctx.stderr.write(`no session matched "${selectorB}"\n`);
+    setExitClass(ctx, "no-session-match");
     return 1;
   }
   const [sessionA, sessionB] = await Promise.all([loadSession(summaryA), loadSession(summaryB)]);
   if (!sessionA || !sessionB) {
     ctx.stderr.write("failed to load one or both sessions\n");
+    setExitClass(ctx, "not-comparable");
     return 1;
   }
   const [modelA, modelB] = await Promise.all([

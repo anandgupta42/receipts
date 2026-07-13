@@ -6,17 +6,20 @@ import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
 import { buildBenchmarkPayload, confirmPrompt, BENCHMARK_UNAVAILABLE_MESSAGE } from "../../benchmark/index.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { resolveSelector } from "../common/session.js";
+import { setExitClass } from "../exitClass.js";
 
 async function run(ctx: CommandContext): Promise<number> {
   const { options } = ctx;
   const resolved = await resolveSelector(options.positional[1]);
   if ("error" in resolved) {
     ctx.stderr.write(`${resolved.error}\n`);
+    setExitClass(ctx, "no-session-match");
     return 1;
   }
   const session = await loadSession(resolved.summary);
   if (!session) {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
+    setExitClass(ctx, "other-controlled");
     return 1;
   }
   const model = await buildFullSessionReceiptModel(session);

@@ -11,6 +11,7 @@ import { buildReceiptModel } from "../../receipt/model.js";
 import { renderReceipt } from "../../receipt/render.js";
 import type { AgentSource } from "../../parse/types.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import { setExitClass } from "../exitClass.js";
 
 const DEMO_FIXTURE = "clean-multi-tool-2-models.jsonl";
 
@@ -45,11 +46,13 @@ async function run(ctx: CommandContext): Promise<number> {
   const path = demoTranscriptPath();
   if (!path) {
     ctx.stderr.write("aireceipts: demo transcript not found (packaging error)\n");
+    setExitClass(ctx, "other-controlled");
     return 1;
   }
   const session = await loadById("claude-code" as AgentSource, path);
   if (!session) {
     ctx.stderr.write("aireceipts: demo transcript could not be parsed (packaging error)\n");
+    setExitClass(ctx, "other-controlled");
     return 1;
   }
   const model = await buildReceiptModel(session);

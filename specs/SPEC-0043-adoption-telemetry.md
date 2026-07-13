@@ -143,6 +143,20 @@ disagree — the amendment must land there, not only here).
   third-party product-analytics SDK — that is the single most documented backlash
   trigger (GitLab 2019).
 
+### Amendment — 2026-07-13 · controlled-exit funnel visibility
+
+The fixed `commandClass` catalog adds `setup` and `integrations`; both now emit the
+same content-free `cli_run` dimensions as every other catalogued command. `cli_run`
+also gains optional `exitClass`, present only with `ok: false` for a controlled
+non-zero return. Its closed taxonomy is `no-session-match`, `invalid-arguments`,
+`budget-exceeded`, `not-comparable`, and `other-controlled`. It never carries a
+selector, path, session id, option value, or error text. Thrown errors remain solely
+owned by `cli_error` and do not emit `cli_run` or `exitClass`; hidden `hook pre-push`
+and statusline polling suppression are unchanged. This amendment implements the two
+instrumentation slices named in SPEC-0081's 2026-07-13 Tombstone: launch data showed
+controlled non-zero runs without diagnostic events, so classification must precede
+any conversion intervention.
+
 ## Scenarios
 
 - **Given** a user runs `aireceipts` on a Claude Code session with two stuck-loop waste
