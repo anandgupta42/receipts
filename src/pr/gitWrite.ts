@@ -530,6 +530,34 @@ export function toolCallInvocations(call: ToolCall): string[][] {
   return resolveInvocations(rawInvocations(call.input));
 }
 
+const SHELL_FD_DUPLICATION_RE = /^(?:\d*)>&\d+$/;
+const SHELL_REDIRECTION_OPERATOR_RE = /^(?:\d*(?:>>?|<)|&>>?)$/;
+const SHELL_ATTACHED_REDIRECTION_RE = /^(?:\d*(?:>>?|<)|&>>?).+$/;
+
+/**
+ * Remove shell redirections from one tokenized argv before classifying the
+ * command itself. A standalone operator consumes its following filename;
+ * attached filenames and fd duplications occupy only their own token.
+ */
+export function stripShellRedirections(argv: string[]): string[] {
+  const stripped: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i];
+    if (SHELL_FD_DUPLICATION_RE.test(token)) {
+      continue;
+    }
+    if (SHELL_REDIRECTION_OPERATOR_RE.test(token)) {
+      i++;
+      continue;
+    }
+    if (SHELL_ATTACHED_REDIRECTION_RE.test(token)) {
+      continue;
+    }
+    stripped.push(token);
+  }
+  return stripped;
+}
+
 /** True if `argv` is a real `codex exec …` invocation (argv[0] is `codex`, first non-option token is `exec`). */
 export function isCodexExec(argv: string[]): boolean {
   if (argv.length === 0 || path.basename(argv[0]) !== "codex") {

@@ -194,6 +194,9 @@ Add the hook for each coding agent the repo uses.
 #### Claude Code
 
 Commit `.claude/settings.json` ([template](https://github.com/anandgupta42/receipts/blob/main/docs/adopt/claude-settings.json)):
+The `|| true` matters: the CLI itself exits 0 on every path, but if `npx` cannot even
+fetch or start it (registry outage, cold cache timeout), the hook must still succeed —
+a receipt is never worth blocking a push.
 
 ```json
 {
@@ -204,7 +207,7 @@ Commit `.claude/settings.json` ([template](https://github.com/anandgupta42/recei
         "hooks": [
           {
             "type": "command",
-            "command": "npx -y aireceipts-cli@latest hook pre-push",
+            "command": "npx -y aireceipts-cli@latest hook pre-push || true",
             "timeout": 60
           }
         ]
@@ -227,7 +230,7 @@ Commit `.codex/hooks.json` ([template](https://github.com/anandgupta42/receipts/
         "hooks": [
           {
             "type": "command",
-            "command": "npx -y aireceipts-cli@latest hook pre-push",
+            "command": "npx -y aireceipts-cli@latest hook pre-push || true",
             "timeout": 60
           }
         ]
@@ -240,6 +243,9 @@ Commit `.codex/hooks.json` ([template](https://github.com/anandgupta42/receipts/
 [Codex loads project hooks](https://learn.chatgpt.com/docs/hooks) only for trusted
 projects. Review and trust the exact hook definition once through `/hooks`; changed
 definitions require review again.
+
+Chained agent commands still auto-attach when they contain an unambiguous branch push
+and keep the same working directory; output redirections are ignored and the hook attaches once.
 
 ### Step 3 — Keep the Codex finalizer instruction
 

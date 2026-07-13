@@ -33,7 +33,8 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
 ## Requirements
 
 - **R1 — `aireceipts hook pre-push` (hidden) reads a PreToolUse payload and attaches on branch
-  push only, using the tokenized command parser (no substring matching).** It reads a JSON object
+  push only, using the tokenized command parser (no substring matching).** *(Amended 2026-07-13,
+  #241.)* It reads a JSON object
   on stdin (the Claude Code hook payload: `{ tool_name, tool_input: { command } }`, and the
   equivalent Codex shape where present). It acts **only** when `tool_name` is a shell tool
   (`Bash`) **and** `tool_input.command`, parsed with the repo's existing tokenized git-command
@@ -46,9 +47,15 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
   only refspec is `refs/aireceipts/*` (recursion guard); a push to a non-`origin` remote; a
   **repo-retargeting push** (`git -C <dir> push`, `--git-dir`/`--work-tree`/`--namespace`/
   `--exec-path`) whose target repo/worktree differs from the hook's cwd — the attach only runs
-  against the hook's cwd, so attaching would write the ref to the wrong repo; or any command the
-  parser cannot unambiguously resolve to the above (heredocs, aliases, `&&`-chains whose push
-  target is unclear → **no action**, under-attach). When it acts, it runs the existing
+  against the hook's cwd, so attaching would write the ref to the wrong repo; or any push
+  invocation the parser cannot unambiguously resolve to the above (heredocs and aliases remain
+  **no action**, under-attach). The parser tokenizes the whole shell command, strips shell
+  redirections from each invocation before push classification, and acts exactly once when **at
+  least one** invocation is an attachable branch push — including in `&&`/`;`/pipe chains — as
+  long as **no** `cd`, `pushd`, or `popd` invocation appears anywhere in the command. A cwd change
+  before or after the push is conservatively refused because invocation ordering across shell
+  operators cannot safely retarget the attach, which must run against the hook's cwd. When it
+  acts, it runs the existing
   `pr --store ref --push-ref` path (SPEC-0065) — which writes the deterministic ref and pushes it
   to `origin`. A spurious attach is harmless by construction (the ref is deterministic and the
   session is real — it only writes a correct ref slightly early), but ambiguity still resolves to
@@ -130,12 +137,14 @@ ref (SPEC-0065). It **never blocks the push from succeeding** and never fabricat
 | R1 | branch push (bare) | `{tool_name:"Bash",tool_input:{command:"git push"}}` | runs attach (`pr --store ref --push-ref`) |
 | R1 | branch push origin | `git push origin feat` | runs attach |
 | R1 | explicit refspec | `git push origin HEAD:refs/heads/main` | runs attach |
+| R1 | chained or redirected branch push | `npm test && git push`, `git push 2>&1 \| tail -3` | runs one attach |
 | R1 | non-git command | `npm test` | no action, exit 0 |
 | R1 | git non-push | `git status` | no action |
 | R1 | delete/tag-only/dry-run | `git push --delete`, `git push --tags`, `git push --dry-run` | no action |
 | R1 | non-origin remote | `git push upstream feat` | no action (only origin) |
 | R1 | nested receipts push (recursion) | `git push origin refs/aireceipts/x` | no action |
-| R1 | echoed / heredoc / alias | `echo "git push"`, push inside a heredoc, ambiguous `&&`-chain | no action (tokenized parser, under-attach) |
+| R1 | echoed / heredoc / alias | `echo "git push"`, push inside a heredoc, alias | no action (tokenized parser, under-attach) |
+| R1 | cwd-changing chain | `cd /elsewhere && git push`, `pushd /elsewhere && git push && popd` | no action (attach must target the hook's cwd) |
 | R1 | repo-retargeting push | `git -C sub push …`, `git --git-dir=… push …`, `--work-tree`/`--namespace`/`--exec-path` | **no action** — the attach only runs against the hook's cwd, so a push aimed at another repo/worktree must not attach (would write the ref to the wrong repo) |
 | R2 | never blocks | attach throws / no git / empty stdin / bad JSON / no session | exit 0, empty stdout, empty stderr, no decision object |
 | R2 | zero stdout on success | valid branch push, attach succeeds | ref written; hook stdout is empty (runPrDetailed given no-op writers) |
