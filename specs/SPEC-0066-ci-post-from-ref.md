@@ -113,7 +113,8 @@ transports what the local hook produced.
 payload (injection-corpus golden), renders via `renderPrBody`, and upserts via
 `GITHUB_TOKEN` from a separate `post` job; the comment-marker back-compat path is unchanged.
 **Deferred (spec stays `building`):** R5's agent-built vs hand-written discrimination is not
-implemented. `scripts/check-pr-receipt.mjs` distinguishes only same-repo vs fork, so opt-in
-enforcement currently fails **any** same-repo PR missing a receipt — it does not yet skip a
-hand-written PR. Enforcement is opt-in and default-off, so this is a refinement, not a
-regression; the spec flips to `shipped` when the agent-evidence gate lands.
+implemented. `scripts/check-pr-receipt.mjs` distinguishes same-repo vs fork plus the
+SPEC-0036 R2 exempt-glob carve-out (maintainer-directed 2026-07-13, default `release/*`),
+so opt-in enforcement fails any non-exempt same-repo PR missing a receipt — it does not yet
+skip a hand-written PR. Enforcement is opt-in and default-off, so this is a refinement, not
+a regression; the spec flips to `shipped` when the agent-evidence gate lands.

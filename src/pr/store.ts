@@ -76,7 +76,7 @@ function git(args: string[], opts: GitOpts = {}): GitResult {
 export type WriteReceiptRefOutcome = { ok: true; ref: string; commit: string } | { ok: false; reason: string };
 
 /**
- * Write `json` as `receipt.json` on `refs/receipts/<slug>`, wrapped in a
+ * Write `json` as `receipt.json` on `refs/aireceipts/<slug>`, wrapped in a
  * commit dated `<epochSeconds> +0000` derived from `endedAtMs` (never
  * wall-clock) under a fixed identity — so the same `(slug, branch, json,
  * endedAtMs)` always produces the same commit SHA (SPEC-0065 R1/R6).
@@ -121,7 +121,7 @@ export function writeReceiptRef(slug: string, branch: string, json: string, ende
   return { ok: true, ref, commit: commitSha };
 }
 
-/** Read back `receipt.json` from `refs/receipts/<slug>`, or `null` when the ref or blob doesn't exist. */
+/** Read back `receipt.json` from `refs/aireceipts/<slug>`, or `null` when the ref or blob doesn't exist. */
 export function readReceiptRef(slug: string, cwd?: string): string | null {
   const result = git(["cat-file", "blob", `${receiptRef(slug)}:receipt.json`], { cwd });
   return result.ok ? result.out : null;

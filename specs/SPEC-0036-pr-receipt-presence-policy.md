@@ -39,6 +39,13 @@ approval converted that implementation from provisional to accepted.
   (`head.repo.full_name == github.repository`) becomes `missing-required`; the workflow
   emits `::error::` and exits 1. The failure message must tell the author to run
   `npx aireceipts pr --post` locally and rerun the check.
+  Amendment (maintainer-directed, 2026-07-13): branches matching repository variable
+  `AIRECEIPTS_RECEIPT_EXEMPT_GLOBS` (space-separated anchored globs, `*` wildcards only;
+  the workflow defaults to `release/*` when the variable is unset) stay notice-only even
+  under enforcement. Release checkouts are authored without a capturable agent session,
+  so no receipt can exist for them; a hard requirement there would block every release
+  PR. Keep patterns narrow so feature work cannot slip through. The verdict logic lives
+  in `scripts/check-pr-receipt.mjs` (`isExemptRef`), gated by unit tests.
 - **R3 - Fork PRs remain notice-only.** Fork PRs never fail this check, even when R2 is
   enabled. The workflow may not assume a fork contributor has local agent sessions for
   the base repo, and it may not pressure them to upload transcripts.

@@ -4,7 +4,7 @@
 # (run `npm run setup:hooks`; SPEC-0065 R3).
 #
 # RECURSION GUARD: this hook runs `aireceipts pr --store ref --push-ref`, which
-# does a nested `git push` of `refs/receipts/<slug>` (see `pushReceiptRef` in
+# does a nested `git push` of `refs/aireceipts/<slug>` (see `pushReceiptRef` in
 # src/pr/store.ts). That nested push re-invokes this same hook. We act only when
 # the ORIGINAL push targets a branch — a stdin line whose LOCAL or REMOTE ref is
 # `refs/heads/*` (a refspec like `HEAD^:refs/heads/main` names the branch only on
