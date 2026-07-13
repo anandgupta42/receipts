@@ -23,8 +23,37 @@ export function hasReceiptComment(commentsJson) {
   return parsed.some((c) => c && typeof c.body === "string" && c.body.startsWith(DOGFOOD_MARKER));
 }
 
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/**
+ * Anchored shell-style glob match (`*` wildcards only). Two-pointer scan with
+ * single backtrack-point, so worst case is O(text * glob): no RegExp, no
+ * catastrophic backtracking on pathological patterns like `release/*a*a*a*Z`
+ * (Codex review, 2026-07-13).
+ */
+function globMatch(text, glob) {
+  let t = 0;
+  let g = 0;
+  let star = -1;
+  let mark = 0;
+  while (t < text.length) {
+    if (g < glob.length && glob[g] === "*") {
+      star = g;
+      mark = t;
+      g += 1;
+    } else if (g < glob.length && glob[g] === text[t]) {
+      t += 1;
+      g += 1;
+    } else if (star !== -1) {
+      mark += 1;
+      t = mark;
+      g = star + 1;
+    } else {
+      return false;
+    }
+  }
+  while (g < glob.length && glob[g] === "*") {
+    g += 1;
+  }
+  return g === glob.length;
 }
 
 /**
@@ -41,13 +70,7 @@ export function isExemptRef(headRef, exemptGlobs) {
   return exemptGlobs
     .split(/\s+/)
     .filter(Boolean)
-    .some((glob) => {
-      // Collapse `*` runs: `a**b` and `a*b` match the same strings, and the
-      // collapsed form can't compile to adjacent `.*.*` (catastrophic
-      // backtracking on long non-matching refs).
-      const pattern = glob.replace(/\*+/g, "*").split("*").map(escapeRegExp).join(".*");
-      return new RegExp(`^${pattern}$`).test(headRef);
-    });
+    .some((glob) => globMatch(headRef, glob));
 }
 
 /**

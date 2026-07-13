@@ -91,12 +91,14 @@ describe("isExemptRef", () => {
     expect(isExemptRef("release.v1", "release.v*")).toBe(true);
   });
 
-  it("collapses `*` runs so pathological globs stay linear-time", () => {
+  it("stays fast on pathological globs (no regex backtracking)", () => {
     const ref = `release/${"a".repeat(300)}`;
     const started = performance.now();
     expect(isExemptRef(ref, `release/${"*".repeat(8)}Z`)).toBe(false);
+    expect(isExemptRef(ref, "release/*a*a*a*a*Z")).toBe(false);
     expect(performance.now() - started).toBeLessThan(200);
     expect(isExemptRef("release/v1", "release/**")).toBe(true);
+    expect(isExemptRef("release/a1a2a3Z", "release/*a*a*a*Z")).toBe(true);
   });
 });
 
