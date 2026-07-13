@@ -142,7 +142,8 @@ opencode-family examples. The approved accuracy gate requires at least 20 real p
 from every supported trace family before recommendation review. Codex has only 14, so
 the audit cannot meet its minimum even if every available example is correct. The
 second hidden rule found only three examples in total. Both remain shadow-only, render
-nothing, and send no telemetry.
+nothing, and now emit zero-inclusive aggregate telemetry on each successful review so
+their delivered-event hit rates and total counts can be measured before promotion.
 
 This is the intended outcome of the gate, not a reason to weaken it. Visible coverage
 does not meet either shipping threshold, so the implementation must not claim that
@@ -246,7 +247,8 @@ It contains 23 preserved patterns: 4 default findings, 2 neutral diagnostics,
 | `subagent-delivery-gap` | disabled | Belongs to continuity and lacks a safe parent-delivery join |
 
 “Enabled” above means implemented for the approved slice, not shipped. Shadow rules run
-only in local dogfood and never render or enter telemetry. Disabled rules remain in the
+on every successful review, never render, and emit only the registry key/version, source
+family, evaluation state, and exact aggregate count. Disabled rules remain in the
 registry with `extractor: null`; they are not silently discarded.
 
 ## Registry contract
@@ -271,7 +273,8 @@ and tests. Detector code may compute evidence; it may not carry another copy of 
 recommendation.
 
 Raw prompt/response text, commands, tool input/output, paths, and repository names are
-forbidden both in rendered evidence and in registry-driven telemetry. Evidence may
+forbidden both in rendered evidence and in registry-driven telemetry. Telemetry may
+carry only fixed registry metadata plus the zero-inclusive aggregate match count. Evidence may
 contain counts, turn indices, fixed enums, sanitized tool names, capability coverage,
 and explicitly labeled impact values.
 

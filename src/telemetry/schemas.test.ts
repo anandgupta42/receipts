@@ -13,6 +13,7 @@ import {
   parseFailurePropertiesSchema,
   prFlowCompletedPropertiesSchema,
   receiptGeneratedPropertiesSchema,
+  reviewPatternEvaluatedPropertiesSchema,
   validateEvent,
   type CliErrorEvent,
   type CliRunEvent,
@@ -22,7 +23,7 @@ import {
 
 const INSTALL_HASH = "a".repeat(64);
 
-describe("SPEC-0043 R1: exactly nine event names", () => {
+describe("SPEC-0043 R1: exactly ten event names", () => {
   it("is exhaustive over the v2 catalog — no more, no less", () => {
     expect([...EVENT_NAMES].sort()).toEqual(
       [
@@ -35,6 +36,7 @@ describe("SPEC-0043 R1: exactly nine event names", () => {
         "parse_failure",
         "pr_flow_completed",
         "receipt_generated",
+        "review_pattern_evaluated",
       ].sort(),
     );
   });
@@ -78,6 +80,15 @@ describe("SPEC-0043 R9: docs parity", () => {
     hook_configured: ["operation", "promptOutcome", "result"],
     integration_surface_rendered: ["integration", "inputMode", "payloadValid", "customFormat", "scoped", "configFile", "result"],
     activation_milestone: ["milestone", "command", "installAgeBucket"],
+    review_pattern_evaluated: [
+      "registryVersion",
+      "patternId",
+      "ruleVersion",
+      "rolloutState",
+      "agentType",
+      "evaluationStatus",
+      "findingCount",
+    ],
   } as const;
 
   it("documents every event and field", () => {
@@ -215,6 +226,18 @@ describe("SPEC-0043 R1-R5: valid events pass their schema", () => {
       },
     ],
     ["activation_milestone", { milestone: "first_receipt", command: "receipt", installAgeBucket: "first_day" }],
+    [
+      "review_pattern_evaluated",
+      {
+        registryVersion: 1,
+        patternId: "last-change-not-checked",
+        ruleVersion: 1,
+        rolloutState: "shadow",
+        agentType: "opencode",
+        evaluationStatus: "evaluated",
+        findingCount: 0,
+      },
+    ],
   ] as const)("accepts a well-formed %s event", (name, properties) => {
     expect(validateEvent({ name, properties } as TelemetryEvent)).toBe(true);
   });
@@ -317,6 +340,18 @@ describe("SPEC-0043 R9: leakage fixtures — banned content is structurally reje
       { integration: "quota", inputMode: "none", payloadValid: false, result: "no_data" },
     ],
     [activationMilestonePropertiesSchema, { milestone: "first_run", command: "stats", installAgeBucket: "2-7d" }],
+    [
+      reviewPatternEvaluatedPropertiesSchema,
+      {
+        registryVersion: 1,
+        patternId: "last-check-still-failing",
+        ruleVersion: 1,
+        rolloutState: "shadow",
+        agentType: "codex",
+        evaluationStatus: "evaluated",
+        findingCount: 2,
+      },
+    ],
   ] as const;
 
   it.each([
@@ -383,5 +418,50 @@ describe("SPEC-0083 R13 — reviewFormat allowlist", () => {
   it("rejects any non-enum value (never content)", () => {
     expect(cliRunPropertiesSchema.safeParse({ ...base, reviewFormat: "markdown" }).success).toBe(false);
     expect(cliRunPropertiesSchema.safeParse({ ...base, reviewFormat: "/home/user/secret" }).success).toBe(false);
+  });
+});
+
+describe("SPEC-0083 R13 — exact shadow-pattern measurement allowlist", () => {
+  const base = {
+    registryVersion: 1 as const,
+    patternId: "last-change-not-checked" as const,
+    ruleVersion: 1,
+    rolloutState: "shadow" as const,
+    agentType: "opencode" as const,
+    evaluationStatus: "evaluated" as const,
+    findingCount: 0,
+  };
+
+  it("accepts zero and positive exact aggregate counts", () => {
+    expect(reviewPatternEvaluatedPropertiesSchema.safeParse(base).success).toBe(true);
+    expect(reviewPatternEvaluatedPropertiesSchema.safeParse({ ...base, findingCount: 17 }).success).toBe(true);
+  });
+
+  it("forces unavailable rows to zero and rejects non-integer counts", () => {
+    expect(
+      reviewPatternEvaluatedPropertiesSchema.safeParse({
+        ...base,
+        evaluationStatus: "unavailable",
+        findingCount: 0,
+      }).success,
+    ).toBe(true);
+    expect(
+      reviewPatternEvaluatedPropertiesSchema.safeParse({
+        ...base,
+        evaluationStatus: "unavailable",
+        findingCount: 1,
+      }).success,
+    ).toBe(false);
+    expect(reviewPatternEvaluatedPropertiesSchema.safeParse({ ...base, findingCount: 1.5 }).success).toBe(false);
+  });
+
+  it("fails closed when the pattern metadata does not match the registry", () => {
+    expect(reviewPatternEvaluatedPropertiesSchema.safeParse({ ...base, ruleVersion: 2 }).success).toBe(false);
+    expect(
+      reviewPatternEvaluatedPropertiesSchema.safeParse({
+        ...base,
+        patternId: "repeated-identical-attempt",
+      }).success,
+    ).toBe(false);
   });
 });

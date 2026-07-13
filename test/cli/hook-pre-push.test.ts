@@ -33,6 +33,7 @@ function fakeContext(payload: string): { ctx: CommandContext; out: () => string;
       recordPrFlowCompleted: () => {},
       recordHookConfigured: () => {},
       recordIntegrationSurfaceRendered: () => {},
+      recordReviewPatternEvaluated: () => {},
       noteMilestone: async () => {},
     },
     renderHelp: () => "",

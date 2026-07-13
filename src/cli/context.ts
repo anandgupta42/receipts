@@ -14,6 +14,7 @@ import {
   recordHookConfigured,
   recordIntegrationSurfaceRendered,
   recordPrFlowCompleted,
+  recordReviewPatternEvaluated,
   showTelemetryPayload,
 } from "../telemetry/index.js";
 
@@ -59,6 +60,7 @@ export function createContext(options: CliOptions, commands: readonly CommandDef
       recordPrFlowCompleted,
       recordHookConfigured,
       recordIntegrationSurfaceRendered,
+      recordReviewPatternEvaluated,
       noteMilestone,
     },
     renderHelp: () => assembleHelp(commands),

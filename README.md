@@ -213,9 +213,9 @@ receipt proves, and what it can't: [docs/trust.md](docs/trust.md) · `aireceipts
 
 ## Telemetry
 
-Anonymous diagnostics and usage signals, on by default (in CI too) — error classes,
-duration buckets, parse-failure signatures, feature enums, and coarse buckets. Never
-code, prompts, paths, titles, or dollar amounts. See exactly what a run would send:
+Content-free diagnostics and usage signals, on by default (in CI too) — error classes,
+duration buckets, parse-failure signatures, feature enums, coarse buckets, and disclosed
+aggregate review-rule counts. Never code, prompts, paths, titles, or dollar amounts. See exactly what a run would send:
 `aireceipts --telemetry-show`. Kill it: `AIRECEIPTS_TELEMETRY=off` or
 `DO_NOT_TRACK=1`. Schema and rationale: [docs/telemetry.md](docs/telemetry.md).
 

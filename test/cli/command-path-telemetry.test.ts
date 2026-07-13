@@ -36,6 +36,7 @@ vi.mock("node:os", async (importOriginal) => {
 import * as telemetry from "../../src/telemetry/index.js";
 import { peekQueuedEvents, __resetQueueForTests } from "../../src/telemetry/sender.js";
 import { validateEvent, RECEIPT_SURFACE_VALUES, COUNT_BUCKET_VALUES, ORDINAL_BUCKET_VALUES, type TelemetryEvent } from "../../src/telemetry/schemas.js";
+import { REVIEW_PATTERNS } from "../../src/receipt/reviewRegistry.js";
 import { main } from "../../src/cli/index.js";
 
 const fixturesDir = resolve(__dirname, "..", "fixtures");
@@ -126,6 +127,37 @@ describe("SPEC-0043 command-path telemetry", () => {
     const runs = events.filter((e) => e.name === "cli_run");
     expect(runs).toHaveLength(1);
     expect((runs[0].properties as Record<string, unknown>).commandClass).toBe("receipt");
+  });
+
+  it("every successful review invocation queues one exact observation per shadow rule, including zero", async () => {
+    expect(await main(["review"])).toBe(0);
+    expect(await main(["--handoff"])).toBe(0);
+    expect(telemetry.flushTelemetry).toHaveBeenCalledTimes(2);
+
+    const expectedPatternIds = REVIEW_PATTERNS.filter(({ pattern }) => pattern.rollout.state === "shadow").map(
+      ({ id }) => id,
+    );
+    const observations = peekQueuedEvents().filter((event) => event.name === "review_pattern_evaluated");
+    expect(observations).toHaveLength(expectedPatternIds.length * 2);
+    for (const patternId of expectedPatternIds) {
+      expect(observations.filter((event) => event.properties.patternId === patternId)).toHaveLength(2);
+    }
+    for (const event of observations) {
+      expect(validateEvent(event as TelemetryEvent)).toBe(true);
+      expect(Object.keys(event.properties).sort()).toEqual(
+        [
+          "agentType",
+          "evaluationStatus",
+          "findingCount",
+          "patternId",
+          "registryVersion",
+          "rolloutState",
+          "ruleVersion",
+        ].sort(),
+      );
+      expect(Number.isSafeInteger(event.properties.findingCount)).toBe(true);
+      expect(event.properties.findingCount).toBeGreaterThanOrEqual(0);
+    }
   });
 
   it("SPEC-0075 R6: scoped statusline advances the local counter but skips the network flush", async () => {

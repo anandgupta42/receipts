@@ -12,9 +12,11 @@ Invariants: **I1** — every finding is a deterministic local extractor result; 
 model calls and zero product-path network. **I2** — a dollar renders only from a dated
 matching price row; otherwise tokens or no impact. **I3** — evidence and impact roles
 are traceable, same-token repricing is labeled arithmetic, and no line predicts that a
-different model would finish the task. **I4** — the command works offline; no prompt,
-response, tool input/output, command, path, repository, finding, recommendation, or
-cost enters telemetry, and existing notice/show/opt-out contracts remain. **I5** — text
+different model would finish the task. **I4** — the command works offline; telemetry may
+carry only registry-defined rule identity/version, source family, evaluation state, and
+exact aggregate match count—never prompt/response, tool input/output, command, path,
+repository, evidence, recommendation, cost, or session identity—and existing
+notice/show/opt-out contracts remain. **I5** — text
 and JSON are byte-stable golden contracts. **I6** — the review reports recorded facts
 and caveated observations, never model or agent rankings and never a causal verdict the
 trace cannot support.
@@ -122,9 +124,10 @@ feature remains building rather than padding coverage with weaker heuristics.
   `last-change-not-checked` as: a recognized source write exists and no successful
   recognized validation occurs anywhere after the final source write. Do not use the
   rejected “final five actions” variant. Implement `last-check-still-failing` using a
-  stable normalized check key. Both start `shadow`: local dogfood computes aggregate
-  counts only, renders nothing, and sends no telemetry. Before promotion, freeze the
-  input corpus and audit at least 20 positives per supported source family plus at least
+  stable normalized check key. Both start `shadow`: evaluation renders nothing, while
+  every successful `review` invocation emits one zero-inclusive, registry-keyed aggregate
+  measurement per shadow rule under R13. Before promotion, freeze the input corpus and
+  audit at least 20 positives per supported source family plus at least
   30 adversarial boundary negatives covering documentation/generated writes, intentional
   red-phase tests, a later narrow passing check, wrappers, shell mutations, and
   unrecognized checks. Promotion requires zero predicate mismatches and no more than 10%
@@ -177,12 +180,23 @@ feature remains building rather than padding coverage with weaker heuristics.
   summaries. The hidden legacy invocation emits this same new schema. Strict export and
   documentation schemas reject unknown keys and enforce text/JSON parity.
 
-- **R13 — Telemetry records use, never findings.** Normalize both invocations to the
-  disclosed `review` command class and a `reviewFormat: "text" | "json"` feature enum.
-  Do not send pattern IDs, states, counts, coverage, recommendations, evidence, costs,
-  source paths, or whether any rule fired. `--telemetry-show`, opt-outs, allowlists, and
-  leakage fixtures cover the renamed command. Shadow evaluation is local dogfood only
-  and emits no event or payload field.
+- **R13 — Telemetry measures shadow rules on every successful review.** Normalize both
+  invocations to the disclosed `review` command class and a
+  `reviewFormat: "text" | "json"` feature enum. In the same per-invocation flush, emit
+  exactly one `review_pattern_evaluated` event for every registry entry whose rollout is
+  `shadow`, including zero-match and unavailable evaluations. Its strict fields are
+  `registryVersion`, fixed-enum `patternId`, `ruleVersion`, literal `rolloutState:
+  "shadow"`, fixed-enum `agentType`, `evaluationStatus: "evaluated" | "unavailable"`,
+  and exact non-negative integer `findingCount` (forced to zero when unavailable).
+  Hit percentages are derived in the telemetry workspace from evaluated rows including
+  zero matches; unavailable rows form a separate capability-coverage rate. No duplicated
+  percentage field ships. Never send evidence, recommendations, prompts,
+  messages, tool inputs/outputs, commands, paths, repositories, session/install IDs,
+  timestamps, models, or costs in this event. Registry/version/state mismatches fail
+  closed. Metrics are explicitly invocation-weighted and delivered-only: repeat reviews
+  count again, opt-outs/drops do not, and the result cannot replace R7's frozen-corpus
+  audit or estimate unique-session prevalence. `--telemetry-show`, opt-outs, allowlists,
+  and leakage fixtures still apply.
 
 - **R14 — Determinism, resource bounds, and product coverage.** The selected session is
   parsed once; recent recurrence reuses existing bounded loading and never adds an
@@ -216,8 +230,9 @@ feature remains building rather than padding coverage with weaker heuristics.
   actions, **when** shadow validation runs, **then** the rejected final-five predicate
   does not fire.
 - **Given** a final source edit with no later successful recognized check, **when** the
-  rule is still shadow, **then** no user output or telemetry changes; after and only
-  after promotion gates pass, the fixed prevention finding renders.
+  rule is still shadow, **then** no user output changes and its per-call telemetry event
+  reports the exact aggregate count; after and only after promotion gates pass, the fixed
+  prevention finding renders.
 - **Given** a long search streak or repeated query, **when** review runs in registry
   version 1, **then** neither disabled rule executes or renders even though its rationale
   remains in JSON.
@@ -230,8 +245,8 @@ feature remains building rather than padding coverage with weaker heuristics.
   same-provider lower row exists, **then** same-token arithmetic may render with its
   limitation and no task-success prediction.
 - **Given** the hidden legacy invocation and the public command with equal arguments,
-  **when** each runs, **then** text/JSON bytes are identical and telemetry classifies both
-  as review without revealing which patterns fired.
+  **when** each runs, **then** text/JSON bytes are identical and both emit the same
+  zero-inclusive, registry-keyed shadow measurements.
 
 ## Non-goals
 
@@ -274,7 +289,7 @@ feature remains building rather than padding coverage with weaker heuristics.
 | R6 overlap | identical error run that matches generic rules | one most-specific finding |
 | R6 reread | existing low-confidence positive | watch item; no waste/savings subtotal |
 | R7 safer tail | source write then pass then six other actions | no tail-gap firing |
-| R7 true tail | final source write, no later pass | shadow count only until promotion |
+| R7 true tail | final source write, no later pass | no rendering; exact shadow measurement until promotion |
 | R7 adversarial audit | frozen positives + boundary negatives | zero predicate mismatch; ≤10% inapplicable advice |
 | R8 disabled entries | all 15 disabled patterns | `extractor:null`; never executed/rendered/telemetried |
 | R9 clean result | no firing + unavailable capabilities | scoped empty state plus honest coverage |
@@ -282,7 +297,7 @@ feature remains building rather than padding coverage with weaker heuristics.
 | R10 impact roles | all four roles in one aggregate | unlike roles never summed/ranked as savings |
 | R11 recurrence | threshold across overlapping sessions | distinct-session count; one canonical generic recommendation |
 | R12 JSON | multiple findings + unavailable rule | findings keyed by stable ID; strict schema/text parity |
-| R13 telemetry | text/json, public/hidden, show/off | review class/format only; no finding data; opt-outs hold |
+| R13 telemetry | text/json, public/hidden, zero/positive/unavailable, show/off | one strict row per shadow rule per successful call; exact count including zero; forbidden data absent; opt-outs hold |
 | R14 source goldens | clean + three source families + unpriced | byte-stable text/JSON and correct capability coverage |
 | R14 determinism | same fixture/registry/window ×10 | byte-identical output |
 | R14 value | frozen full corpus after SPEC-0082 | ≥15% visible coverage and ≥10-point gain, or no ship claim |
@@ -305,6 +320,8 @@ feature remains building rather than padding coverage with weaker heuristics.
       with only aggregate privacy-safe measurements committed.
 - [x] No unlike impact roles are summed or described as recoverable savings.
 - [x] Text/JSON/privacy/telemetry/source/overlap/recurrence goldens and leakage tests pass.
+- [x] Every successful review emits one strict, zero-inclusive aggregate telemetry row
+      per shadow rule; backend percentages remain derived rather than duplicated.
 - [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
@@ -352,3 +369,10 @@ adversarial boundary fixtures have zero predicate mismatches, but the real-posit
 recommendation audit remains incomplete. Both rules stay shadow-only and no increased-
 coverage claim ships. Aggregate evidence:
 `docs/internal/research/measurements/session-review-2026-07-12.json`.
+
+**2026-07-13 · Maintainer telemetry amendment:** exact aggregate detector counts are
+approved product metadata when the schema fixes the registry key, version, state, and
+source family and excludes all evidence/content/identity fields. R7/R13 now require a
+zero-inclusive observation for every shadow rule on every successful review invocation;
+the delivered-event denominator lets the workspace derive hit percentages without a
+second percentage truth.

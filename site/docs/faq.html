@@ -347,7 +347,7 @@ footer{
 
 <h2 id="does-aireceipts-send-anything-off-my-machine">Does aireceipts send anything off my machine?</h2>
 
-<p>The product path is fully offline. The only network call is content-free telemetry from a fixed nine-event catalog — never transcript content, prompts, file paths, repo names, or dollar amounts. It is on by default; <code>aireceipts --telemetry-show</code> prints exactly what the current run would send (and sends nothing), and <code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code> means zero network calls. The authoritative schema, field by field: <a href="telemetry.html">telemetry.md</a>.</p>
+<p>The product path is fully offline. The only network call is content-free telemetry from a fixed ten-event catalog, including disclosed aggregate review-rule counts — never transcript content, prompts, file paths, repo names, or dollar amounts. It is on by default; <code>aireceipts --telemetry-show</code> prints exactly what the current run would send (and sends nothing), and <code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code> means zero network calls. The authoritative schema, field by field: <a href="telemetry.html">telemetry.md</a>.</p>
 
 <h2 id="can-i-trust-the-numbers-could-someone-fake-a-receipt">Can I trust the numbers? Could someone fake a receipt?</h2>
 

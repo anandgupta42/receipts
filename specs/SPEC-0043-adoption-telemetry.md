@@ -32,13 +32,15 @@ disagree — the amendment must land there, not only here).
 
 ## Requirements
 
-- **R1 — Event catalog v2, exactly nine names.** `EVENT_NAMES` becomes {`cli_run`,
+- **R1 — Event catalog, exactly ten names.** `EVENT_NAMES` is {`cli_run`,
   `cli_error`, `parse_failure`, `receipt_generated`, `export_generated`,
   `pr_flow_completed`, `hook_configured`, `integration_surface_rendered`,
-  `activation_milestone`}. `cli_error` and `parse_failure` are unchanged. The
-  exhaustive-name test moves from "exactly three" to this closed set. Every new schema
-  follows SPEC-0002 R3 verbatim: `.strict()` zod, enum/bucket/boolean/bounded-hash
-  fields only, no free text anywhere, invalid events dropped not sanitized.
+  `activation_milestone`, `review_pattern_evaluated`}. `cli_error` and
+  `parse_failure` are unchanged. The exhaustive-name test pins this closed set. Every
+  schema is strict and free-text-free; fields are fixed enums, booleans, buckets,
+  bounded hashes, or an explicitly decision-scoped exact aggregate count. Invalid
+  events are dropped, not sanitized. SPEC-0083 R13 owns the tenth event's fields and
+  per-review emission rule.
 - **R2 — `cli_run` widened.** `commandClass` becomes the full registry command enum —
   the 17 existing names under `src/cli/commands/` plus R7's new `stats`, 18 total; the
   {receipt, compare, other} collapse made per-feature adoption invisible. The
@@ -122,12 +124,12 @@ disagree — the amendment must land there, not only here).
   identifier"; `docs/telemetry.md` documents every new event field-by-field (parity with
   schemas) and states plainly that (a) the install identifier links events from the same
   install, and (b) like any HTTPS request, the sink records an arrival time per batch —
-  the payload-field ban on raw counts/timestamps is about *fields we choose*, not a
-  denial of transport metadata. README one-liner still accurate. New leakage fixtures:
-  payloads seeded with paths/prompts/dollar strings/raw counts/raw UUIDs must be
-  rejected by every new schema. The banned-forever list (SPEC-0002 R3) is unchanged and
-  applies to all nine events; raw counts and raw timestamps join it **as payload
-  fields** (buckets only).
+  the payload-field ban on raw timestamps is about *fields we choose*, not a denial of
+  transport metadata. README one-liner stays accurate. New leakage fixtures reject
+  paths/prompts/dollar strings/raw UUIDs and unlisted count fields. Exact aggregate
+  counts are permitted only when a spec names the product decision, a strict schema
+  names the field, dimensions are fixed enums/versions, and content/evidence/identity
+  remain structurally impossible. SPEC-0083's `findingCount` is the first such field.
 - **R10 — `--telemetry-show` sends nothing (bug fix).** `main()`
   (`src/cli/index.ts:26-36`) currently records `cli_run` and flushes even when the
   selected command is `telemetry-show`, contradicting SPEC-0002 R5's "prints … instead
@@ -165,8 +167,9 @@ disagree — the amendment must land there, not only here).
 
 ## Non-goals
 
-- **No raw counts, timings, or timestamps as payload fields** — buckets only. The local
-  file keeps exact counts (it never leaves the machine).
+- **No arbitrary raw session data, timings, or timestamps as payload fields.** General
+  usage counts stay bucketed; a decision-scoped aggregate count may be exact only under
+  R9's schema, disclosure, and content-exclusion gate.
 - **No per-stage pipeline timing events** — high volume, low decision value today.
 - **No detail events for week/handoff/budget/benchmark** — R2 covers their adoption.
 - **No `receipt_generated` from statusline/quota** — passive surfaces would flood the
@@ -183,8 +186,8 @@ disagree — the amendment must land there, not only here).
 
 | Case | Input | Expected |
 |---|---|---|
-| R1 exhaustive names | event-name assertion | exactly the nine names, nothing else |
-| R1 leakage fixtures | payloads w/ paths, prompts, $, raw UUIDs, raw counts | every new schema rejects |
+| R1 exhaustive names | event-name assertion | exactly the ten names, nothing else |
+| R1 leakage fixtures | payloads w/ paths, prompts, $, raw UUIDs, unlisted counts | every schema rejects |
 | R2 command enum | each of the 18 commands | maps to its own enum value; unknown → dropped event |
 | R2 isCI | `CI=true` env | `isCI: true`; unset → false |
 | R2 runOrdinal boundaries | runCount 1, 3, 10, 51 | `1`, `2-3`, `4-10`, `>50` |
@@ -204,7 +207,7 @@ disagree — the amendment must land there, not only here).
 | R7 concurrent runs | two interleaved read-modify-writes | valid JSON survives; a lost increment is acceptable, corruption is not |
 | R8 seam | fake ctx.telemetry in command tests | recorders receive bounded values only |
 | R10 show no-send | `--telemetry-show` under mocked network | zero calls, zero recorded events; lifecycle test updated |
-| R9 docs parity | docs/telemetry.md vs schemas | field lists identical (parity test extended to all nine) |
+| R9 docs parity | docs/telemetry.md vs schemas | field lists identical (parity test extended to all ten) |
 | R9 governance parity | SPEC-0000 + AGENTS.md I4 | amended wording lands with the implementation |
 | R11 budget | hung sender stub | CLI completes ≤300ms budget |
 
@@ -214,7 +217,7 @@ disagree — the amendment must land there, not only here).
       100-session opencode stress tests time out on the loaded dev machine — reproduced
       byte-identical on unmodified `main`, unrelated to this spec's rows; CI is the
       arbiter for those).
-- [x] `docs/telemetry.md` documents all nine events; notice text updated; README still
+- [x] `docs/telemetry.md` documents the event catalog; notice text updated; README still
       one honest sentence.
 - [x] AGENTS.md I4 **and** SPEC-0000's telemetry sentences amended to name pseudonymous
       feature-adoption telemetry + this spec (founder-authorized; SPEC-0000 outranks).
@@ -280,3 +283,9 @@ commissioning session — "telemetry … should be speced and implemented," expa
 privacy boundary ("shouldn't come at cost of leaking personal information"), and the
 receipts counter all named by the maintainer directly. Approval recorded post-S2 rework,
 consistent with the SPEC-0037 in-session approval precedent.
+
+**2026-07-13 · Amendment (maintainer decision):** product metadata may include exact
+aggregate counts when they are necessary for a named product decision and carried by a
+strict, disclosed, content-free schema. SPEC-0083 adds `review_pattern_evaluated` on
+every successful session review, including zero and unavailable rows, so per-rule hit
+percentages have a valid denominator. Transcript evidence and identity remain forbidden.

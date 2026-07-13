@@ -5,7 +5,7 @@ import { partitionWindows, windowBounds } from "../../aggregate/week.js";
 import { listFullSessions, loadSession } from "../../index.js";
 import type { Session } from "../../parse/types.js";
 import { mapWithConcurrency } from "../../parse/util.js";
-import { buildReviewReport, DEFAULT_REVIEW_THRESHOLD, renderReview } from "../../receipt/review.js";
+import { buildReviewReportWithMeasurements, DEFAULT_REVIEW_THRESHOLD, renderReview } from "../../receipt/review.js";
 import { resolveSelector } from "../common/session.js";
 import type { CommandContext, CommandDef } from "../types.js";
 
@@ -73,8 +73,11 @@ async function run(ctx: CommandContext): Promise<number> {
   }
 
   const recent = await recentReviewSessions(ctx.now(), [session]);
-  const report = await buildReviewReport(session, recent, threshold);
+  const { report, patternMeasurements } = await buildReviewReportWithMeasurements(session, recent, threshold);
   ctx.stdout.write((options.json ? JSON.stringify(report, null, 2) : renderReview(report)) + "\n");
+  for (const measurement of patternMeasurements) {
+    ctx.telemetry.recordReviewPatternEvaluated(measurement);
+  }
   return 0;
 }
 

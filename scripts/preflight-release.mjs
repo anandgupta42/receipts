@@ -23,7 +23,7 @@ import { promisify } from "node:util";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const r = (p) => join(ROOT, p);
 
-// Ceilings: the SPEC-0083 publish artifact is 73 files / 650.3 KiB.
+// Ceilings: the SPEC-0083 publish artifact is 74 files / 653.6 KiB.
 // Keep narrow headroom so normal runtime growth fits while a real regression
 // (sourcemaps back, a stray directory) still trips the release gate.
 export const MAX_TARBALL_FILES = 80;

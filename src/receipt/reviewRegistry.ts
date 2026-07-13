@@ -185,8 +185,11 @@ const patternSchema = z
   .strict();
 
 export type ReviewPatternId = keyof typeof reviewRegistryJson.patterns;
-const PATTERN_IDS = Object.keys(reviewRegistryJson.patterns) as ReviewPatternId[];
-const patternShape = Object.fromEntries(PATTERN_IDS.map((id) => [id, patternSchema])) as Record<
+export const REVIEW_PATTERN_IDS = Object.keys(reviewRegistryJson.patterns) as [
+  ReviewPatternId,
+  ...ReviewPatternId[],
+];
+const patternShape = Object.fromEntries(REVIEW_PATTERN_IDS.map((id) => [id, patternSchema])) as Record<
   ReviewPatternId,
   typeof patternSchema
 >;
@@ -205,9 +208,9 @@ type ExtractorId = ExtractorConfig["id"];
 
 export function validateReviewRegistry(value: unknown): ReviewRegistry {
   const registry = registrySchema.parse(value);
-  const ids = new Set(PATTERN_IDS);
+  const ids = new Set(REVIEW_PATTERN_IDS);
   const orders = new Set<number>();
-  for (const id of PATTERN_IDS) {
+  for (const id of REVIEW_PATTERN_IDS) {
     const pattern = registry.patterns[id];
     if (orders.has(pattern.order)) {
       throw new Error("Duplicate review pattern order: " + pattern.order);
@@ -236,7 +239,7 @@ export function validateReviewRegistry(value: unknown): ReviewRegistry {
 
 export const REVIEW_REGISTRY = validateReviewRegistry(reviewRegistryJson);
 
-export const REVIEW_PATTERNS = PATTERN_IDS
+export const REVIEW_PATTERNS = REVIEW_PATTERN_IDS
   .map((id) => ({ id, pattern: REVIEW_REGISTRY.patterns[id] }))
   .sort((a, b) => a.pattern.order - b.pattern.order || a.id.localeCompare(b.id));
 

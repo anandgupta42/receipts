@@ -57,11 +57,11 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
   lines are labeled (arithmetic vs ≈ estimate), and no line ever claims another model
   would have completed the task.
 - **I4 — Local-first; diagnostics + adoption telemetry, disclosed and escapable.** The
-  product works fully offline. The only network call is content-free telemetry (Azure
-  App Insights): command, coarse buckets, versions, agent type, error class, parse-failure
-  signature, feature-usage enums, and a random (never machine-derived) install identifier
-  sent only as a salted hash — NEVER transcript content, prompts, file paths, repo names,
-  or dollar amounts; raw counts/timestamps never ship as payload fields. First-run notice;
+  product works fully offline. The only network call is disclosed telemetry (Azure App
+  Insights): schema-enumerated product metadata, including versions, agent type, feature
+  enums/buckets, and bounded aggregate detector counts, plus a random (never machine-derived)
+  install identifier sent only as a salted hash — NEVER transcript content, prompts, file
+  paths, repo names, dollar amounts, or raw timestamps. First-run notice;
   `--telemetry-show` prints the exact payload; `AIRECEIPTS_TELEMETRY=off` or
   `DO_NOT_TRACK=1` kills it. (SPEC-0002, SPEC-0043.)
 

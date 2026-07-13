@@ -1,16 +1,18 @@
 import { z } from "zod";
 import { TEMPLATE_NAMES } from "../receipt/blocks.js";
+import { REVIEW_PATTERN_IDS, REVIEW_REGISTRY } from "../receipt/reviewRegistry.js";
 
 /**
  * Allowlist schemas for SPEC-0002/SPEC-0043 telemetry events (R1-R5).
  *
- * Every field is enum-only, boolean, bucketed, or a bounded-format hash. There
- * is no free-text field anywhere in this module. `.strict()` rejects any payload
- * carrying an extra key, so a caller can never smuggle a path, prompt, raw count,
- * timestamp, or dollar string under a new name. Banned forever, and structurally
+ * Every field is enum-only, boolean, bucketed, a bounded-format hash, or an
+ * explicitly decision-scoped aggregate safe integer. There is no free-text field
+ * anywhere in this module. `.strict()` rejects any unlisted payload key. Banned
+ * forever, and structurally
  * unrepresentable here: transcript content, prompts, file paths, repo names,
- * hostnames, usernames, session IDs, dollar amounts, raw counts, raw timestamps,
- * and raw model strings (I4, SPEC-0002 R3, SPEC-0043 R9).
+ * hostnames, usernames, session IDs, dollar amounts, raw timestamps, and raw
+ * model strings (I4, SPEC-0002 R3, SPEC-0043 R9). Exact aggregate counts require
+ * an individually named schema field and product decision (SPEC-0083 R13).
  */
 
 export const OS_VALUES = ["darwin", "linux", "win32", "other"] as const;
@@ -148,6 +150,9 @@ const adapterVersionSchema = z.string().regex(/^[a-zA-Z0-9_.-]{1,32}$/, "adapter
 export const REVIEW_FORMAT_VALUES = ["text", "json"] as const;
 export type ReviewFormatValue = (typeof REVIEW_FORMAT_VALUES)[number];
 
+export const REVIEW_EVALUATION_STATUS_VALUES = ["evaluated", "unavailable"] as const;
+export type ReviewEvaluationStatusValue = (typeof REVIEW_EVALUATION_STATUS_VALUES)[number];
+
 export const cliRunPropertiesSchema = z
   .object({
     cliVersion: cliVersionSchema,
@@ -269,7 +274,30 @@ export const activationMilestonePropertiesSchema = z
   .strict();
 export type ActivationMilestoneProperties = z.infer<typeof activationMilestonePropertiesSchema>;
 
-/** Exactly nine event names exist (SPEC-0043 R1) — this array is the single source of truth other modules and tests assert against. */
+/** SPEC-0083 R13 — one zero-inclusive, content-free aggregate row per shadow rule and successful review. */
+export const reviewPatternEvaluatedPropertiesSchema = z
+  .object({
+    registryVersion: z.literal(REVIEW_REGISTRY.registryVersion),
+    patternId: z.enum(REVIEW_PATTERN_IDS),
+    ruleVersion: z.number().int().positive().safe(),
+    rolloutState: z.literal("shadow"),
+    agentType: z.enum(AGENT_TYPE_VALUES),
+    evaluationStatus: z.enum(REVIEW_EVALUATION_STATUS_VALUES),
+    findingCount: z.number().int().nonnegative().safe(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    const pattern = REVIEW_REGISTRY.patterns[value.patternId];
+    if (pattern.ruleVersion !== value.ruleVersion || pattern.rollout.state !== value.rolloutState) {
+      ctx.addIssue({ code: "custom", message: "review pattern metadata does not match the registry" });
+    }
+    if (value.evaluationStatus === "unavailable" && value.findingCount !== 0) {
+      ctx.addIssue({ code: "custom", message: "unavailable review patterns must report zero findings" });
+    }
+  });
+export type ReviewPatternEvaluatedProperties = z.infer<typeof reviewPatternEvaluatedPropertiesSchema>;
+
+/** Exactly ten event names exist (SPEC-0043 R1) — this array is the single source of truth other modules and tests assert against. */
 export const EVENT_NAMES = [
   "cli_run",
   "cli_error",
@@ -280,6 +308,7 @@ export const EVENT_NAMES = [
   "hook_configured",
   "integration_surface_rendered",
   "activation_milestone",
+  "review_pattern_evaluated",
 ] as const;
 export type EventName = (typeof EVENT_NAMES)[number];
 
@@ -319,6 +348,10 @@ export interface ActivationMilestoneEvent {
   name: "activation_milestone";
   properties: ActivationMilestoneProperties;
 }
+export interface ReviewPatternEvaluatedEvent {
+  name: "review_pattern_evaluated";
+  properties: ReviewPatternEvaluatedProperties;
+}
 export type TelemetryEvent =
   | CliRunEvent
   | CliErrorEvent
@@ -328,7 +361,8 @@ export type TelemetryEvent =
   | PrFlowCompletedEvent
   | HookConfiguredEvent
   | IntegrationSurfaceRenderedEvent
-  | ActivationMilestoneEvent;
+  | ActivationMilestoneEvent
+  | ReviewPatternEvaluatedEvent;
 
 /** `event.name` → its properties schema, exhaustive over `EVENT_NAMES`. */
 export const PROPERTIES_SCHEMA_BY_EVENT_NAME = {
@@ -341,6 +375,7 @@ export const PROPERTIES_SCHEMA_BY_EVENT_NAME = {
   hook_configured: hookConfiguredPropertiesSchema,
   integration_surface_rendered: integrationSurfaceRenderedPropertiesSchema,
   activation_milestone: activationMilestonePropertiesSchema,
+  review_pattern_evaluated: reviewPatternEvaluatedPropertiesSchema,
 } as const satisfies Record<EventName, z.ZodTypeAny>;
 
 /** Validates a full envelope (name + properties) against its schema. Never throws — returns `false` on any mismatch, including an unrecognized `name`. */

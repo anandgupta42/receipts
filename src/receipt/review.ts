@@ -128,6 +128,22 @@ export interface ReviewReport {
   };
 }
 
+/** Content-free, registry-derived row recorded once per shadow rule for a selected review. */
+export interface ReviewPatternMeasurement {
+  registryVersion: typeof REVIEW_REGISTRY.registryVersion;
+  patternId: ReviewPatternId;
+  ruleVersion: number;
+  rolloutState: "shadow";
+  agentType: AgentSource;
+  evaluationStatus: "evaluated" | "unavailable";
+  findingCount: number;
+}
+
+export interface ReviewBuildResult {
+  report: ReviewReport;
+  patternMeasurements: readonly ReviewPatternMeasurement[];
+}
+
 /** Registry-backed, privacy-safe review block shared by PR comments and artifacts. */
 export interface PrReviewView {
   summary: string;
@@ -333,12 +349,27 @@ function sessionKey(session: Pick<Session, "source" | "id">): string {
   return session.source + "\0" + session.id;
 }
 
-export async function buildReviewReport(
+function patternMeasurementsOf(evaluation: SessionReviewEvaluation): ReviewPatternMeasurement[] {
+  return REVIEW_PATTERNS.filter(({ pattern }) => pattern.rollout.state === "shadow").map(({ id, pattern }) => {
+    const extracted = evaluation.events.get(id);
+    return {
+      registryVersion: REVIEW_REGISTRY.registryVersion,
+      patternId: id,
+      ruleVersion: pattern.ruleVersion,
+      rolloutState: "shadow",
+      agentType: evaluation.source,
+      evaluationStatus: extracted === undefined ? "unavailable" : "evaluated",
+      findingCount: extracted?.length ?? 0,
+    };
+  });
+}
+
+export async function buildReviewReportWithMeasurements(
   selected: Session,
   recentSessions: readonly Session[] = [],
   threshold: number = DEFAULT_REVIEW_THRESHOLD,
   dataDir: string = defaultDataDir(),
-): Promise<ReviewReport> {
+): Promise<ReviewBuildResult> {
   const selectedEvaluation = await evaluateSessionReview(selected, dataDir);
   const uniqueRecent = new Map<string, Session>();
   for (const session of recentSessions) {
@@ -372,7 +403,7 @@ export async function buildReviewReport(
     findings[id] = finding;
   }
 
-  return {
+  const report: ReviewReport = {
     schemaVersion: REVIEW_SCHEMA_VERSION,
     review: {
       registryVersion: REVIEW_REGISTRY.registryVersion,
@@ -390,6 +421,16 @@ export async function buildReviewReport(
       },
     },
   };
+  return { report, patternMeasurements: patternMeasurementsOf(selectedEvaluation) };
+}
+
+export async function buildReviewReport(
+  selected: Session,
+  recentSessions: readonly Session[] = [],
+  threshold: number = DEFAULT_REVIEW_THRESHOLD,
+  dataDir: string = defaultDataDir(),
+): Promise<ReviewReport> {
+  return (await buildReviewReportWithMeasurements(selected, recentSessions, threshold, dataDir)).report;
 }
 
 function evidenceText(evidence: ReviewEvidence): string {

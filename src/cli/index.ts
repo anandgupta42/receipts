@@ -42,7 +42,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         agentType: undefined,
         durationMs: Date.now() - started,
         ok: code === 0,
-        // SPEC-0083 R13 — review mode only; never findings, counts, or evidence.
+        // SPEC-0083 R13 — lifecycle format only; aggregate rule measurements are separate strict events.
         ...(command.name === "review" ? { reviewFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
         ...runTelemetry,
       });

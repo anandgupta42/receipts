@@ -46,11 +46,11 @@ doubt, this file wins.
   its attribution methodology; cheaper-model lines are labeled (arithmetic vs ≈ estimate),
   and no line ever claims another model would have completed the task.
 - **I4 — Local-first; diagnostics + adoption telemetry, disclosed and escapable.** Offline-
-  complete product; content-free diagnostics and feature-adoption events to App Insights
-  (perf + error + parse-failure signals, feature-usage enums/buckets, and a random install
-  identifier sent only as a salted hash — the pseudonymous key for adoption/retention
-  counts). Never content/paths/repos/prompts/$ amounts; raw counts/timestamps never ship
-  as payload fields. First-run notice, payload inspectable, `AIRECEIPTS_TELEMETRY=off` /
+  complete product; disclosed diagnostics and schema-enumerated product metadata to App
+  Insights (perf/error/parse-failure signals, feature enums/buckets, bounded aggregate
+  detector counts, and a random install identifier sent only as a salted hash — the
+  pseudonymous key for adoption/retention counts). Never content/paths/repos/prompts/$
+  amounts or raw timestamps. First-run notice, payload inspectable, `AIRECEIPTS_TELEMETRY=off` /
   `DO_NOT_TRACK=1`. Details + schema: SPEC-0002, SPEC-0043.
 
 - **I5 — The receipt is a byte-stable contract.** Goldens gate all output changes.

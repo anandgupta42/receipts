@@ -374,7 +374,7 @@ no price table matched</code></pre>
 
 <p>The very first time you run aireceipts, it prints this once:</p>
 
-<pre class="doc-code"><code>aireceipts sends anonymous, content-free diagnostics and feature-usage events (command, coarse buckets, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md</code></pre>
+<pre class="doc-code"><code>aireceipts sends content-free diagnostics and feature-usage events (command, coarse buckets, aggregate review-rule counts, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md</code></pre>
 
 <p>It never prints again after that. To turn telemetry off entirely (zero network calls — not &quot;less,&quot; zero), set either environment variable:</p>
 

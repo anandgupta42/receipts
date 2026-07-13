@@ -51,6 +51,7 @@ describe("R5: first-run disclosure notice", () => {
 
   it("mentions both kill switches, --telemetry-show, and docs/telemetry.md", () => {
     expect(FIRST_RUN_NOTICE).toContain("feature-usage events");
+    expect(FIRST_RUN_NOTICE).toContain("aggregate review-rule counts");
     expect(FIRST_RUN_NOTICE).toContain("random install identifier");
     expect(FIRST_RUN_NOTICE).toContain("AIRECEIPTS_TELEMETRY=off");
     expect(FIRST_RUN_NOTICE).toContain("DO_NOT_TRACK=1");

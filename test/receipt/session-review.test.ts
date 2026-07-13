@@ -10,6 +10,7 @@ import {
 } from "../../src/receipt/reviewRegistry.js";
 import {
   buildReviewReport,
+  buildReviewReportWithMeasurements,
   evaluateSessionReview,
   renderReview,
 } from "../../src/receipt/review.js";
@@ -233,6 +234,41 @@ describe("SPEC-0083 session issue detection", () => {
     expect(Object.keys(report.review.findings)).toEqual([]);
     expect(renderReview(report)).toContain("No supported issues found in the recorded evidence.");
     expect(renderReview(report)).not.toContain("final code change");
+  });
+
+  it("produces one zero-inclusive, registry-derived measurement for every shadow rule", async () => {
+    const selected = session("unchecked-measurement", [
+      call("Write", { file_path: "src/final.ts", content: "redacted" }),
+    ]);
+    const { report, patternMeasurements } = await buildReviewReportWithMeasurements(selected);
+    expect(Object.keys(report.review.findings)).toEqual([]);
+    expect(patternMeasurements).toEqual([
+      {
+        registryVersion: 1,
+        patternId: "last-change-not-checked",
+        ruleVersion: 1,
+        rolloutState: "shadow",
+        agentType: "claude-code",
+        evaluationStatus: "evaluated",
+        findingCount: 1,
+      },
+      {
+        registryVersion: 1,
+        patternId: "last-check-still-failing",
+        ruleVersion: 1,
+        rolloutState: "shadow",
+        agentType: "claude-code",
+        evaluationStatus: "evaluated",
+        findingCount: 0,
+      },
+    ]);
+  });
+
+  it("keeps unavailable shadow rules in the per-call measurements with an exact zero", async () => {
+    const { patternMeasurements } = await buildReviewReportWithMeasurements(session("limited-measurement", [], "gemini"));
+    expect(patternMeasurements).toHaveLength(2);
+    expect(patternMeasurements.every((measurement) => measurement.evaluationStatus === "unavailable")).toBe(true);
+    expect(patternMeasurements.every((measurement) => measurement.findingCount === 0)).toBe(true);
   });
 
   it("applies the same source-write predicate across the three audited source families", async () => {

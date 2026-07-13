@@ -13,6 +13,7 @@ import {
   recordIntegrationSurfaceRendered,
   recordParseFailure,
   recordPrFlowCompleted,
+  recordReviewPatternEvaluated,
   showTelemetryPayload,
   type RecordCliErrorInput,
   type RecordCliRunInput,
@@ -83,6 +84,34 @@ describe("SPEC-0083 R13 — reviewFormat pass-through", () => {
     recordCliRun({ command: "receipt", agentType: undefined, durationMs: 10, ok: true, ...RUN_BASE });
     const [event] = peekQueuedEvents();
     expect("reviewFormat" in (event?.properties as Record<string, unknown>)).toBe(false);
+    expect(validateEvent(event as TelemetryEvent)).toBe(true);
+  });
+});
+
+describe("SPEC-0083 R13 — registry-keyed aggregate review measurements", () => {
+  it("records the exact zero-inclusive count without evidence or identity", () => {
+    recordReviewPatternEvaluated({
+      registryVersion: 1,
+      patternId: "last-change-not-checked",
+      ruleVersion: 1,
+      rolloutState: "shadow",
+      agentType: "opencode",
+      evaluationStatus: "evaluated",
+      findingCount: 0,
+    });
+    const [event] = peekQueuedEvents();
+    expect(event).toEqual({
+      name: "review_pattern_evaluated",
+      properties: {
+        registryVersion: 1,
+        patternId: "last-change-not-checked",
+        ruleVersion: 1,
+        rolloutState: "shadow",
+        agentType: "opencode",
+        evaluationStatus: "evaluated",
+        findingCount: 0,
+      },
+    });
     expect(validateEvent(event as TelemetryEvent)).toBe(true);
   });
 });
@@ -170,6 +199,15 @@ describe("SPEC-0043 recorders", () => {
       customFormat: false,
       scoped: true,
       configFile: true,
+    });
+    recordReviewPatternEvaluated({
+      registryVersion: 1,
+      patternId: "last-check-still-failing",
+      ruleVersion: 1,
+      rolloutState: "shadow",
+      agentType: "codex",
+      evaluationStatus: "evaluated",
+      findingCount: 1,
     });
 
     const names = peekQueuedEvents().map((e) => e.name);
