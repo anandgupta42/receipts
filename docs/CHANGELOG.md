@@ -3,6 +3,21 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.10.0 — 2026-07-13
+
+Minor: **the adoption funnel is now measurable** (PR #257). `setup` and
+`integrations` runs emit the standard content-free `cli_run` event (previously
+invisible — the strict schema dropped uncatalogued command names), and a
+non-zero `cli_run` now carries an `exitClass` enum classifying deliberate
+failures: `no-session-match` | `invalid-arguments` | `budget-exceeded` |
+`not-comparable` | `other-controlled`. Thrown errors keep their separate
+`cli_error`/`errorClass` channel; the two never double-report a run.
+Motivation: the 2026-07-10/11 launch cohort's most common event was a
+receipt-class run exiting non-zero with no diagnosable cause. Everything stays
+content-free (SPEC-0043 amended; `docs/telemetry.md` in schema-pinned parity):
+the class only — never selectors, paths, or messages. The hidden pre-push hook
+and statusline polling remain telemetry-silent.
+
 ## v0.9.1 — 2026-07-13
 
 Patch: **the SPEC-0073 auto-attach hook now fires for the commands coding agents
