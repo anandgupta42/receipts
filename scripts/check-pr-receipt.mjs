@@ -41,7 +41,13 @@ export function isExemptRef(headRef, exemptGlobs) {
   return exemptGlobs
     .split(/\s+/)
     .filter(Boolean)
-    .some((glob) => new RegExp(`^${glob.split("*").map(escapeRegExp).join(".*")}$`).test(headRef));
+    .some((glob) => {
+      // Collapse `*` runs: `a**b` and `a*b` match the same strings, and the
+      // collapsed form can't compile to adjacent `.*.*` (catastrophic
+      // backtracking on long non-matching refs).
+      const pattern = glob.replace(/\*+/g, "*").split("*").map(escapeRegExp).join(".*");
+      return new RegExp(`^${pattern}$`).test(headRef);
+    });
 }
 
 /**
