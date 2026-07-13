@@ -11,7 +11,7 @@ Run `aireceipts review` to inspect a completed coding session. The review report
 | Shown as a cost opportunity | Shown when listed prices give a lower arithmetic result for the same recorded usage. |
 | Shown as an issue | Shown when the recorded evidence matches the rule. |
 | Shown as something to watch | Shown with an extra caution because there may be a reasonable explanation. |
-| Measured only | Evaluated during development, but not shown in command output or sent in telemetry. |
+| Measured only | Checked on each successful review but not shown in the result. When telemetry is enabled, we send which pattern was checked, whether it could be checked, and how many matches it found — not transcript text or evidence. See [telemetry](../telemetry.md). |
 | Not run | Kept in the registry so the idea and its limitations are not lost, but it is not evaluated. |
 
 Registry version: 1. Pattern count: 23.

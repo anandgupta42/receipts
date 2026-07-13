@@ -25,7 +25,7 @@ const STATUS = Object.freeze({
   },
   shadow: {
     label: "Measured only",
-    explanation: "Evaluated during development, but not shown in command output or sent in telemetry.",
+    explanation: "Checked on each successful review but not shown in the result. When telemetry is enabled, we send which pattern was checked, whether it could be checked, and how many matches it found — not transcript text or evidence. See [telemetry](../telemetry.md).",
   },
   disabled: {
     label: "Not run",
