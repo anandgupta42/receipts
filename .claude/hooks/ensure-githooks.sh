@@ -23,7 +23,10 @@ git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0
 current=$(git -C "$root" config core.hooksPath 2>/dev/null)
 case "$current" in
   ".githooks") ;; # healthy
-  "" | */.githooks)
+  "" | /*/.githooks)
+    # Unset, or an ABSOLUTE ".githooks" (our own convention gone stale, the
+    # 2026-07-13 poison). A relative custom path like "tools/.githooks" is a
+    # deliberate setup and falls through to the NOTE branch below.
     git -C "$root" config core.hooksPath .githooks 2>/dev/null || true
     if [ "$(git -C "$root" config core.hooksPath 2>/dev/null)" = ".githooks" ]; then
       echo "aireceipts: repaired core.hooksPath ('${current:-unset}' -> '.githooks')"
