@@ -76,4 +76,18 @@ describe("recentWasteAggregates", () => {
     expect(listSessionsMock).not.toHaveBeenCalled();
     expect(loadSessionMock).not.toHaveBeenCalled();
   });
+
+  it("reuses the selected body and loads each other recent identity once", async () => {
+    const selected = wasteSession("selected", NOW - DAY_MS);
+    const otherSummary = summary("other", NOW - 2 * DAY_MS);
+    const duplicateOther = { ...otherSummary };
+    const other = wasteSession("other", NOW - 2 * DAY_MS);
+    listFullSessionsMock.mockResolvedValue([selected, otherSummary, duplicateOther]);
+    loadSessionMock.mockResolvedValue(other);
+
+    await recentWasteAggregates(NOW, [selected]);
+
+    expect(loadSessionMock).toHaveBeenCalledOnce();
+    expect(loadSessionMock).toHaveBeenCalledWith(otherSummary);
+  });
 });

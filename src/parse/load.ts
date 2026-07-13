@@ -65,8 +65,14 @@ export async function listFullSessions(agent?: AgentSource, opts?: { includeDegr
   const lists = await Promise.all(
     pool.map(async (adapter) => {
       try {
-        if (adapter.id === "cursor" || adapter.id === "opencode") {
+        if (adapter.id === "cursor") {
           return adapter.listSessions({ full: true });
+        }
+        if (adapter.id === "opencode") {
+          // Its SQL summaries already carry the completed token/tool/time facts.
+          // Parsing every SQLite body here violates SessionSummary's lightweight
+          // contract and makes inventory memory scale with private body content.
+          return adapter.listSessions();
         }
         const lazy = await adapter.listSessions();
         return completeSummariesWithCache(lazy, {
@@ -111,9 +117,17 @@ export async function anyDetected(): Promise<boolean> {
 
 /** A human-readable list of the roots we looked in, for "nothing found" error messages. */
 export function rootsHint(): string {
+  const seen = new Set<string>();
   return adapters()
-    .map((a) => a.roots()[0])
-    .filter((r): r is string => typeof r === "string")
+    .flatMap((adapter) => adapter.roots())
+    .filter((root): root is string => typeof root === "string" && root.length > 0)
+    .filter((root) => {
+      if (seen.has(root)) {
+        return false;
+      }
+      seen.add(root);
+      return true;
+    })
     .join(", ");
 }
 

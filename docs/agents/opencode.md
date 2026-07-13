@@ -39,6 +39,28 @@ opencode's local data directory, read-only:
 | macOS / Linux | `~/.local/share/opencode` |
 | Windows | `%LOCALAPPDATA%\opencode` |
 
+If sessions live in more than one data directory, provide every root explicitly:
+
+```sh
+# macOS / Linux (`:` separates roots)
+OPENCODE_DATA_DIRS="$HOME/.local/share/opencode:/path/to/another/store" aireceipts --list
+
+# Windows (`;` separates roots)
+set OPENCODE_DATA_DIRS=%LOCALAPPDATA%\opencode;D:\another\store
+```
+
+`OPENCODE_DATA_DIRS` is opt-in; it does not change the normal default. aireceipts
+checks only top-level, non-symlink `.db` files in those roots—never a recursive
+filesystem search—and opens compatible databases read-only. Compatibility is based on
+the required table columns, not the filename, so older stores without optional session
+summary columns still load from their message-level evidence. Duplicate normalized
+roots are scanned once in deterministic order.
+
+The single-root `OPENCODE_DATA_DIR` and forced-database `OPENCODE_DB_PATH`/
+`OPENCODE_DB` overrides remain supported. A forced database wins over all roots and is
+still schema-qualified. Listing thousands of sessions can use substantial memory; use
+only the roots whose histories you want included.
+
 ## Quick start
 
 ```sh

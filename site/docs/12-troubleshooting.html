@@ -345,9 +345,11 @@ footer{
 
 <ul>
   <li><strong>You haven't run a session yet.</strong> Run your agent once, then try again — the receipt is built from the transcript it writes to disk.</li>
-  <li><strong>Your agent stores logs elsewhere.</strong> aireceipts reads the default locations above. Claude Code honors <code>$CLAUDE_CONFIG_DIR</code>: if you've set it, aireceipts reads <code>$CLAUDE_CONFIG_DIR/projects</code> instead of <code>~/.claude/projects</code>.</li>
+  <li><strong>Your agent stores logs elsewhere.</strong> aireceipts reads the default locations above. Claude Code honors <code>$CLAUDE_CONFIG_DIR</code>: if you've set it, aireceipts reads <code>$CLAUDE_CONFIG_DIR/projects</code> instead of <code>~/.claude/projects</code>. For opencode, set <code>OPENCODE_DATA_DIRS</code> to a <code>:</code>-separated list of roots on macOS/ Linux or a <code>;</code>-separated list on Windows. The older single-root <code>OPENCODE_DATA_DIR</code> override remains supported.</li>
   <li><strong>The files aren't readable.</strong> aireceipts silently skips a transcript it can't read (wrong owner, restrictive mode) rather than erroring on it. If a directory is present but its sessions don't show up, check the file permissions.</li>
 </ul>
+
+<p>For opencode, discovery checks only non-symlink <code>.db</code> files directly inside the configured roots. It does not recurse. A database is accepted only when its <code>session</code> and message tables contain the required columns; optional title, model, directory, path, version, and aggregate-token columns may be absent. <code>OPENCODE_DB_PATH</code> or <code>OPENCODE_DB</code> forces one database and takes precedence over every root setting.</p>
 
 <p>The default human receipt and <code>--list</code> print this as informational guidance and exit <code>0</code>. Machine exports such as <code>--json</code> and <code>--csv</code> still exit non-zero with no sessions, because they would otherwise report success without a payload.</p>
 

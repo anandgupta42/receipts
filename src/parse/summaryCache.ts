@@ -112,7 +112,7 @@ function parseCache(raw: string): Record<string, CacheEntry> {
   return entries;
 }
 
-function stripTurns(session: Session): SessionSummary {
+export function toSessionSummary(session: Session): SessionSummary {
   const summary: Partial<Session> = { ...session };
   // These are full-Session-only concepts. The cache stores SessionSummary rows;
   // request-boundary evidence and confidence flags are recomputed on a full
@@ -207,7 +207,7 @@ export async function completeSummariesWithCache(
         // should re-parse cleanly next run.
         return { ...summary, degraded: "unreadable" as const };
       }
-      const fullSummary = stripTurns(full);
+      const fullSummary = toSessionSummary(full);
       cache.set(summary.filePath, stat, fullSummary);
       return fullSummary;
     } catch {
