@@ -61,8 +61,8 @@ rollout script hard-fails if `npm view aireceipts version` fails.
   deterministic, nothing leaves the machine). Additionally a two-line
   **Related work** block near the docs links, crediting prior art
   generously (maintainer concern, 2026-07-03): `claude-receipts` (the
-  thermal-printer art project for Claude Code sessions) and `ccusage`
-  (its cost source) — different jobs, same good metaphor; the prepared
+  thermal-printer art project for Claude Code sessions) — different jobs,
+  same good metaphor; the prepared
   positioning paragraph for launch threads is committed in
   `docs/internal/readme-evidence.md`. README guard budgets unchanged and
   still passing.
@@ -179,7 +179,7 @@ continuous window):
 | R4 publish gate | mocked missing npm version | refuses, names the gate |
 | R4 idempotence | mocked repo already carrying caller | skipped with note |
 | R4 enumeration filters | mocked repo list (archived/fork/stale) | excluded per rule |
-| R2 related work | README | claude-receipts + ccusage credited |
+| R2 related work | README | adjacent receipt prior art credited |
 | R5 caveat lifecycle | README install section | pre-release caveat present now; removal recorded as a release-flow step |
 | R5 docs | pr-receipts.md + docs/adopt/org-rollout.md | 3-line caller shown; rollout doc exists |
 
@@ -230,8 +230,8 @@ captured to file this time. Findings and disposition:
 revert path (GitHub rename-back) and the whole window was sized against the
 measured 7-URL surface; the rollout gate (npm publish preflight) is testable
 today — it fails, correctly, until v0.1.0 ships. Related-work requirement
-grounded in the measured prior art (claude-receipts: 616 stars, thermal-
-printer novelty over ccusage; verified by reading its README).
+grounded in the measured prior art (claude-receipts: 616 stars and a
+thermal-printer novelty; verified by reading its README).
 
 **2026-07-03 · S5 (PR A implementation review, Codex): REWORK → fixed.**
 (2) "zero writes" claim overbroad (compile wrapper + npm/gh caches write
@@ -247,6 +247,6 @@ truncated in capture were subsumed by (2).
 **2026-07-03 · S4 (lint):** `node scripts/spec-lint.mjs` → 30 spec(s) OK,
 exit 0.
 
-**2026-07-03 · approved (button 1):** maintainer, in-session ("approved") after the hardened prior-art positioning round. Build split: PR A (R2/R4/R5 + caller template, mergeable now) and PR B (R1 cutover + R3 workflow_call, held green for the rename window). Positioning addendum: lineage framing (ccusage, claude-receipts, Infracost), committed reply paragraph, no independent-invention claims anywhere.
+**2026-07-03 · approved (button 1):** maintainer, in-session ("approved") after the hardened prior-art positioning round. Build split: PR A (R2/R4/R5 + caller template, mergeable now) and PR B (R1 cutover + R3 workflow_call, held green for the rename window). Positioning addendum: lineage framing (terminal usage trackers, receipt artifacts, infrastructure cost tools), committed reply paragraph, no independent-invention claims anywhere.
 
 **2026-07-04 · shipped:** merged via #71 #72 (rename window executed 2026-07-04); ledger sweep pre-release.

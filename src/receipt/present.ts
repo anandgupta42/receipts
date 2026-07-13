@@ -356,7 +356,7 @@ export function wasteRowBlock(waste: WasteLine): Extract<Block, { kind: "wasteRo
     const value = waste.usd !== null ? formatUsdLowerBound(waste.usd) : `${formatInt(waste.tokens.total)} tok`;
     return {
       kind: "wasteRow",
-      label: `≈ context thrash: ${waste.compactionCount} compactions (${waste.turnSpan}t)`,
+      label: `≈ context refill: ${waste.compactionCount} compactions (${waste.turnSpan}t)`,
       value,
       detail: CONTEXT_THRASH_NOTE,
       badge: false,
@@ -366,7 +366,7 @@ export function wasteRowBlock(waste: WasteLine): Extract<Block, { kind: "wasteRo
     kind: "wasteRow",
     label: TRIVIAL_SPANS_LABEL,
     value: `≈ $${formatUsdFloor(waste.usd)}`,
-    detail: `(${waste.eligibleTurnCount} tiny turns, priced at ${waste.cheaperModel})`,
+    detail: `(${waste.eligibleTurnCount} tool-free turns; ≤120 output tok each)`,
     badge: false,
   };
 }

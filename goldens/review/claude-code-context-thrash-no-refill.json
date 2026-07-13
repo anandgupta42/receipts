@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "review": {
+    "registryVersion": 1,
+    "source": "claude-code",
+    "findings": {},
+    "coverage": {
+      "evaluated": {
+        "count": 6,
+        "patternIds": [
+          "repeated-identical-attempt",
+          "repeated-identical-error",
+          "consecutive-tool-errors",
+          "same-file-reread-without-recorded-change",
+          "context-refill-cluster",
+          "short-tool-free-turn-cost"
+        ]
+      },
+      "unavailable": {
+        "count": 0,
+        "patternIds": []
+      }
+    }
+  }
+}

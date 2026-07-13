@@ -62,8 +62,8 @@ export interface RecordCliRunInput extends RunStartTelemetry {
   agentType: AgentSource | undefined;
   durationMs: number;
   ok: boolean;
-  /** SPEC-0042 R5 — set only for the handoff command; enum, never content. */
-  handoffFormat?: "text" | "json";
+  /** SPEC-0083 R13 — set only for review; enum, never content. */
+  reviewFormat?: "text" | "json";
 }
 
 /** Records one `cli_run` event (R2). Unknown command names drop the event rather than leaking raw argv text. */
@@ -85,7 +85,7 @@ export function recordCliRun(input: RecordCliRunInput): void {
       isCI: input.isCI,
       installHash: input.installHash,
       runOrdinalBucket: input.runOrdinalBucket,
-      ...(input.handoffFormat !== undefined ? { handoffFormat: input.handoffFormat } : {}),
+      ...(input.reviewFormat !== undefined ? { reviewFormat: input.reviewFormat } : {}),
     },
   });
 }
@@ -197,8 +197,6 @@ export interface RecordPrFlowCompletedInput {
   commentResult: StepResultValue;
   artifactResult: StepResultValue;
   shareResult: StepResultValue;
-  /** SPEC-0059 R8. */
-  handoffSectionIncluded: boolean;
   result: ResultValue;
 }
 
@@ -213,7 +211,6 @@ export function recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void {
       commentResult: input.commentResult,
       artifactResult: input.artifactResult,
       shareResult: input.shareResult,
-      handoffSectionIncluded: input.handoffSectionIncluded,
       result: input.result,
     },
   });

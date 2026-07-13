@@ -27,7 +27,9 @@ export interface CliOptions {
   readonly byProject: boolean;
   /** SPEC-0020 R1: receipt template name (validated by the command). */
   readonly template?: string;
-  /** SPEC-0013: distinct-session recurrence threshold for standing-rule suggestions. */
+  /** SPEC-0083: distinct-session recurrence threshold for prevention advice. */
+  readonly reviewThreshold?: number;
+  /** Hidden compatibility mirror for callers that inspect parsed options. */
   readonly handoffThreshold?: number;
   /** SPEC-0015: print the exact benchmark payload without prompting or sending. */
   readonly dryRun: boolean;
@@ -92,7 +94,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let telemetryShow = false;
   let quota = false;
   let template: string | undefined;
-  let handoffThreshold: number | undefined;
+  let reviewThreshold: number | undefined;
   let mini = false;
   let version = false;
   let demo = false;
@@ -143,10 +145,12 @@ export function parseOptions(argv: string[]): CliOptions {
       template = argv[++i];
     } else if (arg.startsWith("--template=")) {
       template = arg.slice("--template=".length);
-    } else if (arg === "--handoff-threshold") {
-      handoffThreshold = Number(argv[++i]);
+    } else if (arg === "--review-threshold" || arg === "--handoff-threshold") {
+      reviewThreshold = Number(argv[++i]);
+    } else if (arg.startsWith("--review-threshold=")) {
+      reviewThreshold = Number(arg.slice("--review-threshold=".length));
     } else if (arg.startsWith("--handoff-threshold=")) {
-      handoffThreshold = Number(arg.slice("--handoff-threshold=".length));
+      reviewThreshold = Number(arg.slice("--handoff-threshold=".length));
     } else if (arg === "--mini") {
       mini = true;
     } else if (arg === "--csv" || arg === "--csv=session") {
@@ -267,7 +271,8 @@ export function parseOptions(argv: string[]): CliOptions {
     since,
     byProject,
     template,
-    handoffThreshold,
+    reviewThreshold,
+    handoffThreshold: reviewThreshold,
     dryRun,
     post,
     prSession: prSessions.length === 1 ? prSessions[0] : undefined,

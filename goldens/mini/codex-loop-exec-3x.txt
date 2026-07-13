@@ -2,5 +2,5 @@ aireceipts · session receipt
 Codex · gpt-5.3-codex · 1m 12s
 total  ≥ $0.0102
 top    exec_command · ≥ $0.0102 (3 calls)
-⚠ exec_command loop ×3 · ≈ $0.0102
+⚠ exec_command loop ×3 · ≈ $0.0034
 run  aireceipts  for the full receipt

@@ -9,7 +9,7 @@ const { runPrDetailed } = vi.hoisted(() => ({
     commentResult: "skipped" as const,
     artifactResult: "skipped" as const,
     shareResult: "skipped" as const,
-    handoffSectionIncluded: false,
+    reviewSectionIncluded: false,
     result: "success" as const,
   })),
 }));

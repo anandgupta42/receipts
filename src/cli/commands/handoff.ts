@@ -1,32 +1,22 @@
-// SPEC-0018: `--handoff` — paste-ready block of detector-flagged patterns, plus
-// standing-rule suggestions for pattern classes recurring across recent sessions. priority
-// 40 (above the default receipt, below every subcommand), matches `--handoff`.
-import { loadSession } from "../../index.js";
-import type { Session } from "../../parse/types.js";
-import { DEFAULT_HANDOFF_THRESHOLD, renderHandoff, standingRuleSuggestions, type HandoffCounts } from "../../receipt/handoff.js";
-import { toHandoffJson } from "../../receipt/json.js";
-import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
-import { partitionWindows, windowBounds } from "../../aggregate/week.js";
+// SPEC-0083: public post-session review. The historical boolean flag remains a
+// hidden invocation alias and reaches these same bytes.
 import { aggregateWaste, type WasteClassAggregate } from "../../aggregate/waste.js";
-import { listFullSessions } from "../../index.js";
+import { partitionWindows, windowBounds } from "../../aggregate/week.js";
+import { listFullSessions, loadSession } from "../../index.js";
+import type { Session } from "../../parse/types.js";
 import { mapWithConcurrency } from "../../parse/util.js";
-import type { CommandContext, CommandDef } from "../types.js";
+import { buildReviewReport, DEFAULT_REVIEW_THRESHOLD, renderReview } from "../../receipt/review.js";
 import { resolveSelector } from "../common/session.js";
+import type { CommandContext, CommandDef } from "../types.js";
 
-/**
- * SPEC-0013 R1: aggregate waste across the trailing-7-day window (SPEC-0008's
- * window definition, reused so there's one notion of "recent"). Feeds the
- * distinct-session recurrence check for standing-rule suggestions. Re-exported
- * from `src/cli/index.js` for the existing handoff-recent test.
- */
 function sessionKey(session: Pick<Session, "source" | "id">): string {
-  return `${session.source}\u0000${session.id}`;
+  return session.source + "\0" + session.id;
 }
 
-export async function recentWasteAggregates(
-  now: number = Date.now(),
-  preloaded: readonly Session[] = [],
-): Promise<WasteClassAggregate[]> {
+async function recentSessions(
+  now: number,
+  preloaded: readonly Session[],
+): Promise<Session[]> {
   const bounds = windowBounds(now);
   const summaries = await listFullSessions();
   const { current } = partitionWindows(summaries, bounds);
@@ -43,57 +33,62 @@ export async function recentWasteAggregates(
     loads.set(key, pending);
     return pending;
   });
-  return aggregateWaste(loaded.filter((s): s is Session => s !== null));
+  return loaded.filter((session): session is Session => session !== null);
+}
+
+export async function recentReviewSessions(
+  now: number = Date.now(),
+  preloaded: readonly Session[] = [],
+): Promise<Session[]> {
+  return recentSessions(now, preloaded);
+}
+
+/** Compatibility export for the weekly waste aggregation tests and API. */
+export async function recentWasteAggregates(
+  now: number = Date.now(),
+  preloaded: readonly Session[] = [],
+): Promise<WasteClassAggregate[]> {
+  return aggregateWaste(await recentSessions(now, preloaded));
 }
 
 async function run(ctx: CommandContext): Promise<number> {
   const { options } = ctx;
-  const threshold = options.handoffThreshold ?? DEFAULT_HANDOFF_THRESHOLD;
-  if (options.handoffThreshold !== undefined && (!Number.isInteger(threshold) || threshold < 1)) {
-    ctx.stderr.write("invalid --handoff-threshold (expected a positive integer)\n");
+  const threshold = options.reviewThreshold ?? DEFAULT_REVIEW_THRESHOLD;
+  if (options.reviewThreshold !== undefined && (!Number.isInteger(threshold) || threshold < 1)) {
+    ctx.stderr.write("invalid --review-threshold (expected a positive integer)\n");
     return 1;
   }
-  const resolved = await resolveSelector(options.positional[0]);
+
+  const publicInvocation = options.positional[0] === "review";
+  const selector = publicInvocation ? options.positional[1] : options.positional[0];
+  const resolved = await resolveSelector(selector);
   if ("error" in resolved) {
-    ctx.stderr.write(`${resolved.error}\n`);
+    ctx.stderr.write(resolved.error + "\n");
     return 1;
   }
   const session = resolved.session ?? (await loadSession(resolved.summary));
   if (!session) {
-    ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
+    ctx.stderr.write("failed to load selected session\n");
     return 1;
   }
-  const model = await buildFullSessionReceiptModel(session);
-  // SPEC-0042 R1/R2 — counts come from the loaded Session; the render stays pure.
-  const counts: HandoffCounts = {
-    turns: session.turns.length,
-    toolCalls: session.totals.toolCallCount,
-    compactions: session.compactions?.length ?? 0,
-  };
-  const aggregates = await recentWasteAggregates(ctx.now(), [session]);
-  const suggestions = standingRuleSuggestions(aggregates, threshold);
-  // SPEC-0042 R3 — the global `--json` flag is honored (it was previously
-  // ignored here). JSON always emits the full structure, empty arrays included.
-  if (options.json) {
-    ctx.stdout.write(`${JSON.stringify(toHandoffJson(model, suggestions, threshold, counts, aggregates), null, 2)}\n`);
-    return 0;
-  }
-  ctx.stdout.write(`${renderHandoff(model, suggestions, counts)}\n`);
+
+  const recent = await recentReviewSessions(ctx.now(), [session]);
+  const report = await buildReviewReport(session, recent, threshold);
+  ctx.stdout.write((options.json ? JSON.stringify(report, null, 2) : renderReview(report)) + "\n");
   return 0;
 }
 
 export const command: CommandDef = {
-  name: "handoff",
+  name: "review",
   priority: 40,
-  matches: (options) => options.handoff,
+  matches: (options) => options.handoff || options.positional[0] === "review",
   run,
   help: {
     order: 40,
     lines: [
-      "  aireceipts --handoff [selector] [--handoff-threshold N] [--json]",
-      "                                        paste-ready block of detector-flagged patterns;",
-      "                                         suggests CLAUDE.md rules for detector classes",
-      "                                         recurring in N+ recent sessions (default 3)",
+      "  aireceipts review [selector] [--review-threshold N] [--json]",
+      "                                        find recorded session problems and",
+      "                                         recommend how to prevent them next time",
     ],
   },
 };

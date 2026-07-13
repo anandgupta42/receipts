@@ -13,18 +13,19 @@
 // data (I1 — never model-generated); no line judges the agent or names a
 // model (I6).
 import type { WasteClassAggregate } from "../aggregate/waste.js";
-import { dottedLine, formatAbsoluteUtc, formatDuration, formatInt, formatSharePercent, formatUsdFloor, formatUsdLowerBound } from "./format.js";
+import { dottedLine, formatAbsoluteUtc, formatDuration, formatInt, formatSharePercent, formatUsdFloor, formatUsdLowerBound, wrapText } from "./format.js";
 import { combinedPricedUsd, combinedTokenTotal, type ReceiptModel, type WasteLine } from "./model.js";
 import { wasteRowBlock } from "./present.js";
 import { RECEIPT_WIDTH } from "./render.js";
 import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "./costEstimate.js";
 import { combinedPricingCoverageOf, knownCombinedUnpricedTokens } from "./pricingCoverage.js";
+import { REVIEW_REGISTRY } from "./reviewRegistry.js";
 
 /** SPEC-0013 R1: distinct-session recurrence needed before a class is eligible; `--handoff-threshold` overrides. */
 export const DEFAULT_HANDOFF_THRESHOLD = 3;
 
 /** SPEC-0013 R3 label: the section reads as a manual paste, never an auto-write (R4). */
-const SUGGESTION_HEADER = "suggested CLAUDE.md rules (recurring across recent sessions — paste manually):";
+const SUGGESTION_HEADER = "suggested project instructions (recurring across recent sessions — paste manually):";
 
 /**
  * SPEC-0013 R2: static lookup, verbatim strings fixed in-spec, keyed by the
@@ -32,25 +33,11 @@ const SUGGESTION_HEADER = "suggested CLAUDE.md rules (recurring across recent se
  * here is silently omitted from the suggestion section. The banned-phrase test
  * guards these against model-claim wording (I3/I6).
  */
-const STANDING_RULE_TEMPLATES: Record<string, string> = {
-  "stuck-loop":
-    "When a command fails, do not re-run it unchanged more than twice — change the command, add logging, or stop and summarize the failure.",
-  "trivial-spans":
-    "For short acknowledgments and single-line replies, keep responses minimal — do not restate context.",
-};
-
-/**
- * SPEC-0059 R3 — one fixed rule line per waste class, ≤ 48 chars so a slip
- * line never wraps at width 50. Strings verbatim from the spec (I1 — never
- * model-generated); context-thrash is SPEC-0017 R4's suggestion wording, the
- * other two are one-line compressions of SPEC-0013's standing-rule templates
- * (whose long forms below stay behind the recurrence gate). A class with no
- * entry renders evidence only. Guarded by the banned-phrase test (I3/I6).
- */
+/** Legacy detector kinds mapped to the registry's one canonical recommendation. */
 export const SLIP_RULE_LINES: Record<string, string> = {
-  "stuck-loop": "change or stop after two identical failures",
-  "trivial-spans": "route short replies to a cheaper model",
-  "context-thrash": "clear or split context at task boundaries",
+  "stuck-loop": REVIEW_REGISTRY.patterns["repeated-identical-attempt"].recommendation,
+  "trivial-spans": REVIEW_REGISTRY.patterns["short-tool-free-turn-cost"].recommendation,
+  "context-thrash": REVIEW_REGISTRY.patterns["context-refill-cluster"].recommendation,
 };
 
 const FLAGGED_PATTERN_COST_KINDS = new Set(["stuck-loop", "context-thrash"]);
@@ -133,7 +120,8 @@ export function savingsSlipLines(wasteLines: WasteLine[], totalUsd: number | nul
     }
     const rule = SLIP_RULE_LINES[kind];
     if (rule !== undefined) {
-      lines.push(`  → ${rule}`);
+      const wrapped = wrapText(rule, RECEIPT_WIDTH - 4);
+      lines.push(...wrapped.map((line, index) => `${index === 0 ? "  → " : "    "}${line}`));
     }
   }
   return lines;
@@ -156,7 +144,7 @@ export function standingRuleSuggestions(
     if (agg.distinctSessionCount < threshold) {
       continue;
     }
-    const template = STANDING_RULE_TEMPLATES[agg.class];
+    const template = SLIP_RULE_LINES[agg.class];
     if (template !== undefined) {
       out.push(template);
     }

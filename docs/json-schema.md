@@ -5,7 +5,8 @@
 This document is the authoritative, field-by-field description of those shapes.
 
 The **single source of truth** is the `zod` schema in `src/receipt/exportSchema.ts`
-(`receiptJsonSchema` / `compareJsonSchema`). This document mirrors it, and an
+(`receiptJsonSchema`, `compareJsonSchema`, `reviewJsonSchema`, and
+`backfillJsonSchema`). This document mirrors it, and an
 automated parity test (`test/receipt/json-schema-parity.test.ts`) fails the build if
 the two ever disagree — every documented field name must equal the schema's field
 names, and the version below must equal the schema's `SCHEMA_VERSION`. If you find a
@@ -14,9 +15,10 @@ discrepancy, it's a bug; please open an issue.
 <!-- SCHEMA_VERSION: 2 -->
 
 The current public export schema version is **2**. It appears as `schemaVersion`
-on receipt, compare, handoff, and backfill JSON exports, and in the first column
-of CSV exports. Version 2 makes the lower-bound meaning machine-readable beside
-legacy dollar scalars.
+on receipt, compare, and backfill JSON exports, and in the first column of CSV
+exports. Session review has its own version-1 envelope because it is a new,
+independent contract. Version 2 makes the receipt lower-bound meaning
+machine-readable beside legacy dollar scalars.
 
 ## Invariants this schema upholds
 
@@ -111,7 +113,7 @@ SPEC-0067 cost-shape facts — standalone, never in flagged-pattern arithmetic. 
 
 ### SameFileReReads object
 
-SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to the handoff's flagged-pattern subtotal.
+SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row or a savings claim.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -232,53 +234,81 @@ Also carries `model`, `input`, and `output` (rates in USD per MTok) as documente
 
 `compare` also carries `schemaVersion` on its root.
 
-### Handoff envelope (`handoffJsonSchema`) — SPEC-0042
+### Session review envelope (`reviewJsonSchema`) — SPEC-0083
 
-`aireceipts --handoff <selector> --json`: the machine-readable resume packet. Always
-emits the full structure (empty arrays included). The attribution-only privacy fields
-(`cwd`, `gitBranch`, sidechain linkage) are structurally absent, same as every export.
+`aireceipts review [selector] --json` emits a privacy-safe session review. It does
+not contain a session id, title, path, repository, command, tool input/output,
+prompt, or response. `findings` is keyed by stable registry pattern ID; absent keys
+mean the check ran without a finding or did not run, distinguished by `coverage`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `schemaVersion` | number | Same envelope as receipt/compare. |
-| `source` | string | Agent source enum. |
-| `sessionId` | string | Adapter-local session id. |
-| `title` | string \| null | Session title when known. |
-| `startedAtMs` | number \| null | Session start, epoch ms. |
-| `durationMs` | number \| null | Wall-clock span. |
-| `totals` | object | Compatibility parent-session totals: `tokens` (TokenUsage object) + `turnCount` + `toolCallCount` + `scope`. |
-| `scope` | string | Explicitly `parent-session` on `totals`, `coverage`, and `couldHaveSaved`; none of those legacy structures silently includes child turns or findings. |
-| `turnCount` | number | (totals) Assistant turns in the session. |
-| `toolCallCount` | number | (totals) Tool calls in the session. |
-| `pricingCoverage` | enum | Coverage of the parent-session `totalUsd`, with the same `full`/`partial`/`unpriced` semantics as a receipt. |
-| `unpricedTokens` | TokenUsage | Exact known parent-session usage excluded from the parent floor. |
-| `unpricedTokensScope` | literal `parent-session` | Explicit scope of the parent unpriced-token vector. |
-| `combinedUnpricedTokens` | TokenUsage | Exact known parent plus readable-child usage excluded from the combined floor. |
-| `combinedUnpricedTokensScope` | literal `parent-session-plus-readable-subagents` | Explicit scope of the combined unpriced-token vector. |
-| `combinedPricingCoverage` | enum | Coverage of the combined parent-plus-readable-child floor; any known or structural gap makes a priced result `partial`. |
-| `totalUsd` | number \| null | Parent-session lower-bound scalar, retained separately from the combined child rollup. |
-| `totalCostEstimate` | CostEstimate \| null | Structured semantics for the handoff's parent `totalUsd`. |
-| `totalUsdScope` | literal `parent-session` | Scope of `totalUsd` and `unpricedTokens`. |
-| `combinedPricedUsd` | number \| null | Lower-bound sum of priced parent and readable priced-subagent atoms. |
-| `combinedPricedCostEstimate` | CostEstimate \| null | Structured semantics for `combinedPricedUsd`. |
-| `combinedTotalTokens` | number | Observable parent tokens plus all readable-child tokens. Child token components are not fabricated. |
-| `combinedScope` | literal `parent-session-plus-readable-subagents` | Explicit scope of the combined fields. |
-| `subagents` | Subagents \| null | Aggregate child counts/sums; null when the model has no composed child rollup. No child ids, titles, or paths. |
-| `wasteLines` | array | Same WasteLine union as the receipt, plus a per-line `rule` (SPEC-0059). |
-| `wasteLinesScope` | literal `parent-session` | Handoff waste findings remain parent-only; the combined cost fields must not be read as their denominator. |
-| `rule` | string \| null | (wasteLines) The class's fixed one-line next-time rule; `null` for a class without one. |
-| `couldHaveSaved` | object | Historical field name, not a savings assertion. Its `usd` is the largest priced class subtotal across stuck-loop/context-thrash findings (null when none priced), with adjacent `costEstimate`; it excludes counterfactual trivial-span re-pricing and never adds classes that may overlap. `tokens` is the largest one-class token subtotal. This is the heuristic subtotal rendered as `FLAGGED PATTERN COST ≈ …`; detector membership does not prove avoidability, so the value is neither a savings floor nor a savings ceiling. |
-| `interpretation` | string | (couldHaveSaved) Always `heuristic-pattern-pricing-not-proven-savings`; explicitly overrides the legacy field name's implication. |
-| `pctOfTotal` | number \| null | Retained for compatibility and always `null`: a ratio of two lower bounds has no reliable direction. |
-| `suggestions` | array | Standing-rule suggestion strings (SPEC-0013), possibly empty. |
-| `threshold` | number | The distinct-session recurrence threshold in effect. |
-| `coverage` | object | What the parent-only packet covers, checkably: `scope`, `turns`, `toolCalls`, `compactions`, `wasteLines`. |
-| `turns` | number | (coverage) Turn count the packet covers. |
-| `toolCalls` | number | (coverage) Tool-call count the packet covers. |
-| `compactions` | number | (coverage) Compaction events in the session. |
-| `aggregates` | array | `{class, distinctSessionCount}` — exactly the detector classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent). |
-| `class` | string | (aggregates) Waste class name. |
-| `distinctSessionCount` | number | (aggregates) Distinct recent sessions the class fired in. |
+| `schemaVersion` | literal `1` | Independent version for the session-review contract. |
+| `review` | object | Review result and capability coverage. |
+| `registryVersion` | literal `1` | Version of the pattern metadata and configuration registry. |
+| `source` | enum | Transcript source; used only to explain capability coverage, never to rank agents. |
+| `findings` | object | Present findings keyed by one of the stable pattern IDs listed below. Unknown keys are rejected. |
+| `coverage` | object | Checks that ran versus checks unavailable for this trace. |
+| `evaluated` | object | `count` plus ordered `patternIds` for checks that ran, including non-firings. |
+| `unavailable` | object | `count` plus ordered `patternIds` for checks lacking required recorded evidence. |
+| `count` | non-negative integer | Number of checks in the adjacent coverage group. |
+| `patternIds` | array | Stable registry keys in deterministic registry order. |
+| `ruleVersion` | positive integer | Version of this pattern's predicate and fixed advice. |
+| `category` | enum | `issue`, `cost-opportunity`, or `observation`. |
+| `whatHappened` | string | Plain fixed description of the recorded match. |
+| `whyItMatters` | string | Plain fixed explanation of the practical risk. |
+| `recommendation` | string | Canonical prevention step from the registry; recurrence reuses it verbatim. |
+| `evidenceStrength` | string | Fixed description of how directly the trace supports the predicate. |
+| `claimLimit` | string | Fixed statement of what the evidence does not prove. |
+| `evidence` | object | Bounded counts, zero-based turn indices, facts, and sanitized tool labels only. |
+| `eventCount` | non-negative integer | Number of distinct matches for this pattern in the selected session. |
+| `actionCount` | non-negative integer | Number of matched recorded actions after overlap handling. |
+| `turnIndices` | array | At most 20 zero-based recorded turn indices. Text output displays them as one-based turn numbers. |
+| `totalTurnCount` | non-negative integer | Full number of matched turns when `turnIndices` is truncated. |
+| `tools` | array | At most eight sanitized, 64-character tool labels; never commands or inputs. |
+| `totalToolCount` | non-negative integer | Full number of tool labels when `tools` is truncated. |
+| `facts` | array | Fixed `{name, value}` count facts for the matching extractor. |
+| `name` | enum | One of the registry-supported count names such as `attempts`, `consecutive-errors`, or `compactions`. |
+| `value` | non-negative integer | Count for the adjacent fact. |
+| `impact` | object (optional) | One role-labeled impact; unlike roles are never summed into savings. |
+| `role` | enum | `observed-attributed`, `observed-window`, or `same-token-reprice`. |
+| `observedUsd` | number | Same-token-reprice only: directly priced observed units. |
+| `repricedUsd` | number | Same-token-reprice only: those exact units at a lower-priced same-provider row. |
+| `recurrence` | object (optional) | Present after the same pattern reaches its distinct-session threshold. |
+| `distinctSessionCount` | positive integer | Distinct recent sessions in which the same pattern fired. |
+| `windowDays` | positive integer | Registry-defined trailing recurrence window. |
+
+The optional `impact.tokens` value uses TokenUsage; `impact.usd` and
+`impact.durationMs` appear only for the roles that support them. A recurrence's
+`recommendation` is byte-identical to the finding recommendation.
+
+Every possible `findings` key is fixed by the registry and strict schema:
+
+| Field | Status and meaning |
+|---|---|
+| `repeated-identical-attempt` | Same action repeated without a change. |
+| `repeated-identical-error` | Same failed action tried again unchanged. |
+| `consecutive-tool-errors` | Several actions failed in a row. |
+| `search-streak-without-change-or-check` | Preserved but disabled. |
+| `repeated-search-query` | Preserved but disabled. |
+| `same-file-reread-without-recorded-change` | Same file reread without a recorded change. |
+| `last-change-not-checked` | Measured only until its accuracy gate passes. |
+| `last-check-still-failing` | Measured only until its accuracy gate passes. |
+| `unresolved-tool-call` | Preserved but disabled. |
+| `many-writes-without-recorded-plan` | Preserved but disabled. |
+| `failed-read-write-oscillation` | Preserved but disabled. |
+| `context-refill-cluster` | Working context grew back near its earlier size after being reduced. |
+| `short-tool-free-turn-cost` | Listed-price comparison for short replies that used no tools. |
+| `large-tool-output` | Preserved but disabled. |
+| `shell-over-structured-tool` | Preserved but disabled. |
+| `unsupported-completion-claim` | Preserved but disabled. |
+| `semantic-phase-oscillation` | Preserved but disabled. |
+| `semantic-fruitless-exploration` | Preserved but disabled. |
+| `reference-scope-drift` | Preserved but disabled. |
+| `reference-relative-rapid-rewrite` | Preserved but disabled. |
+| `open-task-at-end` | Preserved but disabled. |
+| `interrupted-work` | Preserved but disabled. |
+| `subagent-delivery-gap` | Preserved but disabled. |
 
 ### Backfill envelope (`backfillJsonSchema`) — SPEC-0056
 
@@ -286,11 +316,11 @@ emits the full structure (empty arrays included). The attribution-only privacy f
 SPEC-0045 — degraded/unloadable sessions are counted in `loadFailureCount`, never
 silently dropped. `sessions` is one row per matched session (after
 `--since`/`--limit`), newest-first; rows also carry `source`, `sessionId`, `title`,
-`startedAtMs` with the same meanings as the handoff envelope above.
+`startedAtMs` with the same meanings as the receipt envelope above.
 
 | Field | Type | Notes |
 |---|---|---|
-| `schemaVersion` | number | Same envelope as receipt/compare/handoff. |
+| `schemaVersion` | number | Same version-2 envelope as receipt/compare. |
 | `discoveredCount` | number | Every discovered session summary, degraded ones included. |
 | `matchedCount` | number | After the `--since`/`--limit` filters. |
 | `loadFailureCount` | number | Honest per SPEC-0045, mode-dependent: on an `--out` run (loads attempted), degraded summaries plus failed loads; on a dry run only known-unreadable summaries — a lower bound (labelled `Known unreadable` in the text summary). |
@@ -375,7 +405,7 @@ The two cost metadata cells describe that row's `usd`; both are empty for an unp
 - CSV columns are additive-only within a major version.
 
 This public export version is deliberately separate from the internal PR
-receipt-ref payload stored at `refs/aireceipts/<slug>`. That producer/CI handoff
+receipt-ref payload stored at `refs/aireceipts/<slug>`. That producer/CI exchange
 remains `PR_RECEIPT_SCHEMA_VERSION = 1`: it serializes renderer inputs, has no
 `costSemantics` field, and did not need an incompatible shape change for the
 human receipt to render `≥` floors. Do not treat its v1 as the version of

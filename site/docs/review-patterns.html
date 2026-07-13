@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Session review pattern reference — aireceipts docs</title>
+<meta name="description" content="Static aireceipts documentation rendered from the repository docs folder.">
+<meta name="theme-color" content="#e9edf0">
+<style>
+:root{
+  --field:#e7ecef;
+  --sheet:#ffffff;
+  --ink:#14181c;
+  --muted:#586570;
+  --faint:#8a949c;
+  --rule:#e3e8eb;
+  --rule-strong:#c2cbd1;
+  --seal:#b23a3a;
+  --ledger:#2f5d3a;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--field);
+  color:var(--ink);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  padding:clamp(16px,3.5vw,40px) 16px clamp(40px,6vw,72px);
+}
+a{color:var(--ledger);text-underline-offset:2px;text-decoration-thickness:1px}
+a:focus-visible{outline:2px solid var(--ledger);outline-offset:2px;border-radius:2px}
+.sheet{
+  width:100%;
+  max-width:1040px;
+  margin:0 auto;
+  background:var(--sheet);
+  border:1px solid var(--rule-strong);
+  border-radius:3px;
+  padding:clamp(20px,3.6vw,44px) clamp(18px,4vw,52px) clamp(28px,4vw,44px);
+  box-shadow:0 1px 0 #fff inset,0 30px 64px -42px rgba(20,32,44,.42);
+}
+header.mast{padding-top:2px}
+.masthead-row{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  gap:16px;
+  font-family:var(--sans);
+  font-size:11.5px;
+  font-weight:700;
+  letter-spacing:.26em;
+  text-transform:uppercase;
+  color:var(--faint);
+}
+.masthead-row .brand{color:var(--ink);letter-spacing:.30em;text-decoration:none}
+.masthead-row nav{display:flex;gap:16px;flex-wrap:wrap;justify-content:flex-end}
+.masthead-row nav a{color:var(--muted);letter-spacing:.12em;text-decoration:none}
+.masthead-row nav a:hover{color:var(--ink)}
+.rule2{
+  margin:12px 0 0;
+  height:0;
+  border-top:3px solid var(--ink);
+  box-shadow:0 5px 0 -4px var(--ink);
+}
+.doc-hero{padding:clamp(24px,4vw,38px) 0 clamp(20px,3vw,30px)}
+.doc-label{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  margin:0 0 16px;
+  font-size:11.5px;
+  font-weight:700;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--faint);
+}
+.doc-label::after{content:"";flex:1 1 auto;height:1px;background:var(--rule-strong)}
+h1{
+  font-family:var(--serif);
+  font-size:clamp(30px,5vw,50px);
+  line-height:1.1;
+  font-weight:600;
+  letter-spacing:0;
+  margin:0;
+  max-width:19ch;
+}
+.sub{
+  color:var(--muted);
+  font-size:clamp(15px,2.2vw,17.5px);
+  max-width:58ch;
+  margin:15px 0 0;
+  line-height:1.55;
+}
+.doc-grid{
+  display:grid;
+  grid-template-columns:minmax(190px,240px) minmax(0,1fr);
+  gap:clamp(24px,4vw,46px);
+  border-top:1px solid var(--rule);
+  padding-top:clamp(24px,4vw,38px);
+}
+.toc{
+  align-self:start;
+  position:sticky;
+  top:18px;
+  border-right:1px solid var(--rule);
+  padding-right:20px;
+}
+.toc h2{
+  margin:0 0 12px;
+  color:var(--faint);
+  font-size:11px;
+  letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.toc-section{
+  margin:18px 0 8px;
+  color:var(--faint);
+  font-size:10.5px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.toc-section:first-of-type{margin-top:0}
+.toc ol,.toc ul{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.toc a{color:var(--muted);font-size:14px;text-decoration:none}
+.toc a:hover{color:var(--ink);text-decoration:underline}
+.doc-content{min-width:0}
+.doc-content > :first-child{margin-top:0}
+.doc-content h1{font-size:clamp(28px,4vw,42px)}
+.doc-content h2{
+  margin:clamp(32px,4vw,44px) 0 12px;
+  padding-top:18px;
+  border-top:1px solid var(--rule);
+  font-family:var(--serif);
+  font-size:clamp(22px,3vw,30px);
+  line-height:1.2;
+  font-weight:600;
+  letter-spacing:0;
+}
+.doc-content h3{
+  margin:28px 0 10px;
+  font-family:var(--serif);
+  font-size:21px;
+  line-height:1.25;
+  font-weight:600;
+  letter-spacing:0;
+}
+.doc-content h4,.doc-content h5,.doc-content h6{margin:22px 0 8px;font-size:16px;line-height:1.35}
+.doc-content p{margin:0 0 16px;color:var(--ink)}
+.doc-content ul,.doc-content ol{margin:0 0 18px;padding-left:22px}
+.doc-content li{margin:7px 0}
+.doc-content img{display:block;max-width:100%;height:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
+.doc-content blockquote{
+  margin:20px 0;
+  padding:14px 18px;
+  border-left:4px solid var(--ledger);
+  background:#f7f9fa;
+  color:var(--muted);
+}
+code{
+  font-family:var(--mono);
+  font-size:.92em;
+  background:#f6f8f9;
+  border:1px solid var(--rule);
+  border-radius:4px;
+  padding:.08em .32em;
+}
+pre.doc-code{
+  margin:18px 0;
+  overflow-x:auto;
+  max-width:100%;
+  background:#0f1518;
+  border:1px solid #1c272d;
+  border-radius:9px;
+  padding:14px 16px;
+  box-shadow:0 20px 44px -34px rgba(9,14,18,.9);
+}
+pre.doc-code code{
+  display:block;
+  background:transparent;
+  border:0;
+  border-radius:0;
+  padding:0;
+  color:#d6dde2;
+  font-size:13px;
+  line-height:1.5;
+}
+.table-wrap{overflow-x:auto;margin:18px 0;border:1px solid var(--rule-strong);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+th,td{padding:10px 12px;border-bottom:1px solid var(--rule);vertical-align:top;text-align:left}
+th{background:#f6f8f9;color:var(--ink);font-weight:700}
+tr:last-child td{border-bottom:0}
+.doc-index-list{list-style:none;margin:0;padding:0;display:grid;gap:0;border-top:1px solid var(--rule)}
+.doc-index-list li{padding:18px 0;border-bottom:1px solid var(--rule)}
+.doc-index-list a{
+  display:inline-block;
+  font-family:var(--serif);
+  font-size:22px;
+  line-height:1.2;
+  font-weight:600;
+}
+.doc-index-list .path{
+  display:block;
+  margin-top:4px;
+  color:var(--faint);
+  font-family:var(--mono);
+  font-size:12px;
+}
+.doc-index-list p{margin:8px 0 0;color:var(--muted);max-width:70ch}
+footer{
+  border-top:1px solid var(--rule);
+  margin-top:clamp(34px,5vw,52px);
+  padding-top:clamp(26px,4vw,34px);
+}
+.close{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:20px;
+  flex-wrap:wrap;
+}
+.close-copy{max-width:34ch}
+.issued{
+  font-size:11px;
+  font-weight:700;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+  color:var(--faint);
+  display:flex;
+  gap:18px;
+  flex-wrap:wrap;
+  margin:0 0 14px;
+}
+.thanks{
+  font-family:var(--serif);
+  font-size:19px;
+  font-weight:600;
+  color:var(--ink);
+  margin:0 0 10px;
+}
+.serial{
+  font-family:var(--mono);
+  font-size:10.5px;
+  letter-spacing:.34em;
+  color:var(--faint);
+  margin:0;
+  padding-left:.34em;
+}
+.seal{flex:0 0 auto;width:clamp(104px,17vw,128px);height:auto;color:var(--seal);transform:rotate(-5deg)}
+.barcode{color:var(--rule-strong);height:30px;display:block;margin:24px 0 8px}
+.flinks{font-size:14px;color:var(--muted);line-height:2}
+.flinks a{color:var(--ledger)}
+.flinks .sep{color:var(--rule-strong);padding:0 .6ch}
+.samosa{color:var(--muted);margin:10px 0 0;font-size:13.5px}
+.samosa a{color:inherit;text-decoration:none}
+.samosa a:hover{color:var(--ink)}
+.samosa svg{vertical-align:middle;margin-right:4px}
+@media (max-width:760px){
+  .doc-grid{grid-template-columns:minmax(0,1fr)}
+  .toc{position:static;border-right:0;border-bottom:1px solid var(--rule);padding:0 0 18px}
+}
+@media (max-width:480px){
+  .masthead-row{letter-spacing:.16em;align-items:flex-start}
+  .masthead-row nav{gap:10px}
+  .close{flex-direction:column-reverse;align-items:flex-start}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="mast">
+    <div class="masthead-row">
+      <a class="brand" href="../index.html">AIRECEIPTS</a>
+      <nav aria-label="Primary">
+        <a href="../index.html">Home</a>
+        <a href="index.html">Docs</a>
+      </nav>
+    </div>
+    <div class="rule2" aria-hidden="true"></div>
+    <div class="doc-hero">
+      <p class="doc-label">Docs ledger</p>
+      <h1>Session review pattern reference</h1>
+      <p class="sub">Rendered from <code>docs/reference/review-patterns.md</code>.</p>
+    </div>
+  </header>
+  <main class="doc-grid">
+    <aside class="toc" aria-label="Docs contents">
+      <h2>Contents</h2>
+      <p class="toc-section">Start here</p>
+      <ul>
+        <li><a href="01-getting-started.html">Get started in 60 seconds</a></li>
+        <li><a href="02-install.html">Install</a></li>
+        <li><a href="03-install-hook.html">Install the agent hook</a></li>
+      </ul>
+      <p class="toc-section">Using it</p>
+      <ul>
+        <li><a href="04-read-a-receipt.html">Read a receipt</a></li>
+        <li><a href="05-compare.html">Compare two sessions</a></li>
+        <li><a href="06-week.html">Aggregate the week</a></li>
+        <li><a href="07-statusline.html">Keep the meter running</a></li>
+        <li><a href="08-budget.html">Set and watch a budget</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
+        <li><a href="10-templates.html">Use a template</a></li>
+        <li><a href="11-share-and-export.html">Share and export</a></li>
+        <li><a href="15-integrations.html">Choose an integration</a></li>
+      </ul>
+      <p class="toc-section">Reference</p>
+      <ul>
+        <li><a href="12-troubleshooting.html">Troubleshooting &amp; FAQ</a></li>
+        <li><a href="faq.html">FAQ</a></li>
+        <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
+        <li><a href="statusline.html">Statusline — the meter</a></li>
+        <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
+        <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
+        <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
+        <li><a href="CHANGELOG.html">Changelog</a></li>
+      </ul>
+      <p class="toc-section">Why</p>
+      <ul>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
+        <li><a href="14-session-attribution.html">How session attribution works</a></li>
+        <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
+        <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
+      </ul>
+    </aside>
+    <article class="doc-content">
+<h1 id="session-review-pattern-reference">Session review pattern reference</h1>
+
+<p>This page lists every idea considered for session review, including ideas that are not currently shown. It is generated from the same registry the command uses, so the wording here cannot quietly drift from the product.</p>
+
+<p>Run <code>aireceipts review</code> to inspect a completed coding session. The review reports only what the saved trace can support, explains why it may matter, and gives one prevention step for next time.</p>
+
+<h2 id="what-the-statuses-mean">What the statuses mean</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>Shown as a cost opportunity</td><td>Shown when listed prices give a lower arithmetic result for the same recorded usage.</td></tr>
+    <tr><td>Shown as an issue</td><td>Shown when the recorded evidence matches the rule.</td></tr>
+    <tr><td>Shown as something to watch</td><td>Shown with an extra caution because there may be a reasonable explanation.</td></tr>
+    <tr><td>Measured only</td><td>Evaluated during development, but not shown in command output or sent in telemetry.</td></tr>
+    <tr><td>Not run</td><td>Kept in the registry so the idea and its limitations are not lost, but it is not evaluated.</td></tr>
+  </tbody>
+</table></div>
+
+<p>Registry version: 1. Pattern count: 23.</p>
+
+<h2 id="same-action-repeated-without-a-change">Same action repeated without a change</h2>
+
+<ul>
+  <li>Pattern key: <code>repeated-identical-attempt</code></li>
+  <li>Status: Shown as an issue</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The same tool ran at least three times in a row with identical recorded input.</p>
+
+<p>Why it may matter: Repeating an unchanged action can use more time and tokens without trying a new approach.</p>
+
+<p>Prevent it next time: After two identical attempts, inspect the result and change the input or approach before trying again.</p>
+
+<p>What the evidence cannot prove: This proves repetition, not that the repeated action was unnecessary or failed.</p>
+
+<p>Repeated pattern: The review can say this recurred after it appears in at least 3 distinct sessions within 7 days.</p>
+
+<h2 id="the-same-failed-action-was-tried-again-unchanged">The same failed action was tried again unchanged</h2>
+
+<ul>
+  <li>Pattern key: <code>repeated-identical-error</code></li>
+  <li>Status: Shown as an issue</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The same recorded action failed at least twice within the next ten actions. No file change or passing check was recorded between those failures.</p>
+
+<p>Why it may matter: Trying the same failed action again without recorded progress is a useful point to change approach.</p>
+
+<p>Prevent it next time: After the same action fails twice without recorded progress, inspect the error and change the input or approach, or record the blocker before trying again.</p>
+
+<p>What the evidence cannot prove: Some failures may be deliberate tests; this does not prove the retry was unreasonable.</p>
+
+<p>Repeated pattern: The review can say this recurred after it appears in at least 3 distinct sessions within 7 days.</p>
+
+<h2 id="several-actions-failed-in-a-row">Several actions failed in a row</h2>
+
+<ul>
+  <li>Pattern key: <code>consecutive-tool-errors</code></li>
+  <li>Status: Shown as something to watch</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: Three or more recorded actions failed one after another.</p>
+
+<p>Why it may matter: A chain of errors is a useful point to pause before more retries compound the problem.</p>
+
+<p>Prevent it next time: After two failures in a row, pause, inspect them, and change one variable before continuing.</p>
+
+<p>What the evidence cannot prove: The failures may be deliberate tests and may not share a cause.</p>
+
+<p>Repeated pattern: The review can say this recurred after it appears in at least 3 distinct sessions within 7 days.</p>
+
+<h2 id="long-search-streak-before-the-next-concrete-step">Long search streak before the next concrete step</h2>
+
+<ul>
+  <li>Pattern key: <code>search-streak-without-change-or-check</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: Ten searches or file reads occurred in a row without a recorded write or validation command.</p>
+
+<p>Why it may matter: Long exploration streaks are a useful checkpoint because a session can keep gathering context without testing a hypothesis.</p>
+
+<p>Prevent it next time: After ten searches or reads without a change or check, summarize what is known and choose one concrete next step before searching more.</p>
+
+<p>What the evidence cannot prove: This does not prove that any search or read was unnecessary.</p>
+
+<p>If enabled later, its recurrence rule would require at least 3 distinct sessions within 7 days.</p>
+
+<p>Why it is not shown now: In the local audit, 525 of 629 qualifying roots later reached a write or validation; the rule mostly described normal research rather than a problem.</p>
+
+<h2 id="the-same-search-was-repeated">The same search was repeated</h2>
+
+<ul>
+  <li>Pattern key: <code>repeated-search-query</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The same normalized search query appeared at least twice within ten actions without an intervening write or compaction.</p>
+
+<p>Why it may matter: Repeating the same search without changing the workspace is unlikely to reveal a different result.</p>
+
+<p>Prevent it next time: Reuse the prior result or change the query, scope, or hypothesis before searching again.</p>
+
+<p>What the evidence cannot prove: External files or search indexes could have changed without a recorded workspace write.</p>
+
+<p>If enabled later, its recurrence rule would require at least 3 distinct sessions within 7 days.</p>
+
+<p>Why it is not shown now: Promotion needs reliable resets for writes, compactions, successful state changes, and external-data refreshes across every source.</p>
+
+<h2 id="the-same-file-was-read-repeatedly-without-a-recorded-change">The same file was read repeatedly without a recorded change</h2>
+
+<ul>
+  <li>Pattern key: <code>same-file-reread-without-recorded-change</code></li>
+  <li>Status: Shown as something to watch</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The same file was read at least three times within ten actions, with no recorded change to that file between reads.</p>
+
+<p>Why it may matter: Repeated full reads can put already-read material back into the session's working context.</p>
+
+<p>Prevent it next time: Before reading the same file again, record what fresh information is needed; prefer a narrower range when only one section matters.</p>
+
+<p>What the evidence cannot prove: Different ranges, deliberate re-grounding, and unrecorded external changes can make a reread useful.</p>
+
+<p>Repeated pattern: The review can say this recurred after it appears in at least 3 distinct sessions within 7 days.</p>
+
+<h2 id="the-final-code-change-had-no-later-recorded-check">The final code change had no later recorded check</h2>
+
+<ul>
+  <li>Pattern key: <code>last-change-not-checked</code></li>
+  <li>Status: Measured only</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The session changed a source-code file and did not record a passing test, type check, or lint check afterward.</p>
+
+<p>Why it may matter: The saved evidence cannot show that the final version of the code passed a relevant check.</p>
+
+<p>Prevent it next time: After the last code change, run the narrowest relevant check; if no check applies, record that reason explicitly.</p>
+
+<p>What the evidence cannot prove: A useful check may be unrecognized, and some code-like changes may not require an executable test.</p>
+
+<p>If enabled later, its recurrence rule would require at least 3 distinct sessions within 7 days.</p>
+
+<p>Why it is not shown now: The final local measurement found only 14 Codex examples, below the approved minimum of 20 examples for every supported trace family.</p>
+
+<h2 id="the-last-recorded-check-was-still-failing">The last recorded check was still failing</h2>
+
+<ul>
+  <li>Pattern key: <code>last-check-still-failing</code></li>
+  <li>Status: Measured only</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: For at least one kind of test, type check, or lint check, the last recorded result was a failure.</p>
+
+<p>Why it may matter: The recorded evidence ends with a known failing check.</p>
+
+<p>Prevent it next time: Fix the failure and rerun the check, run a narrower relevant check, or record the blocker before ending the session.</p>
+
+<p>What the evidence cannot prove: A failing check can be an intentional test written before the fix, or a blocker the user accepted.</p>
+
+<p>If enabled later, its recurrence rule would require at least 3 distinct sessions within 7 days.</p>
+
+<p>Why it is not shown now: The final local measurement found only three examples in total, too few to judge whether the recommendation is dependable across trace families.</p>
+
+<h2 id="an-action-has-no-recorded-completion">An action has no recorded completion</h2>
+
+<ul>
+  <li>Pattern key: <code>unresolved-tool-call</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: One or more tool calls still have a recorded running status at the end of the transcript.</p>
+
+<p>Why it may matter: The trace does not contain a final result for those actions.</p>
+
+<p>Prevent it next time: Before ending, verify or cancel every action that lacks a recorded terminal result.</p>
+
+<p>What the evidence cannot prove: The transcript may have been captured while work was still running; do not call the action abandoned.</p>
+
+<p>If enabled later, its recurrence rule would require at least 3 distinct sessions within 7 days.</p>
+
+<p>Why it is not shown now: A running status can mean an active capture, a truncated transcript, or an adapter pairing gap; no cross-source terminal-session proof exists yet.</p>
+
+<h2 id="many-changes-were-made-without-a-recorded-plan">Many changes were made without a recorded plan</h2>
+
+<ul>
+  <li>Pattern key: <code>many-writes-without-recorded-plan</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: At least five file writes occurred without a preceding structured plan or TODO tool call when that tool surface was available.</p>
+
+<p>Why it may matter: A short plan can keep a multi-change task from losing requirements or verification steps.</p>
+
+<p>Prevent it next time: Before a task that needs several changes, record a short ordered plan and keep it current as work changes.</p>
+
+<p>What the evidence cannot prove: The task may be simple enough that a separate recorded plan would add no value.</p>
+
+<p>If enabled later, its recurrence rule would require at least 3 distinct sessions within 7 days.</p>
+
+<p>Why it is not shown now: Prose plans and planner-tool availability differ by agent, and many bounded tasks legitimately need no separate structured plan.</p>
+
+<h2 id="the-session-cycled-around-the-same-failed-edit">The session cycled around the same failed edit</h2>
+
+<ul>
+  <li>Pattern key: <code>failed-read-write-oscillation</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: For one file, at least two read-write-read cycles contain a middle write explicitly labeled failed or reverted.</p>
+
+<p>Why it may matter: Repeatedly returning to the same failed edit is a strong sign that the current approach needs a new hypothesis.</p>
+
+<p>Prevent it next time: After a failed edit cycle repeats, stop editing, restate the failure evidence, and choose a different change before continuing.</p>
+
+<p>What the evidence cannot prove: No claim is emitted while failed and reverted write effects are incomplete.</p>
+
+<p>Why it is not shown now: Cross-source write failure and reversal effects are not normalized reliably enough.</p>
+
+<h2 id="working-context-grew-back-near-its-earlier-size-after-being-reduced">Working context grew back near its earlier size after being reduced</h2>
+
+<ul>
+  <li>Pattern key: <code>context-refill-cluster</code></li>
+  <li>Status: Shown as an issue</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The session reduced its working context at least twice. Within five turns each time, the recorded working-context size grew back to at least 80% of its earlier high point.</p>
+
+<p>Why it may matter: Repeatedly returning to a large working context can make one session expensive and harder to steer.</p>
+
+<p>Prevent it next time: Split unrelated tasks into separate sessions. After context is reduced, bring back only evidence needed for the current task.</p>
+
+<p>What the evidence cannot prove: The trace does not prove that the refilled context was old, unnecessary, or unrelated to new work.</p>
+
+<p>Repeated pattern: The review can say this recurred after it appears in at least 3 distinct sessions within 7 days.</p>
+
+<h2 id="short-replies-used-a-higher-priced-option">Short replies used a higher-priced option</h2>
+
+<ul>
+  <li>Pattern key: <code>short-tool-free-turn-cost</code></li>
+  <li>Status: Shown as a cost opportunity</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: One or more replies used no tools, were 120 output tokens or fewer, and have a cheaper same-provider price calculation for the exact recorded tokens.</p>
+
+<p>Why it may matter: The same recorded token volume has a lower list-price arithmetic result, although task quality is unknown.</p>
+
+<p>Prevent it next time: Keep short replies minimal. If your setup can route work by price tier, consider its lower-cost option for this narrow kind of reply.</p>
+
+<p>What the evidence cannot prove: A short answer can still require difficult reasoning; this never claims another model would complete the task.</p>
+
+<p>Repeated pattern: The review can say this recurred after it appears in at least 3 distinct sessions within 7 days.</p>
+
+<h2 id="a-tool-returned-a-very-large-recorded-output">A tool returned a very large recorded output</h2>
+
+<ul>
+  <li>Pattern key: <code>large-tool-output</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: A single tool result crossed a frozen recorded-size threshold in a source that preserves output completeness.</p>
+
+<p>Why it may matter: Large outputs can fill context with material that is not needed for the next decision.</p>
+
+<p>Prevent it next time: Narrow the command, file range, or result limit so the next run returns only the evidence needed.</p>
+
+<p>What the evidence cannot prove: Recorded characters are not tokens, and a large output can be necessary.</p>
+
+<p>Why it is not shown now: Adapters and source stores truncate or omit output differently, so recorded character counts are not comparable enough even for shadow promotion work.</p>
+
+<h2 id="a-shell-command-duplicated-an-available-structured-tool">A shell command duplicated an available structured tool</h2>
+
+<ul>
+  <li>Pattern key: <code>shell-over-structured-tool</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: A shell read or search command was used while an equivalent structured tool was exposed.</p>
+
+<p>Why it may matter: Structured tools can provide more bounded and consistently recorded evidence.</p>
+
+<p>Prevent it next time: Prefer the available structured read or search tool when it can express the same bounded request.</p>
+
+<p>What the evidence cannot prove: No finding is emitted because shell use can be the correct scaffold convention.</p>
+
+<p>Why it is not shown now: External evidence shows this mainly reflects the agent scaffold, not a per-session failure.</p>
+
+<h2 id="completion-was-stated-without-a-later-recorded-check">Completion was stated without a later recorded check</h2>
+
+<ul>
+  <li>Pattern key: <code>unsupported-completion-claim</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: Final assistant text matches a completion phrase and no successful recognized validation follows the last source write.</p>
+
+<p>Why it may matter: Completion language is not evidence that the final code was checked.</p>
+
+<p>Prevent it next time: Tie completion statements to a recorded passing check or state clearly that verification was not run.</p>
+
+<p>What the evidence cannot prove: No assistant text is ingested or rendered for this detector.</p>
+
+<p>Why it is not shown now: The normalized model intentionally omits assistant prose, and a fixed text regex would still not prove the claim false.</p>
+
+<h2 id="the-session-repeatedly-switched-between-the-same-work-phases">The session repeatedly switched between the same work phases</h2>
+
+<ul>
+  <li>Pattern key: <code>semantic-phase-oscillation</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The same two semantic phases alternate at least three times within six actions.</p>
+
+<p>Why it may matter: Repeated switching can indicate that the current hypothesis is not converging.</p>
+
+<p>Prevent it next time: Pause after repeated phase switches, state one hypothesis and its decisive check, then follow that path before switching again.</p>
+
+<p>What the evidence cannot prove: Never run this detector in the deterministic product path.</p>
+
+<p>Why it is not shown now: Published versions require model-generated semantic phase labels and would violate deterministic zero-model-call operation.</p>
+
+<h2 id="exploration-did-not-connect-to-later-implementation">Exploration did not connect to later implementation</h2>
+
+<ul>
+  <li>Pattern key: <code>semantic-fruitless-exploration</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: At least four of five semantically labeled code reads never appear in a later implementation step.</p>
+
+<p>Why it may matter: Exploration that never informs a change can consume context without narrowing the task.</p>
+
+<p>Prevent it next time: After several exploratory reads, summarize which evidence changes the implementation plan and drop paths that do not.</p>
+
+<p>What the evidence cannot prove: Never run this detector in the deterministic product path.</p>
+
+<p>Why it is not shown now: Published versions require model-generated semantic labels and later-intent judgments.</p>
+
+<h2 id="work-moved-outside-a-reference-change-scope">Work moved outside a reference change scope</h2>
+
+<ul>
+  <li>Pattern key: <code>reference-scope-drift</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: Recorded writes target files outside an explicit reference or gold change set.</p>
+
+<p>Why it may matter: Unexpected scope expansion is a useful review checkpoint when a valid reference exists.</p>
+
+<p>Prevent it next time: Before changing files outside the agreed scope, record why the expansion is necessary and verify the added surface.</p>
+
+<p>What the evidence cannot prove: Do not infer task scope from a single session or live repository state.</p>
+
+<p>Why it is not shown now: A single local session has no trustworthy gold or successful reference scope.</p>
+
+<h2 id="a-change-was-quickly-overwritten-or-reversed">A change was quickly overwritten or reversed</h2>
+
+<ul>
+  <li>Pattern key: <code>reference-relative-rapid-rewrite</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: A file write is overwritten or reversed within three actions and a valid reference run does not show the same rewrite.</p>
+
+<p>Why it may matter: Quick reversals can identify unstable edits that deserve a more explicit hypothesis.</p>
+
+<p>Prevent it next time: Before rewriting the same change again, state what the previous edit disproved and run a focused check.</p>
+
+<p>What the evidence cannot prove: No single-session finding is emitted because rapid correction can be healthy work.</p>
+
+<p>Why it is not shown now: A quick rewrite can be normal; published disambiguation requires a reference run.</p>
+
+<h2 id="recorded-tasks-were-still-open-at-the-end">Recorded tasks were still open at the end</h2>
+
+<ul>
+  <li>Pattern key: <code>open-task-at-end</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: The latest trustworthy structured task snapshot contains pending or in-progress items at session end.</p>
+
+<p>Why it may matter: Open tracked work can be forgotten when the session is treated as complete.</p>
+
+<p>Prevent it next time: Before ending, complete each open task or record its blocker and next concrete action.</p>
+
+<p>What the evidence cannot prove: Never treat a stale task snapshot as current state.</p>
+
+<p>Why it is not shown now: Structured task state is not normalized and sampled snapshots can be stale after later activity.</p>
+
+<h2 id="an-interrupted-operation-had-no-recorded-resumption">An interrupted operation had no recorded resumption</h2>
+
+<ul>
+  <li>Pattern key: <code>interrupted-work</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: An explicit interrupted or aborted event has no later matching resumed completion.</p>
+
+<p>Why it may matter: Interrupted work can leave a partial change or missing result behind.</p>
+
+<p>Prevent it next time: After an interruption, resume the operation or record the blocker and the next safe action.</p>
+
+<p>What the evidence cannot prove: A truncated transcript may omit a completion that occurred later.</p>
+
+<p>Why it is not shown now: Explicit interruption lifecycle events are not normalized consistently across sources.</p>
+
+<h2 id="a-child-result-was-not-recorded-as-delivered-to-its-parent">A child result was not recorded as delivered to its parent</h2>
+
+<ul>
+  <li>Pattern key: <code>subagent-delivery-gap</code></li>
+  <li>Status: Not run</li>
+  <li>Rule version: 1</li>
+</ul>
+
+<p>What it notices: A child run records completion but the parent trace has no matching delivery event.</p>
+
+<p>Why it may matter: Completed delegated work can be lost if its result never reaches the parent session.</p>
+
+<p>Prevent it next time: Before ending, confirm that every completed child result was received or record which delivery failed.</p>
+
+<p>What the evidence cannot prove: Do not infer delivery failure from child existence alone.</p>
+
+<p>Why it is not shown now: Child lifecycle and parent-delivery evidence are not normalized across sources.</p>
+    </article>
+  </main>
+  <footer>
+    <div class="close">
+      <div class="close-copy">
+        <p class="issued"><span>No account</span><span>Transcripts never leave your machine</span><span>Docs</span></p>
+        <p class="thanks">Thank you for your tokens.</p>
+        <p class="serial">AIRECEIPTS · NO. 0001</p>
+      </div>
+      <svg class="seal" viewBox="0 0 200 200" role="img" aria-label="A round vermillion seal reading RECEIPTED, SETTLED, and NO FABRICATED DOLLARS.">
+  <defs>
+    <path id="ring-top" d="M 30 100 A 70 70 0 0 1 170 100"/>
+    <path id="ring-bot" d="M 34 100 A 66 66 0 0 0 166 100"/>
+  </defs>
+  <circle cx="100" cy="100" r="95" fill="none" stroke="currentColor" stroke-width="2.5"/>
+  <circle cx="100" cy="100" r="83" fill="none" stroke="currentColor" stroke-width="1.5"/>
+  <g fill="currentColor" font-family="system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-weight="700">
+    <text font-size="14.5" letter-spacing="3.5" text-anchor="middle"><textPath href="#ring-top" startOffset="50%">RECEIPTED</textPath></text>
+    <text font-size="14.5" letter-spacing="3.5" text-anchor="middle"><textPath href="#ring-bot" startOffset="50%">SETTLED</textPath></text>
+  </g>
+  <line x1="66" y1="70" x2="134" y2="70" stroke="currentColor" stroke-width="1.5"/>
+  <line x1="66" y1="130" x2="134" y2="130" stroke="currentColor" stroke-width="1.5"/>
+  <g fill="currentColor" font-family="system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" font-weight="700" text-anchor="middle" letter-spacing="1.5">
+    <text x="100" y="91" font-size="15">NO</text>
+    <text x="100" y="106" font-size="13">FABRICATED</text>
+    <text x="100" y="121" font-size="15">DOLLARS</text>
+  </g>
+</svg>
+    </div>
+    <svg class="barcode" viewBox="0 0 90 34" width="180" height="30" fill="currentColor" role="img" aria-label="Barcode encoding the word aireceipts.">
+  <rect x="0" y="0" width="3" height="34"/><rect x="4" y="0" width="2" height="34"/><rect x="8" y="0" width="3" height="34"/><rect x="12" y="0" width="2" height="34"/><rect x="16" y="0" width="4" height="34"/><rect x="21" y="0" width="3" height="34"/><rect x="26" y="0" width="3" height="34"/><rect x="31" y="0" width="2" height="34"/><rect x="35" y="0" width="3" height="34"/><rect x="39" y="0" width="4" height="34"/><rect x="45" y="0" width="3" height="34"/><rect x="50" y="0" width="2" height="34"/><rect x="54" y="0" width="3" height="34"/><rect x="58" y="0" width="2" height="34"/><rect x="62" y="0" width="4" height="34"/><rect x="67" y="0" width="1" height="34"/><rect x="70" y="0" width="4" height="34"/><rect x="76" y="0" width="1" height="34"/><rect x="79" y="0" width="4" height="34"/><rect x="84" y="0" width="4" height="34"/>
+</svg>
+    <p class="flinks">
+      <a href="../index.html">Home</a><span class="sep" aria-hidden="true">·</span><a href="index.html">Docs</a><span class="sep" aria-hidden="true">·</span><span>Apache-2.0</span>
+    </p>
+    <p class="samosa"><a href="../samosa.html"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 48 48" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"><path d="M22 10 L38.5 39.5 Q40 42 37 42 H7 Q4 42 5.5 39.5 Z"/><path d="M9.5 37 q2.2 -2.8 4.4 0 t4.4 0 t4.4 0 t4.4 0 t4.4 0 t4.4 0"/><path d="M32 12 q3 -3 1 -6"/><path d="M38 17 q3 -3 1 -6"/></g></svg>buy me a samosa</a></p>
+  </footer>
+</div>
+</body>
+</html>

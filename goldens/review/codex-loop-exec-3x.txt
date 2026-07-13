@@ -1,0 +1,16 @@
+SESSION REVIEW
+Source: Codex
+
+THINGS TO IMPROVE
+
+The same failed action was tried again unchanged
+  What happened: The same recorded action failed at least twice within the next ten actions. No file change or passing check was recorded between those failures.
+  Evidence: recorded attempts: 3 · retries after the first error: 2 · recorded turns: 1 · tools: exec_command
+  Why it matters: Trying the same failed action again without recorded progress is a useful point to change approach.
+  Prevent it next time: After the same action fails twice without recorded progress, inspect the error and change the input or approach, or record the blocker before trying again.
+  Observed cost attributed to these actions: ≥ $0.0068 · 12s
+  What this does not prove: Some failures may be deliberate tests; this does not prove the retry was unreasonable.
+
+COVERAGE
+Checks run: 5
+Checks unavailable for this trace: 1

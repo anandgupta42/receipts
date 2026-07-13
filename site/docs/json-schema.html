@@ -307,7 +307,7 @@ footer{
         <li><a href="06-week.html">Aggregate the week</a></li>
         <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
-        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
         <li><a href="15-integrations.html">Choose an integration</a></li>
@@ -319,6 +319,7 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
@@ -336,9 +337,9 @@ footer{
 
 <p><code>aireceipts</code> can emit a session receipt as machine-readable JSON (<code>--json</code>) or CSV (<code>--csv</code>) instead of the text receipt, for FinOps tooling and spreadsheet ingestion. This document is the authoritative, field-by-field description of those shapes.</p>
 
-<p>The <strong>single source of truth</strong> is the <code>zod</code> schema in <code>src/receipt/exportSchema.ts</code> (<code>receiptJsonSchema</code> / <code>compareJsonSchema</code>). This document mirrors it, and an automated parity test (<code>test/receipt/json-schema-parity.test.ts</code>) fails the build if the two ever disagree — every documented field name must equal the schema's field names, and the version below must equal the schema's <code>SCHEMA_VERSION</code>. If you find a discrepancy, it's a bug; please open an issue.</p>
+<p>The <strong>single source of truth</strong> is the <code>zod</code> schema in <code>src/receipt/exportSchema.ts</code> (<code>receiptJsonSchema</code>, <code>compareJsonSchema</code>, <code>reviewJsonSchema</code>, and <code>backfillJsonSchema</code>). This document mirrors it, and an automated parity test (<code>test/receipt/json-schema-parity.test.ts</code>) fails the build if the two ever disagree — every documented field name must equal the schema's field names, and the version below must equal the schema's <code>SCHEMA_VERSION</code>. If you find a discrepancy, it's a bug; please open an issue.</p>
 
-<p>The current public export schema version is <strong>2</strong>. It appears as <code>schemaVersion</code> on receipt, compare, handoff, and backfill JSON exports, and in the first column of CSV exports. Version 2 makes the lower-bound meaning machine-readable beside legacy dollar scalars.</p>
+<p>The current public export schema version is <strong>2</strong>. It appears as <code>schemaVersion</code> on receipt, compare, and backfill JSON exports, and in the first column of CSV exports. Session review has its own version-1 envelope because it is a new, independent contract. Version 2 makes the receipt lower-bound meaning machine-readable beside legacy dollar scalars.</p>
 
 <h2 id="invariants-this-schema-upholds">Invariants this schema upholds</h2>
 
@@ -436,7 +437,7 @@ footer{
 
 <h3 id="samefilerereads-object">SameFileReReads object</h3>
 
-<p>SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row and never contributes to the handoff's flagged-pattern subtotal.</p>
+<p>SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recorded edit, compaction, or matching shell command between them. A neutral low-confidence diagnostic; it is not a waste row or a savings claim.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
@@ -588,63 +589,91 @@ footer{
 
 <p><code>compare</code> also carries <code>schemaVersion</code> on its root.</p>
 
-<h3 id="handoff-envelope-handoffjsonschema-spec-0042">Handoff envelope (<code>handoffJsonSchema</code>) — SPEC-0042</h3>
+<h3 id="session-review-envelope-reviewjsonschema-spec-0083">Session review envelope (<code>reviewJsonSchema</code>) — SPEC-0083</h3>
 
-<p><code>aireceipts --handoff &lt;selector&gt; --json</code>: the machine-readable resume packet. Always emits the full structure (empty arrays included). The attribution-only privacy fields (<code>cwd</code>, <code>gitBranch</code>, sidechain linkage) are structurally absent, same as every export.</p>
+<p><code>aireceipts review [selector] --json</code> emits a privacy-safe session review. It does not contain a session id, title, path, repository, command, tool input/output, prompt, or response. <code>findings</code> is keyed by stable registry pattern ID; absent keys mean the check ran without a finding or did not run, distinguished by <code>coverage</code>.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>schemaVersion</code></td><td>number</td><td>Same envelope as receipt/compare.</td></tr>
-    <tr><td><code>source</code></td><td>string</td><td>Agent source enum.</td></tr>
-    <tr><td><code>sessionId</code></td><td>string</td><td>Adapter-local session id.</td></tr>
-    <tr><td><code>title</code></td><td>string | null</td><td>Session title when known.</td></tr>
-    <tr><td><code>startedAtMs</code></td><td>number | null</td><td>Session start, epoch ms.</td></tr>
-    <tr><td><code>durationMs</code></td><td>number | null</td><td>Wall-clock span.</td></tr>
-    <tr><td><code>totals</code></td><td>object</td><td>Compatibility parent-session totals: <code>tokens</code> (TokenUsage object) + <code>turnCount</code> + <code>toolCallCount</code> + <code>scope</code>.</td></tr>
-    <tr><td><code>scope</code></td><td>string</td><td>Explicitly <code>parent-session</code> on <code>totals</code>, <code>coverage</code>, and <code>couldHaveSaved</code>; none of those legacy structures silently includes child turns or findings.</td></tr>
-    <tr><td><code>turnCount</code></td><td>number</td><td>(totals) Assistant turns in the session.</td></tr>
-    <tr><td><code>toolCallCount</code></td><td>number</td><td>(totals) Tool calls in the session.</td></tr>
-    <tr><td><code>pricingCoverage</code></td><td>enum</td><td>Coverage of the parent-session <code>totalUsd</code>, with the same <code>full</code>/<code>partial</code>/<code>unpriced</code> semantics as a receipt.</td></tr>
-    <tr><td><code>unpricedTokens</code></td><td>TokenUsage</td><td>Exact known parent-session usage excluded from the parent floor.</td></tr>
-    <tr><td><code>unpricedTokensScope</code></td><td>literal <code>parent-session</code></td><td>Explicit scope of the parent unpriced-token vector.</td></tr>
-    <tr><td><code>combinedUnpricedTokens</code></td><td>TokenUsage</td><td>Exact known parent plus readable-child usage excluded from the combined floor.</td></tr>
-    <tr><td><code>combinedUnpricedTokensScope</code></td><td>literal <code>parent-session-plus-readable-subagents</code></td><td>Explicit scope of the combined unpriced-token vector.</td></tr>
-    <tr><td><code>combinedPricingCoverage</code></td><td>enum</td><td>Coverage of the combined parent-plus-readable-child floor; any known or structural gap makes a priced result <code>partial</code>.</td></tr>
-    <tr><td><code>totalUsd</code></td><td>number | null</td><td>Parent-session lower-bound scalar, retained separately from the combined child rollup.</td></tr>
-    <tr><td><code>totalCostEstimate</code></td><td>CostEstimate | null</td><td>Structured semantics for the handoff's parent <code>totalUsd</code>.</td></tr>
-    <tr><td><code>totalUsdScope</code></td><td>literal <code>parent-session</code></td><td>Scope of <code>totalUsd</code> and <code>unpricedTokens</code>.</td></tr>
-    <tr><td><code>combinedPricedUsd</code></td><td>number | null</td><td>Lower-bound sum of priced parent and readable priced-subagent atoms.</td></tr>
-    <tr><td><code>combinedPricedCostEstimate</code></td><td>CostEstimate | null</td><td>Structured semantics for <code>combinedPricedUsd</code>.</td></tr>
-    <tr><td><code>combinedTotalTokens</code></td><td>number</td><td>Observable parent tokens plus all readable-child tokens. Child token components are not fabricated.</td></tr>
-    <tr><td><code>combinedScope</code></td><td>literal <code>parent-session-plus-readable-subagents</code></td><td>Explicit scope of the combined fields.</td></tr>
-    <tr><td><code>subagents</code></td><td>Subagents | null</td><td>Aggregate child counts/sums; null when the model has no composed child rollup. No child ids, titles, or paths.</td></tr>
-    <tr><td><code>wasteLines</code></td><td>array</td><td>Same WasteLine union as the receipt, plus a per-line <code>rule</code> (SPEC-0059).</td></tr>
-    <tr><td><code>wasteLinesScope</code></td><td>literal <code>parent-session</code></td><td>Handoff waste findings remain parent-only; the combined cost fields must not be read as their denominator.</td></tr>
-    <tr><td><code>rule</code></td><td>string | null</td><td>(wasteLines) The class's fixed one-line next-time rule; <code>null</code> for a class without one.</td></tr>
-    <tr><td><code>couldHaveSaved</code></td><td>object</td><td>Historical field name, not a savings assertion. Its <code>usd</code> is the largest priced class subtotal across stuck-loop/context-thrash findings (null when none priced), with adjacent <code>costEstimate</code>; it excludes counterfactual trivial-span re-pricing and never adds classes that may overlap. <code>tokens</code> is the largest one-class token subtotal. This is the heuristic subtotal rendered as <code>FLAGGED PATTERN COST ≈ …</code>; detector membership does not prove avoidability, so the value is neither a savings floor nor a savings ceiling.</td></tr>
-    <tr><td><code>interpretation</code></td><td>string</td><td>(couldHaveSaved) Always <code>heuristic-pattern-pricing-not-proven-savings</code>; explicitly overrides the legacy field name's implication.</td></tr>
-    <tr><td><code>pctOfTotal</code></td><td>number | null</td><td>Retained for compatibility and always <code>null</code>: a ratio of two lower bounds has no reliable direction.</td></tr>
-    <tr><td><code>suggestions</code></td><td>array</td><td>Standing-rule suggestion strings (SPEC-0013), possibly empty.</td></tr>
-    <tr><td><code>threshold</code></td><td>number</td><td>The distinct-session recurrence threshold in effect.</td></tr>
-    <tr><td><code>coverage</code></td><td>object</td><td>What the parent-only packet covers, checkably: <code>scope</code>, <code>turns</code>, <code>toolCalls</code>, <code>compactions</code>, <code>wasteLines</code>.</td></tr>
-    <tr><td><code>turns</code></td><td>number</td><td>(coverage) Turn count the packet covers.</td></tr>
-    <tr><td><code>toolCalls</code></td><td>number</td><td>(coverage) Tool-call count the packet covers.</td></tr>
-    <tr><td><code>compactions</code></td><td>number</td><td>(coverage) Compaction events in the session.</td></tr>
-    <tr><td><code>aggregates</code></td><td>array</td><td><code>{class, distinctSessionCount}</code> — exactly the detector classes that fired in the trailing recurrence window, below-threshold classes included (inspectable, not silent).</td></tr>
-    <tr><td><code>class</code></td><td>string</td><td>(aggregates) Waste class name.</td></tr>
-    <tr><td><code>distinctSessionCount</code></td><td>number</td><td>(aggregates) Distinct recent sessions the class fired in.</td></tr>
+    <tr><td><code>schemaVersion</code></td><td>literal <code>1</code></td><td>Independent version for the session-review contract.</td></tr>
+    <tr><td><code>review</code></td><td>object</td><td>Review result and capability coverage.</td></tr>
+    <tr><td><code>registryVersion</code></td><td>literal <code>1</code></td><td>Version of the pattern metadata and configuration registry.</td></tr>
+    <tr><td><code>source</code></td><td>enum</td><td>Transcript source; used only to explain capability coverage, never to rank agents.</td></tr>
+    <tr><td><code>findings</code></td><td>object</td><td>Present findings keyed by one of the stable pattern IDs listed below. Unknown keys are rejected.</td></tr>
+    <tr><td><code>coverage</code></td><td>object</td><td>Checks that ran versus checks unavailable for this trace.</td></tr>
+    <tr><td><code>evaluated</code></td><td>object</td><td><code>count</code> plus ordered <code>patternIds</code> for checks that ran, including non-firings.</td></tr>
+    <tr><td><code>unavailable</code></td><td>object</td><td><code>count</code> plus ordered <code>patternIds</code> for checks lacking required recorded evidence.</td></tr>
+    <tr><td><code>count</code></td><td>non-negative integer</td><td>Number of checks in the adjacent coverage group.</td></tr>
+    <tr><td><code>patternIds</code></td><td>array</td><td>Stable registry keys in deterministic registry order.</td></tr>
+    <tr><td><code>ruleVersion</code></td><td>positive integer</td><td>Version of this pattern's predicate and fixed advice.</td></tr>
+    <tr><td><code>category</code></td><td>enum</td><td><code>issue</code>, <code>cost-opportunity</code>, or <code>observation</code>.</td></tr>
+    <tr><td><code>whatHappened</code></td><td>string</td><td>Plain fixed description of the recorded match.</td></tr>
+    <tr><td><code>whyItMatters</code></td><td>string</td><td>Plain fixed explanation of the practical risk.</td></tr>
+    <tr><td><code>recommendation</code></td><td>string</td><td>Canonical prevention step from the registry; recurrence reuses it verbatim.</td></tr>
+    <tr><td><code>evidenceStrength</code></td><td>string</td><td>Fixed description of how directly the trace supports the predicate.</td></tr>
+    <tr><td><code>claimLimit</code></td><td>string</td><td>Fixed statement of what the evidence does not prove.</td></tr>
+    <tr><td><code>evidence</code></td><td>object</td><td>Bounded counts, zero-based turn indices, facts, and sanitized tool labels only.</td></tr>
+    <tr><td><code>eventCount</code></td><td>non-negative integer</td><td>Number of distinct matches for this pattern in the selected session.</td></tr>
+    <tr><td><code>actionCount</code></td><td>non-negative integer</td><td>Number of matched recorded actions after overlap handling.</td></tr>
+    <tr><td><code>turnIndices</code></td><td>array</td><td>At most 20 zero-based recorded turn indices. Text output displays them as one-based turn numbers.</td></tr>
+    <tr><td><code>totalTurnCount</code></td><td>non-negative integer</td><td>Full number of matched turns when <code>turnIndices</code> is truncated.</td></tr>
+    <tr><td><code>tools</code></td><td>array</td><td>At most eight sanitized, 64-character tool labels; never commands or inputs.</td></tr>
+    <tr><td><code>totalToolCount</code></td><td>non-negative integer</td><td>Full number of tool labels when <code>tools</code> is truncated.</td></tr>
+    <tr><td><code>facts</code></td><td>array</td><td>Fixed <code>{name, value}</code> count facts for the matching extractor.</td></tr>
+    <tr><td><code>name</code></td><td>enum</td><td>One of the registry-supported count names such as <code>attempts</code>, <code>consecutive-errors</code>, or <code>compactions</code>.</td></tr>
+    <tr><td><code>value</code></td><td>non-negative integer</td><td>Count for the adjacent fact.</td></tr>
+    <tr><td><code>impact</code></td><td>object (optional)</td><td>One role-labeled impact; unlike roles are never summed into savings.</td></tr>
+    <tr><td><code>role</code></td><td>enum</td><td><code>observed-attributed</code>, <code>observed-window</code>, or <code>same-token-reprice</code>.</td></tr>
+    <tr><td><code>observedUsd</code></td><td>number</td><td>Same-token-reprice only: directly priced observed units.</td></tr>
+    <tr><td><code>repricedUsd</code></td><td>number</td><td>Same-token-reprice only: those exact units at a lower-priced same-provider row.</td></tr>
+    <tr><td><code>recurrence</code></td><td>object (optional)</td><td>Present after the same pattern reaches its distinct-session threshold.</td></tr>
+    <tr><td><code>distinctSessionCount</code></td><td>positive integer</td><td>Distinct recent sessions in which the same pattern fired.</td></tr>
+    <tr><td><code>windowDays</code></td><td>positive integer</td><td>Registry-defined trailing recurrence window.</td></tr>
+  </tbody>
+</table></div>
+
+<p>The optional <code>impact.tokens</code> value uses TokenUsage; <code>impact.usd</code> and <code>impact.durationMs</code> appear only for the roles that support them. A recurrence's <code>recommendation</code> is byte-identical to the finding recommendation.</p>
+
+<p>Every possible <code>findings</code> key is fixed by the registry and strict schema:</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Status and meaning</th></tr></thead>
+  <tbody>
+    <tr><td><code>repeated-identical-attempt</code></td><td>Same action repeated without a change.</td></tr>
+    <tr><td><code>repeated-identical-error</code></td><td>Same failed action tried again unchanged.</td></tr>
+    <tr><td><code>consecutive-tool-errors</code></td><td>Several actions failed in a row.</td></tr>
+    <tr><td><code>search-streak-without-change-or-check</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>repeated-search-query</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>same-file-reread-without-recorded-change</code></td><td>Same file reread without a recorded change.</td></tr>
+    <tr><td><code>last-change-not-checked</code></td><td>Measured only until its accuracy gate passes.</td></tr>
+    <tr><td><code>last-check-still-failing</code></td><td>Measured only until its accuracy gate passes.</td></tr>
+    <tr><td><code>unresolved-tool-call</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>many-writes-without-recorded-plan</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>failed-read-write-oscillation</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>context-refill-cluster</code></td><td>Working context grew back near its earlier size after being reduced.</td></tr>
+    <tr><td><code>short-tool-free-turn-cost</code></td><td>Listed-price comparison for short replies that used no tools.</td></tr>
+    <tr><td><code>large-tool-output</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>shell-over-structured-tool</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>unsupported-completion-claim</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>semantic-phase-oscillation</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>semantic-fruitless-exploration</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>reference-scope-drift</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>reference-relative-rapid-rewrite</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>open-task-at-end</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>interrupted-work</code></td><td>Preserved but disabled.</td></tr>
+    <tr><td><code>subagent-delivery-gap</code></td><td>Preserved but disabled.</td></tr>
   </tbody>
 </table></div>
 
 <h3 id="backfill-envelope-backfilljsonschema-spec-0056">Backfill envelope (<code>backfillJsonSchema</code>) — SPEC-0056</h3>
 
-<p><code>aireceipts backfill --json</code>: the bulk-sweep summary. Counts are honest per SPEC-0045 — degraded/unloadable sessions are counted in <code>loadFailureCount</code>, never silently dropped. <code>sessions</code> is one row per matched session (after <code>--since</code>/<code>--limit</code>), newest-first; rows also carry <code>source</code>, <code>sessionId</code>, <code>title</code>, <code>startedAtMs</code> with the same meanings as the handoff envelope above.</p>
+<p><code>aireceipts backfill --json</code>: the bulk-sweep summary. Counts are honest per SPEC-0045 — degraded/unloadable sessions are counted in <code>loadFailureCount</code>, never silently dropped. <code>sessions</code> is one row per matched session (after <code>--since</code>/<code>--limit</code>), newest-first; rows also carry <code>source</code>, <code>sessionId</code>, <code>title</code>, <code>startedAtMs</code> with the same meanings as the receipt envelope above.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
-    <tr><td><code>schemaVersion</code></td><td>number</td><td>Same envelope as receipt/compare/handoff.</td></tr>
+    <tr><td><code>schemaVersion</code></td><td>number</td><td>Same version-2 envelope as receipt/compare.</td></tr>
     <tr><td><code>discoveredCount</code></td><td>number</td><td>Every discovered session summary, degraded ones included.</td></tr>
     <tr><td><code>matchedCount</code></td><td>number</td><td>After the <code>--since</code>/<code>--limit</code> filters.</td></tr>
     <tr><td><code>loadFailureCount</code></td><td>number</td><td>Honest per SPEC-0045, mode-dependent: on an <code>--out</code> run (loads attempted), degraded summaries plus failed loads; on a dry run only known-unreadable summaries — a lower bound (labelled <code>Known unreadable</code> in the text summary).</td></tr>
@@ -690,7 +719,7 @@ footer{
   <li>CSV columns are additive-only within a major version.</li>
 </ul>
 
-<p>This public export version is deliberately separate from the internal PR receipt-ref payload stored at <code>refs/aireceipts/&lt;slug&gt;</code>. That producer/CI handoff remains <code>PR_RECEIPT_SCHEMA_VERSION = 1</code>: it serializes renderer inputs, has no <code>costSemantics</code> field, and did not need an incompatible shape change for the human receipt to render <code>≥</code> floors. Do not treat its v1 as the version of <code>--json</code>/<code>--csv</code>, and do not add a field to the ref merely to mirror a public export envelope.</p>
+<p>This public export version is deliberately separate from the internal PR receipt-ref payload stored at <code>refs/aireceipts/&lt;slug&gt;</code>. That producer/CI exchange remains <code>PR_RECEIPT_SCHEMA_VERSION = 1</code>: it serializes renderer inputs, has no <code>costSemantics</code> field, and did not need an incompatible shape change for the human receipt to render <code>≥</code> floors. Do not treat its v1 as the version of <code>--json</code>/<code>--csv</code>, and do not add a field to the ref merely to mirror a public export envelope.</p>
 
 <h2 id="weekly-digest-spec-0008-integration-point">Weekly digest (SPEC-0008 integration point)</h2>
 

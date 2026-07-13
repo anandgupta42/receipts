@@ -307,7 +307,7 @@ footer{
         <li><a href="06-week.html">Aggregate the week</a></li>
         <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
-        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
         <li><a href="15-integrations.html">Choose an integration</a></li>
@@ -319,6 +319,7 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
@@ -374,7 +375,7 @@ footer{
 
 <p>Use the same instruction for every coding assistant:</p>
 
-<pre class="doc-code"><code class="language-text">Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in the handoff.</code></pre>
+<pre class="doc-code"><code class="language-text">Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in your final task summary.</code></pre>
 
 <h3 id="optional-convenience-git-alias">Optional convenience: git alias</h3>
 
@@ -492,7 +493,7 @@ jobs:
 
 <p>Add this second producer path to <code>AGENTS.md</code>:</p>
 
-<blockquote>Before you finish a PR-producing task, run <code>npx aireceipts-cli pr --post</code> from the repo worktree and include any failure message in the handoff.</blockquote>
+<blockquote>Before you finish a PR-producing task, run <code>npx aireceipts-cli pr --post</code> from the repo worktree and include any failure message in your final task summary.</blockquote>
 
 <h3 id="step-4-tell-contributors">Step 4 — Tell contributors</h3>
 
@@ -533,7 +534,7 @@ jobs:
   <li>One combined total. Priced and unpriced sessions are never blended: dollars and tokens total separately.</li>
   <li>An honest note counting any plausible-but-unproven sessions that were <strong>not</strong> attributed.</li>
   <li>A collapsed <code>full receipts</code> section: a per-session ledger table, each session's full receipt, and — for a session that launched subagents — a <code>subagents (N)</code> table under its receipt, sorted by cost and capped at 20 rows where the last row carries the remainder's sum (a capped list never silently drops value).</li>
-  <li>When a counted session fires a detector, a collapsed <code>handoff — flagged pattern cost ≈ …</code> section. Its headline is an overlap-safe heuristic subtotal with the explicit line <code>not proven savings</code>; it is not a savings floor or ceiling.</li>
+  <li>When a counted session has a supported registry finding, a collapsed <code>session review — N patterns to prevent</code> section. It states how many sessions and recorded matches support each pattern, gives the canonical prevention step, and names what the trace cannot prove. Different impact roles are not combined into a savings number.</li>
 </ul>
 
 <h2 id="how-sessions-are-matched-to-a-pr">How sessions are matched to a PR</h2>

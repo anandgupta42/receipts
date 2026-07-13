@@ -1,0 +1,8 @@
+SESSION REVIEW
+Source: opencode
+
+No supported issues found in the recorded evidence.
+
+COVERAGE
+Checks run: 4
+Checks unavailable for this trace: 2

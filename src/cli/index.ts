@@ -11,7 +11,7 @@ import { loadCommands, selectCommand } from "./registry.js";
 import { createContext } from "./context.js";
 
 export { readStdin, loadFromStdinPayload, loadFromDisk, loadFromCwd, MAX_SCOPED_LOAD_ATTEMPTS, runStatusline } from "./commands/statusline.js";
-export { recentWasteAggregates } from "./commands/handoff.js";
+export { recentReviewSessions, recentWasteAggregates } from "./commands/handoff.js";
 
 /** CLI entrypoint: parse → discover/select → first-run notice → run → telemetry record → bounded flush (SPEC-0002 wiring). */
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {
@@ -42,8 +42,8 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
         agentType: undefined,
         durationMs: Date.now() - started,
         ok: code === 0,
-        // SPEC-0042 R5 — emission mode for the handoff command only (enum, never content).
-        ...(command.name === "handoff" ? { handoffFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
+        // SPEC-0083 R13 — review mode only; never findings, counts, or evidence.
+        ...(command.name === "review" ? { reviewFormat: options.json ? ("json" as const) : ("text" as const) } : {}),
         ...runTelemetry,
       });
     }

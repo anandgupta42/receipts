@@ -43,7 +43,7 @@ describe("SPEC-0043 R1: exactly nine event names", () => {
 describe("SPEC-0043 R9: docs parity", () => {
   const doc = readFileSync(resolve(process.cwd(), "docs/telemetry.md"), "utf8");
   const fieldsByEvent = {
-    cli_run: ["cliVersion", "os", "nodeMajor", "commandClass", "agentType", "durationBucket", "ok", "isCI", "installHash", "runOrdinalBucket"],
+    cli_run: ["cliVersion", "os", "nodeMajor", "commandClass", "agentType", "durationBucket", "ok", "isCI", "installHash", "runOrdinalBucket", "reviewFormat"],
     cli_error: ["errorClass", "command", "agentType", "inPackage"],
     parse_failure: ["agentType", "adapterVersion", "signatureHash"],
     receipt_generated: [
@@ -73,7 +73,6 @@ describe("SPEC-0043 R9: docs parity", () => {
       "commentResult",
       "artifactResult",
       "shareResult",
-      "handoffSectionIncluded",
       "result",
     ],
     hook_configured: ["operation", "promptOutcome", "result"],
@@ -100,7 +99,6 @@ describe("SPEC-0043 R2: command enum", () => {
         "check-budget",
         "compare",
         "demo",
-        "handoff",
         "help",
         "install-hook",
         "list",
@@ -109,6 +107,7 @@ describe("SPEC-0043 R2: command enum", () => {
         "pr",
         "quota",
         "receipt",
+        "review",
         "stats",
         "statusline",
         "telemetry-show",
@@ -199,7 +198,6 @@ describe("SPEC-0043 R1-R5: valid events pass their schema", () => {
         commentResult: "success",
         artifactResult: "success",
         shareResult: "skipped",
-        handoffSectionIncluded: true,
         result: "success",
       },
     ],
@@ -362,12 +360,12 @@ describe("SPEC-0043 R9: leakage fixtures — banned content is structurally reje
   });
 });
 
-describe("SPEC-0042 R5 — handoffFormat allowlist", () => {
+describe("SPEC-0083 R13 — reviewFormat allowlist", () => {
   const base = {
     cliVersion: "0.1.0",
     os: "linux" as const,
     nodeMajor: 20,
-    commandClass: "handoff" as const,
+    commandClass: "review" as const,
     agentType: "unknown" as const,
     durationBucket: "<100ms" as const,
     ok: true,
@@ -377,13 +375,13 @@ describe("SPEC-0042 R5 — handoffFormat allowlist", () => {
   };
 
   it("accepts text/json and absence", () => {
-    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "text" }).success).toBe(true);
-    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "json" }).success).toBe(true);
+    expect(cliRunPropertiesSchema.safeParse({ ...base, reviewFormat: "text" }).success).toBe(true);
+    expect(cliRunPropertiesSchema.safeParse({ ...base, reviewFormat: "json" }).success).toBe(true);
     expect(cliRunPropertiesSchema.safeParse(base).success).toBe(true);
   });
 
   it("rejects any non-enum value (never content)", () => {
-    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "markdown" }).success).toBe(false);
-    expect(cliRunPropertiesSchema.safeParse({ ...base, handoffFormat: "/home/user/secret" }).success).toBe(false);
+    expect(cliRunPropertiesSchema.safeParse({ ...base, reviewFormat: "markdown" }).success).toBe(false);
+    expect(cliRunPropertiesSchema.safeParse({ ...base, reviewFormat: "/home/user/secret" }).success).toBe(false);
   });
 });

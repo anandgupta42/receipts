@@ -22,7 +22,6 @@ export const COMMAND_VALUES = [
   "check-budget",
   "compare",
   "demo",
-  "handoff",
   "help",
   "install-hook",
   "list",
@@ -31,6 +30,7 @@ export const COMMAND_VALUES = [
   "pr",
   "quota",
   "receipt",
+  "review",
   "stats",
   "statusline",
   "telemetry-show",
@@ -144,9 +144,9 @@ const installHashSchema = z.union([
 /** An internal per-adapter constant (e.g. `"1"`), not anything read from a transcript. */
 const adapterVersionSchema = z.string().regex(/^[a-zA-Z0-9_.-]{1,32}$/, "adapterVersion must be a short opaque token");
 
-/** SPEC-0042 R5 — emission mode of the handoff command only; enum, never content. */
-export const HANDOFF_FORMAT_VALUES = ["text", "json"] as const;
-export type HandoffFormatValue = (typeof HANDOFF_FORMAT_VALUES)[number];
+/** SPEC-0083 R13 — emission mode of the review command only; enum, never content. */
+export const REVIEW_FORMAT_VALUES = ["text", "json"] as const;
+export type ReviewFormatValue = (typeof REVIEW_FORMAT_VALUES)[number];
 
 export const cliRunPropertiesSchema = z
   .object({
@@ -160,8 +160,8 @@ export const cliRunPropertiesSchema = z
     isCI: z.boolean(),
     installHash: installHashSchema,
     runOrdinalBucket: z.enum(ORDINAL_BUCKET_VALUES),
-    /** SPEC-0042 R5 — present only on handoff-command runs. */
-    handoffFormat: z.enum(HANDOFF_FORMAT_VALUES).optional(),
+    /** SPEC-0083 R13 — present only on review-command runs. */
+    reviewFormat: z.enum(REVIEW_FORMAT_VALUES).optional(),
   })
   .strict();
 export type CliRunProperties = z.infer<typeof cliRunPropertiesSchema>;
@@ -230,8 +230,6 @@ export const prFlowCompletedPropertiesSchema = z
     commentResult: z.enum(STEP_RESULT_VALUES),
     artifactResult: z.enum(STEP_RESULT_VALUES),
     shareResult: z.enum(STEP_RESULT_VALUES),
-    /** SPEC-0059 R8 — the body carried the handoff section (rendering rate, never engagement). */
-    handoffSectionIncluded: z.boolean(),
     result: z.enum(RESULT_VALUES),
   })
   .strict();

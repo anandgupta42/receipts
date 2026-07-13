@@ -15,9 +15,9 @@ never a ranking).
 
 `aireceipts statusline` prints one line — the last-completed session's cost-or-tokens
 plus a waste flag — for Claude Code's `statusLine` command config. This is the proven
-retention lever (the `ccusage` precedent: a number visible on every prompt, no command
-to remember). **Kill criterion:** if the line adds no signal a user notices within a
-week of daily use (vs. running `aireceipts` manually), cut it.
+retention lever (the always-visible local usage-meter precedent: a number on every
+prompt, no command to remember). **Kill criterion:** if the line adds no signal a user
+notices within a week of daily use (vs. running `aireceipts` manually), cut it.
 
 ## Requirements
 

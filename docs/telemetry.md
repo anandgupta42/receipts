@@ -27,14 +27,14 @@ than widening itself.
 | `cliVersion` | string | semver | From this package's `package.json`. |
 | `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | Collapsed from `process.platform`. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
-| `commandClass` | enum | `backfill` \| `benchmark` \| `check-budget` \| `compare` \| `demo` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
+| `commandClass` | enum | `backfill` \| `benchmark` \| `check-budget` \| `compare` \| `demo` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `review` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket; never raw milliseconds. |
 | `ok` | boolean | | Whether the command returned exit code 0. |
 | `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. Telemetry is enabled by default in CI, so this field distinguishes CI runs from human runs in the data. |
 | `installHash` | string | 64-hex sha256 or `unavailable` | Salted hash of the random local install id; raw id never leaves disk. |
 | `runOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime run ordinal bucket; never the raw count. |
-| `handoffFormat` | enum (optional) | `text` \| `json` | SPEC-0042: emission mode, present only on handoff-command runs — never content. |
+| `reviewFormat` | enum (optional) | `text` \| `json` | Session-review emission mode only. No finding, pattern, evidence, coverage, or result state is sent. |
 
 ### `cli_error` — one per uncaught top-level CLI error
 
@@ -94,7 +94,6 @@ than widening itself.
 | `commentResult` | enum | `success` \| `failed` \| `skipped` | |
 | `artifactResult` | enum | `success` \| `failed` \| `skipped` | |
 | `shareResult` | enum | `success` \| `failed` \| `skipped` | |
-| `handoffSectionIncluded` | boolean | | SPEC-0059: the rendered body carried the handoff section (rendering rate only — never engagement, never contents). |
 | `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
 
 ### `hook_configured` — one per hook install/uninstall command

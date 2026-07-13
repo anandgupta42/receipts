@@ -4,11 +4,10 @@ Seeing an error or an odd receipt? That's
 [troubleshooting](guide/12-troubleshooting.md) — symptom-first. This page is
 question-first. (SPEC-0048.)
 
-## How is this different from ccusage or my agent's built-in `/usage`?
+## How is this different from usage dashboards or my agent's built-in `/usage`?
 
-Those are usage dashboards: [ccusage](https://github.com/ryoppippi/ccusage) and
-your agent's built-ins aggregate what you spent over time — today, this week,
-this billing window. aireceipts prints a receipt
+Usage dashboards and your agent's built-ins aggregate what you spent over time —
+today, this week, this billing window. aireceipts prints a receipt
 for a **unit of work** — one session or one pull request — with observable
 Standard-API floor attributed per
 tool call, prices taken from cited and dated tables, and byte-deterministic output.

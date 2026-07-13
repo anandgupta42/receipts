@@ -57,7 +57,7 @@ on the line; it is evidence to inspect, not a proven savings claim.
 
 **2 · When the session ends — the receipt.** `npx aireceipts-cli` prints the itemized
 receipt — cited floors on priceable tool rows, tokens-only buckets where evidence
-is insufficient, heuristic patterns flagged (loops, context thrash, trivial spans), and the
+is insufficient, heuristic patterns flagged (repeated actions, context refill, short tool-free turns), and the
 cheaper-model line as arithmetic, not a prediction. The exact bytes:
 
 ```
@@ -105,7 +105,7 @@ carry one — a real one, live:
 ## What it tells you
 
 - **Which model is active, and the observable Standard-API floor so far** — on every prompt, before the session is over, with your 5-hour cap countdown next to it.
-- **Where the observable usage went** — priceable rows carry cited `≥` floors; unmatched or unattributed components stay as tokens. Heuristic flags identify stuck loops, context thrash, and trivial turns without claiming avoidability.
+- **Where the observable usage went** — priceable rows carry cited `≥` floors; unmatched or unattributed components stay as tokens. Heuristic flags identify repeated actions, context refill, and short tool-free turns without claiming avoidability.
 - **The observable floor behind a PR** — attributed across the sessions that built it, with same-tokens-on-a-cheaper-model arithmetic.
 
 ## Supported agents
@@ -193,18 +193,17 @@ If you are an AI agent asked to install aireceipts, do the following:
 | `aireceipts week` | Trailing-7-day digest: totals, per-agent split, flagged patterns — [guide](docs/guide/06-week.md) |
 | `aireceipts backfill [--out <dir>]` | Bulk receipts across your existing session history; summary by default, one file per session with `--out` — [guide](docs/guide/01-getting-started.md) |
 | `aireceipts integrations [target]` | Exact local snippets for Claude Code, Codex, OpenCode, Cursor, and GitHub — [guide](docs/guide/15-integrations.md) |
-| `aireceipts --handoff` | Paste-ready block that tells your *agent* what to do cheaper next time — [guide](docs/guide/09-handoff.md) |
+| `aireceipts review [selector]` | Find recorded session problems and recommend how to prevent them next time — [guide](docs/guide/09-review.md) |
 | `aireceipts install-hook` | Consent-gated Claude Code hook: every session ends with a mini-receipt — [guide](docs/guide/03-install-hook.md) |
 | `aireceipts statusline` | Live observable-floor line in Claude Code's status bar, or any terminal via `--cwd` (tmux/starship/pwsh) — [setup](docs/statusline.md) |
 | `aireceipts --quota` / `--check-budget` | Claude Code rate-limit window, read from the statusline stdin payload (silent otherwise); `--check-budget` exits 1 when your local budget cap is exceeded |
 | `aireceipts --json` / `--csv` / `--svg` / `--png` | Versioned schema, RFC 4180 rows, shareable SVG/PNG image — [schema](docs/json-schema.md) |
 | `aireceipts stats` | Local usage counters — receipts generated on this machine |
 
-<div align="center">
-
-<img alt="Historical terminal recording of a synthetic handoff. Current aireceipts prints FLAGGED PATTERN COST with approximate notation, a not-proven-savings disclaimer, the flagged Bash loop evidence and its fix, and the coverage line; this recording predates that notation." src="site/assets/waste-handoff.gif" width="640">
-
-</div>
+`aireceipts review` explains what happened, shows bounded recorded evidence, gives one
+prevention step, and states what the evidence cannot prove. Its generated
+[pattern reference](docs/reference/review-patterns.md) also preserves ideas that are
+measured only or disabled because they are not reliable enough to show users.
 
 ## The honesty rules
 

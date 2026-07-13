@@ -820,11 +820,8 @@ describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e thro
   });
 });
 
-// SPEC-0059 R5/R8 — the handoff section through the real PR flow: present on a
-// wasteful PR (and reported via handoffSectionIncluded), absent on a clean PR
-// and under --no-details. Section-content details (arithmetic, hedge, budget)
-// are unit-covered in test/receipt/savings-slip.test.ts.
-describe("SPEC-0059 handoff section (e2e through runPr)", () => {
+// SPEC-0083 — the registry-backed review section through the real PR flow.
+describe("SPEC-0083 session review section (e2e through runPr)", () => {
   const LOOP_ANCHORS = path.join(FIX, "claude-anchors-loop.jsonl");
 
   async function loopDeps(): Promise<{ deps: PrDeps; out: string[] }> {
@@ -847,29 +844,30 @@ describe("SPEC-0059 handoff section (e2e through runPr)", () => {
     const { deps, out } = await loopDeps();
     const result = await runPrDetailed({ post: false }, deps);
     expect(result.code).toBe(0);
-    expect(result.handoffSectionIncluded).toBe(true);
+    expect(result.reviewSectionIncluded).toBe(true);
     const body = out[0];
-    expect(body).toContain("<details><summary>handoff — flagged pattern cost ≈ $");
-    expect(body).toContain("FLAGGED PATTERN COST");
-    expect(body).toContain("→ change or stop after two identical failures");
-    expect(body).toContain("covers: 1 session ·");
-    expect(body.indexOf("full receipts (")).toBeLessThan(body.indexOf("<details><summary>handoff — "));
+    expect(body).toContain("<details><summary>session review — 1 pattern to prevent</summary>");
+    expect(body).toContain("SESSION REVIEW");
+    expect(body).toContain("The same failed action was tried again unchanged");
+    expect(body).toContain("Prevent it next time:");
+    expect(body).toContain("Sessions reviewed: 1");
+    expect(body.indexOf("full receipts (")).toBeLessThan(body.indexOf("<details><summary>session review — "));
   });
 
   it("--no-details drops the section and the flag with it", async () => {
     const { deps, out } = await loopDeps();
     const result = await runPrDetailed({ post: false, details: false }, deps);
     expect(result.code).toBe(0);
-    expect(result.handoffSectionIncluded).toBe(false);
-    expect(out[0]).not.toContain("handoff — could have saved");
+    expect(result.reviewSectionIncluded).toBe(false);
+    expect(out[0]).not.toContain("session review —");
   });
 
   it("a clean PR has no section and the body is byte-identical to pre-SPEC-0059 output", async () => {
     const { deps, out } = await makeDeps();
     const result = await runPrDetailed({ post: false }, deps);
     expect(result.code).toBe(0);
-    expect(result.handoffSectionIncluded).toBe(false);
-    expect(out[0]).not.toContain("handoff —");
+    expect(result.reviewSectionIncluded).toBe(false);
+    expect(out[0]).not.toContain("session review —");
   });
 
   it("dry-run and --post render the identical body, and the post result reports the section (R8)", async () => {
@@ -886,6 +884,6 @@ describe("SPEC-0059 handoff section (e2e through runPr)", () => {
     // Codex review finding: the successful-post path must carry the boolean
     // too — a posted wasteful PR is the kill criterion's main denominator.
     expect(posted.commentResult).toBe("success");
-    expect(posted.handoffSectionIncluded).toBe(true);
+    expect(posted.reviewSectionIncluded).toBe(true);
   });
 });

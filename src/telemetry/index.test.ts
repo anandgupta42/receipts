@@ -70,19 +70,19 @@ describe("recordCliRun builds a valid cli_run event from raw runtime inputs", ()
   });
 });
 
-describe("SPEC-0042 R5 — handoffFormat pass-through", () => {
-  it("records the enum for handoff runs and validates against the strict schema", () => {
-    recordCliRun({ command: "handoff", agentType: undefined, durationMs: 10, ok: true, handoffFormat: "json", ...RUN_BASE });
+describe("SPEC-0083 R13 — reviewFormat pass-through", () => {
+  it("records the enum for review runs and validates against the strict schema", () => {
+    recordCliRun({ command: "review", agentType: undefined, durationMs: 10, ok: true, reviewFormat: "json", ...RUN_BASE });
     const [event] = peekQueuedEvents();
-    expect((event?.properties as Record<string, unknown>).commandClass).toBe("handoff");
-    expect((event?.properties as Record<string, unknown>).handoffFormat).toBe("json");
+    expect((event?.properties as Record<string, unknown>).commandClass).toBe("review");
+    expect((event?.properties as Record<string, unknown>).reviewFormat).toBe("json");
     expect(validateEvent(event as TelemetryEvent)).toBe(true);
   });
 
   it("omits the field entirely when not supplied (absent, not null)", () => {
     recordCliRun({ command: "receipt", agentType: undefined, durationMs: 10, ok: true, ...RUN_BASE });
     const [event] = peekQueuedEvents();
-    expect("handoffFormat" in (event?.properties as Record<string, unknown>)).toBe(false);
+    expect("reviewFormat" in (event?.properties as Record<string, unknown>)).toBe(false);
     expect(validateEvent(event as TelemetryEvent)).toBe(true);
   });
 });
@@ -159,7 +159,6 @@ describe("SPEC-0043 recorders", () => {
       commentResult: "skipped",
       artifactResult: "skipped",
       shareResult: "skipped",
-      handoffSectionIncluded: false,
       result: "success",
     });
     recordHookConfigured({ operation: "install", promptOutcome: "accepted", result: "success" });

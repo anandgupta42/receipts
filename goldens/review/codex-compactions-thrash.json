@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "review": {
+    "registryVersion": 1,
+    "source": "codex",
+    "findings": {
+      "context-refill-cluster": {
+        "ruleVersion": 1,
+        "category": "issue",
+        "title": "Working context grew back near its earlier size after being reduced",
+        "whatHappened": "The session reduced its working context at least twice. Within five turns each time, the recorded working-context size grew back to at least 80% of its earlier high point.",
+        "whyItMatters": "Repeatedly returning to a large working context can make one session expensive and harder to steer.",
+        "recommendation": "Split unrelated tasks into separate sessions. After context is reduced, bring back only evidence needed for the current task.",
+        "evidenceStrength": "exact-structure-estimated-cause",
+        "claimLimit": "The trace does not prove that the refilled context was old, unnecessary, or unrelated to new work.",
+        "evidence": {
+          "eventCount": 1,
+          "actionCount": 0,
+          "turnIndices": [
+            2
+          ],
+          "totalTurnCount": 1,
+          "tools": [],
+          "totalToolCount": 0,
+          "facts": [
+            {
+              "name": "compactions",
+              "value": 2
+            },
+            {
+              "name": "window-turns",
+              "value": 1
+            }
+          ]
+        },
+        "impact": {
+          "role": "observed-window",
+          "tokens": {
+            "input": 25000,
+            "output": 0,
+            "cacheRead": 90000,
+            "cacheCreation": 0,
+            "cacheCreation5m": null,
+            "cacheCreation1h": null,
+            "total": 115000
+          },
+          "usd": 0.059500000000000004
+        }
+      }
+    },
+    "coverage": {
+      "evaluated": {
+        "count": 5,
+        "patternIds": [
+          "repeated-identical-attempt",
+          "repeated-identical-error",
+          "consecutive-tool-errors",
+          "context-refill-cluster",
+          "short-tool-free-turn-cost"
+        ]
+      },
+      "unavailable": {
+        "count": 1,
+        "patternIds": [
+          "same-file-reread-without-recorded-change"
+        ]
+      }
+    }
+  }
+}

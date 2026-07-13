@@ -2,8 +2,9 @@
 
 **Date:** 2026-07-12
 **Code baseline:** `origin/main` at `396de73`
-**Trace snapshot:** 5,255 root sessions across Claude Code, Codex, and
+**Research snapshot:** 5,255 root sessions across Claude Code, Codex, and
 opencode-family stores
+**Final implementation measurement:** 5,394 frozen root sessions, measured twice
 **Privacy:** only aggregate counts and structural facts were retained. No prompt,
 assistant response, tool input/output, command, path, repository name, or secret is
 included here or in the proposed registry.
@@ -22,8 +23,9 @@ research, but they are disabled for this product surface.
 
 ## Decision
 
-Rename the public command to `aireceipts review`. Keep `--handoff` as a hidden,
-byte-compatible alias for existing users during a deprecation window.
+Rename the public command to `aireceipts review`. Keep the old flag as a hidden alias
+for existing scripts; both invocations enter the same implementation and emit the new
+review output.
 
 `review` is the clearest term for a completed-session check. `handoff` implies moving
 work to another person or session, which caused the exact scope confusion corrected
@@ -122,6 +124,32 @@ the tail-check candidate leaves only 95 new roots, so that rule is the value gat
 must be audited and promoted safely or the first release does not achieve the requested
 coverage increase.
 
+### Final implementation measurement
+
+The approved implementation was measured after SPEC-0082 made every discovered root
+loadable. The harness froze one sorted input list, evaluated it twice with bounded
+concurrency, and retained aggregate structural counts only. Both passes produced the
+same digest; all 5,394 roots loaded and discovery stayed unchanged during the run.
+
+| Result | Sessions | Reach | Gain over baseline |
+|---|---:|---:|---:|
+| Existing three-pattern baseline | 172 | 3.19% | — |
+| User-visible registry rules | 220 | 4.08% | +0.89 points |
+| Visible plus the two hidden tail checks | 1,183 | 21.93% | +18.74 points |
+
+The hidden `last-change-not-checked` rule found 33 Claude Code, 14 Codex, and 959
+opencode-family examples. The approved accuracy gate requires at least 20 real positives
+from every supported trace family before recommendation review. Codex has only 14, so
+the audit cannot meet its minimum even if every available example is correct. The
+second hidden rule found only three examples in total. Both remain shadow-only, render
+nothing, and send no telemetry.
+
+This is the intended outcome of the gate, not a reason to weaken it. Visible coverage
+does not meet either shipping threshold, so the implementation must not claim that
+coverage increased and SPEC-0083 remains building. The aggregate measurement is stored
+in
+[`measurements/session-review-2026-07-12.json`](./measurements/session-review-2026-07-12.json).
+
 ### Classifier boundaries
 
 - **Repeated identical attempt:** consecutive calls only; tool name and canonical JSON
@@ -184,11 +212,11 @@ Reddit reports were used only to improve plain-language phrasing around repeated
 rereads, context growth, and completion without checks. They were not used to validate
 any detector or threshold.
 
-## Proposed pattern registry
+## Pattern registry
 
 The canonical research registry is
 [`2026-07-12-session-review-pattern-registry.json`](./2026-07-12-session-review-pattern-registry.json).
-It contains 23 preserved patterns: 4 proposed default findings, 2 neutral diagnostics,
+It contains 23 preserved patterns: 4 default findings, 2 neutral diagnostics,
 2 shadow-only candidates, and 15 disabled ideas.
 
 | Pattern key | State | User-facing meaning |
@@ -217,9 +245,9 @@ It contains 23 preserved patterns: 4 proposed default findings, 2 neutral diagno
 | `interrupted-work` | disabled | Belongs to continuity and lacks cross-source lifecycle normalization |
 | `subagent-delivery-gap` | disabled | Belongs to continuity and lacks a safe parent-delivery join |
 
-“Enabled” above means proposed for the first approved implementation, not shipped.
-Shadow rules run only in local dogfood and never render or enter telemetry. Disabled
-rules remain in the registry with `extractor: null`; they are not silently discarded.
+“Enabled” above means implemented for the approved slice, not shipped. Shadow rules run
+only in local dogfood and never render or enter telemetry. Disabled rules remain in the
+registry with `extractor: null`; they are not silently discarded.
 
 ## Registry contract
 
@@ -294,7 +322,7 @@ Coverage: 7 checks ran · 2 were unavailable for this transcript format.
 
 This avoids both a false clean bill of health and unexplained silence.
 
-## First implementation slice and gates
+## Implemented slice and gate outcome
 
 1. Introduce `aireceipts review`, retain hidden `--handoff`, and replace resume-oriented
    headings and empty-state language.
@@ -304,18 +332,17 @@ This avoids both a false clean bill of health and unexplained silence.
 4. Add strict repeated-error as an issue and consecutive-errors as an explicitly
    caveated diagnostic. Reuse the existing low-confidence same-file reread fact as a
    diagnostic without turning it into waste or savings.
-5. Run tail-validation and final-failing-check extractors in shadow. Promote them in the
-   same implementation only after a stratified adversarial audit finds zero factual
-   predicate mismatches and at most 10% materially inapplicable recommendations.
-6. Freeze the corpus before the promotion run. Ship the coverage claim only if
-   user-visible session-specific coverage rises by at least 10 percentage points and
-   reaches at least 15% of roots. The measured candidate result is 18.3%, +15.0 points.
-   If tail validation fails promotion, keep it shadowed and do not claim that the
-   coverage objective was met.
+5. Tail-validation and final-failing-check extractors run in shadow. Thirty-six
+   adversarial boundary fixtures pass, but the real-positive sample minimum is
+   unavailable for every source family, so neither rule is promoted.
+6. The final frozen-input measurement reaches 4.08% visibly, only +0.89 points over the
+   3.19% baseline. Hidden candidates would reach 21.93%, but accuracy gates come first.
+   Keep the coverage objective open and make no increased-coverage claim.
 7. Keep search heuristics, plan absence, unresolved calls, large outputs, semantic
    detectors, reference-relative rules, and continuity facts disabled. Their evidence
    remains preserved in the registry.
 
-The draft implementation contract is
-[`SPEC-0082-session-review-registry.md`](../../../specs/SPEC-0082-session-review-registry.md).
-No product code should change until the maintainer approves it.
+The approved implementation contract is
+[`SPEC-0083-session-review-registry.md`](../../../specs/SPEC-0083-session-review-registry.md).
+Its status remains `building` because the measured visible rules do not pass the value
+gate.

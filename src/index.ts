@@ -71,6 +71,27 @@ export {
 } from "./aggregate/week.js";
 export { renderWeek, weekToJson } from "./receipt/week.js";
 
+// SPEC-0083 session review — registry-backed deterministic issue detection.
+export type {
+  PrReviewView,
+  ReviewCoverage,
+  ReviewEvidence,
+  ReviewFinding,
+  ReviewImpact,
+  ReviewReport,
+  ReviewTokenUsage,
+  SessionReviewEvaluation,
+} from "./receipt/review.js";
+export {
+  buildPrReview,
+  buildReviewReport,
+  DEFAULT_REVIEW_THRESHOLD,
+  evaluateSessionReview,
+  renderReview,
+  REVIEW_SCHEMA_VERSION,
+} from "./receipt/review.js";
+export { REVIEW_PATTERNS, REVIEW_REGISTRY } from "./receipt/reviewRegistry.js";
+
 // SPEC-0056 backfill — bulk retroactive receipt sweep.
 export type { BackfillFilters, BackfillPlan, BackfillPlanEntry } from "./aggregate/backfill.js";
 export { backfillFileName, buildManifest, filterSummaries, MANIFEST_MARKER, planBackfill, slugForId } from "./aggregate/backfill.js";

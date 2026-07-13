@@ -44,8 +44,8 @@ describe("R7 — --json row shape and key order", () => {
 describe("R7 — text receipt line + methodology sentence", () => {
   it("renders the compact compaction/turn-span label and one methodology sub-line", async () => {
     const text = renderReceipt(await tpModel(), { color: false });
-    expect(text).toContain("≈ context thrash: 3 compactions (4t)");
-    expect(text).toContain("context refilled ≥80% of peak within 5 turns");
+    expect(text).toContain("≈ context refill: 3 compactions (4t)");
+    expect(text).toContain("prompt load ≥80% of prior peak within 5 turns");
   });
 });
 
@@ -53,7 +53,7 @@ describe("R7 — --handoff static suggestion", () => {
   it("pairs the context-thrash evidence line with the clear/split-context rule (SPEC-0059 R3 form)", async () => {
     const handoff = renderHandoff(await tpModel());
     // Evidence via the receipt's own wasteRowBlock label (shared, not re-derived).
-    expect(handoff).toContain("≈ context thrash: 3 compactions (4t)");
-    expect(handoff).toContain("→ clear or split context at task boundaries");
+    expect(handoff).toContain("≈ context refill: 3 compactions (4t)");
+    expect(handoff).toContain("→ Split unrelated tasks into separate sessions.");
   });
 });

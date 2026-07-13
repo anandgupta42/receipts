@@ -307,7 +307,7 @@ footer{
         <li><a href="06-week.html">Aggregate the week</a></li>
         <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
-        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
         <li><a href="15-integrations.html">Choose an integration</a></li>
@@ -319,6 +319,7 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
@@ -362,14 +363,14 @@ footer{
     <tr><td><code>cliVersion</code></td><td>string</td><td>semver</td><td>From this package's <code>package.json</code>.</td></tr>
     <tr><td><code>os</code></td><td>enum</td><td><code>darwin</code> | <code>linux</code> | <code>win32</code> | <code>other</code></td><td>Collapsed from <code>process.platform</code>.</td></tr>
     <tr><td><code>nodeMajor</code></td><td>integer</td><td>e.g. <code>22</code></td><td>Major Node version only.</td></tr>
-    <tr><td><code>commandClass</code></td><td>enum</td><td><code>backfill</code> | <code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>demo</code> | <code>handoff</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>version</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
+    <tr><td><code>commandClass</code></td><td>enum</td><td><code>backfill</code> | <code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>demo</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>review</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>version</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
     <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td>Which agent format was parsed, if known.</td></tr>
     <tr><td><code>durationBucket</code></td><td>enum</td><td><code>&lt;100ms</code> | <code>100-500ms</code> | <code>500ms-2s</code> | <code>2-10s</code> | <code>&gt;10s</code></td><td>Coarse bucket; never raw milliseconds.</td></tr>
     <tr><td><code>ok</code></td><td>boolean</td><td></td><td>Whether the command returned exit code 0.</td></tr>
     <tr><td><code>isCI</code></td><td>boolean</td><td></td><td>True when <code>CI</code> or <code>GITHUB_ACTIONS</code> is set and not false. Telemetry is enabled by default in CI, so this field distinguishes CI runs from human runs in the data.</td></tr>
     <tr><td><code>installHash</code></td><td>string</td><td>64-hex sha256 or <code>unavailable</code></td><td>Salted hash of the random local install id; raw id never leaves disk.</td></tr>
     <tr><td><code>runOrdinalBucket</code></td><td>enum</td><td><code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code> | <code>unavailable</code></td><td>Lifetime run ordinal bucket; never the raw count.</td></tr>
-    <tr><td><code>handoffFormat</code></td><td>enum (optional)</td><td><code>text</code> | <code>json</code></td><td>SPEC-0042: emission mode, present only on handoff-command runs — never content.</td></tr>
+    <tr><td><code>reviewFormat</code></td><td>enum (optional)</td><td><code>text</code> | <code>json</code></td><td>Session-review emission mode only. No finding, pattern, evidence, coverage, or result state is sent.</td></tr>
   </tbody>
 </table></div>
 
@@ -444,7 +445,6 @@ footer{
     <tr><td><code>commentResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
     <tr><td><code>artifactResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
     <tr><td><code>shareResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
-    <tr><td><code>handoffSectionIncluded</code></td><td>boolean</td><td></td><td>SPEC-0059: the rendered body carried the handoff section (rendering rate only — never engagement, never contents).</td></tr>
     <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
   </tbody>
 </table></div>

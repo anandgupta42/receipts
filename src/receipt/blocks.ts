@@ -25,10 +25,10 @@ export function isTemplateName(name: string): name is TemplateName {
 // --- Honesty constants (byte-equal battery targets, R3) ----------------------
 
 /** SPEC-0001 R4(b): the trivial-spans waste label — must render with `≈`, never "a cheaper model would have handled this." */
-export const TRIVIAL_SPANS_LABEL = "≈ re-priced eligible trivial spans";
+export const TRIVIAL_SPANS_LABEL = "≈ re-priced short tool-free turns";
 
 /** SPEC-0017 R7: the context-thrash methodology sub-line (I3 — discloses the refill estimate; ≤48 chars for the grocery grid). */
-export const CONTEXT_THRASH_NOTE = "context refilled ≥80% of peak within 5 turns";
+export const CONTEXT_THRASH_NOTE = "prompt load ≥80% of prior peak within 5 turns";
 
 /** SPEC-0001: the price-delta honesty note — arithmetic, never a prediction. */
 export const PRICE_DELTA_NOTE = "(arithmetic, not a prediction)";

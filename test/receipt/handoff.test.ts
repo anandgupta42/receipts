@@ -21,6 +21,7 @@ import type {
   TrivialSpansWasteLine,
 } from "../../src/receipt/model.js";
 import type { Session, TokenUsage, ToolCall, Turn } from "../../src/parse/types.js";
+import { REVIEW_REGISTRY } from "../../src/receipt/reviewRegistry.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
 
@@ -70,10 +71,8 @@ const trivialSpans: TrivialSpansWasteLine = {
   cheaperModel: "a cheaper model",
 };
 
-const STUCK_LOOP_LINE =
-  "When a command fails, do not re-run it unchanged more than twice — change the command, add logging, or stop and summarize the failure.";
-const TRIVIAL_SPANS_LINE =
-  "For short acknowledgments and single-line replies, keep responses minimal — do not restate context.";
+const STUCK_LOOP_LINE = REVIEW_REGISTRY.patterns["repeated-identical-attempt"].recommendation;
+const TRIVIAL_SPANS_LINE = REVIEW_REGISTRY.patterns["short-tool-free-turn-cost"].recommendation;
 
 describe("standingRuleSuggestions (SPEC-0013 R1/R2)", () => {
   it("R1: a class at the default threshold (3 distinct sessions) is eligible", () => {
@@ -147,10 +146,15 @@ describe("renderHandoff v2 (SPEC-0013 R3/R5)", () => {
       "",
       "⚠ Bash loop ×5.............................≥ $0.50",
       "  at turns 2-6",
-      "  → change or stop after two identical failures",
-      "≈ re-priced eligible trivial spans.........≈ $0.02",
-      "  (4 tiny turns, priced at a cheaper model)",
-      "  → route short replies to a cheaper model",
+      "  → After two identical attempts, inspect the",
+      "    result and change the input or approach before",
+      "    trying again.",
+      "≈ re-priced short tool-free turns..........≈ $0.02",
+      "  (4 tool-free turns; ≤120 output tok each)",
+      "  → Keep short replies minimal. If your setup can",
+      "    route work by price tier, consider its",
+      "    lower-cost option for this narrow kind of",
+      "    reply.",
     ].join("\n");
     expect(renderHandoff(model)).toBe(expected);
     expect(renderHandoff(model, [])).toBe(expected);
@@ -175,9 +179,11 @@ describe("renderHandoff v2 (SPEC-0013 R3/R5)", () => {
         "",
         "⚠ Bash loop ×5.............................≥ $0.50",
         "  at turns 2-6",
-        "  → change or stop after two identical failures",
+        "  → After two identical attempts, inspect the",
+        "    result and change the input or approach before",
+        "    trying again.",
         "",
-        "suggested CLAUDE.md rules (recurring across recent sessions — paste manually):",
+        "suggested project instructions (recurring across recent sessions — paste manually):",
         `- ${STUCK_LOOP_LINE}`,
       ].join("\n"),
     );
@@ -187,7 +193,7 @@ describe("renderHandoff v2 (SPEC-0013 R3/R5)", () => {
   it("R3: suggestions with no current-session waste still render the section (no bare 'nothing to hand off')", () => {
     const out = renderHandoff(baseModel(), [STUCK_LOOP_LINE]);
     expect(out).not.toBe("nothing to hand off");
-    expect(out).toContain("suggested CLAUDE.md rules");
+    expect(out).toContain("suggested project instructions");
     expect(out).toContain(`- ${STUCK_LOOP_LINE}`);
   });
 });

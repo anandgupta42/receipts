@@ -307,7 +307,7 @@ footer{
         <li><a href="06-week.html">Aggregate the week</a></li>
         <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
-        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
         <li><a href="15-integrations.html">Choose an integration</a></li>
@@ -319,6 +319,7 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
@@ -393,7 +394,7 @@ footer{
 
 <p>The line under the total re-prices the session's <strong>identical token counts</strong> on a cheaper model. It is arithmetic on numbers you already spent — not a claim that the other model would have completed the task, used the same tokens, or produced the same result. Read it as &quot;the Standard API floor if those same observable tokens had been priced at that model's rate,&quot; nothing more.</p>
 
-<p>The <code>trivial spans</code> detector uses the same strict boundary. It emits a dollar only when every request unit in the candidate turn carries its own model/date/ provider evidence, resolves to the agent's direct source vendor, and has a cited row that is more expensive than the comparison row. One missing or routed unit suppresses the finding instead of pricing a partial turn.</p>
+<p>The short tool-free-turn check uses the same strict boundary. A turn qualifies structurally only when it used no tools and recorded at most 120 output tokens. It emits a dollar comparison only when every request unit in that turn carries its own model, date, and provider evidence and has a cited row more expensive than a lower-priced row for that same provider. One incomplete unit suppresses that turn rather than presenting a partial comparison as complete. Different turns are evaluated independently, so a source-wide provider assumption is not required.</p>
 
 <h2 id="why-it-may-differ-from-your-bill">Why it may differ from your bill</h2>
 

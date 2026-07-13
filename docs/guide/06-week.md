@@ -113,4 +113,4 @@ See [Share and export](11-share-and-export.md) for the shape.
 ## Next
 
 - **[Set a budget](08-budget.md)** — turn the weekly total into an exit code.
-- **[Fix it next time](09-handoff.md)** — inspect the `Flagged patterns` lines.
+- **[Review a completed session](09-review.md)** — inspect one session and get prevention advice.

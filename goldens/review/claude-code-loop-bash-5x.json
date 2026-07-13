@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "review": {
+    "registryVersion": 1,
+    "source": "claude-code",
+    "findings": {
+      "repeated-identical-error": {
+        "ruleVersion": 1,
+        "category": "issue",
+        "title": "The same failed action was tried again unchanged",
+        "whatHappened": "The same recorded action failed at least twice within the next ten actions. No file change or passing check was recorded between those failures.",
+        "whyItMatters": "Trying the same failed action again without recorded progress is a useful point to change approach.",
+        "recommendation": "After the same action fails twice without recorded progress, inspect the error and change the input or approach, or record the blocker before trying again.",
+        "evidenceStrength": "exact-structure-and-status",
+        "claimLimit": "Some failures may be deliberate tests; this does not prove the retry was unreasonable.",
+        "evidence": {
+          "eventCount": 4,
+          "actionCount": 5,
+          "turnIndices": [
+            0,
+            1,
+            2,
+            3,
+            4
+          ],
+          "totalTurnCount": 5,
+          "tools": [
+            "Bash"
+          ],
+          "totalToolCount": 1,
+          "facts": [
+            {
+              "name": "attempts",
+              "value": 5
+            },
+            {
+              "name": "retries-after-first-error",
+              "value": 4
+            }
+          ]
+        },
+        "impact": {
+          "role": "observed-attributed",
+          "tokens": {
+            "input": 5360,
+            "output": 450,
+            "cacheRead": 48800,
+            "cacheCreation": 0,
+            "cacheCreation5m": null,
+            "cacheCreation1h": null,
+            "total": 54610
+          },
+          "usd": 0.06245,
+          "durationMs": 100000
+        }
+      }
+    },
+    "coverage": {
+      "evaluated": {
+        "count": 6,
+        "patternIds": [
+          "repeated-identical-attempt",
+          "repeated-identical-error",
+          "consecutive-tool-errors",
+          "same-file-reread-without-recorded-change",
+          "context-refill-cluster",
+          "short-tool-free-turn-cost"
+        ]
+      },
+      "unavailable": {
+        "count": 0,
+        "patternIds": []
+      }
+    }
+  }
+}

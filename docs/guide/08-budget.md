@@ -81,4 +81,4 @@ budget.json ignored: unknown key(s): monthly
 ## Next
 
 - **[Aggregate the week](06-week.md)** — the spend the weekly cap is measured against.
-- **[Fix it next time](09-handoff.md)** — reduce the number instead of just watching it.
+- **[Review a completed session](09-review.md)** — identify process problems that may be worth preventing.
