@@ -1,4 +1,4 @@
-import { dottedLine, formatInt, formatUsd, MIN_LEADER } from "../receipt/format.js";
+import { dottedLine, formatInt, formatUsdLowerBound, MIN_LEADER } from "../receipt/format.js";
 import type { IntegrationRecipe } from "./integrations.js";
 import { INTEGRATION_RECIPES, INTEGRATION_TARGETS } from "./integrations.js";
 import type { SetupReport } from "./report.js";
@@ -6,7 +6,7 @@ import type { SetupReport } from "./report.js";
 const WIDTH = 58;
 
 function costOrTokens(usd: number | null, tokens: number): string {
-  return usd !== null ? `$${formatUsd(usd)}` : `${formatInt(tokens)} tok`;
+  return usd !== null ? formatUsdLowerBound(usd) : `${formatInt(tokens)} tok`;
 }
 
 function row(label: string, value: string): string {
@@ -17,6 +17,10 @@ function row(label: string, value: string): string {
     return `${label}: ${value}`;
   }
   return dottedLine(label, value, WIDTH);
+}
+
+function scopeLabel(scope: "parent-session" | "parent-session-plus-readable-subagents"): string {
+  return scope === "parent-session" ? "parent session only" : "parent + readable subagents";
 }
 
 export function renderSetupReport(report: SetupReport, noSessionMessage?: string): string {
@@ -41,8 +45,38 @@ export function renderSetupReport(report: SetupReport, noSessionMessage?: string
   lines.push("Latest session");
   lines.push(`  ${row("Agent", report.latest.label)}`);
   lines.push(`  ${row("Model", report.latest.model ?? "unknown")}`);
-  lines.push(`  ${row("Total", costOrTokens(report.latest.totalUsd, report.latest.totalTokens.total))}`);
-  lines.push(`  ${row("Waste lines", String(report.latest.wasteLineCount))}`);
+  const latestTotalLabel = report.latest.pricingCoverage === "partial"
+    ? report.latest.subagentCount !== undefined
+      ? `Known priced subtotal (incl. ${formatInt(report.latest.subagentCount)} subagents)`
+      : "Known priced subtotal"
+    : report.latest.subagentCount !== undefined
+      ? `Total (incl. ${formatInt(report.latest.subagentCount)} subagents)`
+      : "Total";
+  lines.push(
+    `  ${row(
+      latestTotalLabel,
+      costOrTokens(report.latest.totalUsd, report.latest.combinedTotalTokens ?? report.latest.totalTokens.total),
+    )}`,
+  );
+  lines.push(`  ${row("Pricing coverage", report.latest.pricingCoverage)}`);
+  lines.push(`  ${row("Cost scope", scopeLabel(report.latest.costScope))}`);
+  lines.push(`  ${row("Token scope", scopeLabel(report.latest.tokenScope))}`);
+  lines.push(`  ${row("Parent unpriced tokens", `${formatInt(report.latest.parentUnpricedTokens.total)} tok`)}`);
+  lines.push(`  ${row("Known unpriced (combined)", `${formatInt(report.latest.combinedUnpricedTokens.total)} tok`)}`);
+  if (report.latest.subagentRollupStatus === "unavailable") {
+    lines.push(`  ${row("Subagent coverage", "unavailable · child counts/tokens unknown")}`);
+  } else {
+    const unpricedCount = report.latest.subagentUnpricedCount ?? 0;
+    const unreadableCount = report.latest.subagentUnreadableCount ?? 0;
+    const unreadableSuffix = unreadableCount > 0 ? " (tokens unknown)" : "";
+    lines.push(
+      `  ${row(
+        "Subagent coverage",
+        `${formatInt(report.latest.subagentCount ?? 0)} found · ${formatInt(unpricedCount)} unpriced · ${formatInt(unreadableCount)} unreadable${unreadableSuffix}`,
+      )}`,
+    );
+  }
+  lines.push(`  ${row("Flagged patterns", String(report.latest.wasteLineCount))}`);
 
   if (report.week) {
     lines.push("");
@@ -50,11 +84,27 @@ export function renderSetupReport(report: SetupReport, noSessionMessage?: string
     lines.push(`  ${row("Sessions", String(report.week.sessionCount))}`);
     lines.push(
       `  ${row(
-        `Priced total (${report.week.pricedSessionCount} of ${report.week.sessionCount})`,
-        report.week.pricedUsd !== null ? `$${formatUsd(report.week.pricedUsd)}` : "n/a",
+        `Priced floor (${report.week.fullyPricedSessionCount} full + ${report.week.partiallyPricedSessionCount} partial)`,
+        report.week.pricedUsd !== null ? formatUsdLowerBound(report.week.pricedUsd) : "n/a",
       )}`,
     );
-    lines.push(`  ${row("Tokens (all sessions)", `${formatInt(report.week.tokenTotal.total)} tok`)}`);
+    if (report.week.cacheRatePartialSessionCount > 0) {
+      lines.push(`  ${row("Cache-rate gaps", `${report.week.cacheRatePartialSessionCount} partial sess`)}`);
+    }
+    lines.push(
+      `  ${row(
+        "Pricing coverage",
+        `${report.week.fullyPricedSessionCount} full · ${report.week.partiallyPricedSessionCount} partial · ${report.week.unpricedSessionCount} none`,
+      )}`,
+    );
+    if (report.week.unreadableSessionCount > 0) {
+      lines.push(`  ${row("Unreadable", `${report.week.unreadableSessionCount} sess`)}`);
+    }
+    if (report.week.unpricedTokenTotal.total > 0) {
+      lines.push(`  ${row("Known unpriced tokens", `${formatInt(report.week.unpricedTokenTotal.total)} tok`)}`);
+    }
+    lines.push(`  ${row("Tokens (observable)", `${formatInt(report.week.tokenTotal.total)} tok`)}`);
+    lines.push(`  ${row("Scope", "top-level only; children excluded")}`);
   }
 
   lines.push("");

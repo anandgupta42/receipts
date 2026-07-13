@@ -1,8 +1,8 @@
-// SPEC-0018: `benchmark` — opt-in cost-per-turn benchmark (SPEC-0015 v1: client
+// SPEC-0018: `benchmark` — opt-in observable-floor-per-turn benchmark (SPEC-0015 v1: client
 // contract only, sends disabled). priority 130, matches the `benchmark`
 // positional subcommand. selector is positional[1].
 import { loadSession } from "../../index.js";
-import { buildReceiptModel } from "../../receipt/model.js";
+import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
 import { buildBenchmarkPayload, confirmPrompt, BENCHMARK_UNAVAILABLE_MESSAGE } from "../../benchmark/index.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { resolveSelector } from "../common/session.js";
@@ -19,7 +19,7 @@ async function run(ctx: CommandContext): Promise<number> {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
     return 1;
   }
-  const model = await buildReceiptModel(session);
+  const model = await buildFullSessionReceiptModel(session);
   const payload = buildBenchmarkPayload(model, session.totals.turnCount);
 
   if (options.dryRun) {
@@ -45,8 +45,8 @@ export const command: CommandDef = {
   help: {
     order: 120,
     lines: [
-      "  aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client",
-      "                                         contract only, sends disabled)",
+      "  aireceipts benchmark [--dry-run]      opt-in floor-per-turn benchmark (Standard API; v1:",
+      "                                         client contract only, sends disabled)",
     ],
   },
 };

@@ -1,11 +1,11 @@
-// SPEC-0018: `--handoff` — paste-ready block of fired waste lines, plus standing
-// -rule suggestions for waste classes recurring across recent sessions. priority
+// SPEC-0018: `--handoff` — paste-ready block of detector-flagged patterns, plus
+// standing-rule suggestions for pattern classes recurring across recent sessions. priority
 // 40 (above the default receipt, below every subcommand), matches `--handoff`.
 import { loadSession } from "../../index.js";
 import type { Session } from "../../parse/types.js";
 import { DEFAULT_HANDOFF_THRESHOLD, renderHandoff, standingRuleSuggestions, type HandoffCounts } from "../../receipt/handoff.js";
 import { toHandoffJson } from "../../receipt/json.js";
-import { buildReceiptModel } from "../../receipt/model.js";
+import { buildFullSessionReceiptModel } from "../../receipt/subagents.js";
 import { partitionWindows, windowBounds } from "../../aggregate/week.js";
 import { aggregateWaste, type WasteClassAggregate } from "../../aggregate/waste.js";
 import { listFullSessions } from "../../index.js";
@@ -43,7 +43,7 @@ async function run(ctx: CommandContext): Promise<number> {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
     return 1;
   }
-  const model = await buildReceiptModel(session);
+  const model = await buildFullSessionReceiptModel(session);
   // SPEC-0042 R1/R2 — counts come from the loaded Session; the render stays pure.
   const counts: HandoffCounts = {
     turns: session.turns.length,
@@ -71,8 +71,8 @@ export const command: CommandDef = {
     order: 40,
     lines: [
       "  aireceipts --handoff [selector] [--handoff-threshold N] [--json]",
-      "                                        paste-ready block of fired waste lines;",
-      "                                         suggests CLAUDE.md rules for waste classes",
+      "                                        paste-ready block of detector-flagged patterns;",
+      "                                         suggests CLAUDE.md rules for detector classes",
       "                                         recurring in N+ recent sessions (default 3)",
     ],
   },

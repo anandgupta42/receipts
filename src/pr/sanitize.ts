@@ -106,8 +106,10 @@ const subagentRowSchema = z
     model: str().optional(),
     usd: finiteNum().nullable(),
     tokens: tokenUsageSchema,
+    unpricedTokens: tokenUsageSchema.optional(),
     unreadable: z.boolean(),
     droppedRecords: finiteNum().optional(),
+    unobservedCacheWriteTokens: z.boolean().optional(),
     filePath: str(),
   })
   .strict();
@@ -116,10 +118,15 @@ const confidenceSummarySchema = z
   .object({
     unattributableAnchorPool: finiteNum(),
     silencedGitWrite: finiteNum(),
+    // Additive optional fields keep older v1 refs valid while accepting the
+    // current producer's richer confidence summary.
+    unanchoredGitWrite: finiteNum().optional(),
     unreadableSubagent: finiteNum(),
     costLowerBoundCacheTier: finiteNum(),
+    unobservedCacheWriteTokens: finiteNum().optional(),
     unreadableSession: finiteNum(),
     droppedTranscriptRecords: finiteNum(),
+    partialPricedCoverage: finiteNum().optional(),
   })
   .strict();
 
@@ -131,6 +138,7 @@ const contributorViewSchema = z
     modelMix: boundedArray(modelMixEntrySchema),
     usd: finiteNum().nullable(),
     tokens: tokenUsageSchema,
+    unpricedTokens: tokenUsageSchema.optional(),
     subagents: boundedArray(subagentRowSchema),
     basis: z.enum(["anchor", "helper", "message"]).optional(),
     durationMs: finiteNum().optional(),
@@ -315,6 +323,42 @@ function sanitizeMarkdown(value: string, maxLength: number): string {
 /** A field rendered INSIDE a code fence (the pre-rendered per-session receipt `text`): Markdown is inert there, so only a fence breakout matters — guard fences and cap, and deliberately DON'T HTML-encode or escape brackets, which would corrupt the literal receipt bytes. */
 function sanitizeFenced(value: string, maxLength: number): string {
   return capString(guardCodeFences(value), maxLength);
+}
+
+const PRE_RENDERED_DOLLAR_RE = /\$-?\d[\d,]*(?:\.\d+)?/g;
+
+function unsafePreRenderedDollar(value: string): string | null {
+  PRE_RENDERED_DOLLAR_RE.lastIndex = 0;
+  for (const match of value.matchAll(PRE_RENDERED_DOLLAR_RE)) {
+    const at = match.index;
+    const prefix = value.slice(Math.max(0, at - 4), at);
+    if (!/[≥≈]\s*$/u.test(prefix)) {
+      return match[0];
+    }
+  }
+  if (/\$\S*…/u.test(value)) {
+    return "truncated dollar amount";
+  }
+  return null;
+}
+
+/** Reject legacy/hostile pre-rendered receipt strings that bypass current lower-bound rendering. */
+export function preRenderedDollarViolation(payload: PrReceiptPayload): string | null {
+  for (const detail of payload.extras.details ?? []) {
+    for (const [field, value] of [
+      ["text", detail.text],
+      ["subagents", detail.subagents],
+    ] as const) {
+      if (value === undefined) {
+        continue;
+      }
+      const bad = unsafePreRenderedDollar(value);
+      if (bad !== null) {
+        return `extras.details.${field}: unqualified or truncated ${bad}; regenerate the receipt ref`;
+      }
+    }
+  }
+  return null;
 }
 
 /** An `artifactLink.url` is rendered raw into a Markdown link TARGET (`[text](url)`). Allow

@@ -8,11 +8,13 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-exec_command......................$0.02  (2 calls)
-apply_patch........................$0.01  (1 call)
+exec_command..................≥ $0.0175  (2 calls)
+apply_patch....................≥ $0.0082  (1 call)
 --------------------------------------------------
-TOTAL........................................$0.03
-same tokens on gpt-5.4-mini.......$0.01 (64% less)
+TOTAL....................................≥ $0.0257
+standard API-equivalent floor; not an invoice
+same tokens on gpt-5.4-mini..............≥ $0.0094
+  (64% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

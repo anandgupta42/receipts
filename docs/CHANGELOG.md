@@ -106,22 +106,23 @@ adopt the new namespace together on this release. Rendered receipt output is byt
 
 ## v0.7.1 — 2026-07-09
 
-Patch: **Claude Code receipts were over-reporting cost by ~2.5–3× and are now correct.**
+Patch: **Claude Code receipts were multiplying repeated response snapshots by ~2.5–3×; response-group deduplication removed that over-count.**
 Claude Code writes one `assistant` transcript record per content block of a response, and
 every record of that response repeats the same `message.id` and a byte-identical `usage`
 snapshot. The adapter had counted each record as its own billed turn, multiplying a
 response's tokens by its block count. Turns are now deduped by `message.id` — the first
 record of a response books its usage once, later records only add their tool calls — so
-`turnCount` and every `$` reflect real billed responses (PR #196). **After upgrading, every
-Claude Code receipt you render shows lower dollars and fewer turns than 0.7.0 showed for
-the same session**: a real local session dropped from $102.97 to $36.69 (2.81×), and one PR
-slice from $5.17 to $1.61. This was a silent **over**-report — the first known arithmetic
-case of a receipt exceeding the true floor rather than under-reporting it. Codex, opencode,
-and Cursor are unaffected (Codex reconciles against the rollout's own cumulative total and
-was re-verified correct to the cent). Synthetic-fixture output is byte-identical (goldens
+`turnCount` and each observable Standard-API floor book the documented response group once
+(PR #196). **After upgrading, affected Claude Code receipts show lower floors and fewer
+turns than 0.7.0 showed for the same session**: legacy output for one local session changed
+from `$102.97` to `$36.69` (2.81×), and one PR slice from `$5.17` to `$1.61`. Those are
+historical CLI values, not invoice amounts. This was a silent **over**-count of observable
+usage. Codex, opencode, and Cursor were unaffected by that duplicate-snapshot bug; the
+then-current Codex token reconciliation was rechecked, but did not establish commercial
+invoice exactness. Synthetic-fixture output is byte-identical (goldens
 unchanged); the summary-cache version was bumped (2 → 3) so stale inflated totals recompute
 on the next run. Receipts posted on this repo's own past PRs carry per-session correction
-blocks with exact recomputed figures. Full audit and evidence: PR #196,
+blocks with recomputed observable floors. Full audit and evidence: PR #196,
 `docs/cost-model.md`, and the 2026-07-08 addendum in
 `docs/internal/cost-attribution-evidence.md`.
 
@@ -189,10 +190,12 @@ footer — both called out below.
 
 ### Changed (deliberate output changes)
 
-- **Richer default statusline** (SPEC-0071): the default line now carries a burn rate (`$/hr`),
+- **Richer default statusline** (SPEC-0071): the default line added a floor rate (then rendered as `$/hr`),
   context-window %, abbreviated `M`/`B` token counts, and an inline 5h reset countdown — e.g.
-  `[aireceipts] $423 · $80/hr · 501M · ctx 42% · 5h 26% ↺2h13m`. Every segment renders from a
-  real payload field or a priced ledger value; nothing is estimated.
+  legacy example: `[aireceipts] $423 · $80/hr · 501M · ctx 42% · 5h 26% ↺2h13m`.
+  Current output qualifies those dollar values with `≥`; they are observable Standard-API
+  floors/floor rates, not invoice charges. Every segment renders from a payload field or
+  priced-floor ledger; only explicitly `≈` arithmetic is estimated.
 - **Samosa tip link off by default** (SPEC-0070): the `buy me a samosa` link no longer appears
   on the surfaces aireceipts posts onto a PR (the comment's `<details>` and the artifact
   footer). Opt back in with `--samosa`; the standalone tip page and the docs-site footer are
@@ -273,8 +276,8 @@ changes rendered output — the callouts below list every change.
 - The receipt footer now carries the install CTA (`npx aireceipts-cli`) instead
   of the samosa link, and the inline methodology paragraph moved behind
   `--methodology` (SPEC-0055).
-- The `same tokens on <model>` line gains a `(N% less)` suffix when it is real
-  savings (SPEC-0054).
+- The `same tokens on <model>` line gained a `(N% less)` suffix in that release;
+  current output calls this a lower observable-floor difference, not realized savings (SPEC-0054).
 
 ### Added
 
@@ -295,7 +298,8 @@ changes rendered output — the callouts below list every change.
   a machine with no sessions yet; both empty-state messages point at it.
 - **`setup` + `integrations`** (SPEC-0050): first-run report and exact local
   integration snippets for Claude Code, Codex, opencode, Cursor, and GitHub.
-- **Savings slip** (SPEC-0059): could-have-saved handoff block and PR section.
+- **Savings slip** (SPEC-0059, legacy name): the current handoff/PR section is
+  labeled `FLAGGED PATTERN COST ≈` and explicitly says it is not proven savings.
 - **`--version`**, NOTICE file, and the OIDC release pipeline (#134); OpenSSF
   Scorecard, community files, and CI telemetry default-off (#139).
 - Per-agent docs pages for the five supported agents (SPEC-0058); discovery

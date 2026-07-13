@@ -6,4 +6,4 @@
 // must stay loadable there.
 
 /** Bumped only on a breaking `--json` shape change (R4). Mirrored in `docs/json-schema.md`. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;

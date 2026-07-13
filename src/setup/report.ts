@@ -4,7 +4,14 @@ import { agentIds } from "../parse/registry.js";
 import type { AgentSource, TokenUsage } from "../parse/types.js";
 import { SOURCE_LABELS } from "../parse/types.js";
 import { addUsage, emptyUsage } from "../parse/util.js";
-import { buildReceiptModel } from "../receipt/model.js";
+import { combinedPricedUsd } from "../receipt/model.js";
+import { combinedPricingCoverageOf, type PricingCoverage } from "../receipt/pricingCoverage.js";
+import {
+  buildFullSessionReceiptWithCoverage,
+  type FullSessionScope,
+  type SubagentRollupStatus,
+} from "../receipt/subagents.js";
+import { STANDARD_API_LOWER_BOUND_SEMANTICS } from "../receipt/costEstimate.js";
 import { INTEGRATION_RECIPES, type IntegrationRecipe } from "./integrations.js";
 
 export const SETUP_SCHEMA_VERSION = 1;
@@ -21,7 +28,19 @@ export interface SetupLatest {
   label: string;
   model: string | null;
   totalUsd: number | null;
+  pricingCoverage: PricingCoverage;
   totalTokens: TokenUsage;
+  /** Observable parent-session tokens + readable-child tokens; unreadable children remain count-only. */
+  combinedTotalTokens?: number;
+  subagentCount?: number;
+  parentUnpricedTokens: TokenUsage;
+  /** Exact known-unpriced parent + readable-child usage; unreadable child tokens are unknowable and excluded. */
+  combinedUnpricedTokens: TokenUsage;
+  subagentUnpricedCount: number | null;
+  subagentUnreadableCount: number | null;
+  subagentRollupStatus: SubagentRollupStatus;
+  costScope: FullSessionScope;
+  tokenScope: FullSessionScope;
   wasteLineCount: number;
   unpriceable: boolean;
 }
@@ -30,8 +49,15 @@ export interface SetupWeek {
   sessionCount: number;
   pricedSessionCount: number;
   excludedSessionCount: number;
+  fullyPricedSessionCount: number;
+  partiallyPricedSessionCount: number;
+  cacheRatePartialSessionCount: number;
+  unpricedSessionCount: number;
+  unreadableSessionCount: number;
+  unpricedTokenTotal: TokenUsage;
   pricedUsd: number | null;
   tokenTotal: TokenUsage;
+  childSessionsIncluded: false;
 }
 
 export interface SetupOffer {
@@ -103,17 +129,31 @@ export async function buildSetupReport(now: number = Date.now()): Promise<SetupR
 
   const latestSummary = summaries[0];
   const [latestSession, weekDigest] = await Promise.all([loadSession(latestSummary), buildWeekDigest({ now })]);
-  const latestModel = latestSession ? await buildReceiptModel(latestSession) : null;
+  const latestReceipt = latestSession ? await buildFullSessionReceiptWithCoverage(latestSession) : null;
   const latest: SetupLatest | null =
-    latestSession && latestModel
+    latestSession && latestReceipt
       ? {
           source: latestSession.source,
           label: SOURCE_LABELS[latestSession.source],
           model: latestSession.model ?? null,
-          totalUsd: latestModel.totalUsd,
-          totalTokens: latestModel.sessionTotalTokens,
-          wasteLineCount: latestModel.wasteLines.length,
-          unpriceable: latestModel.unpriceable,
+          totalUsd: combinedPricedUsd(latestReceipt.model),
+          pricingCoverage: combinedPricingCoverageOf(latestReceipt.model),
+          totalTokens: latestReceipt.model.sessionTotalTokens,
+          ...(latestReceipt.model.subagents
+            ? {
+                combinedTotalTokens: latestReceipt.model.sessionTotalTokens.total + latestReceipt.model.subagents.tokensTotal,
+                subagentCount: latestReceipt.model.subagents.count,
+              }
+            : {}),
+          parentUnpricedTokens: latestReceipt.coverage.parentUnpricedTokens,
+          combinedUnpricedTokens: latestReceipt.coverage.combinedUnpricedTokens,
+          subagentUnpricedCount: latestReceipt.coverage.subagentUnpricedCount,
+          subagentUnreadableCount: latestReceipt.coverage.subagentUnreadableCount,
+          subagentRollupStatus: latestReceipt.coverage.subagentRollupStatus,
+          costScope: latestReceipt.coverage.costScope,
+          tokenScope: latestReceipt.coverage.tokenScope,
+          wasteLineCount: latestReceipt.model.wasteLines.length,
+          unpriceable: latestReceipt.model.unpriceable,
         }
       : null;
 
@@ -126,8 +166,15 @@ export async function buildSetupReport(now: number = Date.now()): Promise<SetupR
       sessionCount: weekDigest.current.sessionCount,
       pricedSessionCount: weekDigest.current.pricedSessionCount,
       excludedSessionCount: weekDigest.current.excludedSessionCount,
+      fullyPricedSessionCount: weekDigest.current.fullyPricedSessionCount,
+      partiallyPricedSessionCount: weekDigest.current.partiallyPricedSessionCount,
+      cacheRatePartialSessionCount: weekDigest.current.cacheRatePartialSessionCount,
+      unpricedSessionCount: weekDigest.current.unpricedSessionCount,
+      unreadableSessionCount: weekDigest.current.unreadableSessionCount,
+      unpricedTokenTotal: weekDigest.current.unpricedTokenTotal,
       pricedUsd: weekDigest.current.pricedUsd,
       tokenTotal: weekDigest.current.tokenTotal,
+      childSessionsIncluded: false,
     },
     offers: offers(),
   };
@@ -136,6 +183,7 @@ export async function buildSetupReport(now: number = Date.now()): Promise<SetupR
 export function setupReportToJson(report: SetupReport) {
   return {
     schemaVersion: report.schemaVersion,
+    costSemantics: STANDARD_API_LOWER_BOUND_SEMANTICS,
     status: report.status,
     agents: report.agents.map((agent) => ({
       source: agent.source,
@@ -149,7 +197,23 @@ export function setupReportToJson(report: SetupReport) {
           label: report.latest.label,
           model: report.latest.model,
           totalUsd: report.latest.totalUsd,
+          pricingCoverage: report.latest.pricingCoverage,
           totalTokens: usageJson(report.latest.totalTokens),
+          parentUnpricedTokens: usageJson(report.latest.parentUnpricedTokens),
+          combinedUnpricedTokens: usageJson(report.latest.combinedUnpricedTokens),
+          subagentUnpricedCount: report.latest.subagentUnpricedCount,
+          subagentUnreadableCount: report.latest.subagentUnreadableCount,
+          subagentRollupStatus: report.latest.subagentRollupStatus,
+          costScope: report.latest.costScope,
+          tokenScope: report.latest.tokenScope,
+          ...(report.latest.subagentCount !== undefined
+            ? {
+                combinedTotalTokens: report.latest.combinedTotalTokens,
+                subagentCount: report.latest.subagentCount,
+                /** Compatibility alias; costScope/tokenScope carry the explicit split. */
+                totalScope: report.latest.tokenScope,
+              }
+            : {}),
           wasteLineCount: report.latest.wasteLineCount,
           unpriceable: report.latest.unpriceable,
         }
@@ -159,8 +223,17 @@ export function setupReportToJson(report: SetupReport) {
           sessionCount: report.week.sessionCount,
           pricedSessionCount: report.week.pricedSessionCount,
           excludedSessionCount: report.week.excludedSessionCount,
+          pricingCoverage: {
+            fullyPricedSessionCount: report.week.fullyPricedSessionCount,
+            partiallyPricedSessionCount: report.week.partiallyPricedSessionCount,
+            cacheRatePartialSessionCount: report.week.cacheRatePartialSessionCount,
+            unpricedSessionCount: report.week.unpricedSessionCount,
+            unreadableSessionCount: report.week.unreadableSessionCount,
+            unpricedTokenTotal: usageJson(report.week.unpricedTokenTotal),
+          },
           pricedUsd: report.week.pricedUsd,
           tokenTotal: usageJson(report.week.tokenTotal),
+          scope: { childSessionsIncluded: report.week.childSessionsIncluded },
         }
       : null,
     offers: report.offers.map((offer) => ({

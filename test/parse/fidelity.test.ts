@@ -43,8 +43,18 @@ describe("codex fidelity (envelope self-consistency)", () => {
     expect(codexFidelity.validate(session)).toEqual([]);
   });
 
-  it("flags a one-token drift between summed turns and the cumulative envelope", async () => {
-    const session = (await loadById("codex", path.join(FIX, "reconcile-drift.jsonl")))!;
+  it("flags a one-token parser drift between summed turns and the cumulative envelope", async () => {
+    const session = (await loadById("codex", path.join(FIX, "clean-session.jsonl")))!;
+    // Simulate a parser dropping one output token after reading the independent
+    // cumulative envelope. A raw last-vs-total disagreement is no longer the
+    // right red path: after the first snapshot, the cumulative difference is
+    // deliberately authoritative and therefore becomes the turn itself.
+    const turn = session.turns[0];
+    turn.usage = {
+      ...turn.usage!,
+      output: turn.usage!.output - 1,
+      total: turn.usage!.total - 1,
+    };
     const findings = codexFidelity.validate(session);
     expect(findings.length).toBeGreaterThan(0);
     expect(findings.every((f) => f.check === "codex-envelope")).toBe(true);

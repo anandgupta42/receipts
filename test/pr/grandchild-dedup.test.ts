@@ -89,7 +89,7 @@ async function run(): Promise<{ code: number; body: string }> {
 
 describe("B5 — grandchild subagent counted once, not twice", () => {
   it("discovery sanity: P's recursive discovery walk finds BOTH the middle and the grandchild", async () => {
-    const children = await rollupChildren(PARENT, null, {});
+    const children = await rollupChildren(PARENT, { kind: "full" }, {});
     const paths = children.map((c) => c.filePath);
     expect(paths).toContain(CHILD_A);
     expect(paths).toContain(GRANDCHILD_B);
@@ -126,7 +126,7 @@ describe("B5 — grandchild subagent counted once, not twice", () => {
 
   it("the PR total reconciles to P + A + B priced once each — no inflation from the duplicate rollup", async () => {
     const { body } = await run();
-    const totalMatch = body.match(/TOTAL priced\.*\$([\d.]+)/);
+    const totalMatch = body.match(/TOTAL priced\.*≥ \$([\d.]+)/);
     expect(totalMatch).not.toBeNull();
     const total = Number(totalMatch![1]);
 
@@ -135,11 +135,11 @@ describe("B5 — grandchild subagent counted once, not twice", () => {
     // rendered SUBAGENTS dollar figure — summed independently of the TOTAL
     // line the receipt itself prints. If B were priced under both P and A,
     // this sum would diverge from `total`.
-    const contributorAmounts = [...body.matchAll(/orchestrator · claude-opus-4-8\.+\$([\d.]+)/g)].map((m) => Number(m[1]));
+    const contributorAmounts = [...body.matchAll(/orchestrator · claude-opus-4-8\.+≥ \$([\d.]+)/g)].map((m) => Number(m[1]));
     expect(contributorAmounts).toHaveLength(2);
     // SPEC-0060: the fence draws one aggregate row — B is its only member, so
     // the aggregate's dollars ARE B's dollars.
-    const subagentMatch = body.match(/SUBAGENTS \(1\)\.+\$([\d.]+)/);
+    const subagentMatch = body.match(/SUBAGENTS \(1\)\.+≥ \$([\d.]+)/);
     expect(subagentMatch).not.toBeNull();
     const bAmount = Number(subagentMatch![1]);
 

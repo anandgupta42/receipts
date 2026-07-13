@@ -9,7 +9,7 @@
 // handoff/PR savings math.
 import type { Session, Turn } from "../parse/types.js";
 import { defaultDataDir } from "./priceTable.js";
-import { isoDateOf, priceTurn, vendorForTurn } from "./resolve.js";
+import { priceSessionTurn } from "./resolve.js";
 
 /** Named edit tools across adapters (Claude Code, opencode lowercase, Gemini). Shell/exec is NOT an edit — the split sees only named edit tools (I6, stated in the spec). */
 export const EDIT_TOOL_NAMES = new Set(["Edit", "Write", "NotebookEdit", "write", "replace"]);
@@ -82,11 +82,9 @@ async function perTurnCosts(session: Session, dataDir: string): Promise<TurnCost
     if (!turn.usage || turn.usage.total <= 0) {
       continue;
     }
-    const model = turn.model ?? session.model;
-    const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
-    const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
-    out.push({ index: turn.index, usd: priced ? priced.usd : null, tokens: turn.usage.total });
+    const priced = await priceSessionTurn(session, turn, dataDir);
+    const completeUsd = priced && priced.unpricedUsage.total === 0 ? priced.usd : null;
+    out.push({ index: turn.index, usd: completeUsd, tokens: turn.usage.total });
   }
   return out;
 }

@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -334,11 +334,11 @@ footer{
     <article class="doc-content">
 <h1 id="keep-the-meter-running">Keep the meter running</h1>
 
-<p>Goal: the meter on <em>every</em> Claude Code prompt — model, cost so far, burn rate — without running a command yourself.</p>
+<p>Goal: the meter on <em>every</em> Claude Code prompt — model, observable cost floor, floor burn rate — without running a command yourself.</p>
 
 <p><code>aireceipts statusline</code> prints exactly one line, meant to be wired into Claude Code's <code>statusLine</code> config:</p>
 
-<pre class="doc-code"><code>[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m</code></pre>
+<pre class="doc-code"><code>[aireceipts] Opus · ≥$4.20 · ≥$9/hr · 128k · ctx 42% · 5h 24% ↺2h13m</code></pre>
 
 <p><img src="../assets/statusline.gif" alt="An agent session replayed in a Claude Code-shaped terminal — tool rows scrolling above the input box, the aireceipts meter highlighted beneath it, ticking up as the session runs; host-supplied payload fields simulated."></p>
 
@@ -353,13 +353,13 @@ footer{
   }
 }</code></pre>
 
-<p>Claude Code runs that command on its own schedule and pipes a small JSON payload on stdin — including the <code>transcript_path</code> of the active session. aireceipts reads that payload, prices the referenced transcript, and prints the line. No polling, no daemon, one disk read per invocation.</p>
+<p>Claude Code runs that command on its own schedule and pipes a small JSON payload on stdin — including the <code>transcript_path</code> of the active session. aireceipts reads that payload, computes the referenced transcript's Standard-API floor, and prints the line. No polling, no daemon, one disk read per invocation.</p>
 
 <p>If <code>aireceipts</code> isn't on your <code>PATH</code>, put the absolute path (the output of <code>which aireceipts</code>) in the <code>command</code> field.</p>
 
 <h2 id="in-tmux-or-another-shell-codex-opencode">In tmux or another shell (Codex, opencode)</h2>
 
-<p>The statusline is not Claude-Code-only. Any terminal surface that can run a command shows it — which is how Codex and opencode sessions get a live cost line. With <code>aireceipts</code> installed globally, add to <code>~/.tmux.conf</code>:</p>
+<p>The statusline is not Claude-Code-only. Any terminal surface that can run a command shows it — which is how Codex and opencode sessions get a live floor line. With <code>aireceipts</code> installed globally, add to <code>~/.tmux.conf</code>:</p>
 
 <pre class="doc-code"><code class="language-tmux">set -g status-right '#(aireceipts statusline --cwd &quot;#{pane_current_path}&quot;)'</code></pre>
 
@@ -367,14 +367,14 @@ footer{
 
 <h2 id="what-the-line-shows">What the line shows</h2>
 
-<p>The default line is the segment set <code>brand,model,cost,burn,tokens,context,waste,quota5h</code> — the model, cost, burn rate, tokens, context fullness, a waste flag, and your rate-limit window:</p>
+<p>The default line is the segment set <code>brand,model,cost,burn,tokens,context,waste,quota5h</code> — the model, observable floor, floor rate, tokens, context fullness, a heuristic-pattern flag, and your rate-limit window:</p>
 
 <ul>
   <li><code>Opus</code> (after the brand) is the model — in stdin mode, Claude Code's own current model name (a mid-session switch shows on the next render); in disk fallback, the session's dominant model by token share. Omitted when neither is known.</li>
-  <li><code>$X.XX</code> is the session's priced cost (<code>Nk</code>/<code>NM</code> tokens alone when it can't be priced — never a fabricated dollar amount), and <code>$X/hr</code> its session-average burn rate.</li>
+  <li><code>≥$X.XX</code> is the session's observable Standard-API list-price-equivalent floor (<code>Nk</code>/<code>NM</code> tokens alone when no cited row matches), and <code>≥$X/hr</code> is that floor divided by elapsed session time. Neither is an invoice or exact charge; both are rounded down for display.</li>
   <li><code>ctx N%</code> is how full the current context window is; token counts abbreviate to <code>k</code>/<code>M</code> (<code>128k</code>, <code>1.2M</code>).</li>
   <li><code>5h N% ↺Xh Ym</code> is your official 5-hour rate-limit usage plus the time until it resets — subscribers only, on by default, and dropped when Claude Code doesn't provide it.</li>
-  <li>A waste flag (<code>⚠ Bash loop ×5</code>) appears only when a detector actually fired.</li>
+  <li>A heuristic-pattern flag (<code>⚠ Bash loop ×5</code>) appears only when a detector fired; it is evidence to inspect, not proven waste or savings.</li>
   <li>Outside a piped call, or when the payload carries no session, it falls back to the newest session on disk, and prints a neutral placeholder rather than an error if there are none — so your statusline layout never breaks.</li>
 </ul>
 

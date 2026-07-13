@@ -33,8 +33,10 @@ export interface CliOptions {
   readonly dryRun: boolean;
   /** SPEC-0019: `aireceipts pr --post` posts the receipt comment. */
   readonly post: boolean;
-  /** SPEC-0019: `aireceipts pr --session <id>`. */
+  /** SPEC-0019 compatibility scalar: populated only when exactly one `--session` is present. */
   readonly prSession?: string;
+  /** Issue #234: every `aireceipts pr --session <id>` occurrence, in argv order. */
+  readonly prSessions: readonly string[];
   /** SPEC-0027: `aireceipts pr --post --artifact` publishes the HTML receipt artifact. */
   readonly artifact: boolean;
   /** SPEC-0026 R5: `aireceipts pr --no-details` omits the collapsed full-receipts section. */
@@ -105,7 +107,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let theme: "light" | "dark" = "light";
   let output: string | undefined;
   let post = false;
-  let prSession: string | undefined;
+  const prSessions: string[] = [];
   let artifact = false;
   let noDetails = false;
   let share = false;
@@ -202,9 +204,12 @@ export function parseOptions(argv: string[]): CliOptions {
     } else if (arg === "--require-same-repo") {
       requireSameRepo = true;
     } else if (arg === "--session") {
-      prSession = argv[++i];
+      const value = argv[++i];
+      if (value !== undefined) {
+        prSessions.push(value);
+      }
     } else if (arg.startsWith("--session=")) {
-      prSession = arg.slice("--session=".length);
+      prSessions.push(arg.slice("--session=".length));
     } else if (arg === "--limit") {
       limit = Number(argv[++i]);
     } else if (arg.startsWith("--limit=")) {
@@ -265,7 +270,8 @@ export function parseOptions(argv: string[]): CliOptions {
     handoffThreshold,
     dryRun,
     post,
-    prSession,
+    prSession: prSessions.length === 1 ? prSessions[0] : undefined,
+    prSessions,
     artifact,
     noDetails,
     share,

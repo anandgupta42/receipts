@@ -384,7 +384,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     );
 
     expect(code).toBe(0);
-    expect(output).toBe("147k · [aireceipts] · $0.18 · [aireceipts]\n");
+    expect(output).toBe("147k · [aireceipts] · ≥$0.1767 · [aireceipts]\n");
   });
 
   it("SPEC-0075 R2: explicit --format beats a valid config file", async () => {
@@ -399,7 +399,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     );
 
     expect(code).toBe(0);
-    expect(output).toBe("$0.18 · [aireceipts]\n");
+    expect(output).toBe("≥$0.1767 · [aireceipts]\n");
   });
 
   it.each([
@@ -468,7 +468,7 @@ describe("runStatusline (R3/R4 end-to-end)", () => {
     expect(baseline.code).toBe(0);
     // SPEC-0076: no payload `model` field → the model segment falls back to the
     // session's dominant model (this fixture's `claude-opus-4-8`) before the cost.
-    expect(baseline.output).toContain("[aireceipts] claude-opus-4-8 · $0.18");
+    expect(baseline.output).toContain("[aireceipts] claude-opus-4-8 · ≥$0.17");
     expect(err).toBe("");
   });
 

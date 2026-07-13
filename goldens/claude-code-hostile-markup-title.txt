@@ -8,10 +8,12 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-Read...............................$0.01  (1 call)
+Read...........................≥ $0.0071  (1 call)
 --------------------------------------------------
-TOTAL........................................$0.01
-same tokens on claude-haiku-4-5...$0.00 (50% less)
+TOTAL....................................≥ $0.0071
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0035
+  (50% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

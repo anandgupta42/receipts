@@ -9,8 +9,8 @@ specific one you pick.
 aireceipts
 ```
 
-With no arguments, aireceipts prices your most recently ended session across every
-supported agent (Claude Code, Codex, Cursor, opencode) and prints its receipt:
+With no arguments, aireceipts computes the observable Standard-API floor for your
+most recently ended session across every supported agent and prints its receipt:
 
 ```
 - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -20,14 +20,16 @@ supported agent (Claude Code, Codex, Cursor, opencode) and prints its receipt:
     claude-opus-4-8 87% · claude-sonnet-5 13%     
          cache served 85% of input tokens         
 
-Bash..............................$0.05  (3 calls)
-Edit..............................$0.05  (2 calls)
-(thinking/reply)..................$0.03  (2 turns)
-Write.............................$0.03  (2 calls)
-Read...............................$0.02  (1 call)
+Bash..........................≥ $0.0517  (3 calls)
+Edit..........................≥ $0.0455  (2 calls)
+(thinking/reply)..............≥ $0.0310  (2 turns)
+Write.........................≥ $0.0290  (2 calls)
+Read...........................≥ $0.0192  (1 call)
 --------------------------------------------------
-TOTAL........................................$0.18
-same tokens on claude-haiku-4-5...$0.04 (78% less)
+TOTAL....................................≥ $0.1767
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0392
+  (78% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                
@@ -38,24 +40,49 @@ same tokens on claude-haiku-4-5...$0.04 (78% less)
 Reading it top to bottom: the **title** is your opening prompt; the header line
 gives the **agent, start time, and duration**; then the **model mix** (share of
 tokens per model) and how much of the input was served from **cache**. The body
-lists **cost per tool**, highest first. `(thinking/reply)` is the model's own
-output on turns that called no tool. `TOTAL` is the sum; `same tokens on …`
+lists the **observable floor per tool**, highest first. `(thinking/reply)` is the model's own
+output on turns that called no tool. The raw `TOTAL` is additive; `same tokens on …`
 re-prices those exact tokens on a cheaper model as a reference point — the
-`(78% less)` is the same arithmetic as a percentage, never a prediction.
+percentage note compares the two observable floors, never predicts completion.
+
+Each human `≥ $X` is rounded down. The additive tool ledger uses one adaptive
+precision: two decimal places for exact cents, normally four when fractional
+cents remain, and up to twelve for tiny positive evidence. Its displayed rows
+sum exactly to `TOTAL`, and neither a row nor `TOTAL` exceeds the corresponding
+raw machine value. If IEEE-754 addition serializes just below the exact row-unit
+sum, the largest row is lowered by the excess unit(s); no row is ever rounded
+upward. Use `--json` or `--csv` for raw precision and explicit lower-bound
+semantics.
 
 A few lines appear only when they have something to say:
 
-- a **pre-edit line** — `pre-edit: 11% of cost (1/10 turns)` — the share of
-  the session's cost spent *before the first named edit-tool call*, and how
+- a **pre-edit line** — `pre-edit: 11% of priced floor (1/10 turns)` — the
+  share of the session's observable priced floor *before the first named
+  edit-tool call*, and how
   many turns that covered. It's a shape fact, not a verdict: a hard bug can
   deserve a high share, and a routine edit usually doesn't — a share that
   surprises you is worth a look;
-- a **stuck-loop waste line** names where to look — `at turns 1-5` — so you
+- a **stuck-loop pattern line** names where to look — `at turns 1-5` — so you
   can jump straight to the loop in your own transcript;
-- a **coverage caveat** — `caveat: 2 of 3 turns unpriced — TOTAL excludes
-  their tokens` — whenever a session mixed a priced model with one that has no
+- a **coverage caveat** — `caveat: 2 of 3 usage turns include unpriced tokens — TOTAL excludes
+  those tokens` — whenever a session mixed a priced model with one that has no
   cited price row, so a partial TOTAL never poses as a complete one;
+- an **unattributed-usage caveat** — Claude id-less response snapshots, Codex
+  request streams that fail reconciliation, and componentwise-dominating
+  opencode session aggregates can expose tokens without a trustworthy
+  request/model join. They remain tokens-only instead of being assigned a fake
+  dollar. A partial turn slice excludes session-level residuals; crossed
+  opencode aggregate/itemized vectors keep the itemized total and report the
+  positive conflict as excluded evidence;
 - time-integrity caveats (inconsistent timestamps, skipped records) as before.
+
+If the parent session has no matching price row but a readable subagent does,
+aireceipts does not throw away either fact. The child keeps its `SUBAGENTS (N)
+≥ $X` row, while the tail shows `KNOWN PRICED SUBTOTAL ≥ $X` and `KNOWN
+UNPRICED TOKENS N tok` on separate lines, followed by `partial pricing
+coverage; invoice total unknown`. The token line is the exact observable usage
+excluded from the dollar subtotal; unreadable or missing transcripts remain a
+separate unknown caveat.
 
 ## The `--details` section
 
@@ -71,11 +98,11 @@ tokens in / out..........................20k / 897
 cache read / write.....................124k / 2.1k
 turns / tool calls..........................10 / 8
 peak turn.........................24k tok (turn 7)
-same reads at uncached input rate............$0.52
+same reads at uncached input rate..........≥ $0.51
   (arithmetic, not a prediction)
 BY MODEL
-claude-opus-4-8........................87% · $0.17
-claude-sonnet-5........................13% · $0.01
+claude-opus-4-8......................87% · ≥ $0.16
+claude-sonnet-5......................13% · ≥ $0.01
 ```
 
 The section slots between the price-delta line and the footer.
@@ -85,9 +112,10 @@ reports the cache-write TTL tiers, a `writes: 5m … · 1h …` sub-line appears
 absent data renders nothing, never a fabricated 0); **turns / tool calls** is
 the session's shape; **peak turn** is the single most context-heavy request;
 **same reads at uncached input rate** re-prices your cache-read tokens at the
-plain input rate — the dollar figure caching saved you, arithmetic on the same
-cited price rows as everything else; **BY MODEL** splits the priced total per
-model (the rows always sum to `TOTAL`). Every line renders only when its data
+plain input rate — a lower-bound counterfactual on the same cited price rows as
+everything else; **BY MODEL** splits the parent session's observable floor per
+model. It is a secondary parent-only partition with no displayed subtotal, so it
+does not purport to decompose a `TOTAL` that may also include subagents. Every line renders only when its data
 exists in the transcript. `--details` composes with the default template only;
 it also works with `--svg`.
 
@@ -131,9 +159,9 @@ aireceipts --mini "email format"
 ```
 aireceipts · session receipt
 Claude Code · claude-opus-4-8 · 10m 30s
-total  $0.18
-top    Bash · $0.05 (3 calls)
-no waste detected
+total  ≥ $0.1767
+top    Bash · ≥ $0.0517 (3 calls)
+no flagged pattern detected
 run  aireceipts  for the full receipt
 ```
 

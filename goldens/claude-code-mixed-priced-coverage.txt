@@ -7,15 +7,16 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-Read...............................$0.01  (1 call)
+Read...........................≥ $0.0071  (1 call)
 (thinking/reply)...............2,335 tok  (1 turn)
 Bash...........................2,160 tok  (1 call)
 
-caveat: 2 of 3 turns unpriced — TOTAL excludes their tokens
+caveat: 2 of 3 usage turns include unpriced tokens — TOTAL excludes those tokens
 --------------------------------------------------
-TOTAL........................................$0.01
-same tokens on claude-haiku-4-5...$0.01 (12% less)
-  (arithmetic, not a prediction)
+KNOWN PRICED SUBTOTAL....................≥ $0.0071
+KNOWN UNPRICED TOKENS....................4,495 tok
+standard API-equivalent floor; not an invoice
+partial pricing coverage; invoice total unknown
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                
          github.com/anandgupta42/receipts         

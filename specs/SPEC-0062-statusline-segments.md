@@ -82,7 +82,7 @@ first (small, self-contained), R3/R4 second on the same spec.
 ## Scenarios
 
 - **Given** a stdin invocation with quota data, **When** the default line renders,
-  **Then** it reads `[aireceipts] $12.40 · 1,012k tok · 5h 23%` (waste segment when
+  **Then** it reads `[aireceipts] ≥$12.40 · 1,012k tok · 5h 23%` (waste segment when
   fired).
 - **Given** `--format "brand,quotaEta"` with two same-window rising readings 5m
   apart, **When** the line renders, **Then** the ETA segment carries the `≈` label

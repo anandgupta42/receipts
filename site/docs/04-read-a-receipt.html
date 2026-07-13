@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -340,7 +340,7 @@ footer{
 
 <pre class="doc-code"><code class="language-sh">aireceipts</code></pre>
 
-<p>With no arguments, aireceipts prices your most recently ended session across every supported agent (Claude Code, Codex, Cursor, opencode) and prints its receipt:</p>
+<p>With no arguments, aireceipts computes the observable Standard-API floor for your most recently ended session across every supported agent and prints its receipt:</p>
 
 <pre class="doc-code"><code>- - - - - - - - - - - - - - - - - - - - - - - - -
                     AIRECEIPTS                    
@@ -349,30 +349,37 @@ footer{
     claude-opus-4-8 87% · claude-sonnet-5 13%     
          cache served 85% of input tokens         
 
-Bash..............................$0.05  (3 calls)
-Edit..............................$0.05  (2 calls)
-(thinking/reply)..................$0.03  (2 turns)
-Write.............................$0.03  (2 calls)
-Read...............................$0.02  (1 call)
+Bash..........................≥ $0.0517  (3 calls)
+Edit..........................≥ $0.0455  (2 calls)
+(thinking/reply)..............≥ $0.0310  (2 turns)
+Write.........................≥ $0.0290  (2 calls)
+Read...........................≥ $0.0192  (1 call)
 --------------------------------------------------
-TOTAL........................................$0.18
-same tokens on claude-haiku-4-5...$0.04 (78% less)
+TOTAL....................................≥ $0.1767
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0392
+  (78% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                
          github.com/anandgupta42/receipts
 - - - - - - - - - - - - - - - - - - - - - - - - -</code></pre>
 
-<p>Reading it top to bottom: the <strong>title</strong> is your opening prompt; the header line gives the <strong>agent, start time, and duration</strong>; then the <strong>model mix</strong> (share of tokens per model) and how much of the input was served from <strong>cache</strong>. The body lists <strong>cost per tool</strong>, highest first. <code>(thinking/reply)</code> is the model's own output on turns that called no tool. <code>TOTAL</code> is the sum; <code>same tokens on …</code> re-prices those exact tokens on a cheaper model as a reference point — the <code>(78% less)</code> is the same arithmetic as a percentage, never a prediction.</p>
+<p>Reading it top to bottom: the <strong>title</strong> is your opening prompt; the header line gives the <strong>agent, start time, and duration</strong>; then the <strong>model mix</strong> (share of tokens per model) and how much of the input was served from <strong>cache</strong>. The body lists the <strong>observable floor per tool</strong>, highest first. <code>(thinking/reply)</code> is the model's own output on turns that called no tool. The raw <code>TOTAL</code> is additive; <code>same tokens on …</code> re-prices those exact tokens on a cheaper model as a reference point — the percentage note compares the two observable floors, never predicts completion.</p>
+
+<p>Each human <code>≥ $X</code> is rounded down. The additive tool ledger uses one adaptive precision: two decimal places for exact cents, normally four when fractional cents remain, and up to twelve for tiny positive evidence. Its displayed rows sum exactly to <code>TOTAL</code>, and neither a row nor <code>TOTAL</code> exceeds the corresponding raw machine value. If IEEE-754 addition serializes just below the exact row-unit sum, the largest row is lowered by the excess unit(s); no row is ever rounded upward. Use <code>--json</code> or <code>--csv</code> for raw precision and explicit lower-bound semantics.</p>
 
 <p>A few lines appear only when they have something to say:</p>
 
 <ul>
-  <li>a <strong>pre-edit line</strong> — <code>pre-edit: 11% of cost (1/10 turns)</code> — the share of the session's cost spent <em>before the first named edit-tool call</em>, and how many turns that covered. It's a shape fact, not a verdict: a hard bug can deserve a high share, and a routine edit usually doesn't — a share that surprises you is worth a look;</li>
-  <li>a <strong>stuck-loop waste line</strong> names where to look — <code>at turns 1-5</code> — so you can jump straight to the loop in your own transcript;</li>
-  <li>a <strong>coverage caveat</strong> — <code>caveat: 2 of 3 turns unpriced — TOTAL excludes their tokens</code> — whenever a session mixed a priced model with one that has no cited price row, so a partial TOTAL never poses as a complete one;</li>
+  <li>a <strong>pre-edit line</strong> — <code>pre-edit: 11% of priced floor (1/10 turns)</code> — the share of the session's observable priced floor <em>before the first named edit-tool call</em>, and how many turns that covered. It's a shape fact, not a verdict: a hard bug can deserve a high share, and a routine edit usually doesn't — a share that surprises you is worth a look;</li>
+  <li>a <strong>stuck-loop pattern line</strong> names where to look — <code>at turns 1-5</code> — so you can jump straight to the loop in your own transcript;</li>
+  <li>a <strong>coverage caveat</strong> — <code>caveat: 2 of 3 usage turns include unpriced tokens — TOTAL excludes those tokens</code> — whenever a session mixed a priced model with one that has no cited price row, so a partial TOTAL never poses as a complete one;</li>
+  <li>an <strong>unattributed-usage caveat</strong> — Claude id-less response snapshots, Codex request streams that fail reconciliation, and componentwise-dominating opencode session aggregates can expose tokens without a trustworthy request/model join. They remain tokens-only instead of being assigned a fake dollar. A partial turn slice excludes session-level residuals; crossed opencode aggregate/itemized vectors keep the itemized total and report the positive conflict as excluded evidence;</li>
   <li>time-integrity caveats (inconsistent timestamps, skipped records) as before.</li>
 </ul>
+
+<p>If the parent session has no matching price row but a readable subagent does, aireceipts does not throw away either fact. The child keeps its <code>SUBAGENTS (N) ≥ $X</code> row, while the tail shows <code>KNOWN PRICED SUBTOTAL ≥ $X</code> and <code>KNOWN UNPRICED TOKENS N tok</code> on separate lines, followed by <code>partial pricing coverage; invoice total unknown</code>. The token line is the exact observable usage excluded from the dollar subtotal; unreadable or missing transcripts remain a separate unknown caveat.</p>
 
 <h2 id="the-details-section">The <code>--details</code> section</h2>
 
@@ -385,13 +392,13 @@ tokens in / out..........................20k / 897
 cache read / write.....................124k / 2.1k
 turns / tool calls..........................10 / 8
 peak turn.........................24k tok (turn 7)
-same reads at uncached input rate............$0.52
+same reads at uncached input rate..........≥ $0.51
   (arithmetic, not a prediction)
 BY MODEL
-claude-opus-4-8........................87% · $0.17
-claude-sonnet-5........................13% · $0.01</code></pre>
+claude-opus-4-8......................87% · ≥ $0.16
+claude-sonnet-5......................13% · ≥ $0.01</code></pre>
 
-<p>The section slots between the price-delta line and the footer. Line by line: <strong>tokens in / out</strong> is the raw prompt/completion split; <strong>cache read / write</strong> shows whether caching is actually working (when the transcript reports the cache-write TTL tiers, a <code>writes: 5m … · 1h …</code> sub-line appears — absent data renders nothing, never a fabricated 0); <strong>turns / tool calls</strong> is the session's shape; <strong>peak turn</strong> is the single most context-heavy request; <strong>same reads at uncached input rate</strong> re-prices your cache-read tokens at the plain input rate — the dollar figure caching saved you, arithmetic on the same cited price rows as everything else; <strong>BY MODEL</strong> splits the priced total per model (the rows always sum to <code>TOTAL</code>). Every line renders only when its data exists in the transcript. <code>--details</code> composes with the default template only; it also works with <code>--svg</code>.</p>
+<p>The section slots between the price-delta line and the footer. Line by line: <strong>tokens in / out</strong> is the raw prompt/completion split; <strong>cache read / write</strong> shows whether caching is actually working (when the transcript reports the cache-write TTL tiers, a <code>writes: 5m … · 1h …</code> sub-line appears — absent data renders nothing, never a fabricated 0); <strong>turns / tool calls</strong> is the session's shape; <strong>peak turn</strong> is the single most context-heavy request; <strong>same reads at uncached input rate</strong> re-prices your cache-read tokens at the plain input rate — a lower-bound counterfactual on the same cited price rows as everything else; <strong>BY MODEL</strong> splits the parent session's observable floor per model. It is a secondary parent-only partition with no displayed subtotal, so it does not purport to decompose a <code>TOTAL</code> that may also include subagents. Every line renders only when its data exists in the transcript. <code>--details</code> composes with the default template only; it also works with <code>--svg</code>.</p>
 
 <h2 id="pick-a-different-session">Pick a different session</h2>
 
@@ -422,9 +429,9 @@ aireceipts &quot;email format&quot;       # matched by title substring</code></p
 
 <pre class="doc-code"><code>aireceipts · session receipt
 Claude Code · claude-opus-4-8 · 10m 30s
-total  $0.18
-top    Bash · $0.05 (3 calls)
-no waste detected
+total  ≥ $0.1767
+top    Bash · ≥ $0.0517 (3 calls)
+no flagged pattern detected
 run  aireceipts  for the full receipt</code></pre>
 
 <p>This is exactly what the <a href="03-install-hook.html">SessionEnd hook</a> prints.</p>

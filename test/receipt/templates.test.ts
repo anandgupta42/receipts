@@ -25,6 +25,7 @@ import { renderReceiptSvg } from "../../src/receipt/svg.js";
 import { previewModel } from "../../src/receipt/preview.js";
 import { main } from "../../src/cli/index.js";
 import { INSTALL_FOOTER_TEXT, REPOSITORY_DISPLAY } from "../../src/receipt/branding.js";
+import { emptyUsage } from "../../src/parse/util.js";
 
 const PRICED = { source: "claude-code", path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
 const UNPRICED = { source: "claude-code", path: "test/fixtures/claude-code/unpriced-unknown-model.jsonl" };
@@ -130,6 +131,42 @@ describe("SPEC-0020 R3 — exact-wording honesty battery holds in every template
       { kind: "row", label: "fake surcharge", value: "$123,456.78" },
     ] as Block[];
     expect(validateReceiptBlocks(withFakeDollar, priced).map((v) => v.code)).toContain("untraced-dollar");
+
+    const exactLooking = buildReceiptView(priced, "classic").blocks.map((block) =>
+      block.kind === "total" ? { ...block, value: block.value.replace(/^≥ /u, "") } : block,
+    );
+    expect(validateReceiptBlocks(exactLooking, priced).map((v) => v.code)).toContain("unqualified-dollar");
+  });
+
+  it.each([...TEMPLATE_NAMES])("accepts the traced parent+subagent TOTAL on %s", async (template) => {
+    const model = await modelFor(PRICED.source, PRICED.path);
+    model.subagents = {
+      count: 1,
+      pricedUsd: 0.03,
+      tokensTotal: 100,
+      unpricedTokens: emptyUsage(),
+      unpricedCount: 0,
+      unreadableCount: 0,
+    };
+    model.priceDelta = null;
+    expect(validateReceiptBlocks(buildReceiptView(model, template).blocks, model)).toEqual([]);
+  });
+
+  it.each([...TEMPLATE_NAMES])("accepts a qualified child floor caveat on an unpriced-parent %s receipt", async (template) => {
+    const model = await modelFor(UNPRICED.source, UNPRICED.path);
+    model.subagents = {
+      count: 1,
+      pricedUsd: 0.03,
+      tokensTotal: 100,
+      unpricedTokens: emptyUsage(),
+      unpricedCount: 0,
+      unreadableCount: 0,
+    };
+    model.caveats.push({
+      kind: "subagents-priced-tokens-only",
+      text: "1 subagent priced (≥ $0.03) — child floor shown separately; parent session unpriced",
+    });
+    expect(validateReceiptBlocks(buildReceiptView(model, template).blocks, model)).toEqual([]);
   });
 });
 
@@ -142,7 +179,7 @@ describe("SPEC-0020 R3 — numbers equal classic to the cent", () => {
     };
     expect(totalOf("grocery")).toBe(totalOf("classic"));
     expect(totalOf("datavis")).toBe(totalOf("classic"));
-    expect(totalOf("classic")).toBe("$0.18");
+    expect(totalOf("classic")).toBe("≥ $0.1764");
   });
 });
 
@@ -166,9 +203,29 @@ describe("SPEC-0020 Design — grocery 50-char column math", () => {
     expect(line.endsWith("$0.05")).toBe(true);
   });
 
-  it("groceryLine caps oversized QTY/AMT too, so a huge token count can never overflow 50 chars", () => {
+  it("groceryLine shrinks ITEM/QTY before AMT, so the qualified amount is never truncated", () => {
     const line = groceryLine("Read", "123456789", "1,234,567,890 tok");
     expect([...line].length).toBe(50);
+    expect(line).toContain("1,234,567,890 tok");
+  });
+
+  it("preserves a large lower-bound amount across every terminal template and SVG", async () => {
+    const base = await modelFor(PRICED.source, PRICED.path);
+    const usd = 1_234_567.899;
+    const model: ReceiptModel = {
+      ...base,
+      toolRows: [{ ...base.toolRows[0], tool: "Bash", usd }],
+      totalUsd: usd,
+      priceDelta: null,
+    };
+    const amount = "≥ $1,234,567.89";
+
+    for (const template of TEMPLATE_NAMES) {
+      const lines = renderReceiptLines(model, { color: false, template });
+      expect(lines.join("\n")).toContain(amount);
+      expect(lines.every((line) => [...line].length <= RECEIPT_WIDTH)).toBe(true);
+      expect(renderReceiptSvg(model, { template })).toContain(amount);
+    }
   });
 
   it("the column header lands QTY in cols 30-37 and AMT in cols 39-50", () => {

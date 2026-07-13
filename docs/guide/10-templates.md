@@ -3,8 +3,8 @@
 Goal: render the same receipt in a different visual style — for a screenshot, a
 share, or just taste.
 
-A template changes only how the receipt is *drawn*. The numbers, the honesty
-rules, and the totals are identical across all of them.
+A template changes only how the receipt is *drawn*. The observable lower-bound
+numbers, honesty rules, and totals are identical across all of them.
 
 ## See the styles
 
@@ -16,26 +16,26 @@ prints a short live preview of each built-in template:
 
 ```
 ── classic  (default) ──
-Bash..............................$0.05  (3 calls)
-Edit..............................$0.05  (2 calls)
-(thinking/reply)..................$0.03  (2 turns)
-Write.............................$0.03  (2 calls)
-Read...............................$0.02  (1 call)
+Bash..........................≥ $0.0517  (3 calls)
+Edit..........................≥ $0.0455  (2 calls)
+(thinking/reply)..............≥ $0.0310  (2 turns)
+Write.........................≥ $0.0290  (2 calls)
+Read...........................≥ $0.0192  (1 call)
 --------------------------------------------------
 
 ── grocery ──
 TXN #A2998369
 ITEM                              QTY          AMT
-Bash                                3        $0.05
-Edit                                2        $0.05
-(thinking/reply)                    2        $0.03
-Write                               2        $0.03
+Bash                                3    ≥ $0.0517
+Edit                                2    ≥ $0.0455
+(thinking/reply)                    2    ≥ $0.0310
+Write                               2    ≥ $0.0290
 
 ── datavis ──
 [##########] = priciest line; others in proportion
 
 --- MODEL OUTPUT ---
-(thinking/reply)................$0.03 [######----]
+(thinking/reply)............≥ $0.0310 [######----]
 
 --- TOOL CALLS ---
 ```
@@ -56,22 +56,24 @@ aireceipts --template grocery "email format"
     claude-opus-4-8 87% · claude-sonnet-5 13%     
          cache served 85% of input tokens         
 
-TXN #A3E98D5C
+TXN #E336964E
 ITEM                              QTY          AMT
-Bash                                3        $0.05
-Edit                                2        $0.05
-(thinking/reply)                    2        $0.03
-Write                               2        $0.03
-Read                                1        $0.02
+Bash                                3    ≥ $0.0517
+Edit                                2    ≥ $0.0455
+(thinking/reply)                    2    ≥ $0.0310
+Write                               2    ≥ $0.0290
+Read                                1    ≥ $0.0192
 --------------------------------------------------
-TOTAL                                        $0.18
-same tokens on claude-haiku-4-5..............$0.04
+TOTAL                                    ≥ $0.1767
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0392
+  (78% lower observable floor)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-opus-4-8
 - - - - - - - - - - - - - - - - - - - - - - - - -
       THANK YOU FOR VIBING WITH Claude Code       
-            || |||| || || | | || ||||             
+           || |||| |||| ||| || ||| | ||
 - - - - - - - - - - - - - - - - - - - - - - - - -
 ```
 
@@ -87,13 +89,13 @@ aireceipts --template datavis "email format"
 [##########] = priciest line; others in proportion
 
 --- MODEL OUTPUT ---
-(thinking/reply)................$0.03 [######----]
+(thinking/reply)............≥ $0.0310 [######----]
 
 --- TOOL CALLS ---
-Bash............................$0.05 [##########]
-Edit............................$0.05 [#########-]
-Write...........................$0.03 [######----]
-Read............................$0.02 [####------]
+Bash........................≥ $0.0517 [##########]
+Edit........................≥ $0.0455 [#########-]
+Write.......................≥ $0.0290 [######----]
+Read........................≥ $0.0192 [####------]
 ```
 
 `--template` works with the image exports too — see

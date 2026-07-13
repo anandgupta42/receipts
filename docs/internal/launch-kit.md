@@ -19,7 +19,7 @@ Recommendation: **1**. The repo is the demo; the title should point at it.
 
 > aireceipts is a local CLI that reads the transcripts your coding agent
 > already writes (Claude Code, Codex, Cursor, opencode) and prints a cost
-> receipt: per-tool spend, cache economics, waste lines, and a PR-level
+> receipt: per-tool observable floors, cache economics, heuristic pattern flags, and a PR-level
 > receipt of every agent session behind a pull request.
 >
 > The honesty rules are the product: no fabricated dollars (unpriced models

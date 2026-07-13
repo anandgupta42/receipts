@@ -36,20 +36,32 @@ describe("renderMiniReceipt (R4)", () => {
     expect(out).toContain("tok");
   });
 
-  it("shows a `$` total when the session priced (I2)", async () => {
+  it("shows a visibly floored `$` total when the session priced (I2)", async () => {
     const out = renderMiniReceipt(await modelOf(PRICED));
-    expect(out).toContain("total  $");
+    expect(out).toContain("total  ≥ $");
   });
 
-  it("surfaces the top waste line when one fired", async () => {
+  it("surfaces the top flagged-pattern line when one fired", async () => {
     const out = renderMiniReceipt(await modelOf(LOOP));
     expect(out).toContain("⚠");
-    expect(out).toContain("loop ×5");
+    expect(out).toMatch(/loop ×5 · ≈ \$/);
   });
 
-  it("says 'no waste detected' on a clean session", async () => {
+  it("labels trivial-span repricing as heuristic rather than a savings floor", async () => {
+    const model = await modelOf(PRICED);
+    model.wasteLines = [{
+      kind: "trivial-spans",
+      eligibleTurnCount: 2,
+      usd: 0.01,
+      tokens: model.totalTokens,
+      cheaperModel: "claude-haiku-4-5",
+    }];
+    expect(renderMiniReceipt(model)).toMatch(/trivial spans.*≈ \$0\.01/);
+  });
+
+  it("says no flagged pattern was detected on a clean session", async () => {
     const out = renderMiniReceipt(await modelOf(PRICED));
-    expect(out).toContain("no waste detected");
+    expect(out).toContain("no flagged pattern detected");
     expect(out).not.toContain("⚠");
   });
 
@@ -77,6 +89,8 @@ describe("buildMiniSummary (shared structure, SPEC-0006 R4 / SPEC-0007)", () => 
     expect(summary.agentLabel).toBe("Claude Code");
     expect(summary.model).toBe("claude-opus-4-8");
     expect(summary.totalUsd).toBe(model.totalUsd);
+    expect(summary.pricingCoverage).toBe("full");
+    expect(summary.knownUnpricedTokens).toBe(0);
     expect(summary.topTool?.tool).toBe(model.toolRows[0]?.tool);
     expect(summary.durationMs).toBe(model.durationMs);
   });
@@ -84,6 +98,8 @@ describe("buildMiniSummary (shared structure, SPEC-0006 R4 / SPEC-0007)", () => 
   it("carries totalUsd=null for an unpriced session so the surface can go tokens-only", async () => {
     const summary = buildMiniSummary(await modelOf(UNPRICED));
     expect(summary.totalUsd).toBeNull();
+    expect(summary.pricingCoverage).toBe("unpriced");
+    expect(summary.knownUnpricedTokens).toBe(summary.totalTokens);
     expect(summary.totalTokens).toBeGreaterThan(0);
   });
 
@@ -100,10 +116,13 @@ describe("renderMiniSummary edge cases", () => {
       model: null,
       durationMs: undefined,
       totalUsd: null,
+      pricingCoverage: "unpriced",
+      knownUnpricedTokens: 5000,
       totalTokens: 5000,
       topTool: null,
       topWaste: null,
       unpriceable: true,
+      subagentCount: 0,
     });
     const lines = out.split("\n");
     expect(lines).toHaveLength(6);
@@ -111,5 +130,25 @@ describe("renderMiniSummary edge cases", () => {
     expect(lines[2]).toBe("total  5,000 tok");
     expect(lines[3]).toBe("top    (no tool calls)");
     expect(out).not.toContain("$");
+  });
+
+  it("distinguishes exact known-unpriced tokens from an unmeasured coverage gap", () => {
+    const base = {
+      agentLabel: "Codex",
+      model: "gpt-5.6-sol",
+      durationMs: 1000,
+      totalUsd: 1,
+      totalTokens: 100,
+      topTool: null,
+      topWaste: null,
+      unpriceable: false,
+      subagentCount: 0,
+    } as const;
+    expect(renderMiniSummary({ ...base, pricingCoverage: "partial", knownUnpricedTokens: 25 })).toContain(
+      "known priced ≥ $1.00 · 25 tok known unpriced · coverage partial",
+    );
+    const unknown = renderMiniSummary({ ...base, pricingCoverage: "partial", knownUnpricedTokens: 0 });
+    expect(unknown).toContain("known priced ≥ $1.00 · coverage partial");
+    expect(unknown).not.toContain("0 tok unpriced");
   });
 });

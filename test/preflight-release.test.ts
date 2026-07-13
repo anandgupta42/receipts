@@ -3,7 +3,7 @@
 // release flow; here we pin the pure guards that decide RELEASABLE vs not.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { checkManifest, checkTarball, MAX_TARBALL_FILES } from "../scripts/preflight-release.mjs";
+import { checkManifest, checkTarball, MAX_TARBALL_FILES, MAX_UNPACKED_KB } from "../scripts/preflight-release.mjs";
 
 const realPkg = JSON.parse(readFileSync("package.json", "utf8"));
 const realLock = JSON.parse(readFileSync("package-lock.json", "utf8"));
@@ -82,6 +82,7 @@ describe("preflight · checkTarball", () => {
   });
 
   it("rejects an oversized unpacked payload", () => {
-    expect(checkTarball({ ...good, unpackedSize: 999 * 1024 }, REQ).some((m) => m.includes("KB"))).toBe(true);
+    expect(checkTarball({ ...good, unpackedSize: MAX_UNPACKED_KB * 1024 }, REQ)).toEqual([]);
+    expect(checkTarball({ ...good, unpackedSize: (MAX_UNPACKED_KB + 1) * 1024 }, REQ).some((m) => m.includes("KB"))).toBe(true);
   });
 });

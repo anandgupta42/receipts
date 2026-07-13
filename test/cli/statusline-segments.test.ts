@@ -87,7 +87,7 @@ describe("SPEC-0062 R3 — parseFormat", () => {
 
 describe("SPEC-0062 R3 — renderSegments", () => {
   it("renders exactly the requested segments, ·-joined", () => {
-    expect(renderSegments(segs("cost,tokens"), ctx())).toBe("$0.50 · 1k");
+    expect(renderSegments(segs("cost,tokens"), ctx())).toBe("≥$0.50 · 1k");
   });
 
   it("duplicate segments render twice", () => {
@@ -107,6 +107,18 @@ describe("SPEC-0062 R3 — renderSegments", () => {
   it("I2: cost omits itself on an unpriced session — no zero-fill, no $ bytes", () => {
     const unpriced = ctx({ summary: buildMiniSummary(model({ totalUsd: null })) });
     expect(renderSegments(segs("cost,tokens"), unpriced)).toBe("1k");
+  });
+
+  it("labels known-token and unmeasured partial floors without implying a complete total", () => {
+    const knownGap = buildMiniSummary(model({ unpricedTokens: usage(250) }));
+    expect(renderSegments(segs("cost"), ctx({ summary: knownGap }))).toBe(
+      "≥$0.50 subtotal (250 known unpriced; partial)",
+    );
+
+    const unmeasuredGap = buildMiniSummary(model({ unobservedCacheWriteTokens: true }));
+    expect(renderSegments(segs("cost,burn"), ctx({ summary: unmeasuredGap }))).toBe(
+      "≥$0.50 subtotal (coverage partial)",
+    );
   });
 
   it("the default format constant matches the spec-pinned list", () => {
@@ -133,8 +145,8 @@ describe("SPEC-0071 — rich statusline (burn, context, quota countdown, M/B tok
     expect(renderSegments(segs("context"), ctx({ payload: {} }))).toBe("");
   });
 
-  it("R3: burn is a priced $/hr over the session wall-clock; omitted with no duration/price (no fabricated rate)", () => {
-    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ totalUsd: 40, durationMs: 1_800_000 })) }))).toBe("$80/hr"); // $40 / 0.5h
+  it("R3: burn is a lower-bound $/hr over the session wall-clock; omitted with no duration/price", () => {
+    expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ totalUsd: 40, durationMs: 1_800_000 })) }))).toBe("≥$80/hr"); // observed $40 floor / 0.5h
     expect(renderSegments(segs("burn"), ctx())).toBe(""); // model() has no durationMs
     expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ durationMs: 1_800_000, totalUsd: null })) }))).toBe("");
     expect(renderSegments(segs("burn"), ctx({ summary: buildMiniSummary(model({ durationMs: 1_800_000, unpriceable: true, totalUsd: null })) }))).toBe("");
@@ -160,14 +172,14 @@ describe("SPEC-0071 — rich statusline (burn, context, quota countdown, M/B tok
   });
 
   it("R5: the rich default renders every segment in order", () => {
-    const summary = buildMiniSummary(model({ totalUsd: 423.26, durationMs: 7_200_000, totalTokens: usage(501_368_000) })); // $423.26 / 2h = $212/hr
+    const summary = buildMiniSummary(model({ totalUsd: 423.26, durationMs: 7_200_000, totalTokens: usage(501_368_000) })); // observed floor / 2h
     const payload = { context_window: { used_percentage: 42 }, rate_limits: { five_hour: { used_percentage: 26, resets_at: WINDOW.resets_at } } };
     const nowMs = RESETS_AT_MS - (2 * 3600 + 13 * 60) * 1000;
-    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ summary, payload, nowMs }))).toBe("[aireceipts] $423.26 · $212/hr · 501M · ctx 42% · 5h 26% ↺2h13m");
+    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ summary, payload, nowMs }))).toBe("[aireceipts] ≥$423.26 · ≥$211/hr · 501M · ctx 42% · 5h 26% ↺2h13m");
   });
 
   it("R5: degrades to cost + tokens when no payload/duration data", () => {
-    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ payload: null }))).toBe("[aireceipts] $0.50 · 1k");
+    expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ payload: null }))).toBe("[aireceipts] ≥$0.50 · 1k");
   });
 
   it("R6: rendered segments contain no ANSI escape codes", () => {
@@ -195,7 +207,7 @@ describe("SPEC-0076 R1/R2 — the model segment", () => {
     };
     const nowMs = RESETS_AT_MS - (2 * 3600 + 13 * 60) * 1000;
     expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ summary, payload, nowMs }))).toBe(
-      "[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m",
+      "[aireceipts] Opus · ≥$4.20 · ≥$9/hr · 128k · ctx 42% · 5h 24% ↺2h13m",
     );
   });
 
@@ -249,7 +261,7 @@ describe("SPEC-0076 R1/R2 — the model segment", () => {
       }),
     );
     expect(renderSegments(segs(DEFAULT_FORMAT), ctx({ inputMode: "disk_fallback", summary, payload: null }))).toBe(
-      "[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k",
+      "[aireceipts · Codex] gpt-5.2-codex · ≥$1.10 · ≥$4/hr · 84k",
     );
   });
 

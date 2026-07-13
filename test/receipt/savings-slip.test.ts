@@ -24,6 +24,7 @@ import type {
 } from "../../src/receipt/model.js";
 import type { TokenUsage } from "../../src/parse/types.js";
 import { emptyCostShape } from "../../src/pricing/costShape.js";
+import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "../../src/receipt/costEstimate.js";
 
 function usage(total: number): TokenUsage {
   return { input: total, output: 0, cacheRead: 0, cacheCreation: 0, total };
@@ -76,45 +77,54 @@ function model(overrides: Partial<ReceiptModel> = {}): ReceiptModel {
 }
 
 describe("SPEC-0059 R2 — headline + hedge arithmetic", () => {
-  it("sums priced waste into the `≤ $` ceiling with the percent hedge", () => {
+  it("renders one flagged class as an explicitly heuristic pattern cost", () => {
     const lines = savingsSlipLines([loop(0.41)], 2.84);
-    expect(lines[0]).toBe("COULD HAVE SAVED...........................≤ $0.41");
-    expect(lines[1]).toBe("  14% of $2.84 · arithmetic, not a prediction");
+    expect(lines[0]).toBe("FLAGGED PATTERN COST.......................≈ $0.41");
+    expect(lines[1]).toBe("  heuristic pattern subtotal · not proven savings");
   });
 
-  it("percent uses Math.round at a .5 boundary", () => {
-    // 0.25 of 2.00 → exactly 12.5 → rounds to 13 (the modelMix idiom).
-    const lines = savingsSlipLines([loop(0.25)], 2.0);
-    expect(lines[1]).toBe("  13% of $2.00 · arithmetic, not a prediction");
+  it("takes the maximum observed-cost class subtotal instead of adding overlapping classes", () => {
+    expect(couldHaveSavedOf([loop(0.41, 1000), thrash(0.9, 900)], 2.0)).toEqual({
+      interpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+      usd: 0.9,
+      tokens: 1000,
+      pctOfTotal: null,
+    });
   });
 
-  it("renders `≤ N tok` and the bare hedge when every fired line is unpriced (I2)", () => {
+  it("renders an approximate token subtotal when every fired line is unpriced (I2)", () => {
     const lines = savingsSlipLines([loop(null, 1200)], null);
-    expect(lines[0]).toBe("COULD HAVE SAVED.......................≤ 1,200 tok");
-    expect(lines[1]).toBe("  arithmetic, not a prediction");
+    expect(lines[0]).toBe("FLAGGED PATTERN COST...................≈ 1,200 tok");
+    expect(lines[1]).toBe("  heuristic pattern subtotal · not proven savings");
     expect(lines.join("\n")).not.toContain("$");
   });
 
-  it("prefixes the hedge with `≈` when an estimate-tier class contributes (I3)", () => {
+  it("excludes counterfactual trivial-span re-pricing from the flagged-pattern subtotal", () => {
     const withEstimate = savingsSlipLines([loop(0.41), trivial(0.05)], 2.84);
-    expect(withEstimate[1]).toBe("  ≈ 16% of $2.84 · arithmetic, not a prediction");
-    const loopOnly = savingsSlipLines([loop(0.41)], 2.84);
-    expect(loopOnly[1]).not.toContain("≈");
+    expect(withEstimate[0]).toBe("FLAGGED PATTERN COST.......................≈ $0.41");
+    expect(withEstimate.join("\n")).toContain("≈ $0.05");
+    expect(couldHaveSavedOf([trivial(0.05)], 2.84)).toEqual({
+      interpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+      usd: null,
+      tokens: 400,
+      pctOfTotal: null,
+    });
   });
 
-  it("mixed priced + token-only: `$` ceiling is priced-only and the hedge says so", () => {
+  it("mixed priced + token-only: the `$` subtotal is priced-only and the hedge says so", () => {
     const lines = savingsSlipLines([loop(0.41), thrash(null, 900)], 2.84);
-    expect(lines[0]).toBe("COULD HAVE SAVED...........................≤ $0.41");
-    expect(lines[1]).toBe("  ≈ 14% of $2.84 · priced waste only, not a prediction");
+    expect(lines[0]).toBe("FLAGGED PATTERN COST.......................≈ $0.41");
+    expect(lines[1]).toBe("  heuristic pattern subtotal · not proven savings");
     // The token-only line still renders as evidence (dottedLine ellipsizes the
     // long label at width 50, exactly as the receipt's own waste row does).
     expect(lines.join("\n")).toContain("≈ context thrash: 2 compactions");
   });
 
-  it("couldHaveSavedOf: tokens sum over ALL lines; pct null without both dollar sides", () => {
+  it("couldHaveSavedOf: token subtotal is also overlap-safe and pct is always null", () => {
     expect(couldHaveSavedOf([loop(0.41, 1000), thrash(null, 900)], null)).toEqual({
+      interpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION,
       usd: 0.41,
-      tokens: 1900,
+      tokens: 1000,
       pctOfTotal: null,
     });
     expect(couldHaveSavedOf([loop(null)], 2.84).usd).toBeNull();
@@ -171,7 +181,7 @@ describe("SPEC-0059 R4 — seam placement", () => {
     const local = renderHandoff(m).split("\n");
     expect(local[1]).toBe("-".repeat(50));
     const bare = savingsSlipLines(m.wasteLines, m.totalUsd);
-    expect(bare[0]).toContain("COULD HAVE SAVED");
+    expect(bare[0]).toContain("FLAGGED PATTERN COST");
     expect(bare.join("\n")).not.toContain("-".repeat(50));
   });
 });
@@ -202,11 +212,11 @@ describe("SPEC-0059 R5 — PR comment section", () => {
       details: [detail],
       handoff: { wasteLines: [loop(0.41), trivial(0.05)], sessionCount: 2, turnCount: 18 },
     });
-    expect(body).toContain("<details><summary>handoff — could have saved ≤ $0.46 (16%)</summary>");
-    expect(body).toContain("COULD HAVE SAVED...........................≤ $0.46");
-    expect(body).toContain("covers: 2 sessions · 18 turns · 2 waste lines");
+    expect(body).toContain("<details><summary>handoff — flagged pattern cost ≈ $0.41</summary>");
+    expect(body).toContain("FLAGGED PATTERN COST.......................≈ $0.41");
+    expect(body).toContain("covers: 2 sessions · 18 turns · 2 flagged-pattern lines");
     // Sibling AFTER the full-receipts section.
-    expect(body.indexOf("full receipts (1 session)")).toBeLessThan(body.indexOf("handoff — could have saved"));
+    expect(body.indexOf("full receipts (1 session)")).toBeLessThan(body.indexOf("handoff — flagged pattern cost"));
   });
 
   it("omits the section entirely when no waste fired — clean-PR bytes unchanged", () => {
@@ -228,8 +238,8 @@ describe("SPEC-0059 R5 — PR comment section", () => {
       prInput({ excludedCount: 1 }),
     );
     expect(slip).not.toBeNull();
-    expect(slip?.summary).toBe("handoff — could have saved ≤ $0.41");
-    expect(slip?.text).toContain("  arithmetic, not a prediction");
+    expect(slip?.summary).toBe("handoff — flagged pattern cost ≈ $0.41");
+    expect(slip?.text).toContain("  heuristic pattern subtotal · not proven savings");
     expect(slip?.text).not.toContain("% of $");
   });
 
@@ -246,7 +256,7 @@ describe("SPEC-0059 R5 — PR comment section", () => {
       handoff: { wasteLines: [loop(0.41)], sessionCount: 40, turnCount: 400 },
     });
     const hasWholeSection = body.includes("<details><summary>handoff — ");
-    const hasAnySlipLine = body.includes("COULD HAVE SAVED");
+    const hasAnySlipLine = body.includes("FLAGGED PATTERN COST");
     expect(hasAnySlipLine).toBe(hasWholeSection);
     expect([...body].length).toBeLessThanOrEqual(65_000);
   });
@@ -262,8 +272,8 @@ describe("SPEC-0059 R6 — artifact parity", () => {
       sessions: [{ label: "lead · abc123", model: model({ wasteLines: [loop(0.41)], totalUsd: 2.84 }) }],
       handoff: slip ?? undefined,
     });
-    expect(html).toContain("<h2>handoff — could have saved ≤ $0.41 (14%)</h2>");
-    expect(html).toContain("COULD HAVE SAVED");
+    expect(html).toContain("<h2>handoff — flagged pattern cost ≈ $0.41</h2>");
+    expect(html).toContain("FLAGGED PATTERN COST");
     expect(html).toContain("→ change or stop after two identical failures");
   });
 
@@ -276,19 +286,20 @@ describe("SPEC-0059 R6 — artifact parity", () => {
 describe("SPEC-0059 R7 — JSON surface", () => {
   const counts = { turns: 6, toolCalls: 5, compactions: 0 };
 
-  it("carries rule per waste line and the couldHaveSaved object; schema version unchanged", () => {
+  it("carries rule per waste line and the overlap-safe legacy object in schema v2", () => {
     const m = model({ wasteLines: [loop(0.41), trivial(0.05)], totalUsd: 2.84 });
     const json = toHandoffJson(m, [], 3, counts, []);
     expect(() => handoffJsonSchema.parse(json)).not.toThrow();
-    expect(json.schemaVersion).toBe(1);
-    // Raw float sum, like every existing export's dollars; formatUsd rounds only for display.
-    expect(json.couldHaveSaved.usd).toBeCloseTo(0.46, 10);
-    expect(json.couldHaveSaved.tokens).toBe(1400);
-    expect(json.couldHaveSaved.pctOfTotal).toBe(16);
+    expect(json.schemaVersion).toBe(2);
+    expect(json.couldHaveSaved.usd).toBeCloseTo(0.41, 10);
+    expect(json.couldHaveSaved.interpretation).toBe(HEURISTIC_PATTERN_PRICING_INTERPRETATION);
+    expect(json.couldHaveSaved.tokens).toBe(1000);
+    expect(json.couldHaveSaved.pctOfTotal).toBeNull();
     expect(json.wasteLines.map((w) => w.rule)).toEqual([
       "change or stop after two identical failures",
       "route short replies to a cheaper model",
     ]);
+    expect(json.wasteLines.every((w) => w.costInterpretation === HEURISTIC_PATTERN_PRICING_INTERPRETATION)).toBe(true);
   });
 
   it("rule is null for a class without a fixed rule", () => {
@@ -306,7 +317,7 @@ describe("SPEC-0059 R7 — JSON surface", () => {
 
 describe("SPEC-0059 — covers line wording", () => {
   it("pluralizes each fact independently", () => {
-    expect(prCoverageLine(1, 1, 1)).toBe("covers: 1 session · 1 turn · 1 waste line");
-    expect(prCoverageLine(2, 18, 2)).toBe("covers: 2 sessions · 18 turns · 2 waste lines");
+    expect(prCoverageLine(1, 1, 1)).toBe("covers: 1 session · 1 turn · 1 flagged-pattern line");
+    expect(prCoverageLine(2, 18, 2)).toBe("covers: 2 sessions · 18 turns · 2 flagged-pattern lines");
   });
 });

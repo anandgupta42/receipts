@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -339,7 +339,7 @@ footer{
 <pre class="doc-code"><code class="language-sh">npx aireceipts-cli
 npx aireceipts-cli setup</code></pre>
 
-<p><code>setup</code> only reports. It shows found sessions, the latest session cost or tokens, the trailing-week total, and integration options. Nothing uploads, posts, or writes settings from this command — its only writes are aireceipts' own local cache under <code>~/.aireceipts/</code>.</p>
+<p><code>setup</code> only reports. It shows found sessions, the latest observable floor or tokens, the trailing-week floor, and integration options. Nothing uploads, posts, or writes settings from this command — its only writes are aireceipts' own local cache under <code>~/.aireceipts/</code>.</p>
 
 <h2 id="pick-by-intent">Pick by intent</h2>
 

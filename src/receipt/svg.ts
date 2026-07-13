@@ -150,6 +150,8 @@ export interface RowGeometry {
   truncated: boolean;
   labelEndX: number;
   valueStartX: number;
+  /** Font size after fitting the complete value inside the card. */
+  valueSize: number;
   leaderStartX: number;
   leaderEndX: number;
   /** True if, even at +10% glyph width, the label and value would collide. The layout guarantees this is false by truncating with "…". */
@@ -165,7 +167,13 @@ export interface RowGeometry {
 export function rowGeometry(labelStartX: number, label: string, value: string, size: number): RowGeometry {
   const cw = charW(size);
   const cwSafe = charW(size, true);
-  const valueStartSafe = RIGHT - value.length * cwSafe;
+  // Amounts are evidence: never truncate or ellipsize them. Reserve space for
+  // at least a minimal label and gap, then reduce only the value font size when
+  // a very large qualified amount would otherwise start outside the card.
+  const valueLength = Math.max(1, [...value].length);
+  const maxValueWidth = Math.max(1, RIGHT - labelStartX - cwSafe - 32);
+  const valueSize = Math.min(size, maxValueWidth / (valueLength * CHAR_RATIO * GLYPH_SAFETY));
+  const valueStartSafe = RIGHT - valueLength * charW(valueSize, true);
   const maxLabelPx = valueStartSafe - 24 - labelStartX;
   const maxChars = Math.max(1, Math.floor(maxLabelPx / cwSafe));
 
@@ -177,13 +185,14 @@ export function rowGeometry(labelStartX: number, label: string, value: string, s
   }
 
   const labelEndX = labelStartX + labelText.length * cw;
-  const valueStartX = RIGHT - value.length * cw;
+  const valueStartX = RIGHT - valueLength * charW(valueSize);
   const labelEndSafe = labelStartX + labelText.length * cwSafe;
   return {
     labelText,
     truncated,
     labelEndX,
     valueStartX,
+    valueSize,
     leaderStartX: labelEndX + 8,
     leaderEndX: valueStartX - 8,
     overlapSafe: labelEndSafe + 8 > valueStartSafe - 8,
@@ -204,7 +213,7 @@ function rowElements(label: string, value: string, rowTop: number, style: RowSty
   const baseline = rowTop + 15;
   const els: string[] = [
     textEl(style.labelStartX, baseline, g.labelText, { size: style.size, weight: style.weight, fill: style.labelFill }),
-    textEl(RIGHT, baseline, value, { size: style.size, weight: style.weight, fill: style.valueFill, anchor: "end" }),
+    textEl(RIGHT, baseline, value, { size: g.valueSize, weight: style.weight, fill: style.valueFill, anchor: "end" }),
   ];
   if (g.leaderEndX > g.leaderStartX) {
     els.push(leaderEl(g.leaderStartX, g.leaderEndX, baseline - 4, style.muted));

@@ -21,46 +21,103 @@ const { budgetExceeded, evaluateBudget, renderBudgetLine } = await import("../..
 
 const listSessionsMock = vi.mocked(listFullSessions);
 
+function usdSum(overrides: Partial<Extract<BudgetSum, { kind: "usd" }>> = {}): Extract<BudgetSum, { kind: "usd" }> {
+  return {
+    kind: "usd",
+    spent: 10,
+    cap: 50,
+    inWindowSessionCount: 1,
+    sessionCount: 1,
+    fullyPricedSessionCount: 1,
+    partiallyPricedSessionCount: 0,
+    cacheRatePartialSessionCount: 0,
+    excludedUnpricedCount: 0,
+    unreadableSessionCount: 0,
+    unpricedTokenCount: 0,
+    childSessionsIncluded: false,
+    ...overrides,
+  };
+}
+
+function tokenSum(overrides: Partial<Extract<BudgetSum, { kind: "tokens" }>> = {}): Extract<BudgetSum, { kind: "tokens" }> {
+  return {
+    kind: "tokens",
+    spentTokens: 1_500,
+    cap: 10_000,
+    sessionCount: 2,
+    excludedUnreadableCount: 0,
+    childSessionsIncluded: false,
+    ...overrides,
+  };
+}
+
 describe("renderBudgetLine (R2, R4)", () => {
   it("R4: a usd line always states it is advisory only and never claims enforcement", () => {
-    const sum: BudgetSum = { kind: "usd", spent: 10, cap: 50, sessionCount: 1, excludedUnpricedCount: 0 };
+    const sum = usdSum();
     const line = renderBudgetLine("daily", sum);
-    expect(line).toBe("budget (today): $10.00 of $50.00 — advisory only — does not stop the agent");
+    expect(line).toBe("budget (today): ≥ $10.00 of $50.00 — advisory only — does not stop the agent (coverage: 1 full, 0 partial, 0 excluded; top-level only; child/subagent transcripts excluded)");
     expect(line.toLowerCase()).not.toMatch(/stopped|blocked|halted|killed|throttled the agent/);
   });
 
   it("R2: a usd line with excluded unpriced sessions notes the count (singular)", () => {
-    const sum: BudgetSum = { kind: "usd", spent: 10, cap: 50, sessionCount: 1, excludedUnpricedCount: 1 };
+    const sum = usdSum({ inWindowSessionCount: 2, excludedUnpricedCount: 1, unpricedTokenCount: 250 });
     const line = renderBudgetLine("weekly", sum);
-    expect(line).toContain("(1 unpriced session excluded from this sum)");
+    expect(line).toContain("coverage: 1 full, 0 partial, 1 excluded");
+    expect(line).toContain("250 known unpriced tok outside ≥ sum");
   });
 
   it("R2: a usd line with multiple excluded unpriced sessions notes the count (plural)", () => {
-    const sum: BudgetSum = { kind: "usd", spent: 10, cap: 50, sessionCount: 1, excludedUnpricedCount: 3 };
+    const sum = usdSum({ inWindowSessionCount: 4, excludedUnpricedCount: 3, unreadableSessionCount: 2 });
     const line = renderBudgetLine("daily", sum);
-    expect(line).toContain("(3 unpriced sessions excluded from this sum)");
+    expect(line).toContain("coverage: 1 full, 0 partial, 3 excluded");
+    expect(line).toContain("2 unreadable");
+  });
+
+  it("marks partial pricing and the top-level-only child scope explicitly", () => {
+    const line = renderBudgetLine("daily", usdSum({
+      fullyPricedSessionCount: 0,
+      partiallyPricedSessionCount: 1,
+      cacheRatePartialSessionCount: 1,
+      unpricedTokenCount: 25,
+    }));
+    expect(line).toContain("coverage: 0 full, 1 partial, 0 excluded");
+    expect(line).toContain("1 partial with uncited cache rate");
+    expect(line).toContain("25 known unpriced tok outside ≥ sum");
+    expect(line).toContain("child/subagent transcripts excluded");
+  });
+
+  it("renders the exact configured threshold precision used by enforcement", () => {
+    expect(renderBudgetLine("daily", usdSum({ cap: 20.005 }))).toContain("of $20.005 —");
+    expect(renderBudgetLine("daily", usdSum({ cap: 0.004 }))).toContain("of $0.004 —");
   });
 
   it("R4: a token line also states advisory-only", () => {
-    const sum: BudgetSum = { kind: "tokens", spentTokens: 1500, cap: 10_000, sessionCount: 2 };
+    const sum = tokenSum();
     const line = renderBudgetLine("daily", sum);
-    expect(line).toBe("budget (today): 1,500 of 10,000 tokens — advisory only — does not stop the agent");
+    expect(line).toBe("budget (today): 1,500 of 10,000 tokens — advisory only — does not stop the agent (2 summaries; top-level only; child/subagent transcripts excluded)");
+  });
+
+  it("uses fixed comma grouping for large token counts on both budget surfaces", () => {
+    expect(renderBudgetLine("daily", tokenSum({ spentTokens: 1_234_567, cap: 9_876_543 })))
+      .toContain("1,234,567 of 9,876,543 tokens");
+    expect(renderBudgetLine("daily", usdSum({ unpricedTokenCount: 1_234_567 })))
+      .toContain("1,234,567 known unpriced tok outside ≥ sum");
   });
 });
 
 describe("budgetExceeded (R3)", () => {
   it("is false when spend equals the cap exactly (strict >)", () => {
-    expect(budgetExceeded({ kind: "usd", spent: 50, cap: 50, sessionCount: 1, excludedUnpricedCount: 0 })).toBe(false);
-    expect(budgetExceeded({ kind: "tokens", spentTokens: 10_000, cap: 10_000, sessionCount: 1 })).toBe(false);
+    expect(budgetExceeded(usdSum({ spent: 50 }))).toBe(false);
+    expect(budgetExceeded(tokenSum({ spentTokens: 10_000 }))).toBe(false);
   });
 
   it("is true when spend exceeds the cap", () => {
-    expect(budgetExceeded({ kind: "usd", spent: 50.01, cap: 50, sessionCount: 1, excludedUnpricedCount: 0 })).toBe(true);
-    expect(budgetExceeded({ kind: "tokens", spentTokens: 10_001, cap: 10_000, sessionCount: 1 })).toBe(true);
+    expect(budgetExceeded(usdSum({ spent: 50.01 }))).toBe(true);
+    expect(budgetExceeded(tokenSum({ spentTokens: 10_001 }))).toBe(true);
   });
 
   it("is false when spend is under the cap", () => {
-    expect(budgetExceeded({ kind: "usd", spent: 10, cap: 50, sessionCount: 1, excludedUnpricedCount: 0 })).toBe(false);
+    expect(budgetExceeded(usdSum())).toBe(false);
   });
 });
 

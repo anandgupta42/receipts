@@ -5,14 +5,16 @@
               gemini-2.5-flash 100%               
          cache served 50% of input tokens         
 
-pre-edit: 0% of cost (0/1 turns)
+pre-edit: 0% of priced floor (0/1 turns)
   (share before the first named edit tool)
 
-read_file..........................$0.00  (1 call)
-replace............................$0.00  (1 call)
+read_file......................≥ $0.0014  (1 call)
+replace........................≥ $0.0014  (1 call)
 --------------------------------------------------
-TOTAL........................................$0.00
-same tokens on gemini-2.5-flas…...$0.00 (76% less)
+TOTAL....................................≥ $0.0028
+standard API-equivalent floor; not an invoice
+same tokens on gemini-2.5-flash-lite.....≥ $0.0006
+  (76% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

@@ -107,6 +107,56 @@ describe("deserializePrReceipt", () => {
     expect(back.ok && back.payload.extras.samosa).toBe(true);
   });
 
+  it("round-trips partial-price contributor and subagent tokens through the strict ref schema", () => {
+    const unpricedContributor = { ...emptyTokens(), input: 125, total: 125 };
+    const unpricedSubagent = { ...emptyTokens(), output: 75, total: 75 };
+    const payload = basePayload({
+      bodyInput: {
+        contributors: [
+          {
+            role: "builder",
+            sessionId: "mixed",
+            slice: { kind: "slice", startTurn: 0, endTurn: 1, turnCount: 2 },
+            modelMix: [],
+            usd: 0.5,
+            tokens: { ...emptyTokens(), input: 1125, total: 1125 },
+            unpricedTokens: unpricedContributor,
+            subagents: [
+              {
+                name: "mixed-child",
+                usd: 0.25,
+                tokens: { ...emptyTokens(), output: 575, total: 575 },
+                unpricedTokens: unpricedSubagent,
+                unreadable: false,
+                filePath: "mixed/subagents/child.jsonl",
+              },
+            ],
+          },
+        ],
+        excludedCount: 0,
+        confidence: {
+          unattributableAnchorPool: 0,
+          silencedGitWrite: 0,
+          unanchoredGitWrite: 0,
+          unreadableSubagent: 0,
+          costLowerBoundCacheTier: 0,
+          unreadableSession: 0,
+          droppedTranscriptRecords: 0,
+          partialPricedCoverage: 2,
+        },
+      },
+    });
+
+    const result = deserializePrReceipt(serializePrReceipt(payload));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.payload).toEqual(payload);
+      const body = renderPrBody(result.payload.bodyInput, result.payload.extras);
+      expect(body).toMatch(/TOTAL unpriced[.]+≥ 200 tokens/);
+      expect(body).toContain("2 sessions had partial price coverage");
+    }
+  });
+
   it("rejects invalid JSON without throwing", () => {
     expect(() => deserializePrReceipt("{not json")).not.toThrow();
     const result = deserializePrReceipt("{not json");

@@ -119,23 +119,23 @@ empty cell, never a fabricated fixture.
 - **R8 — B1: displayed rows must sum to the displayed TOTAL (this PR).** A
   fourth adversarial re-evaluation (`docs/internal/cost-attribution-review-findings.md`)
   found a **visible** self-contradiction the earlier reviews missed: priced
-  rows are `formatUsd`'d independently while the TOTAL sums the RAW `usd` and
-  rounds separately — no shared rounding basis, so a receipt can show rows
-  that don't add up to its own total (e.g. 3 rows @ $0.004 → rows show
-  $0.00×3, Σ $0.00, but TOTAL $0.01). Fix: `reconcileCents`
-  (`src/receipt/format.ts`) — largest-remainder / Hamilton's method — keeps
-  TOTAL as today's correctly-rounded raw sum and apportions its cents across
-  rows (floor each row, hand leftover cents to the largest fractional
-  remainders) so displayed rows sum EXACTLY to the displayed total. Applies
+  rows were formatted independently while the TOTAL used a separately rounded
+  raw sum — no shared display basis, so a receipt could show rows that did not
+  add up to its own total. Fix: `formatUsdFloorLedger`
+  (`src/receipt/format.ts`) selects one deterministic, adaptive precision,
+  floors every row in exact decimal `BigInt` units, and defines the displayed
+  TOTAL as the exact sum of those units. If the serialized IEEE-754 raw aggregate
+  is one or more units below the initial row sum, the excess is removed from the
+  largest row(s), never added elsewhere. Every row and the additive TOTAL remain
+  no greater than their raw observable values. Applies
   wherever priced rows sit beside their total: single-session receipt tool
   rows (`present.ts`) and PR-body contributor/subagent rows (`body.ts`).
   Display-only — `--json` and all underlying `usd`/`totalUsd` values are
   unchanged. Enforced by an invariant, not a snapshot: `test/pr/ledger.test.ts`
   Tier 2 tightened from a tolerated per-row drift bound to exact equality
-  (Σ displayed row cents == displayed TOTAL cents), plus
-  `test/receipt/reconcile.test.ts` unit-testing `reconcileCents` (proof cases,
-  negatives, zero, single-row, empty, ties) and end-to-end across every
-  template.
+  (Σ displayed row units == displayed TOTAL units), plus
+  `test/receipt/reconcile.test.ts` unit-testing the strict-floor ledger and
+  exercising it end-to-end across every template.
 - **R9 — B3: per-record parse-skip must emit a `ConfidenceEvent` (pending).**
   `readJsonl` (`util.ts`) silently `continue`s on a malformed line with no
   event and no skip-count surfaced to callers; a crash-truncated line in a
@@ -178,9 +178,10 @@ empty cell, never a fabricated fixture.
   fails CI.
 - **Given** a new `ConfidenceEvent` variant with no rendered signal, **then** R1
   fails to compile / the hygiene check fails.
-- **Given** priced rows whose individually-rounded cents don't sum to the raw
-  total's own rounding, **then** the displayed rows are cent-reconciled so
-  their sum equals the displayed TOTAL exactly (R8/B1) — never merely close.
+- **Given** priced rows whose downward-rounded display units do not equal a
+  separately rounded raw sum, **then** the displayed TOTAL is the exact sum of
+  the displayed row floors (R8/B1) — never merely close, and never repaired by
+  rounding a row upward.
 
 ## Non-goals
 
@@ -213,7 +214,7 @@ empty cell, never a fabricated fixture.
 | R7 self-check | run on a fixture home | reconcile + events-fired summary; zero content leaked |
 | C1 codex reasoning fold | codex fixture w/ `reasoning_output_tokens` | lands in output total (regression guard) |
 | C3 grandchild subagent | 2-level-nested fixture | priced or counted-absent — never silently missing |
-| R8/B1 row reconciliation | 3 rows @ $0.004 (naive Σ $0.00 vs TOTAL $0.01); 2 rows @ $0.006 (naive Σ $0.02 vs TOTAL $0.01) | displayed rows sum exactly to displayed TOTAL, both templates and render paths (single-session + PR body) |
+| R8/B1 additive floor ledger | 3 rows @ $0.00404; 2 rows @ $0.006; arbitrary nonnegative rows | every row is ≤ its raw value and displayed rows sum exactly to displayed TOTAL, all templates and both render paths (single-session + PR body) |
 | R9/B3 parse-skip *(deferred)* | a credited JSONL session with one malformed/truncated line | a ConfidenceEvent fires + the total floors `≥`; not a silent drop |
 | R10/B4 load-failure *(deferred)* | an anchor-pool / sibling-worktree / sidechain candidate that fails to load | a ConfidenceEvent fires; not silently skipped |
 | R11/B5 grandchild dedup *(deferred)* | P→A→B where A independently commits | B counted once (subtree-aware rollup dedup), not under both P and A |
@@ -318,18 +319,17 @@ Verified-not-bugs from this pass: A1 cannot double-count across
 exhaustiveness forces a case but not necessarily a rendered signal (a
 follow-on note for R12, not a new bug).
 
-**2026-07-05 · R8/B1 implementation:** `reconcileCents`/`formatCentsAmount`
-added to `src/receipt/format.ts` (largest-remainder apportionment; TOTAL's own
-rounding is untouched, only row splits are computed); wired into
-`present.ts` (`reconciledRowText`, keyed by `ToolRow` object reference so
-`buildDatavis`'s filtered row subsets still align) and `body.ts`
-(`reconciledAtomText`, keyed by `ContributorView | SubagentRow` reference).
-`test/pr/ledger.test.ts`'s Tier 2 assertion tightened from a tolerated
-per-row drift bound to exact equality; `test/receipt/reconcile.test.ts` added
-covering `reconcileCents` directly (proof cases, negatives, zero, single-row,
-empty, all-tied remainders, a 300-run fast-check property) plus end-to-end
-render-path assertions for both proof cases across all three templates and
-both the single-session and PR-body paths. A genuine but separate
+**2026-07-11 · R8/B1 strict-floor implementation:**
+`formatUsdFloorLedger` in `src/receipt/format.ts` chooses one adaptive precision,
+uses exact decimal `BigInt` units for every visible row, caps their sum to the
+serialized raw aggregate by lowering the largest row when necessary, and derives
+the displayed TOTAL from the exact unit sum. It is wired into
+`present.ts` (keyed by `ToolRow` object reference so `buildDatavis`'s filtered
+row subsets still align) and `body.ts` (contributor plus aggregate-subagent
+rows). `test/pr/ledger.test.ts` proves exact rendered-unit equality with
+fast-check; `test/receipt/reconcile.test.ts` covers strict flooring, tiny
+positive observations, safe-precision fallback, 3×$0.00404, and both render
+paths across all three templates. A genuine but separate
 completeness gap was found in the process and flagged out of scope: nothing
 in `src/pr/contributors.ts`/`body.ts` structurally guarantees a `helper`-basis
 contributor has empty `subagents` — `helperGroupBlocks` renders exactly one
@@ -440,3 +440,77 @@ outcome) and partly covered by existing basis-label assertions — the remaining
 subtle ones are a mutation follow-up, not a correctness gap (the gate now
 catches gross regressions). Goldens byte-identical; the CI mutation run
 verifies the combined score clears the floor.
+
+**2026-07-10 · matrix and partial-coverage correction.** The three hero cells
+now pin independently calculated exact USD—not merely `priced: true`—and the
+built artifact stages native Claude Code JSONL, Codex JSONL, and opencode SQLite
+homes through discovery → parse → price → JSON. A separate PR aggregation audit
+found that a mixed-price contributor/subagent collapsed into one `$` atom, so
+its unpriced turns vanished from `TOTAL unpriced`. `AttributionResult` now
+carries exact `unpricedTokens` through `ReceiptModel`, contributor and subagent
+views; `partial-priced-coverage` joins the typed event contract, floors the
+known-dollar total, and renders the exact unpriced-token subtotal plus a counted
+note. Fully priced output and all 102 goldens remain byte-identical.
+
+**2026-07-10 · adversarial pricing-domain follow-up.** `priceTurn` now refuses
+non-finite, negative, fractional, component-total-mismatched, or out-of-subset
+cache-tier usage rather than allowing negative/NaN/fabricated dollars. The same
+validator guards the two direct `costOf` side paths (trivial spans and price
+delta), and partial-price sessions no longer compute a whole-session price delta
+from tokens their actual dollar excluded. Fast-check proves arbitrary valid
+integer/cache-tier combinations still equal `costOf` exactly and arbitrary
+invalid domains stay unpriced.
+
+**2026-07-10 · provider-identity safe stop.** Explicit provider evidence is now
+part of every turn's pricing decision. Codex `model_provider` and opencode
+`providerID` select a recognized direct table or block routed/custom traffic to
+tokens-only; only absent evidence retains legacy inference. Focused regressions
+cover nested/string/session metadata, direct and blocked providers, provider
+switches, and every pricing consumer so a routed turn cannot regain a dollar in
+waste, attribution, price-delta, or receipt-model side paths.
+
+**2026-07-10 · R13 visible cost-basis amendment.** Internal token×dated-row
+arithmetic remains deterministic, but a local transcript is not a
+billing ledger: auth/billing channel, negotiated plan, regional uplift, actual
+service tier, upstream credits, or an unpersisted usage dimension may differ.
+Every human-readable dollar total and component therefore carries `≥` as a
+**standard API list-price-equivalent observable floor**. Machine exports retain
+their numeric compatibility fields and gain an additive structured lower-bound
+cost marker. Counterfactual/savings lines stay explicitly approximate. For
+GPT-5.6 Codex, per-response context tier comes from changed cumulative usage;
+absent `cache_write_tokens` contributes zero to the floor. Built-artifact E2E
+fixtures for Claude Code, Codex, and opencode must assert both the independently
+calculated numeric arithmetic and its visible/machine-readable qualifier.
+
+**2026-07-11 · R14 strict-floor additive correction (refines B1/R8 without
+weakening it).** A largest-remainder cent split can assign one cent to a row
+whose raw value is only 0.6 cents, making `≥ $0.01` false. Every human lower
+bound therefore rounds **down** at one shared adaptive precision, no row
+borrows a display unit, and the displayed TOTAL is the exact integer-unit sum
+of its displayed priced rows. Exact decimal `BigInt` units avoid unsafe-number
+corruption even for huge finite values. If IEEE-754 addition serializes the raw
+aggregate below the initial row-unit sum (for example `0.1 + 0.7`), the excess
+unit(s) are removed from the largest row(s). Thus each row stays no greater than
+its raw scalar and the byte-additive TOTAL stays no greater than the raw machine
+aggregate. Precision adapts through 12 decimals, preserving representable tiny
+positive evidence even beside a huge row. Machine scalars retain the unrounded
+arithmetic. Cached reads/writes with no cited applicable rate contribute zero,
+not a guessed input-rate fallback, with a visible cache-rate caveat. The public
+export meaning changed from exact-looking cost to lower bound, so
+`SCHEMA_VERSION` is 2.
+
+**2026-07-10 · request/identity fail-closed amendment.** The product path now
+turns Codex reconciliation from a maintainer-only signal into a pricing gate.
+Non-monotone cumulative usage, a missing/zero/disagreeing post-baseline
+`last_token_usage`, mixed legacy+cumulative schemas, dropped records, or a
+request sum that misses the final local envelope disables all request dollars
+and preserves one unattributed token envelope with a caveat. Claude id-less
+assistant usage is also one coherent unattributed envelope, not a set of priced
+requests. Every pricing consumer uses each unit's own model/provider/timestamp;
+trivial-span dollars require all units to pass that gate.
+
+For PR child rollups, `full`, `range`, and `unknown` are distinct evidence
+states. Range inclusion uses true interval intersection. An unknown sliced
+parent excludes all readable child cost, while unreadable child evidence stays
+counted. OpenCode crossed aggregate/itemized vectors remain itemized and expose
+only positive aggregate-only conflict, excluded from totals and dollars.

@@ -30,11 +30,13 @@ else is reported and ignored (see below) rather than silently accepted.
 With a budget configured, the full receipt appends one advisory line per period:
 
 ```
-budget (this week): $0.00 of $20.00 — advisory only — does not stop the agent
+budget (this week): ≥ $0.00 of $20.00 — advisory only — does not stop the agent (coverage: 0 full, 0 partial, 0 excluded; top-level only; child/subagent transcripts excluded)
 ```
 
-(The demo sessions here are from an earlier week, so this window's spend is
-`$0.00`; on your machine it's your real spend for the current window.)
+(The demo sessions here are from an earlier week, so this window's observable
+floor is `≥ $0.00`. The configured `$20.00` cap is exact; computed spend is not.)
+The cap is rendered at the same precision used by the comparison: for example,
+`20.005` displays as `$20.005`, and `0.004` displays as `$0.004`.
 
 ## Check it in a script
 
@@ -42,17 +44,28 @@ budget (this week): $0.00 of $20.00 — advisory only — does not stop the agen
 aireceipts --check-budget
 ```
 
-prints the same advisory line(s) and sets an **exit code**: `0` when you're under
-every configured cap, `1` when any cap is exceeded. "Exceeded" is a strict
-`>` — a sum exactly at the cap is not yet over it. That makes it composable:
+prints the same advisory line(s) and sets an **exit code**: `1` when an observable
+lower-bound sum exceeds any configured cap, and `0` otherwise. A zero exit does
+not prove the eventual invoice is under the cap; unobserved components can only
+make the real amount higher. "Exceeded" is a strict `>` — a floor exactly at the
+cap is not yet over it. That makes it composable:
 
 ```sh
 aireceipts --check-budget || echo "over budget this week"
 ```
 
 The daily window is the current UTC calendar day; the weekly window is the rolling
-`[now − 7 days, now)`. Sessions on unpriced models are excluded from a `usd` sum
-(and the line says how many), never guessed into it.
+`[now − 7 days, now)`. USD coverage is split into `full`, `partial`, and
+`excluded`. The line prints the exact known unpriced-token subtotal when a
+partial or excluded session has one. A summary whose full load is null or
+degraded stays in the window denominator and is labeled unreadable; its unknown
+dollars are never guessed into the sum. A session with a cached component but no
+cited applicable cache rate is also `partial`; the line calls out that cache-rate
+gap without fabricating a token quantity the trace did not record.
+
+Budget windows are top-level-only and explicitly exclude child/subagent
+transcripts. This is a current limitation, not a claim that child activity was
+free; use a single-session or PR receipt for child rollups.
 
 ## When the file is wrong
 

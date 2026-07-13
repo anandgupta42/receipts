@@ -16,8 +16,9 @@ at-a-glance bill; per-child anatomy belongs in the collapsed full-receipts secti
 with the other per-session detail. This spec draws ONE aggregate `SUBAGENTS (N)`
 row per contributor in the fence and moves the per-subagent breakdown into the
 `<details>` section as a capped table. Requested by the maintainer (2026-07-05,
-PR #141 comment review). Serves **I2/I3** (aggregate is the sum of the same priced
-atoms; nothing new is fabricated, every number still traceable to its child
+PR #141 comment review). Serves **I2/I3** (the aggregate is derived from the same
+priced atoms and displayed through a strict-floor ledger; nothing new is
+fabricated, every number still traceable to its child
 transcript) and preserves SPEC-0044/B1's rows-sum-to-total contract at the new
 drawn-row granularity.
 
@@ -25,11 +26,14 @@ drawn-row granularity.
 
 - **R1 — Aggregate fence row.** A contributor (author or helper) with `N > 0`
   subagents renders exactly one muted row `SUBAGENTS (N)` whose value is the
-  cent-reconciled sum of its priced children (tokens text when none are priced,
-  per I2). No per-subagent rows appear inside the fence.
-- **R2 — Rows still sum to the total.** Cent reconciliation (SPEC-0044/B1) runs
-  over the rows the fence now DRAWS — contributors plus per-contributor subagent
-  aggregates — so the displayed rows sum byte-exactly to `TOTAL priced`.
+  downward floor of the priced-child aggregate (tokens text when none are
+  priced, per I2). No per-subagent rows appear inside the fence.
+- **R2 — Rows still sum to the total.** The shared strict-floor ledger
+  (SPEC-0044/B1) runs over the rows the fence now DRAWS — contributors plus
+  per-contributor subagent aggregates. Each row floors independently at one
+  adaptive precision, and `TOTAL priced` is their exact integer-unit sum. If
+  the raw floating aggregate serializes below that initial sum, excess units
+  are removed from the largest row so the text cannot exceed the machine value.
   `counted: N sessions + M subagents`, the unreadable-subagent floor/note, and the
   aggregate cache line are unchanged (they already count atoms, not rows).
 - **R3 — Breakdown in details.** In the full-receipts `<details>` section, a
@@ -39,10 +43,11 @@ drawn-row granularity.
   with a final `| N more subagents | … |` row that states the remainder's priced
   dollars, unpriced tokens, and unreadable count separately (a capped list never
   silently drops value, and dollars/tokens never blend into one number — I2).
-  Priced cells are cent-reconciled within the table so the column sums to the
-  children's rounded dollar total — the table's own target; the fence aggregate
-  reconciles against `TOTAL priced` instead and may differ by a cent, exactly as
-  each session receipt in this section re-renders its own independent total.
+  Priced cells form a separate shared-precision strict-floor ledger: every cell
+  is no greater than its child or remainder aggregate, and the table ledger's
+  total is the exact sum of those displayed cells. The fence uses its own drawn-
+  row partition against `TOTAL priced`, so the two conservative floors may
+  differ by display units without either overstating a component.
 - **R4 — Size budget still holds.** The subagent table is part of its session's
   kept-block for the details size cap; when the budget forces omission, the
   session degrades to its existing one-line omission note (table included), never
@@ -79,11 +84,11 @@ drawn-row granularity.
 | R1 tokens-only aggregate | subagents all unpriced | aggregate value renders tokens, no `$` |
 | R2 rows sum | contributors + aggregates with awkward cents | drawn `$` rows sum to `TOTAL priced` exactly |
 | R2 counts unchanged | 1 session + 2 subagents (1 unreadable) | `counted: 1 session + 2 subagents`, floor `≥`, unreadable note |
-| R3 table | 3 subagents, mixed priced/unpriced/unreadable | details has `##### subagents (3)` table, sorted, cost column reconciled |
+| R3 table | 3 subagents, mixed priced/unpriced/unreadable | details has `##### subagents (3)` table, sorted, priced cells share one strict-floor precision |
 | R3 cap row | 25 subagents | 20 rows: 19 children + `6 more subagents` row carrying the remaining sum |
 | R3 cap boundary | exactly 20 subagents / 21 subagents | 20 → all 20 children, no remainder row; 21 → 19 children + `2 more subagents` |
 | R3 mixed remainder | remainder holds priced + tokens-only + unreadable children | remainder cell states `$X + N tokens + M unreadable` — nothing dropped |
-| R3 column sums | shown cells + remainder dollars | equal the children's rounded dollar total |
+| R3 column sums | shown cells + remainder dollars | equal the table ledger's downward-rounded displayed total; no cell exceeds its raw scalar |
 | R3 escaping | child name containing `|` and newline | table cell escaped, single-line |
 | R4 budget | details budget too small for lead receipt+table | session degrades to omission note; no partial table |
 | R5 no-details | `--no-details` | aggregate row present; no `##### subagents` anywhere |
@@ -96,3 +101,22 @@ drawn-row granularity.
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked.
+## 2026-07-11 strict-floor additive amendment
+
+R2's byte-exact displayed-row sum remains required without lending a unit to a
+lower-bound row. Contributor and aggregate rows use exact decimal units at one
+adaptive precision; `TOTAL priced` is the exact sum of those visible floors and
+is capped to the raw floating aggregate only by lowering the largest row.
+The child/remainder detail table is a separate ledger using the same rule.
+Machine scalars retain the exact deterministic sums.
+
+## 2026-07-10 child-window evidence amendment
+
+PR rollup windows are an explicit union: `full`, `range`, or `unknown`. A full
+parent includes readable descendants. A range includes a readable child whole
+only when its observable interval truly intersects the parent range
+(`child.start <= parent.end && child.end >= parent.start`), including a child
+that spans both boundaries. A sliced parent whose start/end cannot be observed
+is `unknown` and includes no readable child dollars or tokens. Unreadable child
+transcripts remain listed/countable in every window so missing evidence still
+floors rather than vanishes.

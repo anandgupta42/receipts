@@ -10,8 +10,8 @@
 // user-supplied template file (~/.aireceipts/templates/<name>.json) that
 // `validateReceiptBlocks` can validate at load time, so the honesty invariants
 // (I2/I3) are non-removable by construction rather than by renderer politeness.
-import type { ReceiptModel } from "./model.js";
-import { formatCentsAmount, formatUsd, reconcileCents } from "./format.js";
+import { combinedPricedUsd, type ReceiptModel } from "./model.js";
+import { formatUsdFloor, formatUsdFloorLedger, usdFloorDecimals, type UsdFloorDecimals } from "./format.js";
 
 export type TemplateName = "classic" | "grocery" | "datavis";
 
@@ -124,21 +124,37 @@ function capField(s: string, width: number): string {
 }
 
 /**
- * Grocery column arithmetic (SPEC-0020 Design, exact): ITEM cols 1–28 (truncate
- * `…` at 27), QTY cols 30–37, AMT cols 39–50 → a 50-char line. Every column is
- * capped to its width so the "every emitted line ≤50 chars" invariant holds even
- * for a pathological tool name or an oversized token count (real dollar amounts
- * on a coding session are always small, so no dollar figure is ever truncated).
+ * Grocery column arithmetic (SPEC-0020 Design): the normal grid is ITEM 1–28,
+ * QTY 30–37, AMT 39–50. When AMT is wider than 12 columns, it is never
+ * truncated: ITEM shrinks first, then QTY. This keeps every realistic amount
+ * complete (including its `≥`/`≈` qualifier) inside the 50-column receipt.
  */
 export function groceryLine(item: string, qty: string, amt: string): string {
-  return `${capField(item, 28).padEnd(28)} ${capField(qty, 8).padStart(8)} ${capField(amt, 12).padStart(12)}`;
+  if ([...amt].length <= 12) {
+    return `${capField(item, 28).padEnd(28)} ${capField(qty, 8).padStart(8)} ${amt.padStart(12)}`;
+  }
+
+  const amountWidth = [...amt].length;
+  const beforeAmount = 50 - amountWidth - 1;
+  if (beforeAmount <= 0) {
+    // Preserving the monetary claim is more important than clipping it. This
+    // path needs an amount of at least 49 characters; ordinary and hostile
+    // finite-token fixtures remain within the fixed grid.
+    return amt;
+  }
+  const qtyWidth = Math.min(8, Math.max(0, beforeAmount - 2));
+  if (qtyWidth === 0) {
+    return `${capField(item, beforeAmount).padEnd(beforeAmount)} ${amt}`;
+  }
+  const itemWidth = beforeAmount - qtyWidth - 1;
+  return `${capField(item, itemWidth).padEnd(itemWidth)} ${capField(qty, qtyWidth).padStart(qtyWidth)} ${amt}`;
 }
 
 // --- Honesty battery (R3): pure validator over the block list ----------------
 
 /** One honesty-invariant breach found by {@link validateReceiptBlocks}. */
 export interface BlockViolation {
-  code: "dollar-in-unpriced" | "untraced-dollar" | "missing-delta-note" | "waste-label-drift";
+  code: "dollar-in-unpriced" | "untraced-dollar" | "unqualified-dollar" | "missing-delta-note" | "waste-label-drift";
   detail: string;
 }
 
@@ -148,33 +164,36 @@ function dollarAmounts(s: string): string[] {
   return s.match(DOLLAR_AMOUNT_RE) ?? [];
 }
 
-function addDollar(out: Set<string>, usd: number | null | undefined): void {
+function addDollar(out: Set<string>, usd: number | null | undefined, precision?: UsdFloorDecimals): void {
   if (usd !== null && usd !== undefined) {
-    out.add(`$${formatUsd(usd)}`);
+    out.add(`$${formatUsdFloor(usd, precision)}`);
   }
-}
-
-/**
- * SPEC-0054 R4/R5 — the priced subset of `model.modelMix` (its existing,
- * deterministic order), cent-reconciled via {@link reconcileCents} — the
- * exact split BY MODEL rows render. Exported so `present.ts`'s row builder
- * and {@link tracedDollarAmounts} draw from one source of truth rather than
- * two independently-computed splits that could drift.
- */
-export function reconciledModelCents(model: ReceiptModel): number[] {
-  const priced = model.modelMix.filter((m) => m.usd !== null).map((m) => m.usd as number);
-  return reconcileCents(priced);
 }
 
 function tracedDollarAmounts(model: ReceiptModel): Set<string> {
   const out = new Set<string>();
-  addDollar(out, model.totalUsd);
-  // Rows render the reconciled (largest-remainder) cents, not each row's own
-  // naive rounding — B1. The allowed set must match what present.ts actually
-  // draws, so it's built the same way: reconcile the priced rows together.
-  const pricedRowUsd = model.toolRows.filter((row) => row.usd !== null).map((row) => row.usd as number);
-  for (const cents of reconcileCents(pricedRowUsd)) {
-    out.add(`$${formatCentsAmount(cents)}`);
+  const combined = combinedPricedUsd(model);
+  const ledgerPrecision = usdFloorDecimals([
+    ...model.toolRows.map((row) => row.usd),
+    ...model.modelMix.map((entry) => entry.usd),
+    model.subagents?.pricedUsd,
+    combined,
+  ]);
+  const displayedLedger = formatUsdFloorLedger([
+    ...model.toolRows.flatMap((row) => row.usd === null ? [] : [row.usd]),
+    ...(model.subagents?.pricedUsd === null || model.subagents?.pricedUsd === undefined
+      ? []
+      : [model.subagents.pricedUsd]),
+  ], ledgerPrecision, combined ?? undefined);
+  for (const amount of displayedLedger.amounts) {
+    out.add(`$${amount}`);
+  }
+  if (combined !== null) {
+    out.add(`$${displayedLedger.total}`);
+  }
+  addDollar(out, model.totalUsd, ledgerPrecision);
+  for (const row of model.toolRows) {
+    addDollar(out, row.usd, ledgerPrecision);
   }
   for (const waste of model.wasteLines) {
     addDollar(out, waste.usd);
@@ -182,9 +201,11 @@ function tracedDollarAmounts(model: ReceiptModel): Set<string> {
   addDollar(out, model.priceDelta?.usd);
   // SPEC-0054 R4/R5 — DETAILS' cache counterfactual and BY MODEL splits.
   addDollar(out, model.cacheReadAtInputRateUsd);
-  for (const cents of reconciledModelCents(model)) {
-    out.add(`$${formatCentsAmount(cents)}`);
+  for (const entry of model.modelMix) {
+    addDollar(out, entry.usd, ledgerPrecision);
   }
+  addDollar(out, model.subagents?.pricedUsd, ledgerPrecision);
+  addDollar(out, combined, ledgerPrecision);
   return out;
 }
 
@@ -226,13 +247,18 @@ function blockStrings(b: Block): string[] {
  */
 export function validateReceiptBlocks(blocks: Block[], model: ReceiptModel): BlockViolation[] {
   const violations: BlockViolation[] = [];
-  const priced = model.totalUsd !== null;
+  const priced = combinedPricedUsd(model) !== null;
 
   if (priced) {
     const allowedDollars = tracedDollarAmounts(model);
     for (const b of blocks) {
       for (const s of blockStrings(b)) {
         for (const amount of dollarAmounts(s)) {
+          const at = s.indexOf(amount);
+          const prefix = at >= 2 ? s.slice(Math.max(0, at - 3), at) : s.slice(0, at);
+          if (!/[≥≈]\s*$/u.test(prefix)) {
+            violations.push({ code: "unqualified-dollar", detail: `priced receipt renders exact-looking ${amount} in ${b.kind}: ${s}` });
+          }
           if (!allowedDollars.has(amount)) {
             violations.push({ code: "untraced-dollar", detail: `priced receipt renders untraced ${amount} in ${b.kind}: ${s}` });
           }

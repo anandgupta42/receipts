@@ -7,8 +7,8 @@ npx aireceipts-cli
 npx aireceipts-cli setup
 ```
 
-`setup` only reports. It shows found sessions, the latest session cost or
-tokens, the trailing-week total, and integration options. Nothing uploads, posts,
+`setup` only reports. It shows found sessions, the latest observable floor or
+tokens, the trailing-week floor, and integration options. Nothing uploads, posts,
 or writes settings from this command — its only writes are aireceipts' own local
 cache under `~/.aireceipts/`.
 

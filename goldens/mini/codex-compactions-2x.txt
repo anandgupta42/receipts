@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Codex · gpt-5.3-codex · 1m 12s
-total  $0.03
-top    exec_command · $0.02 (2 calls)
-no waste detected
+total  ≥ $0.0258
+top    exec_command · ≥ $0.0175 (2 calls)
+no flagged pattern detected
 run  aireceipts  for the full receipt

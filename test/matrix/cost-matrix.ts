@@ -37,6 +37,8 @@ export interface CellExpectation {
   unpriceable: boolean;
   /** Does the session price to a `$` total, or render tokens-only (I2)? */
   priced: boolean;
+  /** Exact USD independently calculated from raw tokens × cited price rows. */
+  expectedUsd?: number;
   /** Waste kinds the scenario must surface (scenario-derived). */
   waste?: ReadonlyArray<"stuck-loop" | "context-thrash" | "trivial-spans">;
   /** ConfidenceEvent kinds the receipt must carry for this cell. */
@@ -73,22 +75,37 @@ export const MATRIX: Record<string, Cell> = {
     expected: {
       unpriceable: false,
       priced: true,
+      expectedUsd: 0.1767,
       rawTokens: { input: 19680, output: 897, cacheRead: 124200, cacheCreation: 2100 },
     },
   },
   "clean-multi-tool::codex": {
     fixture: `${f}/codex/clean-session.jsonl`,
-    expected: { unpriceable: false, priced: true },
+    // Raw input_tokens=9,800 includes cached_input_tokens=6,100, so the
+    // billable uncached input oracle is 3,700. gpt-5.3-codex's cited rates
+    // (1.75 / .175 / 14 per million) produce exactly $0.0165025.
+    expected: {
+      unpriceable: false,
+      priced: true,
+      expectedUsd: 0.0165025,
+      rawTokens: { input: 3700, output: 640, cacheRead: 6100, cacheCreation: 0 },
+    },
   },
   "clean-multi-tool::opencode": {
     fixture: `${f}/opencode/clean-multi-vendor.db`,
     // events: two priced turns with cache-write — claude-haiku-4-5 (anthropic,
     // cache.write: 40, cited 5m rate → prices exactly) and gpt-5.3-codex
     // (openai, cache.write: 50, data/prices/openai.json cites NO
-    // input_cache_write_5m/1h → falls back to base input). The row-aware
+    // input_cache_write_5m/1h → contributes zero to the floor). The row-aware
     // trigger fires because of the openai turn specifically, not because
     // opencode lacks a split-tier concept in general.
-    expected: { unpriceable: false, priced: true, events: ["cost-lower-bound-cache-tier"] },
+    expected: {
+      unpriceable: false,
+      priced: true,
+      expectedUsd: 0.00966875,
+      rawTokens: { input: 2200, output: 700, cacheRead: 150, cacheCreation: 90 },
+      events: ["cost-lower-bound-cache-tier"],
+    },
   },
   "clean-multi-tool::cursor": na("Cursor records session totals only — 'clean multi-tool' priced anatomy is unpriceable by construction; covered by the unpriceable cell."),
 
@@ -159,9 +176,9 @@ export const MATRIX: Record<string, Cell> = {
     // cache_creation_input_tokens: 2000 with NO nested 5m/1h split object.
     // The trigger is row-aware: data/prices/openai.json cites NO
     // input_cache_write_5m/1h for gpt-5.4-mini, so this unsplit remainder
-    // falls back to the base `input` rate — a genuine lower bound. The model
+    // contributes zero — a genuine lower bound. The model
     // is deliberately NOT Anthropic — an unsplit write against a row that DOES
-    // cite the 5m rate (e.g. claude-opus-4-8) prices exactly and must NOT
+    // cite the 5m rate (e.g. claude-opus-4-8) includes that observable component and must NOT
     // caveat (see the "does NOT flag ... for an unsplit cache-write when the
     // vendor cites the 5m rate" case in test/pricing/attribution.test.ts). A
     // sibling fixture (cache-tier-fallback-split.jsonl, an Anthropic session
@@ -174,7 +191,7 @@ export const MATRIX: Record<string, Cell> = {
       events: ["cost-lower-bound-cache-tier"],
     },
   },
-  "cache-tier-fallback::codex": na("Codex has no cache-write pricing concept (cached_input is read-only) — the tier-fallback scenario cannot occur."),
+  "cache-tier-fallback::codex": na("Codex rollouts expose no cache-write token bucket — this fixture scenario cannot be constructed from the trace."),
   "cache-tier-fallback::opencode": {
     fixture: `${f}/opencode/clean-multi-vendor.db`,
     // opencode's schema exposes only a flat tokens.cache.write with no tier
@@ -182,7 +199,7 @@ export const MATRIX: Record<string, Cell> = {
     // every opencode cache-write turn takes the unsplit-remainder path — but
     // whether that's a caveat still depends on the row: this fixture's
     // gpt-5.3-codex turn (openai, cache.write: 50) has no cited
-    // input_cache_write_5m/1h and falls back to base input (the trigger); its
+    // input_cache_write_5m/1h and is excluded from the dollar floor (the trigger); its
     // claude-haiku-4-5 turn (cache.write: 40) prices exactly against
     // Anthropic's cited 5m rate and would NOT caveat on its own. Reusing
     // clean-multi-vendor.db rather than authoring a redundant new .db fixture.
@@ -207,7 +224,7 @@ export const MATRIX: Record<string, Cell> = {
     fixture: `${f}/opencode/clean-multi-vendor.db`,
     // events: same A3 ground truth as the cache-tier-fallback and
     // clean-multi-tool cells that reuse this fixture — the gpt-5.3-codex turn's
-    // cache-write falls back to base input (openai cites no cache-write rate),
+    // cache-write contributes zero (openai cites no cache-write rate),
     // a genuine lower bound; the claude-haiku-4-5 turn prices exactly.
     expected: { unpriceable: false, priced: true, events: ["cost-lower-bound-cache-tier"] },
   },

@@ -11,7 +11,7 @@ const DatabaseSync = sqliteMod?.DatabaseSync as typeof import("node:sqlite").Dat
 const hasNodeSqlite = sqliteMod !== null;
 import { afterEach, describe, expect, it } from "vitest";
 import { OpenCodeAdapter } from "../../src/parse/opencode.js";
-import { buildReceiptModel } from "../../src/receipt/model.js";
+import { buildReceiptModel, sliceSessionForReceipt } from "../../src/receipt/model.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures/opencode");
@@ -66,6 +66,11 @@ function expectedUsage(sim: SimulatedOpenCodeSession) {
     cacheCreation: sim.cacheWrite,
     total: sim.input + sim.output + sim.reasoning + sim.cacheRead + sim.cacheWrite,
   };
+}
+
+function simulatedProvider(sim: SimulatedOpenCodeSession): string {
+  if (!sim.priced) return "local";
+  return sim.model.startsWith("claude-") ? "anthropic" : "openai";
 }
 
 function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void {
@@ -141,7 +146,7 @@ function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void
       sim.reasoning,
       sim.cacheRead,
       sim.cacheWrite,
-      JSON.stringify({ id: sim.model, providerID: sim.priced ? "known" : "local" }),
+      JSON.stringify({ id: sim.model, providerID: simulatedProvider(sim) }),
       sim.startedAt,
       sim.endedAt,
     );
@@ -165,7 +170,7 @@ function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void
         sim.startedAt + 1_000,
         sim.endedAt,
         JSON.stringify({
-          model: { id: sim.model, providerID: sim.priced ? "known" : "local" },
+          model: { id: sim.model, providerID: simulatedProvider(sim) },
           tokens,
           time: { created: sim.startedAt + 1_000, completed: sim.endedAt },
           content:
@@ -192,7 +197,7 @@ function makeSimulatedDb(dbPath: string, sims: SimulatedOpenCodeSession[]): void
       JSON.stringify({
         role: "assistant",
         modelID: sim.model,
-        providerID: sim.priced ? "known" : "local",
+        providerID: simulatedProvider(sim),
         tokens,
         time: { created: sim.startedAt + 1_000, completed: sim.endedAt },
       }),
@@ -228,11 +233,11 @@ function makeSessionMessageDb(dbPath: string): void {
       title TEXT NOT NULL,
       version TEXT NOT NULL,
       cost REAL DEFAULT 0 NOT NULL,
-      tokens_input INTEGER DEFAULT 0 NOT NULL,
-      tokens_output INTEGER DEFAULT 0 NOT NULL,
-      tokens_reasoning INTEGER DEFAULT 0 NOT NULL,
-      tokens_cache_read INTEGER DEFAULT 0 NOT NULL,
-      tokens_cache_write INTEGER DEFAULT 0 NOT NULL,
+      tokens_input INTEGER DEFAULT 0,
+      tokens_output INTEGER DEFAULT 0,
+      tokens_reasoning INTEGER DEFAULT 0,
+      tokens_cache_read INTEGER DEFAULT 0,
+      tokens_cache_write INTEGER DEFAULT 0,
       model TEXT,
       time_created INTEGER NOT NULL,
       time_updated INTEGER NOT NULL
@@ -297,6 +302,64 @@ function makeSessionMessageDb(dbPath: string): void {
       ],
     }),
   );
+  db.close();
+}
+
+type SqlTokenValue = number | string | null;
+
+function setCurrentSessionAggregate(
+  dbPath: string,
+  tokens: { input: SqlTokenValue; output: SqlTokenValue; reasoning: SqlTokenValue; cacheRead: SqlTokenValue; cacheWrite: SqlTokenValue },
+): void {
+  const db = new DatabaseSync(dbPath);
+  db.prepare(`
+    UPDATE session
+    SET tokens_input = ?, tokens_output = ?, tokens_reasoning = ?,
+        tokens_cache_read = ?, tokens_cache_write = ?
+    WHERE id = 'ses_current_shape'
+  `).run(tokens.input, tokens.output, tokens.reasoning, tokens.cacheRead, tokens.cacheWrite);
+  db.close();
+}
+
+function setCurrentMessageTokens(dbPath: string, tokens: unknown): void {
+  const db = new DatabaseSync(dbPath);
+  const row = db.prepare("SELECT data FROM session_message WHERE id = 'msg_asst_1'").get() as { data: string };
+  const data = JSON.parse(row.data) as Record<string, unknown>;
+  data.tokens = tokens;
+  db.prepare("UPDATE session_message SET data = ? WHERE id = 'msg_asst_1'").run(JSON.stringify(data));
+  db.close();
+}
+
+function addProviderRoutingMessages(dbPath: string): void {
+  const db = new DatabaseSync(dbPath);
+  const insert = db.prepare(
+    "INSERT INTO session_message (id, session_id, type, seq, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  );
+  const t0 = Date.parse("2026-06-30T12:00:00.000Z");
+  const messages = [
+    { id: "msg_direct_openai", model: JSON.stringify({ id: "gpt-5.3-codex", providerID: "openai" }) },
+    { id: "msg_openrouter", modelID: "gpt-5.3-codex", providerID: "openrouter" },
+    { id: "msg_bedrock", model: { id: "claude-sonnet-5", providerID: "amazon-bedrock" } },
+    { id: "msg_azure", modelID: "gpt-5.3-codex", providerID: "azure" },
+    { id: "msg_custom", model: JSON.stringify({ id: "claude-sonnet-5", providerID: "company-proxy" }) },
+  ];
+  messages.forEach((message, index) => {
+    const ts = t0 + 21_000 + index * 1_000;
+    insert.run(
+      message.id,
+      "ses_current_shape",
+      "assistant",
+      index + 3,
+      ts,
+      ts + 500,
+      JSON.stringify({
+        ...message,
+        tokens: { input: 100, output: 10, reasoning: 0, cache: { read: 0, write: 0 } },
+        time: { created: ts, completed: ts + 500 },
+        content: [{ type: "text", text: "synthetic provider routing" }],
+      }),
+    );
+  });
   db.close();
 }
 
@@ -405,6 +468,7 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     const session = await adapter.loadSession(dbPath);
     expect(session).not.toBeNull();
     expect(session!.turns).toHaveLength(2);
+    expect(session!.turns.map((turn) => turn.pricingProvider)).toEqual(["anthropic", "openai"]);
     expect(session!.turns[0]).toMatchObject({
       model: "claude-haiku-4-5",
       usage: { input: 1200, output: 350, cacheRead: 100, cacheCreation: 40, total: 1690 },
@@ -418,7 +482,9 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
     });
 
     const model = await buildReceiptModel(session!, dataDir);
-    expect(model.totalUsd).toBeCloseTo(0.00975625, 12);
+    // OpenAI cache components without a cited applicable rate contribute zero
+    // to the floor; Claude's cited cache rates remain included.
+    expect(model.totalUsd).toBeCloseTo(0.00966875, 12);
     expect(model.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`).sort()).toEqual([
       "anthropic:claude-haiku-4-5",
       "openai:gpt-5.3-codex",
@@ -462,6 +528,279 @@ describe.skipIf(!hasNodeSqlite)("OpenCodeAdapter", () => {
       output: "ok",
       status: "ok",
     });
+  });
+
+  it.each([
+    ["null", { input: null, output: 100, reasoning: 25, cache: { read: 50, write: 10 } }, 185],
+    ["string", { input: 500, output: "100", reasoning: 25, cache: { read: 50, write: 10 } }, 585],
+    ["negative", { input: 500, output: 100, reasoning: -1, cache: { read: 50, write: 10 } }, 660],
+    ["fractional", { input: 500, output: 100, reasoning: 25, cache: { read: 1.5, write: 10 } }, 635],
+    ["non-safe", { input: 500, output: 100, reasoning: 25, cache: { read: 50, write: Number.MAX_SAFE_INTEGER + 1 } }, 675],
+  ] as const)("keeps valid components but suppresses dollars for %s OpenCode message usage", async (_label, tokens, safeTotal) => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-malformed-message.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentMessageTokens(dbPath, tokens);
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.turns[0].usage?.total).toBe(safeTotal);
+    expect(session!.turns[0].pricingUnits).toEqual([]);
+    expect(session!.droppedRecords).toBe(1);
+    const receipt = await buildReceiptModel(session!, dataDir);
+    expect(receipt.totalUsd).toBeNull();
+    expect(receipt.caveats).toContainEqual(expect.objectContaining({ kind: "dropped-transcript-records" }));
+  });
+
+  it("fails closed when individually safe OpenCode message counters overflow a sum", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-message-sum-overflow.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentMessageTokens(dbPath, {
+      input: 0,
+      output: Number.MAX_SAFE_INTEGER,
+      reasoning: 1,
+      cache: { read: 0, write: 0 },
+    });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.turns[0].usage).toEqual(expect.objectContaining({ total: 0 }));
+    expect(session!.turns[0].pricingUnits).toEqual([]);
+    expect(session!.droppedRecords).toBe(1);
+    expect((await buildReceiptModel(session!, dataDir)).totalUsd).toBeNull();
+  });
+
+  it.each([null, "not-a-number", -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    "excludes a malformed OpenCode session aggregate field (%s) instead of creating a residual",
+    async (invalidInput) => {
+      const dir = tempDir();
+      dirs.push(dir);
+      const dbPath = path.join(dir, "opencode-malformed-aggregate.db");
+      makeSessionMessageDb(dbPath);
+      // Even with large valid-looking sibling components, one malformed field
+      // invalidates this whole projection. The valid itemized message remains.
+      setCurrentSessionAggregate(dbPath, {
+        input: invalidInput,
+        output: 1_000,
+        reasoning: 100,
+        cacheRead: 100,
+        cacheWrite: 100,
+      });
+
+      const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+      expect(session).not.toBeNull();
+      expect(session!.totals.tokens).toMatchObject({ input: 500, output: 125, cacheRead: 50, cacheCreation: 10, total: 685 });
+      expect(session!.unattributedUsage).toBeUndefined();
+      expect(session!.droppedRecords).toBe(1);
+      expect((await buildReceiptModel(session!, dataDir)).totalUsd).not.toBeNull();
+    },
+  );
+
+  it("excludes an OpenCode aggregate whose individually safe fields overflow when summed", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-aggregate-sum-overflow.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentSessionAggregate(dbPath, {
+      input: 0,
+      output: Number.MAX_SAFE_INTEGER,
+      reasoning: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+    });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens.total).toBe(685);
+    expect(session!.unattributedUsage).toBeUndefined();
+    expect(session!.droppedRecords).toBe(1);
+  });
+
+  it("accepts legitimate numeric SQLite strings in a coherent OpenCode aggregate", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-numeric-string-aggregate.db");
+    makeSessionMessageDb(dbPath);
+    setCurrentSessionAggregate(dbPath, {
+      input: "650",
+      output: "150",
+      reasoning: "25",
+      cacheRead: "90",
+      cacheWrite: "30",
+    });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens.total).toBe(945);
+    expect(session!.unattributedUsage?.total).toBe(260);
+    expect(session!.droppedRecords).toBeUndefined();
+  });
+
+  it("preserves a larger session aggregate as explicit unpriced residual usage", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-aggregate-residual.db");
+    makeSessionMessageDb(dbPath);
+    // Itemized assistant usage is 500 input, 125 output+reasoning, 50 read,
+    // 10 write. The projector knows more than the message row in every bucket.
+    setCurrentSessionAggregate(dbPath, { input: 650, output: 150, reasoning: 25, cacheRead: 90, cacheWrite: 30 });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens).toMatchObject({
+      input: 650,
+      output: 175,
+      cacheRead: 90,
+      cacheCreation: 30,
+      total: 945,
+    });
+    // Aggregate-only usage stays outside the turn/model domain: no synthetic
+    // request is invented merely to make downstream arithmetic reconcile.
+    expect(session!.totals.turnCount).toBe(1);
+    expect(session!.turns).toHaveLength(1);
+    expect(session!.unattributedUsage).toMatchObject({
+      input: 150,
+      output: 50,
+      cacheRead: 40,
+      cacheCreation: 20,
+      total: 260,
+    });
+
+    const receipt = await buildReceiptModel(session!, dataDir);
+    expect(receipt.totalTokens.total).toBe(945);
+    expect(receipt.unpricedTokens?.total).toBe(260);
+    expect(receipt.totalUsd).not.toBeNull();
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("260 unattributed tokens") }),
+    );
+    expect(receipt.caveats.some((c) => c.kind === "partial-priced-coverage")).toBe(false);
+    expect(receipt.toolRows).toContainEqual(expect.objectContaining({ tool: "(unattributed usage)", usd: null, callCount: 0 }));
+    expect(receipt.modelMix).toContainEqual(expect.objectContaining({ model: "(unattributed usage)", usd: null }));
+
+    const twoTurnSession = {
+      ...session!,
+      turns: [...session!.turns, { index: 1, toolCalls: [] }],
+      totals: { ...session!.totals, turnCount: 2 },
+    };
+    const slice = sliceSessionForReceipt(twoTurnSession, { startTurn: 0, endTurn: 0 });
+    expect(slice.unattributedUsage).toBeUndefined();
+    expect(slice.excludedUnattributedUsage?.total).toBe(260);
+    expect(slice.totals.tokens.total).toBe(685);
+    const slicedReceipt = await buildReceiptModel(slice, dataDir);
+    expect(slicedReceipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "unattributed-aggregate-usage", text: expect.stringContaining("cannot be assigned to this slice") }),
+    );
+  });
+
+  it("does not splice crossed aggregate and itemized vectors into a fabricated total", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-conflicting-aggregate.db");
+    makeSessionMessageDb(dbPath);
+    // Itemized = 500 input, 125 output, 50 read, 10 write. The aggregate is
+    // larger overall and in output/read/write, but smaller in input. Adding
+    // only its positive deltas would create a vector reported by neither side.
+    setCurrentSessionAggregate(dbPath, { input: 400, output: 300, reasoning: 25, cacheRead: 90, cacheWrite: 30 });
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.totals.tokens).toMatchObject({
+      input: 500,
+      output: 125,
+      cacheRead: 50,
+      cacheCreation: 10,
+      total: 685,
+    });
+    expect(session!.unattributedUsage).toBeUndefined();
+    expect(session!.conflictingAggregateUsage).toMatchObject({
+      input: 0,
+      output: 200,
+      cacheRead: 40,
+      cacheCreation: 20,
+      total: 260,
+    });
+
+    const receipt = await buildReceiptModel(session!, dataDir);
+    expect(receipt.totalTokens.total).toBe(685);
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({
+        kind: "unattributed-aggregate-usage",
+        text: expect.stringContaining("conflict with itemized components"),
+      }),
+    );
+  });
+
+  it("does not inherit missing request identity from OpenCode session metadata", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-missing-request-identity.db");
+    makeSessionMessageDb(dbPath);
+    const db = new DatabaseSync(dbPath);
+    db.prepare("UPDATE session SET model = ? WHERE id = 'ses_current_shape'").run(
+      JSON.stringify({ id: "gpt-5.3-codex", providerID: "openai" }),
+    );
+    const t0 = Date.parse("2026-06-30T12:00:00.000Z");
+    db.prepare("UPDATE session_message SET data = ? WHERE id = 'msg_asst_1'").run(
+      JSON.stringify({
+        // Deliberately no message-level modelID/model/providerID. A later or
+        // session-wide direct identity cannot prove this request's route.
+        tokens: { input: 500, output: 100, reasoning: 25, cache: { read: 50, write: 10 } },
+        time: { created: t0 + 5_000, completed: t0 + 20_000 },
+        content: [{ type: "text", text: "identity omitted" }],
+      }),
+    );
+    db.close();
+
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+    expect(session).not.toBeNull();
+    expect(session!.model).toBe("gpt-5.3-codex");
+    expect(session!.turns[0].model).toBeUndefined();
+    expect(session!.turns[0].pricingProvider).toBeNull();
+    expect((await buildReceiptModel(session!, dataDir)).totalUsd).toBeNull();
+  });
+
+  it("prices only explicit direct providers and blocks routed/custom provider IDs", async () => {
+    const dir = tempDir();
+    dirs.push(dir);
+    const dbPath = path.join(dir, "opencode-providers.db");
+    makeSessionMessageDb(dbPath);
+    addProviderRoutingMessages(dbPath);
+    const session = await new OpenCodeAdapter({ dbPath }).loadSession(dbPath);
+
+    expect(session).not.toBeNull();
+    expect(session!.turns.map((turn) => turn.pricingProvider)).toEqual([
+      "anthropic",
+      "openai",
+      null,
+      null,
+      null,
+      null,
+    ]);
+    expect(session!.turns.map((turn) => turn.model)).toEqual([
+      "claude-sonnet-5",
+      "gpt-5.3-codex",
+      "gpt-5.3-codex",
+      "claude-sonnet-5",
+      "gpt-5.3-codex",
+      "claude-sonnet-5",
+    ]);
+
+    const receipt = await buildReceiptModel(session!, dataDir);
+    // Direct Claude = $0.002285; direct OpenAI = $0.000315. The four
+    // routed/custom turns retain 440 tokens but contribute no guessed dollars.
+    expect(receipt.totalUsd).toBeCloseTo(0.0026, 12);
+    expect(receipt.totalTokens.total).toBe(1_235);
+    expect(receipt.unpricedTokens?.total).toBe(440);
+    expect(receipt.priceRowsUsed.map((row) => `${row.vendor}:${row.model}`).sort()).toEqual([
+      "anthropic:claude-sonnet-5",
+      "openai:gpt-5.3-codex",
+    ]);
+    expect(receipt.caveats).toContainEqual(
+      expect.objectContaining({ kind: "partial-priced-coverage", text: expect.stringContaining("4 of 6 usage turns include unpriced tokens") }),
+    );
   });
 
   it("falls back to legacy message/part rows when session_message exists but is empty", async () => {

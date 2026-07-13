@@ -325,7 +325,7 @@ footer{
       </ul>
       <p class="toc-section">Why</p>
       <ul>
-        <li><a href="13-pricing.html">How pricing is estimated</a></li>
+        <li><a href="13-pricing.html">How pricing lower bounds are computed</a></li>
         <li><a href="14-session-attribution.html">How session attribution works</a></li>
         <li><a href="trust.html">What a receipt proves — and what it can't</a></li>
         <li><a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a></li>
@@ -339,7 +339,7 @@ footer{
   <li>
     <a href="01-getting-started.html">Get started in 60 seconds</a>
     <span class="path">docs/guide/01-getting-started.md</span>
-    <p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a priced receipt of what a session cost.</p>
+    <p>aireceipts reads the transcripts your AI coding agent already writes to disk and prints a cited Standard-API list-price-equivalent floor for a session.</p>
   </li>
   <li>
     <a href="02-install.html">Install</a>
@@ -362,7 +362,7 @@ footer{
   <li>
     <a href="05-compare.html">Compare two sessions</a>
     <span class="path">docs/guide/05-compare.md</span>
-    <p>Goal: put two receipts next to each other and see the ratio between them — which run cost more, and by how much.</p>
+    <p>Goal: put two receipts next to each other and compare their observable Standard-API floors without claiming either vendor invoice.</p>
   </li>
   <li>
     <a href="06-week.html">Aggregate the week</a>
@@ -372,7 +372,7 @@ footer{
   <li>
     <a href="07-statusline.html">Keep the meter running</a>
     <span class="path">docs/guide/07-statusline.md</span>
-    <p>Goal: the meter on *every* Claude Code prompt — model, cost so far, burn rate — without running a command yourself.</p>
+    <p>Goal: the meter on *every* Claude Code prompt — model, observable cost floor, floor burn rate — without running a command yourself.</p>
   </li>
   <li>
     <a href="08-budget.html">Set and watch a budget</a>
@@ -382,7 +382,7 @@ footer{
   <li>
     <a href="09-handoff.html">Fix it next time (handoff)</a>
     <span class="path">docs/guide/09-handoff.md</span>
-    <p>Goal: take the waste a session actually hit and turn it into a paste-ready instruction for your agent — so the next run doesn't repeat it.</p>
+    <p>Goal: take the patterns a session's heuristic detectors flagged and turn them into paste-ready instructions for your agent.</p>
   </li>
   <li>
     <a href="10-templates.html">Use a template</a>
@@ -420,7 +420,7 @@ footer{
   <li>
     <a href="statusline.html">Statusline — the meter</a>
     <span class="path">docs/statusline.md</span>
-    <p>aireceipts statusline is the meter: one line in your status bar while the agent works — the model that's running, cost so far, burn rate, and the quota countdown — updated as the…</p>
+    <p>aireceipts statusline is the meter: one line in your status bar while the agent works — the model that's running, observable floor so far, floor rate, and the quota countdown —…</p>
   </li>
   <li>
     <a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a>
@@ -446,9 +446,9 @@ footer{
 <h2>Why</h2>
 <ul class="doc-index-list">
   <li>
-    <a href="13-pricing.html">How pricing is estimated</a>
+    <a href="13-pricing.html">How pricing lower bounds are computed</a>
     <span class="path">docs/guide/13-pricing.md</span>
-    <p>Every dollar on a receipt is an estimate computed locally from token counts and a cited price table — not a feed from your vendor's billing system.</p>
+    <p>Every dollar on a receipt is a Standard API list-price-equivalent lower bound computed locally from observable token counts and a cited price table.</p>
   </li>
   <li>
     <a href="14-session-attribution.html">How session attribution works</a>
@@ -463,7 +463,7 @@ footer{
   <li>
     <a href="cost-model.html">The cost model — how a receipt's numbers are computed, and when it flags</a>
     <span class="path">docs/cost-model.md</span>
-    <p>This is the living account of how aireceipts turns a transcript into priced numbers, per scenario and per agent, and — the part that matters most — exactly when the receipt tells…</p>
+    <p>This is the living account of how aireceipts turns a transcript into priced numbers, per scenario and per agent, and — the part that matters most — where the receipt's observable…</p>
   </li>
 </ul>
     </article>

@@ -3,9 +3,10 @@
 // the fallbacks (no anchor; push-only rebase; codex-exec wrapper not claimed).
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { loadById } from "../../src/parse/load.js";
-import type { Session, ToolCall } from "../../src/parse/types.js";
+import type { Session, ToolCall, Turn } from "../../src/parse/types.js";
 import { computeSlice, FULL_FALLBACK_LABEL } from "../../src/pr/slice.js";
 import { hexRuns, matchesBranchSha, toolCallGitVerb } from "../../src/pr/gitWrite.js";
 
@@ -13,6 +14,32 @@ const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "fixtu
 
 // Branch B's commit + push heads — "ours" for claude-anchors.jsonl.
 const OUR_SHAS = ["b1c2d3e4f5061728394a5b6c7d8e9f0011223344", "c9d8e7f6a5b4c3d2e1f00918273645546372819a"];
+const PROPERTY_OWN = "aaaaaaaa11111111222222223333333344444444";
+const PROPERTY_ORPHAN = "bbbbbbbb11111111222222223333333344444444";
+const PROPERTY_FOREIGN = "cccccccc11111111222222223333333344444444";
+
+function propertyTurn(index: number, sha?: string, amend = false): Turn {
+  return {
+    index,
+    toolCalls:
+      sha === undefined
+        ? []
+        : [{
+            name: "Bash",
+            shell: true,
+            input: { command: `git commit ${amend ? "--amend " : ""}-m turn-${index}` },
+            output: `[branch ${sha.slice(0, 7)}] turn-${index}`,
+            status: "ok",
+          }],
+  };
+}
+
+function shellTurn(index: number, command: string, output = ""): Turn {
+  return {
+    index,
+    toolCalls: [{ name: "Bash", shell: true, input: { command }, output, status: "ok" }],
+  };
+}
 
 function gitCall(session: Session, turnIndex: number): ToolCall {
   const call = session.turns[turnIndex].toolCalls.find((c) => toolCallGitVerb(c) !== null);
@@ -60,6 +87,167 @@ describe("R1e slice + foreign window", () => {
     expect(slice.kind).toBe("slice");
     expect(slice.startTurn).toBe(0);
     expect(slice.endTurn).toBe(3);
+  });
+
+  it("property: a recovered alias slices exactly like its canonical branch SHA", () => {
+    const kinds = fc.array(fc.constantFrom("alias", "own", "foreign", "none"), { minLength: 1, maxLength: 30 })
+      .filter((values) => values.includes("alias"));
+    fc.assert(
+      fc.property(kinds, (values) => {
+        const aliasTurns = values.map((kind, index) =>
+          propertyTurn(index, kind === "alias" ? PROPERTY_ORPHAN : kind === "own" ? PROPERTY_OWN : kind === "foreign" ? PROPERTY_FOREIGN : undefined),
+        );
+        const canonicalTurns = values.map((kind, index) =>
+          propertyTurn(index, kind === "alias" || kind === "own" ? PROPERTY_OWN : kind === "foreign" ? PROPERTY_FOREIGN : undefined),
+        );
+
+        expect(computeSlice(aliasTurns, [PROPERTY_OWN], new Map([[PROPERTY_ORPHAN.slice(0, 7), PROPERTY_OWN]]))).toEqual(
+          computeSlice(canonicalTurns, [PROPERTY_OWN]),
+        );
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("walks a repeated content-changing amend chain back to the original commit", () => {
+    const secondOrphan = "dddddddd11111111222222223333333344444444";
+    const turns = [
+      propertyTurn(0),
+      propertyTurn(1, PROPERTY_ORPHAN),
+      propertyTurn(2, secondOrphan, true),
+      propertyTurn(3, PROPERTY_OWN, true),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 0,
+      endTurn: 3,
+      turnCount: 4,
+    });
+  });
+
+  it.each(["git checkout pr-branch", "git switch pr-branch"])(
+    "does not absorb a foreign-branch commit across `%s` before an owned amend",
+    (command) => {
+      const turns = [
+        propertyTurn(0, PROPERTY_FOREIGN),
+        shellTurn(1, command, "Switched to branch 'pr-branch'"),
+        propertyTurn(2, PROPERTY_OWN, true),
+      ];
+
+      expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+        kind: "slice",
+        startTurn: 1,
+        endTurn: 2,
+        turnCount: 3,
+      });
+    },
+  );
+
+  it("maps two commit confirmations around a compound branch switch and starts at that turn", () => {
+    const turns = [
+      propertyTurn(0),
+      shellTurn(
+        1,
+        "git commit -m foreign && git checkout pr-branch && git commit --amend -m owned",
+        `[foreign ${PROPERTY_FOREIGN.slice(0, 7)}] foreign\nSwitched to branch 'pr-branch'\n[pr-branch ${PROPERTY_OWN.slice(0, 7)}] owned`,
+      ),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 1,
+      endTurn: 1,
+      turnCount: 2,
+    });
+  });
+
+  it("preserves commit and push confirmations from one compound call", () => {
+    const turns = [
+      shellTurn(
+        0,
+        "git commit -m owned && git push origin HEAD",
+        `[pr-branch ${PROPERTY_OWN.slice(0, 7)}] owned\n ${PROPERTY_FOREIGN.slice(0, 7)}..${PROPERTY_OWN.slice(0, 7)}  HEAD -> pr-branch`,
+      ),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 0,
+      endTurn: 0,
+      turnCount: 1,
+    });
+  });
+
+  it("fails closed when commit confirmations cannot be assigned to compound commits", () => {
+    const turns = [
+      shellTurn(
+        0,
+        "git commit -m first && git commit -m second",
+        `[pr-branch ${PROPERTY_OWN.slice(0, 7)}] only-one-confirmation`,
+      ),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toMatchObject({ kind: "full" });
+  });
+
+  it.each([
+    "git reset --hard HEAD~1",
+    "git rebase main",
+    "git cherry-pick deadbeef",
+    "git merge main",
+    "git pull --rebase",
+    "git am patch.mbox",
+    "git revert deadbeef",
+    "git bisect start",
+    "git stash branch rescue",
+    "git update-ref HEAD deadbeef",
+    "git symbolic-ref HEAD refs/heads/pr-branch",
+    "git fetch --update-head-ok origin pr-branch:pr-branch",
+    "git filter-branch -- --all",
+  ])("does not cross the HEAD-changing lineage barrier `%s`", (command) => {
+    const turns = [
+      propertyTurn(0, PROPERTY_FOREIGN),
+      shellTurn(1, command),
+      propertyTurn(2, PROPERTY_OWN, true),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 1,
+      endTurn: 2,
+      turnCount: 3,
+    });
+  });
+
+  it.each([
+    "git checkout -- src/pr/slice.ts",
+    "git checkout HEAD -- src/pr/slice.ts",
+    "git checkout --ours -- src/pr/slice.ts",
+    "git checkout --theirs src/pr/slice.ts",
+    "git reset HEAD -- src/pr/slice.ts",
+    "git reset HEAD src/pr/slice.ts",
+    "git reset -p",
+    "git cherry-pick --no-commit deadbeef",
+    "git revert -n deadbeef",
+    "git merge --squash feature",
+    "git rebase --show-current-patch",
+    "git am --show-current-patch",
+    "git bisect log",
+    "git symbolic-ref --short HEAD",
+  ])("keeps amend lineage across the path/index-only command `%s`", (command) => {
+    const turns = [
+      propertyTurn(0, PROPERTY_ORPHAN),
+      shellTurn(1, command),
+      propertyTurn(2, PROPERTY_OWN, true),
+    ];
+
+    expect(computeSlice(turns, [PROPERTY_OWN])).toEqual({
+      kind: "slice",
+      startTurn: 0,
+      endTurn: 2,
+      turnCount: 3,
+    });
   });
 });
 

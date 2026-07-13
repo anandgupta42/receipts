@@ -37,19 +37,37 @@ export function formatDuration(ms: number): string {
 }
 
 /** Thousands-grouped integer string with a fixed `,` separator (never a locale-dependent grouping character). */
+function commaGroupDigits(digits: string): string {
+  const groups: string[] = [];
+  for (let i = digits.length; i > 0; i -= 3) {
+    groups.unshift(digits.slice(Math.max(0, i - 3), i));
+  }
+  return groups.join(",");
+}
+
 export function commaGroup(n: number): string {
   const sign = n < 0 ? "-" : "";
   const abs = Math.abs(Math.trunc(n));
-  const str = String(abs);
-  const groups: string[] = [];
-  for (let i = str.length; i > 0; i -= 3) {
-    groups.unshift(str.slice(Math.max(0, i - 3), i));
-  }
-  return sign + groups.join(",");
+  return sign + commaGroupDigits(String(abs));
 }
 
 export function formatInt(n: number): string {
   return commaGroup(Math.round(n));
+}
+
+/**
+ * Round a 0..1 share without turning a real minority into `0%` or a real mix
+ * into `100%`. Exact endpoints keep their exact labels.
+ */
+export function formatSharePercent(share: number): string {
+  const pct = Math.round(share * 100);
+  if (pct <= 0 && share > 0) {
+    return "<1%";
+  }
+  if (pct >= 100 && share < 1) {
+    return ">99%";
+  }
+  return `${pct}%`;
 }
 
 /** `$`-free comma-grouped dollar amount (e.g. `"1,234.56"`) — callers prepend `$`; keeps zero-`$`-bytes callers (tokens-only mode) from having to strip a symbol back out. */
@@ -61,6 +79,155 @@ export function formatUsd(n: number): string {
   const rem = cents % 100;
   return `${sign}${commaGroup(dollars)}.${pad2(rem)}`;
 }
+
+/**
+ * `$`-free, downward-rounded amount for a nonnegative lower-bound claim.
+ * Cents are used normally; precision adapts through 12 decimals when needed.
+ * Unlike `formatUsd`, this function never rounds a claim above the canonical
+ * decimal Number value emitted to machine consumers.
+ */
+export type UsdFloorDecimals = 2 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+
+const MAX_USD_FLOOR_DECIMALS: UsdFloorDecimals = 12;
+
+/** One downward precision for an additive display ledger. */
+export function usdFloorDecimals(values: Iterable<number | null | undefined>): UsdFloorDecimals {
+  const observed = [...values];
+  let decimals: UsdFloorDecimals = 2;
+  for (const value of observed) {
+    if (value !== null && value !== undefined && value > 0) {
+      // Above MAX_SAFE_INTEGER a Number cannot represent fractional dollars,
+      // so multiplying by 100 only risks Infinity and cannot reveal cents.
+      if (value <= Number.MAX_SAFE_INTEGER) {
+        const nearestCent = Math.round(value * 100) / 100;
+        const tolerance = Number.EPSILON * Math.max(1, Math.abs(value)) * 8;
+        // A tiny positive sum residue such as 0.1 + 0.2 may safely render at
+        // the lower exact cent. A value microscopically below the cent cannot:
+        // keep four decimals rather than rounding a `≥` claim upward.
+        if (nearestCent > value || Math.abs(nearestCent - value) > tolerance) {
+          decimals = Math.max(decimals, 4) as UsdFloorDecimals;
+        }
+      }
+      // Four decimals are normally enough, but a positive observable floor
+      // below $0.0001 should not collapse to zero when it is representable
+      // within this format's deterministic 12-decimal observability cap.
+      // Increase only until its first safely displayable decimal unit survives.
+      while (decimals < MAX_USD_FLOOR_DECIMALS && floorUsdUnits(value, decimals) === 0n) {
+        decimals = (decimals + 1) as UsdFloorDecimals;
+      }
+    }
+  }
+  return decimals;
+}
+
+/**
+ * Floor the canonical decimal value a machine consumer sees (`Number#toString`
+ * is also JSON's finite-number spelling) into exact integer display units.
+ * BigInt avoids both unsafe-integer corruption for huge amounts and binary
+ * multiplication crossing a decimal boundary.
+ */
+function floorUsdUnits(n: number, decimals: UsdFloorDecimals): bigint {
+  const safe = Number.isFinite(n) && n > 0 ? n : 0;
+  if (safe === 0) {
+    return 0n;
+  }
+
+  const [coefficient, exponentText] = safe.toString().toLowerCase().split("e");
+  const exponent = exponentText === undefined ? 0 : Number(exponentText);
+  const [whole, fraction = ""] = coefficient.split(".");
+  const digitsText = `${whole}${fraction}`.replace(/^0+/u, "") || "0";
+  const decimalPlaces = fraction.length - exponent;
+  const shift = decimals - decimalPlaces;
+  const digits = BigInt(digitsText);
+  if (shift >= 0) {
+    return digits * (10n ** BigInt(shift));
+  }
+  return digits / (10n ** BigInt(-shift));
+}
+
+function formatUsdUnits(units: bigint, decimals: UsdFloorDecimals): string {
+  const scale = 10n ** BigInt(decimals);
+  const dollars = units / scale;
+  const remainder = (units % scale).toString().padStart(decimals, "0");
+  return `${commaGroupDigits(dollars.toString())}.${remainder}`;
+}
+
+export function formatUsdFloor(n: number, precision?: UsdFloorDecimals): string {
+  const safe = Number.isFinite(n) && n > 0 ? n : 0;
+  const decimals = precision ?? usdFloorDecimals([safe]);
+  return formatUsdUnits(floorUsdUnits(safe, decimals), decimals);
+}
+
+export interface UsdFloorLedger {
+  precision: UsdFloorDecimals;
+  amounts: string[];
+  total: string;
+}
+
+/**
+ * One additive display ledger. Every row starts at its independent floor at
+ * one shared precision. When `rawTotal` is supplied and their exact unit sum
+ * would exceed it, excess units are removed from the largest rows. TOTAL remains
+ * the exact sum of the displayed rows and never exceeds that public aggregate.
+ * Callers without a displayed/machine aggregate may omit `rawTotal`; their rows
+ * remain independent floors and `total` is simply their exact displayed sum.
+ */
+export function formatUsdFloorLedger(
+  values: readonly number[],
+  precision?: UsdFloorDecimals,
+  rawTotal?: number,
+): UsdFloorLedger {
+  const normalized = values.map((value) => Number.isFinite(value) && value > 0 ? value : 0);
+  const aggregate = rawTotal === undefined
+    ? undefined
+    : Number.isFinite(rawTotal) && rawTotal > 0
+      ? rawTotal
+      : 0;
+  const safePrecision = precision ?? usdFloorDecimals([
+    ...normalized,
+    ...(aggregate === undefined ? [] : [aggregate]),
+  ]);
+  const units = normalized.map((value) => floorUsdUnits(value, safePrecision));
+
+  // IEEE-754 addition can serialize just below the mathematical sum of the
+  // rows (0.1 + 0.7 -> 0.7999999999999999). The raw aggregate is the public
+  // machine scalar, so the text floor must not exceed its downward decimal
+  // floor. Remove any excess from the largest displayed rows; this only makes
+  // a component more conservative and preserves tiny positive evidence.
+  let totalUnits = units.reduce((sum, value) => sum + value, 0n);
+  let excess = aggregate === undefined ? 0n : totalUnits - floorUsdUnits(aggregate, safePrecision);
+  if (excess > 0n) {
+    const order = units
+      .map((value, index) => ({ index, value }))
+      .sort((a, b) => a.value === b.value ? a.index - b.index : a.value > b.value ? -1 : 1);
+    for (const { index } of order) {
+      if (excess === 0n) {
+        break;
+      }
+      const removed = units[index] < excess ? units[index] : excess;
+      units[index] -= removed;
+      excess -= removed;
+    }
+    totalUnits = units.reduce((sum, value) => sum + value, 0n);
+  }
+  return {
+    precision: safePrecision,
+    amounts: units.map((value) => formatUsdUnits(value, safePrecision)),
+    total: formatUsdUnits(totalUnits, safePrecision),
+  };
+}
+
+/** Human-facing cost claim: observable tokens at the cited global Standard API list price. It is a floor, never an invoice. */
+export function formatUsdLowerBound(n: number, precision?: UsdFloorDecimals): string {
+  return `≥ $${formatUsdFloor(n, precision)}`;
+}
+
+/** Compact form for status lines where an extra separator column is expensive. */
+export function formatUsdLowerBoundCompact(n: number, precision?: UsdFloorDecimals): string {
+  return `≥$${formatUsdFloor(n, precision)}`;
+}
+
+export const STANDARD_API_LOWER_BOUND_NOTE = "standard API-equivalent floor; not an invoice";
 
 /** `label` left-aligned, `value` right-aligned, `.` leaders filling the gap — the till-receipt line style. Falls back to a single-space gap if `label`+`value` already meet/exceed `width`. */
 export const MIN_LEADER = 3;
@@ -137,55 +304,4 @@ export function formatShortTokens(n: number): string {
     return unit(n / 1_000_000, "M");
   }
   return unit(n / 1_000_000_000, "B");
-}
-
-/**
- * B1 fix — largest-remainder apportionment (Hamilton's method). Rows and the
- * TOTAL they belong to used to round independently (each row through
- * `formatUsd`, the total over the raw sum), so a receipt could visibly show
- * rows that don't add up to its own total. This splits a raw total's cents
- * across its rows so the DISPLAYED rows always sum to the DISPLAYED total,
- * without changing the total's own value: each amount floors to its own
- * cents first, then the whole cent(s) lost to flooring are handed to the
- * items with the largest fractional cent, one cent each — ties broken by
- * input order, so output stays deterministic (I5). `amounts` are this
- * codebase's dollar costs, always >= 0 in practice; the negative branch below
- * (clawing cents back from the smallest remainders) exists only so a
- * degenerate/adversarial input degrades gracefully instead of crashing.
- */
-export function reconcileCents(amounts: number[]): number[] {
-  if (amounts.length === 0) {
-    return [];
-  }
-  const rawSum = amounts.reduce((sum, a) => sum + a, 0);
-  // Mirrors `formatUsd`'s own rounding exactly (round the magnitude, then sign
-  // it) so the total this apportions to is byte-identical to what the TOTAL
-  // line already renders — this fix changes row splits, never the total.
-  const totalCents = rawSum < 0 ? -Math.round(-rawSum * 100) : Math.round(rawSum * 100);
-  const rawCents = amounts.map((a) => a * 100);
-  const floors = rawCents.map((c) => Math.floor(c));
-  const remainders = rawCents.map((c, i) => c - floors[i]);
-  const leftover = totalCents - floors.reduce((sum, c) => sum + c, 0);
-
-  const cents = [...floors];
-  const order = amounts.map((_, i) => i);
-  if (leftover >= 0) {
-    order.sort((a, b) => remainders[b] - remainders[a] || a - b);
-    for (let i = 0; i < leftover; i++) {
-      cents[order[i]] += 1;
-    }
-  } else {
-    order.sort((a, b) => remainders[a] - remainders[b] || a - b);
-    for (let i = 0; i < -leftover; i++) {
-      cents[order[i]] -= 1;
-    }
-  }
-  return cents;
-}
-
-/** An exact integer cent amount (e.g. from {@link reconcileCents}) as a `formatUsd`-style string — no rounding left to do, the split already landed on whole cents. */
-export function formatCentsAmount(cents: number): string {
-  const sign = cents < 0 ? "-" : "";
-  const abs = Math.abs(cents);
-  return `${sign}${commaGroup(Math.floor(abs / 100))}.${pad2(abs % 100)}`;
 }

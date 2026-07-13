@@ -38,11 +38,12 @@ export type ConfidenceEvent =
   | { kind: "unanchored-git-write"; sessionId: string }
   // A subagent transcript that couldn't be parsed — listed, never dropped.
   | { kind: "unreadable-subagent"; sessionId: string }
-  // A3: cache-write tokens priced at the base input rate because the vendor's
-  // price row cites no cache-write rate — the receipt's cost is a floor. (Not
-  // triggered by an absent 5m/1h split alone: a cited 5m rate prices an unsplit
-  // write exactly, so Anthropic/Claude Code never floors here.)
+  // A3: observed cached reads/writes with no cited applicable rate contribute
+  // zero to the dollar floor rather than a guessed fallback.
   | { kind: "cost-lower-bound-cache-tier"; sessionId: string }
+  // A GPT-5.6 Codex trace has priced request usage but no persisted cache-write
+  // token bucket, so its Standard-API floor excludes any write premium.
+  | { kind: "unobserved-cache-write-tokens"; sessionId: string }
   // B4: an in-window candidate we couldn't READ (load/parse failed), outside
   // the current worktree so the classic excluded count never saw it. "Couldn't
   // read" ≠ "read and found no anchor" — its absence is counted, never silent
@@ -51,7 +52,10 @@ export type ConfidenceEvent =
   // B3: a CREDITED session whose transcript had malformed/truncated records
   // silently skipped at parse time — its cost is a lower bound (the dropped
   // records carried real, now-missing token usage) (honesty red-team B3).
-  | { kind: "dropped-transcript-records"; sessionId: string };
+  | { kind: "dropped-transcript-records"; sessionId: string }
+  // A credited session/subagent has both priced and unpriced usage turns. Its
+  // known `$` and exact unpriced tokens both render, and the `$` is a floor.
+  | { kind: "partial-priced-coverage"; sessionId: string };
 
 export interface ConfidenceSummary {
   /** A1 — anchor-pool sessions dropped as unattributable (distinct sessions). */
@@ -62,12 +66,16 @@ export interface ConfidenceSummary {
   unanchoredGitWrite: number;
   /** subagents that couldn't be parsed. */
   unreadableSubagent: number;
-  /** sessions whose cache-write cost is a lower bound (no published cache-write rate). */
+  /** Sessions with observed cache tokens excluded for lack of a cited applicable rate. */
   costLowerBoundCacheTier: number;
+  /** GPT-5.6 Codex contributors/subagents whose trace omitted cache-write tokens. */
+  unobservedCacheWriteTokens?: number;
   /** B4 — in-window candidates that couldn't be read (load/parse failed). */
   unreadableSession: number;
   /** B3 — credited sessions whose transcript had records skipped at parse time. */
   droppedTranscriptRecords: number;
+  /** Credited contributors/subagents whose priced total excludes known unpriced turns. Omitted at zero for payload byte stability. */
+  partialPricedCoverage?: number;
 }
 
 const distinctSessions = (events: readonly ConfidenceEvent[], kind: ConfidenceEvent["kind"]): number =>
@@ -87,8 +95,10 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
       case "unanchored-git-write":
       case "unreadable-subagent":
       case "cost-lower-bound-cache-tier":
+      case "unobserved-cache-write-tokens":
       case "unreadable-session":
       case "dropped-transcript-records":
+      case "partial-priced-coverage":
         break;
       default: {
         const never: never = e;
@@ -96,14 +106,18 @@ export function summarizeConfidence(events: readonly ConfidenceEvent[]): Confide
       }
     }
   }
+  const partialPricedCoverage = distinctSessions(events, "partial-priced-coverage");
+  const unobservedCacheWriteTokens = distinctSessions(events, "unobserved-cache-write-tokens");
   return {
     unattributableAnchorPool: distinctSessions(events, "unattributable-anchor-pool"),
     silencedGitWrite: distinctSessions(events, "silenced-git-write"),
     unanchoredGitWrite: distinctSessions(events, "unanchored-git-write"),
     unreadableSubagent: distinctSessions(events, "unreadable-subagent"),
     costLowerBoundCacheTier: distinctSessions(events, "cost-lower-bound-cache-tier"),
+    ...(unobservedCacheWriteTokens > 0 ? { unobservedCacheWriteTokens } : {}),
     unreadableSession: distinctSessions(events, "unreadable-session"),
     droppedTranscriptRecords: distinctSessions(events, "dropped-transcript-records"),
+    ...(partialPricedCoverage > 0 ? { partialPricedCoverage } : {}),
   };
 }
 
@@ -115,7 +129,9 @@ export function isFloored(summary: ConfidenceSummary): boolean {
     summary.unanchoredGitWrite > 0 ||
     summary.unreadableSubagent > 0 ||
     summary.costLowerBoundCacheTier > 0 ||
+    (summary.unobservedCacheWriteTokens ?? 0) > 0 ||
     summary.unreadableSession > 0 ||
-    summary.droppedTranscriptRecords > 0
+    summary.droppedTranscriptRecords > 0 ||
+    (summary.partialPricedCoverage ?? 0) > 0
   );
 }

@@ -49,4 +49,28 @@ describe("renderReceiptPayload", () => {
     const json = JSON.stringify({ schemaVersion: PR_RECEIPT_SCHEMA_VERSION, bodyInput: { contributors: [], excludedCount: 0 }, extras: {} });
     expect(renderReceiptPayload(json).ok).toBe(true);
   });
+
+  it("rejects an old detail receipt with an exact-looking bare dollar", () => {
+    const json = JSON.stringify({
+      schemaVersion: PR_RECEIPT_SCHEMA_VERSION,
+      bodyInput: { contributors: [], excludedCount: 0 },
+      extras: { details: [{ label: "builder", row: [], text: "TOTAL................$1.23" }] },
+    });
+    const out = renderReceiptPayload(json);
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.reason).toContain("regenerate the receipt ref");
+    }
+  });
+
+  it("accepts qualified lower-bound/heuristic dollars but rejects truncated ones", () => {
+    const payload = (text: string) =>
+      JSON.stringify({
+        schemaVersion: PR_RECEIPT_SCHEMA_VERSION,
+        bodyInput: { contributors: [], excludedCount: 0 },
+        extras: { details: [{ label: "builder", row: [], text }] },
+      });
+    expect(renderReceiptPayload(payload("TOTAL.............≥ $1.23\npattern...........≈ $0.50")).ok).toBe(true);
+    expect(renderReceiptPayload(payload("TOTAL.............≥ $1,234,56…")).ok).toBe(false);
+  });
 });

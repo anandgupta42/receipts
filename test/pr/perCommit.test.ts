@@ -17,9 +17,11 @@ import {
   SUBJECT_DISPLAY_CAP,
 } from "../../src/pr/perCommit.js";
 import { renderPrArtifactHtml, type ArtifactInput } from "../../src/pr/html.js";
+import { STANDARD_API_LIST_PRICE_EQUIVALENT } from "../../src/receipt/costEstimate.js";
 
 const SHA_A = "aaaa111122223333444455556666777788889999";
 const SHA_B = "bbbb111122223333444455556666777788889999";
+const ORPHAN_SHA_A = "cccc111122223333444455556666777788889999";
 const usage = (input: number, output: number) => withTotal({ ...emptyUsage(), input, output });
 
 /** newest-first, like git log: B is newer, A is chronologically earliest. */
@@ -34,7 +36,7 @@ function turn(index: number, opts: { commitSha?: string; commitShas?: string[]; 
   const shas = opts.commitShas ?? (opts.commitSha !== undefined ? [opts.commitSha] : []);
   if (shas.length > 0) {
     toolCalls.push({ name: "Bash", shell: true,
-      input: { command: "git commit -m x" },
+      input: { command: shas.map((_, index) => `git commit -m x-${index}`).join(" && ") },
       output: shas.map((s) => `[main ${s.slice(0, 7)}] x`).join("\n"),
       status: "ok" as const,
     });
@@ -110,6 +112,26 @@ describe("SPEC-0031 R1 · segmentation", () => {
     expect(segs[1].startTurn).toBe(1);
   });
 
+  it("canonicalizes an amended SHA alias and deduplicates the later branch SHA", () => {
+    const turns = [turn(0, { commitSha: ORPHAN_SHA_A }), turn(1, { commitSha: SHA_A })];
+    const aliases = new Map([[ORPHAN_SHA_A.slice(0, 7), SHA_A]]);
+    const slice = computeSlice(turns, [SHA_A], aliases);
+    const events = anchorEvents(turns, [SHA_A], aliases);
+
+    expect(slice).toEqual({ kind: "slice", startTurn: 0, endTurn: 1, turnCount: 2 });
+    expect(events).toEqual([
+      { turnIndex: 0, shas: [SHA_A] },
+      { turnIndex: 1, shas: [SHA_A] },
+    ]);
+    const segs = segmentSlice(slice, events, {
+      shas: [SHA_A],
+      commitMs: [1000],
+      subjects: ["feat: first"],
+    });
+    expect(segs).toHaveLength(1);
+    expect(segs[0]).toMatchObject({ sha: SHA_A, startTurn: 0, endTurn: 1 });
+  });
+
   it("full-fallback and anchorless sessions produce no segments (labeled bucket instead)", () => {
     const noAnchors = [turn(0), turn(1)];
     expect(segmentSlice(computeSlice(noAnchors, COMMITS.shas), anchorEvents(noAnchors, COMMITS.shas), COMMITS)).toEqual([]);
@@ -143,6 +165,29 @@ describe("SPEC-0031 R3 · surfaces", () => {
     expect(lines[1]).toContain("(+1 more in this turn)");
     expect(lines[1]).not.toContain("$");
     expect(lines.at(-1)).toContain(PER_COMMIT_METHODOLOGY);
+  });
+
+  it("renders both the dollar floor and exact unpriced tokens for a mixed-price segment", async () => {
+    const at = Date.UTC(2026, 5, 15);
+    const priced = { ...turn(0), timestamp: at };
+    const unpriced = { ...turn(1, { commitSha: SHA_A }), timestamp: at + 1, model: "claude-unknown-model" };
+    const s = session([priced, unpriced]);
+    const slice = computeSlice(s.turns, [SHA_A]);
+    const segments = segmentSlice(slice, anchorEvents(s.turns, [SHA_A]), {
+      shas: [SHA_A], commitMs: [1000], subjects: ["feat: mixed"],
+    });
+    const rows = await buildPerCommitRows(s, segments);
+    const lines = renderPerCommitLines(rows);
+
+    expect(rows[0].unpricedTokens).toBe(550);
+    expect(rows[0].costEstimate).toEqual({
+      kind: "lower-bound",
+      basis: STANDARD_API_LIST_PRICE_EQUIVALENT,
+      minUsd: 0.0037,
+    });
+    expect(rows[0].costEstimate!.minUsd).toBeLessThanOrEqual(rows[0].usd!);
+    expect(lines[0]).toContain("≥ $");
+    expect(lines[0]).toContain("550 unpriced tokens");
   });
 
   it("artifact embeds the table, the labeled bucket, and an inert template island — still script-free", async () => {

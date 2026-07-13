@@ -61,8 +61,8 @@ real-time) is cut, not softened.
 - **R3 — the default line shows the model.** `DEFAULT_FORMAT =
   "brand,model,cost,burn,tokens,context,waste,quota5h"` — identity before numbers, the
   same order the mini receipt uses (`agent · model · duration`). Renders as
-  `[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m` (stdin) and
-  `[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k` (disk fallback, priced
+  `[aireceipts] Opus · ≥$4.20 · ≥$9/hr · 128k · ctx 42% · 5h 24% ↺2h13m` (stdin) and
+  `[aireceipts · Codex] gpt-5.2-codex · ≥$1.10 · ≥$4/hr · 84k` (disk fallback, priced
   with duration). `model` joins `SEGMENT_NAMES` so `--format` and `statusline.json`
   can name or drop it; memoized render and fail-fast unknown-segment behavior are
   inherited from SPEC-0062.
@@ -114,7 +114,7 @@ real-time) is cut, not softened.
 
 - **Given** a stdin payload with `model.display_name: "Opus"` and full cost/quota data,
   **when** the default statusline renders, **then**
-  `[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m`.
+  `[aireceipts] Opus · ≥$4.20 · ≥$9/hr · 128k · ctx 42% · 5h 24% ↺2h13m`.
 - **Given** a payload whose `model.display_name` is `"  "` (or 65+ chars, or contains a
   control char), and a session whose dominant model is `claude-opus-4-8`, **when** it
   renders, **then** the segment shows `claude-opus-4-8` (guarded fallback).
@@ -122,7 +122,7 @@ real-time) is cut, not softened.
   disk-fallback session selected, **when** it renders, **then** the model segment shows
   the fallback session's dominant model, never the stale payload's (R1 gate).
 - **Given** disk-fallback mode on a priced Codex session with duration, **when** it
-  renders, **then** `[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k`.
+  renders, **then** `[aireceipts · Codex] gpt-5.2-codex · ≥$1.10 · ≥$4/hr · 84k`.
 - **Given** a Cursor session (no per-turn model), **when** it renders, **then** no model
   segment appears — omitted, never `model unknown` on a one-line bar.
 - **Given** a mid-session switch from Sonnet to Opus, **when** the next render arrives,
@@ -176,8 +176,8 @@ real-time) is cut, not softened.
 | R2 line separator | `"Opus\u2028X"` | fallback |
 | R1 gate (command level) | `runStatusline`: payload with dead `transcript_path` + `display_name: "Opus"`, disk session with a distinct dominant model | line carries the disk session's model |
 | R2 fallback guarded | summary model 65 chars or control-bearing | segment omitted |
-| R3 default | full payload fixture | `[aireceipts] Opus · $4.20 · …` exact string |
-| R3 disk fallback | priced Codex session with duration | `[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k` |
+| R3 default | full payload fixture | `[aireceipts] Opus · ≥$4.20 · …` exact string |
+| R3 disk fallback | priced Codex session with duration | `[aireceipts · Codex] gpt-5.2-codex · ≥$1.10 · ≥$4/hr · 84k` |
 | R7 format select | `runStatusline` with `--format brand,model` | `[aireceipts] Opus` exact |
 | R7 config select | `statusline.json` `items: ["brand","model"]` | `[aireceipts] Opus` exact |
 | R4 forbidden phrases | grep changed copy surfaces | no "real-time"/"stream"/"per-token live" |

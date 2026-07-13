@@ -7,110 +7,112 @@
 
 TXN #7104B878
 ITEM                              QTY          AMT
-mcp__postgres__query_098            1        $0.01
-mcp__redis__scan_099                1        $0.01
-mcp__sentry__resolve_event_…        1        $0.01
-Task_088                            1        $0.01
-mcp__figma__get_node_096            1        $0.01
-NotebookEdit_087                    1        $0.01
-Edit_077                            1        $0.01
-mcp__linear__list_issues_095        1        $0.01
-NotebookRead_086                    1        $0.01
-Read_076                            1        $0.01
-mcp__github__get_issue_094          1        $0.01
-WebFetch_084                        1        $0.01
-WebSearch_085                       1        $0.01
-mcp__browser__click_075             1        $0.01
-KillShell_066                       1        $0.01
-ReadMcpResource_093                 1        $0.01
-TodoWrite_083                       1        $0.01
-mcp__redis__scan_074                1        $0.01
-Read_101                            1        $0.01
-MultiEdit_065                       1        $0.01
-KillShell_091                       1        $0.01
-Grep_055                            1        $0.01
-ListMcpResources_092                1        $0.01
-LS_082                              1        $0.01
-mcp__postgres__query_073            1        $0.01
-Task_063                            1        $0.01
-mcp__browser__click_100             1        $0.01
-SlashCommand_064                    1        $0.01
-MultiEdit_090                       1        $0.01
-Bash_054                            1        $0.01
-Glob_081                            1        $0.01
-mcp__sentry__resolve_event_…        1        $0.01
-NotebookEdit_062                    1        $0.01
-SlashCommand_089                    1        $0.01
-Write_053                           1        $0.01
-Grep_080                            1        $0.01
-mcp__github__get_issue_044          1        $0.00
-mcp__linear__list_issues_070        1        $0.00
-mcp__figma__get_node_071            1        $0.00
-NotebookRead_061                    1        $0.00
-Edit_052                            1        $0.00
-ListMcpResources_042                1        $0.00
-Bash_079                            1        $0.00
-ReadMcpResource_043                 1        $0.00
-mcp__github__get_issue_069          1        $0.00
-TodoWrite_033                       1        $0.00
-WebSearch_060                       1        $0.00
-Read_051                            1        $0.00
-KillShell_041                       1        $0.00
-Write_078                           1        $0.00
-ReadMcpResource_068                 1        $0.00
-LS_032                              1        $0.00
-WebFetch_059                        1        $0.00
-mcp__redis__scan_049                1        $0.00
-mcp__browser__click_050             1        $0.00
-MultiEdit_040                       1        $0.00
-ListMcpResources_067                1        $0.00
-Glob_031                            1        $0.00
-mcp__figma__get_node_021            1        $0.00
-TodoWrite_058                       1        $0.00
-mcp__sentry__resolve_event_…        1        $0.00
-mcp__postgres__query_048            1        $0.00
-SlashCommand_039                    1        $0.00
-Grep_030                            1        $0.00
-Glob_056                            1        $0.00
-mcp__linear__list_issues_020        1        $0.00
-LS_057                              1        $0.00
-mcp__sentry__resolve_event_…        1        $0.00
-NotebookRead_011                    1        $0.00
-mcp__claude-in-chrome__brow…        1        $0.00
-Write_028                           1        $0.00
-Bash_029                            1        $0.00
-mcp__github__get_issue_019          1        $0.00
-mcp__figma__get_node_046            1        $0.00
-WebSearch_010                       1        $0.00
-NotebookEdit_037                    1        $0.00
-Edit_027                            1        $0.00
-ReadMcpResource_018                 1        $0.00
-mcp__linear__list_issues_045        1        $0.00
-WebFetch_009                        1        $0.00
-WebSearch_035                       1        $0.00
-NotebookRead_036                    1        $0.00
-Read_026                            1        $0.00
-ListMcpResources_017                1        $0.00
-LS_007                              1        $0.00
-TodoWrite_008                       1        $0.00
-WebFetch_034                        1        $0.00
-mcp__browser__click_025             1        $0.00
-KillShell_016                       1        $0.00
-Glob_006                            1        $0.00
-mcp__redis__scan_024                1        $0.00
-SlashCommand_014                    1        $0.00
-MultiEdit_015                       1        $0.00
-Grep_005                            1        $0.00
-mcp__postgres__query_023            1        $0.00
-Task_013                            1        $0.00
-Bash_004                            1        $0.00
-NotebookEdit_012                    1        $0.00
-Write_003                           1        $0.00
-Edit_002                            1        $0.00
-Read_001                            1        $0.00
+mcp__postgres__query_098            1    ≥ $0.0037
+mcp__redis__scan_099                1    ≥ $0.0037
+mcp__sentry__resolve_event_…        1    ≥ $0.0037
+Task_088                            1    ≥ $0.0036
+mcp__figma__get_node_096            1    ≥ $0.0036
+NotebookEdit_087                    1    ≥ $0.0036
+Edit_077                            1    ≥ $0.0036
+mcp__linear__list_issues_095        1    ≥ $0.0036
+NotebookRead_086                    1    ≥ $0.0036
+Read_076                            1    ≥ $0.0036
+mcp__github__get_issue_094          1    ≥ $0.0036
+WebFetch_084                        1    ≥ $0.0036
+WebSearch_085                       1    ≥ $0.0036
+mcp__browser__click_075             1    ≥ $0.0036
+KillShell_066                       1    ≥ $0.0036
+ReadMcpResource_093                 1    ≥ $0.0036
+TodoWrite_083                       1    ≥ $0.0036
+mcp__redis__scan_074                1    ≥ $0.0036
+Read_101                            1    ≥ $0.0036
+MultiEdit_065                       1    ≥ $0.0036
+KillShell_091                       1    ≥ $0.0036
+Grep_055                            1    ≥ $0.0036
+ListMcpResources_092                1    ≥ $0.0036
+LS_082                              1    ≥ $0.0036
+mcp__postgres__query_073            1    ≥ $0.0036
+Task_063                            1    ≥ $0.0036
+mcp__browser__click_100             1    ≥ $0.0036
+SlashCommand_064                    1    ≥ $0.0036
+MultiEdit_090                       1    ≥ $0.0036
+Bash_054                            1    ≥ $0.0036
+Glob_081                            1    ≥ $0.0036
+mcp__sentry__resolve_event_…        1    ≥ $0.0036
+NotebookEdit_062                    1    ≥ $0.0036
+SlashCommand_089                    1    ≥ $0.0036
+Write_053                           1    ≥ $0.0036
+Grep_080                            1    ≥ $0.0035
+mcp__github__get_issue_044          1    ≥ $0.0035
+mcp__linear__list_issues_070        1    ≥ $0.0035
+mcp__figma__get_node_071            1    ≥ $0.0035
+NotebookRead_061                    1    ≥ $0.0035
+Edit_052                            1    ≥ $0.0035
+ListMcpResources_042                1    ≥ $0.0035
+Bash_079                            1    ≥ $0.0035
+ReadMcpResource_043                 1    ≥ $0.0035
+mcp__github__get_issue_069          1    ≥ $0.0035
+TodoWrite_033                       1    ≥ $0.0035
+WebSearch_060                       1    ≥ $0.0035
+Read_051                            1    ≥ $0.0035
+KillShell_041                       1    ≥ $0.0035
+Write_078                           1    ≥ $0.0035
+ReadMcpResource_068                 1    ≥ $0.0035
+LS_032                              1    ≥ $0.0035
+WebFetch_059                        1    ≥ $0.0035
+mcp__redis__scan_049                1    ≥ $0.0035
+mcp__browser__click_050             1    ≥ $0.0035
+MultiEdit_040                       1    ≥ $0.0035
+ListMcpResources_067                1    ≥ $0.0035
+Glob_031                            1    ≥ $0.0035
+mcp__figma__get_node_021            1    ≥ $0.0035
+TodoWrite_058                       1    ≥ $0.0035
+mcp__sentry__resolve_event_…        1    ≥ $0.0035
+mcp__postgres__query_048            1    ≥ $0.0035
+SlashCommand_039                    1    ≥ $0.0035
+Grep_030                            1    ≥ $0.0035
+Glob_056                            1    ≥ $0.0035
+mcp__linear__list_issues_020        1    ≥ $0.0035
+LS_057                              1    ≥ $0.0035
+mcp__sentry__resolve_event_…        1    ≥ $0.0035
+NotebookRead_011                    1    ≥ $0.0035
+mcp__claude-in-chrome__brow…        1    ≥ $0.0035
+Write_028                           1    ≥ $0.0035
+Bash_029                            1    ≥ $0.0035
+mcp__github__get_issue_019          1    ≥ $0.0035
+mcp__figma__get_node_046            1    ≥ $0.0035
+WebSearch_010                       1    ≥ $0.0035
+NotebookEdit_037                    1    ≥ $0.0035
+Edit_027                            1    ≥ $0.0035
+ReadMcpResource_018                 1    ≥ $0.0035
+mcp__linear__list_issues_045        1    ≥ $0.0035
+WebFetch_009                        1    ≥ $0.0035
+WebSearch_035                       1    ≥ $0.0034
+NotebookRead_036                    1    ≥ $0.0034
+Read_026                            1    ≥ $0.0034
+ListMcpResources_017                1    ≥ $0.0034
+LS_007                              1    ≥ $0.0034
+TodoWrite_008                       1    ≥ $0.0034
+WebFetch_034                        1    ≥ $0.0034
+mcp__browser__click_025             1    ≥ $0.0034
+KillShell_016                       1    ≥ $0.0034
+Glob_006                            1    ≥ $0.0034
+mcp__redis__scan_024                1    ≥ $0.0034
+SlashCommand_014                    1    ≥ $0.0034
+MultiEdit_015                       1    ≥ $0.0034
+Grep_005                            1    ≥ $0.0034
+mcp__postgres__query_023            1    ≥ $0.0034
+Task_013                            1    ≥ $0.0034
+Bash_004                            1    ≥ $0.0034
+NotebookEdit_012                    1    ≥ $0.0034
+Write_003                           1    ≥ $0.0034
+Edit_002                            1    ≥ $0.0034
+Read_001                            1    ≥ $0.0034
 --------------------------------------------------
-TOTAL                                        $0.36
-same tokens on claude-haiku-4-5...$0.18 (50% less)
+TOTAL                                    ≥ $0.3552
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.1801
+  (50% lower observable floor)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-sonnet-5

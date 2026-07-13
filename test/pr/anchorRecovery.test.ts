@@ -8,9 +8,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentSource, Session, SessionSummary, Turn } from "../../src/parse/types.js";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
+import { sliceSessionForReceipt } from "../../src/receipt/model.js";
 import { defaultRunner } from "../../src/pr/git.js";
 import { selectContributors, type PoolCandidate } from "../../src/pr/contributors.js";
 import { summarizeConfidence } from "../../src/pr/confidence.js";
+import { rollupChildren } from "../../src/pr/rollup.js";
 
 const dirs: string[] = [];
 const usage = withTotal({ ...emptyUsage(), input: 1000, output: 100 });
@@ -92,6 +94,10 @@ function repo(s: Session): PoolCandidate {
   return { summary: s, pool: "repo" };
 }
 
+function anchor(s: Session): PoolCandidate {
+  return { summary: s, pool: "anchor" };
+}
+
 function depsFor(cwd: string, sessions: Session[], branchSubjects: readonly string[] = []) {
   const byId = new Map(sessions.map((s) => [s.id, s]));
   return {
@@ -128,6 +134,33 @@ async function duplicatePatchRepo(): Promise<{ cwd: string; firstSha: string; re
 }
 
 describe("SPEC-0072 R1 - patch-id anchor recovery", () => {
+  it("keeps pre-amend work when an in-session commit is amended", async () => {
+    const { cwd, oldSha, newSha } = await amendRepo(false);
+    const s = makeSession("amended-in-session", cwd, [
+      bashTurn(0, "npm test", "tests passed"),
+      bashTurn(1, "git commit -m original", commitOutput(oldSha, "feat: original change")),
+      bashTurn(2, "git commit --amend -m amended", commitOutput(newSha, "feat: amended branch change")),
+    ]);
+
+    const sel = await selectContributors([repo(s)], [newSha], depsFor(cwd, [s]));
+
+    expect(sel.contributors).toHaveLength(1);
+    const slice = sel.contributors[0].slice;
+    expect(slice).toEqual({ kind: "slice", startTurn: 0, endTurn: 2, turnCount: 3 });
+    expect(sel.excludedCount).toBe(0);
+
+    if (slice.kind !== "slice") {
+      throw new Error("expected amended session to be sliceable");
+    }
+    const rendered = sliceSessionForReceipt(s, slice);
+    const child = makeSession("child", cwd, [bashTurn(0, "npm test", "child tests passed")]);
+    const rows = await rollupChildren(s.filePath, { kind: "range", start: rendered.startedAt!, end: rendered.endedAt! }, {
+      discover: async () => [child.filePath],
+      load: async () => child,
+    });
+    expect(rows.map((row) => row.filePath)).toEqual([child.filePath]);
+  });
+
   it("credits a message-only amend by matching the orphan SHA's stable patch-id", async () => {
     const { cwd, oldSha, newSha } = await amendRepo(false);
     const s = makeSession("amended", cwd, [bashTurn(0, "git commit -m original", commitOutput(oldSha, "feat: original change"))]);
@@ -135,8 +168,67 @@ describe("SPEC-0072 R1 - patch-id anchor recovery", () => {
     const sel = await selectContributors([repo(s)], [newSha], depsFor(cwd, [s]));
 
     expect(sel.contributors.map((c) => [c.summary.id, c.basis])).toEqual([["amended", "anchor"]]);
-    expect(sel.contributors[0].slice.kind).toBe("full");
+    expect(sel.contributors[0].slice).toEqual({ kind: "slice", startTurn: 0, endTurn: 0, turnCount: 1 });
     expect(sel.excludedCount).toBe(0);
+  });
+
+  it("credits a recovered-only anchor-pool session with a precise slice", async () => {
+    const { cwd, oldSha, newSha } = await amendRepo(false);
+    const s = makeSession("anchor-pool-amended", cwd, [
+      bashTurn(0, "npm test", "tests passed"),
+      bashTurn(1, "git commit -m original", commitOutput(oldSha, "feat: original change")),
+    ]);
+
+    const sel = await selectContributors([anchor(s)], [newSha], depsFor(cwd, [s]));
+
+    expect(sel.contributors).toHaveLength(1);
+    expect(sel.contributors[0]).toMatchObject({
+      basis: "anchor",
+      slice: { kind: "slice", startTurn: 0, endTurn: 1, turnCount: 2 },
+    });
+    expect(summarizeConfidence(sel.events).unattributableAnchorPool).toBe(0);
+  });
+
+  it("keeps a genuine foreign commit as the boundary before a recovered amend", async () => {
+    const cwd = await tempRepo();
+    const main = currentBranch(cwd);
+    git(cwd, ["checkout", "--quiet", "-b", "foreign"]);
+    const foreignSha = await commitFile(cwd, "foreign.txt", "foreign\n", "feat: foreign change");
+    git(cwd, ["checkout", "--quiet", main]);
+    const oldSha = await commitFile(cwd, "feature.txt", "one\n", "feat: original change");
+    git(cwd, ["commit", "--amend", "--quiet", "-m", "feat: amended branch change"]);
+    const newSha = head(cwd);
+    const s = makeSession("foreign-then-amended", cwd, [
+      bashTurn(0, "git commit -m foreign", commitOutput(foreignSha, "feat: foreign change")),
+      bashTurn(1, "npm test", "tests passed"),
+      bashTurn(2, "git commit -m original", commitOutput(oldSha, "feat: original change")),
+      bashTurn(3, "git commit --amend -m amended", commitOutput(newSha, "feat: amended branch change")),
+    ]);
+
+    const sel = await selectContributors([repo(s)], [newSha], depsFor(cwd, [s]));
+
+    expect(sel.contributors).toHaveLength(1);
+    expect(sel.contributors[0].slice).toEqual({ kind: "slice", startTurn: 1, endTurn: 3, turnCount: 4 });
+  });
+
+  it("keeps all work across multiple direct commits followed by an amend", async () => {
+    const cwd = await tempRepo();
+    const firstSha = await commitFile(cwd, "first.txt", "first\n", "feat: first change");
+    const oldSha = await commitFile(cwd, "feature.txt", "one\n", "feat: original change");
+    git(cwd, ["commit", "--amend", "--quiet", "-m", "feat: amended branch change"]);
+    const newSha = head(cwd);
+    const s = makeSession("multiple-then-amended", cwd, [
+      bashTurn(0, "npm test", "tests passed"),
+      bashTurn(1, "git commit -m first", commitOutput(firstSha, "feat: first change")),
+      bashTurn(2, "npm run lint", "lint passed"),
+      bashTurn(3, "git commit -m original", commitOutput(oldSha, "feat: original change")),
+      bashTurn(4, "git commit --amend -m amended", commitOutput(newSha, "feat: amended branch change")),
+    ]);
+
+    const sel = await selectContributors([repo(s)], [newSha, firstSha], depsFor(cwd, [s]));
+
+    expect(sel.contributors).toHaveLength(1);
+    expect(sel.contributors[0].slice).toEqual({ kind: "slice", startTurn: 0, endTurn: 4, turnCount: 5 });
   });
 
   it("does not credit a content-changing amend whose patch-id differs", async () => {
@@ -150,6 +242,21 @@ describe("SPEC-0072 R1 - patch-id anchor recovery", () => {
     const confidence = summarizeConfidence(sel.events);
     expect(confidence.unanchoredGitWrite).toBe(1);
     expect(confidence.silencedGitWrite).toBe(0);
+  });
+
+  it("keeps pre-amend work for a content-changing amend when the same session prints final B", async () => {
+    const { cwd, oldSha, newSha } = await amendRepo(true);
+    const s = makeSession("changed-with-final", cwd, [
+      bashTurn(0, "npm test", "tests passed"),
+      bashTurn(1, "git commit -m original", commitOutput(oldSha, "feat: original change")),
+      bashTurn(2, "git commit --amend -m changed", commitOutput(newSha, "feat: changed amend")),
+    ]);
+
+    const sel = await selectContributors([repo(s)], [newSha], depsFor(cwd, [s]));
+
+    expect(sel.contributors).toHaveLength(1);
+    expect(sel.contributors[0].slice).toEqual({ kind: "slice", startTurn: 0, endTurn: 2, turnCount: 3 });
+    expect(sel.events).toEqual([]);
   });
 
   it("skips an unresolvable orphan object without crashing", async () => {

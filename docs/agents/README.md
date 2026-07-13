@@ -8,7 +8,7 @@ doesn't (I3/I6).
 | Agent | Depth | Page |
 |---|---|---|
 | Claude Code | Full: per-turn models, tools, cache tiers, subagents | [claude-code.md](claude-code.md) |
-| Codex CLI | Full per-turn parsing + compaction waste | [codex.md](codex.md) |
+| Codex CLI | Full per-turn parsing + compaction pattern flags | [codex.md](codex.md) |
 | Cursor | Honest degraded mode: session totals only | [cursor.md](cursor.md) |
 | Gemini CLI | Full: per-turn models, tools, cache tokens | [gemini.md](gemini.md) |
 | opencode | Full: per-message models, tools, cache read/write | [opencode.md](opencode.md) |

@@ -1,9 +1,10 @@
 // R6 `compare <a> <b>`: strictly factual side-by-side comparison. I6 forbids
 // "better/worse" language — the only comparative wording allowed is a plain
 // cost ratio ("A cost 6.1× B"), computed from real totals, never a judgment.
-import { formatRatio, formatUsd, formatInt } from "./format.js";
+import { formatRatio, formatUsdLowerBound, formatInt } from "./format.js";
 import { colorEnabled, makeColorizer } from "./color.js";
-import type { ReceiptModel } from "./model.js";
+import { combinedPricedUsd, combinedTokenTotal, type ReceiptModel } from "./model.js";
+import { combinedPricingCoverageOf, knownCombinedUnpricedTokens } from "./pricingCoverage.js";
 import { renderReceiptLines, RECEIPT_WIDTH } from "./render.js";
 
 const SIDE_BY_SIDE_MIN_TERM_WIDTH = 110;
@@ -13,24 +14,43 @@ function labelFor(model: ReceiptModel): string {
   return model.title ?? model.sessionId;
 }
 
+function coverageFacts(model: ReceiptModel): string {
+  const coverage = combinedPricingCoverageOf(model);
+  const usd = combinedPricedUsd(model);
+  const knownUnpriced = knownCombinedUnpricedTokens(model).total;
+  const priced = usd === null ? "no known priced subtotal" : `known priced ${formatUsdLowerBound(usd)}`;
+  return `${priced} + ${formatInt(knownUnpriced)} known-unpriced tok (${coverage})`;
+}
+
 /** Factual-only delta line: a cost ratio when both sides priced, a token ratio when neither is, and a plain "unpriced" note when the two are mixed (a $/token ratio wouldn't be a real number). No better/worse wording (I6). */
 export function compareDeltaLine(a: ReceiptModel, b: ReceiptModel): string {
   const labelA = labelFor(a);
   const labelB = labelFor(b);
+  const usdA = combinedPricedUsd(a);
+  const usdB = combinedPricedUsd(b);
+  const coverageA = combinedPricingCoverageOf(a);
+  const coverageB = combinedPricingCoverageOf(b);
 
-  if (a.totalUsd !== null && b.totalUsd !== null) {
-    if (b.totalUsd === 0) {
-      return a.totalUsd === 0
-        ? `${labelA} and ${labelB} both cost $0.00`
-        : `${labelB} cost $0.00; ${labelA} cost $${formatUsd(a.totalUsd)}`;
-    }
-    const ratio = a.totalUsd / b.totalUsd;
-    return `${labelA} cost ${formatRatio(ratio)} ${labelB} ($${formatUsd(a.totalUsd)} vs $${formatUsd(b.totalUsd)})`;
+  // A ratio of incomplete lower bounds has no sound direction: omitted usage
+  // can change either side by an unknown amount. State each observed subtotal
+  // and exact known-unpriced token count instead (I2/I3).
+  if (coverageA === "partial" || coverageB === "partial") {
+    return `${labelA} and ${labelB} are not directly comparable: ${labelA} ${coverageFacts(a)}; ${labelB} ${coverageFacts(b)}`;
   }
 
-  const tokensA = a.unpriceable ? a.sessionTotalTokens.total : a.totalTokens.total;
-  const tokensB = b.unpriceable ? b.sessionTotalTokens.total : b.totalTokens.total;
-  if (a.totalUsd === null && b.totalUsd === null) {
+  if (coverageA === "full" && coverageB === "full" && usdA !== null && usdB !== null) {
+    if (usdB === 0) {
+      return usdA === 0
+        ? `${labelA} and ${labelB} both have a ${formatUsdLowerBound(0)} standard-API floor`
+        : `${labelB} has a ${formatUsdLowerBound(0)} floor; ${labelA} has a ${formatUsdLowerBound(usdA)} floor`;
+    }
+    const ratio = usdA / usdB;
+    return `${labelA}'s standard-API floor is ${formatRatio(ratio)} ${labelB}'s (${formatUsdLowerBound(usdA)} vs ${formatUsdLowerBound(usdB)})`;
+  }
+
+  const tokensA = combinedTokenTotal(a);
+  const tokensB = combinedTokenTotal(b);
+  if (usdA === null && usdB === null) {
     if (tokensB === 0) {
       return tokensA === 0
         ? `${labelA} and ${labelB} both used 0 tokens`

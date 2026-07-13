@@ -156,6 +156,14 @@ describe("rowGeometry — R1 font-safety on the column grid", () => {
     expect(g.truncated).toBe(false);
     expect(g.labelText).toBe("Bash");
   });
+
+  it("fits a complete extreme value inside the card instead of clipping its qualifier", () => {
+    const value = `≥ $${"9".repeat(120)}.99`;
+    const g = rowGeometry(LABEL_X, "TOTAL", value, 12.5);
+    expect(g.valueSize).toBeLessThan(12.5);
+    expect(g.valueStartX).toBeGreaterThanOrEqual(LABEL_X);
+    expect(g.overlapSafe).toBe(false);
+  });
 });
 
 describe("renderReceiptSvg — R2 geometry", () => {

@@ -11,13 +11,17 @@ import { fileURLToPath } from "node:url";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import fc from "fast-check";
 import { afterAll, describe, expect, it } from "vitest";
 import {
+  cacheReadIsLowerBound,
   cacheWriteIsLowerBound,
   cheapestCurrentRow,
   costOf,
   isoDateOf,
+  priceSessionTurn,
   priceTurn,
+  pricingUnitsForTurn,
   resolvePrice,
   vendorForSource,
 } from "../../src/pricing/resolve.js";
@@ -34,6 +38,75 @@ function usage(overrides: Partial<TokenUsage> & Pick<TokenUsage, "input" | "outp
   const total = overrides.total ?? overrides.input + overrides.output + overrides.cacheRead + overrides.cacheCreation;
   return { total, ...overrides };
 }
+
+const validUsageArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .record({
+    input: fc.integer({ min: 0, max: 1_000_000 }),
+    output: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheRead: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation5m: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation1h: fc.integer({ min: 0, max: 1_000_000 }),
+    unsplitCacheCreation: fc.integer({ min: 0, max: 1_000_000 }),
+    reports5m: fc.boolean(),
+    reports1h: fc.boolean(),
+  })
+  .map(({ input, output, cacheRead, cacheCreation5m, cacheCreation1h, unsplitCacheCreation, reports5m, reports1h }) => {
+    const cacheCreation = cacheCreation5m + cacheCreation1h + unsplitCacheCreation;
+    return {
+      input,
+      output,
+      cacheRead,
+      cacheCreation,
+      cacheCreation5m: reports5m ? cacheCreation5m : undefined,
+      cacheCreation1h: reports1h ? cacheCreation1h : undefined,
+      total: input + output + cacheRead + cacheCreation,
+    };
+  });
+
+const invalidComponentArbitrary = fc.oneof(
+  fc.integer({ min: -1_000_000, max: -1 }),
+  fc.integer({ min: 0, max: 1_000_000 }).map((value) => value + 0.5),
+  fc.constantFrom(Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY),
+);
+
+const malformedComponentUsageArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .tuple(
+    validUsageArbitrary,
+    fc.constantFrom<keyof TokenUsage>(
+      "input",
+      "output",
+      "cacheRead",
+      "cacheCreation",
+      "cacheCreation5m",
+      "cacheCreation1h",
+      "total",
+    ),
+    invalidComponentArbitrary,
+  )
+  .map(([valid, component, invalid]) => ({ ...valid, [component]: invalid }));
+
+const mismatchedTotalUsageArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .tuple(validUsageArbitrary, fc.integer({ min: 1, max: 1_000_000 }))
+  .map(([valid, extra]) => ({ ...valid, total: valid.total + extra }));
+
+const invalidCacheTierSubsetArbitrary: fc.Arbitrary<TokenUsage> = fc
+  .record({
+    input: fc.integer({ min: 0, max: 1_000_000 }),
+    output: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheRead: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation: fc.integer({ min: 0, max: 1_000_000 }),
+    cacheCreation5m: fc.integer({ min: 0, max: 1_000_000 }),
+    excess: fc.integer({ min: 1, max: 1_000_000 }),
+  })
+  .map(({ input, output, cacheRead, cacheCreation, cacheCreation5m, excess }) => ({
+    input,
+    output,
+    cacheRead,
+    cacheCreation,
+    cacheCreation5m,
+    cacheCreation1h: cacheCreation + excess,
+    total: input + output + cacheRead + cacheCreation,
+  }));
 
 describe("costOf / cacheWriteCost fallback chain", () => {
   it("prices an unsplit cache-write at the 5m rate (default-TTL assumption) plus cited input/output/cached rates", () => {
@@ -57,31 +130,243 @@ describe("costOf / cacheWriteCost fallback chain", () => {
     expect(costOf(u, r)).toBeCloseTo(12.0, 10);
   });
 
-  it("falls back to the plain input rate for both cache-write tiers and cached-read when the row cites neither", () => {
+  it("excludes cached reads and writes when the row cites neither applicable rate", () => {
     const r = row({ input: 4, output: 8 }); // no input_cached, no input_cache_write_5m/1h
     const u = usage({ input: 1_000_000, output: 1_000_000, cacheRead: 1_000_000, cacheCreation: 1_000_000 });
-    // input 4 + output 8 + cacheRead fallback-to-input 4 + cacheWrite fallback-to-input 4 (unsplit) = 20
-    expect(costOf(u, r)).toBeCloseTo(20, 10);
+    // Only cited input/output components enter the observable floor.
+    expect(costOf(u, r)).toBeCloseTo(12, 10);
+    expect(cacheReadIsLowerBound(u, r)).toBe(true);
+    expect(cacheWriteIsLowerBound(u, r)).toBe(true);
   });
 
-  it("falls back to the input rate only for the uncited 1h tier while using the cited 5m rate for the rest", () => {
+  it("excludes an uncited 1h tier while using the cited 5m rate for the rest", () => {
     const r = row({ input: 2, output: 6, input_cache_write_5m: 2.5 }); // no input_cache_write_1h, no input_cached
     const u = usage({ input: 0, output: 0, cacheRead: 1_000_000, cacheCreation: 800_000, cacheCreation1h: 500_000 });
-    // cacheRead fallback-to-input: rate(2,1e6)=2.0
-    // known1h=500000 @ fallback input rate 2.0 = 1.0; unsplit=800000-0-500000=300000 @ cited 5m rate 2.5 = 0.75
-    // cacheWriteCost = 0(known5m) + 1.0 + 0.75 = 1.75
-    expect(costOf(u, r)).toBeCloseTo(2.0 + 1.75, 10);
+    // Cached reads and the known 1h write have no cited rate and contribute 0;
+    // the 300K unsplit remainder uses the cited 5m rate = 0.75.
+    expect(costOf(u, r)).toBeCloseTo(0.75, 10);
+  });
+
+  it("uses TTL-specific cache-write rates before a generic rate, preserving Anthropic-style semantics", () => {
+    const r = row({
+      input: 4,
+      output: 8,
+      input_cache_write: 5,
+      input_cache_write_5m: 6,
+      input_cache_write_1h: 8,
+    });
+    const u = usage({
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheCreation: 1_000_000,
+      cacheCreation5m: 200_000,
+      cacheCreation1h: 300_000,
+    });
+    // Known 5m + the unsplit remainder use the specific 5m rate; known 1h
+    // uses the specific 1h rate. The generic rate is only a fallback.
+    expect(costOf(u, r)).toBeCloseTo(6.6, 10);
+  });
+
+  it("uses a cited generic cache-write rate for known TTL buckets and unsplit writes when no specific rate exists", () => {
+    const r = row({ input: 4, output: 8, input_cache_write: 5 });
+    const u = usage({
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheCreation: 1_000_000,
+      cacheCreation5m: 200_000,
+      cacheCreation1h: 300_000,
+    });
+    expect(costOf(u, r)).toBeCloseTo(5, 10);
+    expect(cacheWriteIsLowerBound(u, r)).toBe(false);
+  });
+});
+
+describe("costOf context tiers", () => {
+  const tiered = row({
+    input: 10,
+    output: 40,
+    input_cached: 1,
+    input_cache_write: 12,
+    context_tiers: [
+      {
+        above_input_tokens: 272_000,
+        input: 20,
+        output: 60,
+        input_cached: 2,
+        input_cache_write: 24,
+      },
+    ],
+  });
+
+  it("keeps exactly 272000 prompt-input tokens on the base tier and prices every token component", () => {
+    const u = usage({ input: 100_000, output: 1_000_000, cacheRead: 100_000, cacheCreation: 72_000 });
+    expect(costOf(u, tiered)).toBeCloseTo(41.964, 12);
+  });
+
+  it("moves 272001 prompt-input tokens to the >272K tier for the full request", () => {
+    const u = usage({ input: 100_001, output: 1_000_000, cacheRead: 100_000, cacheCreation: 72_000 });
+    expect(costOf(u, tiered)).toBeCloseTo(63.92802, 12);
+  });
+
+  it("does not count output toward the prompt-input threshold", () => {
+    const u = usage({ input: 0, output: 10_000_000, cacheRead: 272_000, cacheCreation: 0 });
+    expect(costOf(u, tiered)).toBeCloseTo(400.272, 12);
+  });
+
+  it("does count cache creation toward the prompt-input threshold", () => {
+    const u = usage({ input: 272_000, output: 0, cacheRead: 0, cacheCreation: 1 });
+    expect(costOf(u, tiered)).toBeCloseTo(5.440024, 12);
+  });
+
+  it("selects the highest eligible tier independent of declaration order", () => {
+    const multiTier = row({
+      input: 1,
+      output: 1,
+      context_tiers: [
+        { above_input_tokens: 500_000, input: 3, output: 3 },
+        { above_input_tokens: 272_000, input: 2, output: 2 },
+      ],
+    });
+    const u = usage({ input: 500_001, output: 1_000_000, cacheRead: 0, cacheCreation: 0 });
+    expect(costOf(u, multiTier)).toBeCloseTo(3 * 0.500001 + 3, 12);
+  });
+
+  it("property: matches an independent all-component oracle on both sides of the threshold", () => {
+    const arbitrary = fc.record({
+      input: fc.integer({ min: 0, max: 400_000 }),
+      output: fc.integer({ min: 0, max: 1_000_000 }),
+      cacheRead: fc.integer({ min: 0, max: 400_000 }),
+      cacheCreation: fc.integer({ min: 0, max: 400_000 }),
+    });
+    fc.assert(
+      fc.property(arbitrary, ({ input, output, cacheRead, cacheCreation }) => {
+        const u = usage({ input, output, cacheRead, cacheCreation });
+        const long = input + cacheRead + cacheCreation > 272_000;
+        const expected =
+          ((long ? 20 : 10) * input +
+            (long ? 60 : 40) * output +
+            (long ? 2 : 1) * cacheRead +
+            (long ? 24 : 12) * cacheCreation) /
+          1_000_000;
+        expect(costOf(u, tiered)).toBeCloseTo(expected, 12);
+        expect(cacheWriteIsLowerBound(u, tiered)).toBe(false);
+      }),
+      { numRuns: 250 },
+    );
+  });
+
+  it("property: every partition of the exact boundary stays base and one token more selects long context", () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 272_001 }),
+        fc.integer({ min: 0, max: 272_001 }),
+        (first, second) => {
+          for (const promptInput of [272_000, 272_001]) {
+            const input = first % (promptInput + 1);
+            const remainder = promptInput - input;
+            const cacheRead = second % (remainder + 1);
+            const cacheCreation = remainder - cacheRead;
+            const u = usage({ input, output: 123_456, cacheRead, cacheCreation });
+            const long = promptInput === 272_001;
+            const expected =
+              ((long ? 20 : 10) * input +
+                (long ? 60 : 40) * u.output +
+                (long ? 2 : 1) * cacheRead +
+                (long ? 24 : 12) * cacheCreation) /
+              1_000_000;
+            expect(costOf(u, tiered)).toBeCloseTo(expected, 12);
+          }
+        },
+      ),
+      { numRuns: 150 },
+    );
+  });
+});
+
+describe("pricingUnitsForTurn", () => {
+  it("accepts exact request partitions and rejects mismatches without aggregate fallback", () => {
+    const first = usage({ input: 100, output: 10, cacheRead: 0, cacheCreation: 0 });
+    const second = usage({ input: 200, output: 20, cacheRead: 0, cacheCreation: 0 });
+    const exact = { index: 0, usage: usage({ input: 300, output: 30, cacheRead: 0, cacheCreation: 0 }), pricingUnits: [{ usage: first }, { usage: second }], toolCalls: [] };
+    expect(pricingUnitsForTurn(exact)).toHaveLength(2);
+    expect(pricingUnitsForTurn({ ...exact, usage: usage({ input: 301, output: 30, cacheRead: 0, cacheCreation: 0 }) })).toBeNull();
+    expect(pricingUnitsForTurn({ ...exact, pricingUnits: [] })).toBeNull();
+  });
+
+  it("never inherits request model or timestamp from the enclosing turn/session", async () => {
+    const u = usage({ input: 100, output: 10, cacheRead: 0, cacheCreation: 0 });
+    const session = { source: "codex" as const, model: "gpt-5.3-codex", startedAt: Date.parse("2026-07-10T00:00:00Z") };
+    const enclosing = {
+      index: 0,
+      timestamp: Date.parse("2026-07-10T00:00:01Z"),
+      model: "gpt-5.3-codex",
+      usage: u,
+      toolCalls: [],
+    };
+
+    expect(await priceSessionTurn(session, { ...enclosing, pricingUnits: [{ usage: u }] }, realDataDir)).toBeNull();
+    expect(
+      await priceSessionTurn(
+        session,
+        { ...enclosing, pricingUnits: [{ usage: u, model: "gpt-5.3-codex" }] },
+        realDataDir,
+      ),
+    ).toBeNull();
+    expect(
+      await priceSessionTurn(
+        session,
+        { ...enclosing, pricingUnits: [{ usage: u, model: "gpt-5.3-codex", timestamp: enclosing.timestamp }] },
+        realDataDir,
+      ),
+    ).not.toBeNull();
+
+    // A legacy single-request turn still carries its own model/time through
+    // the synthetic unit; session-level fallback alone is not enough.
+    expect(await priceSessionTurn(session, { ...enclosing, model: undefined }, realDataDir)).toBeNull();
+    expect(await priceSessionTurn(session, { ...enclosing, timestamp: undefined }, realDataDir)).toBeNull();
+  });
+
+  it("retains a known request-unit subtotal and the exact unpriced remainder", async () => {
+    const pricedUnit = usage({ input: 1_000_000, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const routedUnit = usage({ input: 300, output: 100, cacheRead: 0, cacheCreation: 25 });
+    const timestamp = Date.parse("2026-06-15T10:00:00Z");
+    const session = { source: "claude-code" as const };
+    const turn = {
+      index: 0,
+      timestamp,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 1_000_300, output: 100, cacheRead: 0, cacheCreation: 25 }),
+      pricingUnits: [
+        { usage: pricedUnit, model: "claude-haiku-4-5", timestamp, pricingProvider: "anthropic" as const },
+        { usage: routedUnit, model: "claude-haiku-4-5", timestamp, pricingProvider: null },
+      ],
+      toolCalls: [],
+    };
+
+    const result = await priceSessionTurn(session, turn, realDataDir);
+    expect(result?.usd).toBeCloseTo(1, 12);
+    expect(result?.unpricedUsage).toEqual(routedUnit);
+    expect(result?.byModelUsd).toEqual([{ model: "claude-haiku-4-5", usd: 1 }]);
+    expect(result?.cacheReadAtInputRateUsd).toBeNull();
+
+    const allRouted = {
+      ...turn,
+      pricingUnits: turn.pricingUnits.map((unit) => ({ ...unit, pricingProvider: null })),
+    };
+    expect(await priceSessionTurn(session, allRouted, realDataDir)).toBeNull();
   });
 });
 
 describe("cacheWriteIsLowerBound (SPEC-0044 A3 — row-aware, not usage-only)", () => {
-  it("is false for an unsplit cache-write when the row cites the 5m rate (e.g. Anthropic) — priced exactly, no caveat", () => {
+  it("is false for an unsplit cache-write when the row cites the 5m rate (e.g. Anthropic) — observable component included, no caveat", () => {
     const r = row({ input: 4, output: 8, input_cache_write_5m: 5.0, input_cache_write_1h: 10.0 });
     const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000 });
     expect(cacheWriteIsLowerBound(u, r)).toBe(false);
   });
 
-  it("is true for an unsplit cache-write when the row does NOT cite the 5m rate — falls back to base input, genuine lower bound", () => {
+  it("is true for an unsplit cache-write when the row does NOT cite the 5m rate — component excluded, genuine lower bound", () => {
     const r = row({ input: 4, output: 8 }); // no input_cache_write_5m/1h cited
     const u = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000 });
     expect(cacheWriteIsLowerBound(u, r)).toBe(true);
@@ -121,6 +406,32 @@ describe("cacheWriteIsLowerBound (SPEC-0044 A3 — row-aware, not usage-only)", 
     const r = row({ input: 4, output: 8 });
     const u = usage({ input: 1_000, output: 1_000, cacheRead: 0, cacheCreation: 0 });
     expect(cacheWriteIsLowerBound(u, r)).toBe(false);
+  });
+
+  it("is false when the selected context tier cites a generic cache-write rate", () => {
+    const r = row({
+      input: 4,
+      output: 8,
+      context_tiers: [
+        { above_input_tokens: 100, input: 8, output: 12, input_cache_write: 10 },
+      ],
+    });
+    const u = usage({ input: 101, output: 0, cacheRead: 0, cacheCreation: 1_000 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(false);
+  });
+
+  it("is true when only the base tier cites a generic cache-write rate and the selected tier does not", () => {
+    const r = row({
+      input: 4,
+      output: 8,
+      input_cache_write: 5,
+      context_tiers: [
+        { above_input_tokens: 100, input: 8, output: 12 },
+      ],
+    });
+    const u = usage({ input: 101, output: 0, cacheRead: 0, cacheCreation: 1_000 });
+    expect(cacheWriteIsLowerBound(u, r)).toBe(true);
+    expect(costOf(u, r)).toBeCloseTo((101 * 8) / 1_000_000, 12);
   });
 });
 
@@ -176,6 +487,16 @@ describe("cheapestCurrentRow", () => {
 
 describe("priceTurn", () => {
   const validUsage = usage({ input: 1_000_000, output: 0, cacheRead: 0, cacheCreation: 0 });
+  const invalidRateDir = mkdtempSync(path.join(tmpdir(), "aireceipts-invalid-rate-"));
+  afterAll(() => rmSync(invalidRateDir, { recursive: true, force: true }));
+  const invalidRateTable: PriceTable = {
+    vendor: "invalid-rate",
+    models: {
+      negative: { price_history: [row({ input: -1, output: 1 })] },
+      overflow: { price_history: [row({ input: 1e308, output: 1e308 })] },
+    },
+  };
+  writeFileSync(path.join(invalidRateDir, "invalid-rate.json"), JSON.stringify(invalidRateTable));
 
   it("returns null when vendor, modelId, dateISO, or usage is missing", async () => {
     expect(await priceTurn(undefined, "claude-haiku-4-5", "2026-06-15", validUsage, realDataDir)).toBeNull();
@@ -193,6 +514,17 @@ describe("priceTurn", () => {
     expect(result?.usd).toBeCloseTo(1.0, 10);
   });
 
+  it("preserves an exact zero-dollar result for valid zero usage", async () => {
+    const zeroUsage = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 0 });
+    expect((await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", zeroUsage, realDataDir))?.usd).toBe(0);
+  });
+
+  it("returns null if a malformed row would make the computed dollar negative or non-finite", async () => {
+    expect(await priceTurn("invalid-rate", "negative", "2026-06-15", validUsage, invalidRateDir)).toBeNull();
+    const overflowUsage = usage({ input: 1_000_000, output: 1_000_000, cacheRead: 0, cacheCreation: 0 });
+    expect(await priceTurn("invalid-rate", "overflow", "2026-06-15", overflowUsage, invalidRateDir)).toBeNull();
+  });
+
   it("carries cacheWriteLowerBound: false for a turn with no cache-write at all", async () => {
     const result = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", validUsage, realDataDir);
     expect(result?.cacheWriteLowerBound).toBe(false);
@@ -202,6 +534,47 @@ describe("priceTurn", () => {
     const withCacheWrite = usage({ input: 0, output: 0, cacheRead: 0, cacheCreation: 1_000 });
     const result = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", withCacheWrite, realDataDir);
     expect(result?.cacheWriteLowerBound).toBe(false);
+  });
+
+  it("returns null when the reported cache tiers exceed the cache-write total", async () => {
+    const impossibleSplit = usage({
+      input: 0,
+      output: 0,
+      cacheRead: 0,
+      cacheCreation: 1_000,
+      cacheCreation5m: 700,
+      cacheCreation1h: 400,
+    });
+    expect(await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", impossibleSplit, realDataDir)).toBeNull();
+  });
+
+  it("returns null when total disagrees with the sum of the priced components", async () => {
+    const mismatchedTotal = usage({ input: 100, output: 20, cacheRead: 10, cacheCreation: 5, total: 136 });
+    expect(await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", mismatchedTotal, realDataDir)).toBeNull();
+  });
+
+  it("keeps valid integer usage equal to costOf's Standard-row arithmetic across cache-tier combinations", async () => {
+    const resolved = await resolvePrice("anthropic", "claude-haiku-4-5", "2026-06-15", realDataDir);
+    expect(resolved).not.toBeNull();
+    await fc.assert(
+      fc.asyncProperty(validUsageArbitrary, async (candidate) => {
+        const priced = await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", candidate, realDataDir);
+        expect(priced?.usd).toBe(costOf(candidate, resolved!));
+      }),
+      { numRuns: 100 },
+    );
+  });
+
+  it("never prices non-finite, negative, fractional, or out-of-subset usage", async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.oneof(malformedComponentUsageArbitrary, mismatchedTotalUsageArbitrary, invalidCacheTierSubsetArbitrary),
+        async (candidate) => {
+          expect(await priceTurn("anthropic", "claude-haiku-4-5", "2026-06-15", candidate, realDataDir)).toBeNull();
+        },
+      ),
+      { numRuns: 150 },
+    );
   });
 });
 

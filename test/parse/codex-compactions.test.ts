@@ -31,6 +31,30 @@ function assistantTurn(input: number, ts: string): unknown[] {
   ];
 }
 
+function cumulativeAssistantTurn(cumulativeInput: number, localInput: number, turnNumber: number, ts: string): unknown[] {
+  return [
+    {
+      timestamp: ts,
+      type: "event_msg",
+      payload: {
+        type: "token_count",
+        info: {
+          total_token_usage: {
+            input_tokens: cumulativeInput,
+            output_tokens: turnNumber * 10,
+            total_tokens: cumulativeInput + turnNumber * 10,
+          },
+          last_token_usage: {
+            input_tokens: localInput,
+            output_tokens: 10,
+            total_tokens: localInput + 10,
+          },
+        },
+      },
+    },
+  ];
+}
+
 function userMsg(text: string, ts: string): unknown {
   return { timestamp: ts, type: "event_msg", payload: { type: "user_message", message: text } };
 }
@@ -215,13 +239,13 @@ describe("SPEC-0040 R4 — detector parity (no agent branching)", () => {
     // 2+ refill-positive compactions with gap ≤ 25: prompt-side peaks at ~1000
     // before each compaction and refills to ≥ 0.8× after.
     const records: unknown[] = [userMsg("go", "2026-07-01T09:00:00.000Z")];
-    records.push(...assistantTurn(1000, "2026-07-01T09:00:04.000Z"));
+    records.push(...cumulativeAssistantTurn(1000, 1000, 1, "2026-07-01T09:00:04.000Z"));
     records.push(userMsg("a", "2026-07-01T09:00:06.000Z"));
     records.push(compacted("2026-07-01T09:00:08.000Z"));
-    records.push(...assistantTurn(950, "2026-07-01T09:00:12.000Z"));
+    records.push(...cumulativeAssistantTurn(1950, 950, 2, "2026-07-01T09:00:12.000Z"));
     records.push(userMsg("b", "2026-07-01T09:00:14.000Z"));
     records.push(compacted("2026-07-01T09:00:16.000Z"));
-    records.push(...assistantTurn(980, "2026-07-01T09:00:20.000Z"));
+    records.push(...cumulativeAssistantTurn(2930, 980, 3, "2026-07-01T09:00:20.000Z"));
     const s = await load(records);
     expect(s?.compactions).toHaveLength(2);
     const findings = await detectContextThrash(s!);

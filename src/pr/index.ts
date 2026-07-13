@@ -48,7 +48,10 @@ import { pushReceiptRef, writeReceiptRef } from "./store.js";
 
 export interface PrOptions {
   post: boolean;
+  /** SPEC-0023 R5 compatibility: one selector still replaces auto-selection. */
   session?: string;
+  /** Issue #234: two or more explicit selectors append to the conservative auto-selected set. */
+  sessions?: readonly string[];
   /** SPEC-0027: publish the HTML receipt artifact and link it (requires --post). */
   artifact?: boolean;
   /** SPEC-0026 R5: include the collapsed full-receipts section (default true; `--no-details` clears it). */
@@ -151,11 +154,12 @@ interface Resolved {
 }
 
 /**
- * Resolve the contributor set: explicit --session → exactly one (R5); else the
- * conservative auto-selected union of the repo pool and SPEC-0024's anchor
- * pool (R1). Sidechain candidates are returned for the post-rollup promotion
- * pass, so an empty contributor list here is not yet a NO_MATCH — `runPr`
- * decides after promotion (SPEC-0024 R4).
+ * Resolve the contributor set: one explicit --session → exactly one (R5);
+ * repeated --session flags → the conservative auto-selected union plus every
+ * explicit attachment (#234), de-duplicated by transcript file. Sidechain
+ * candidates are returned for the post-rollup promotion pass, so an empty
+ * contributor list here is not yet a NO_MATCH — `runPr` decides after
+ * promotion (SPEC-0024 R4).
  */
 async function resolveContributors(
   opts: PrOptions,
@@ -175,18 +179,41 @@ async function resolveContributors(
     return hit ? Promise.resolve(hit) : deps.loadSession(summary);
   };
 
-  if (opts.session) {
-    const summary = await selectExplicitSession([...sessions, ...nested.map((n) => n.summary)], opts.session);
+  // `sessions` is the lossless CLI representation. The scalar remains for
+  // direct API callers and the shipped one-selector contract.
+  const explicitSelectors =
+    opts.sessions !== undefined && opts.sessions.length > 0
+      ? [...opts.sessions]
+      : opts.session !== undefined
+        ? [opts.session]
+        : [];
+  const allSummaries = [...sessions, ...nested.map((n) => n.summary)];
+  const explicitByPath = new Map<string, RawContributor>();
+  for (const selector of explicitSelectors) {
+    const summary = await selectExplicitSession(allSummaries, selector);
     if (!summary) {
-      return { error: `no session matched "${opts.session}"` };
+      return { error: `no session matched "${selector}"` };
+    }
+    if (explicitByPath.has(summary.filePath)) {
+      continue;
     }
     const session = await loadSession(summary);
     if (!session) {
       return { error: `failed to load session "${summary.id}"` };
     }
-    return {
+    preloaded.set(summary.filePath, session);
+    explicitByPath.set(summary.filePath, {
+      summary,
+      session,
+      slice: computeSlice(session.turns, shas),
       // Explicitly-selected sessions are the user's own attribution claim — anchor-grade.
-      contributors: [{ summary, session, slice: computeSlice(session.turns, shas), basis: "anchor" }],
+      basis: "anchor",
+    });
+  }
+
+  if (explicitSelectors.length === 1) {
+    return {
+      contributors: [...explicitByPath.values()],
       excludedCount: 0,
       events: [],
       sidechains: [],
@@ -230,7 +257,7 @@ async function resolveContributors(
       candidates.push({ summary: n.summary, pool: "anchor" });
     }
   }
-  if (candidates.length === 0 && sidechains.length === 0) {
+  if (candidates.length === 0 && sidechains.length === 0 && explicitSelectors.length === 0) {
     return { error: NO_MATCH };
   }
   const selection = await selectContributors(candidates, shas, {
@@ -239,7 +266,38 @@ async function resolveContributors(
     currentWorktreeRoot: currentWorktreeRoot(deps.runGit, deps.cwd) ?? deps.cwd,
     runGit: deps.runGit,
   });
-  return { ...selection, sidechains };
+  if (explicitSelectors.length < 2) {
+    return { ...selection, sidechains };
+  }
+
+  // Repeated flags are additive: auto attribution remains the conservative
+  // baseline, while each named transcript is an explicit user claim. Replace
+  // an auto copy with its explicit form instead of counting it twice. When the
+  // auto copy carries recovered amend aliases, retain that richer slicing data
+  // and only upgrade its basis.
+  const contributorsByPath = new Map(selection.contributors.map((raw) => [raw.summary.filePath, raw]));
+  for (const explicit of explicitByPath.values()) {
+    const automatic = contributorsByPath.get(explicit.summary.filePath);
+    contributorsByPath.set(explicit.summary.filePath, automatic ? { ...automatic, basis: "anchor" } : explicit);
+  }
+  const contributors = [...contributorsByPath.values()].sort(
+    (a, b) =>
+      (a.session.startedAt ?? 0) - (b.session.startedAt ?? 0) ||
+      a.summary.id.localeCompare(b.summary.id) ||
+      a.summary.filePath.localeCompare(b.summary.filePath),
+  );
+
+  // An auto-attribution drop for a transcript the user explicitly attached is
+  // no longer a drop. Removing its event also keeps the legacy excluded count
+  // and the typed confidence summary on the same source of truth.
+  const explicitPaths = new Set(explicitByPath.keys());
+  const events = selection.events.filter((event) => !explicitPaths.has(event.sessionId));
+  const excludedCount = new Set(
+    events
+      .filter((event) => event.kind === "silenced-git-write" || event.kind === "unanchored-git-write")
+      .map((event) => event.sessionId),
+  ).size;
+  return { contributors, excludedCount, events, sidechains };
 }
 
 /**
@@ -259,10 +317,24 @@ async function resolveContributors(
  *    "single typed enumeration" claim holds. Both agree by construction (same
  *    `row.unreadable`); the legacy count still renders the note, the event floors
  *    — no double note, so output is byte-identical.
+ *  - `partial-priced-coverage`: a credited contributor/subagent has a known `$`
+ *    plus turns that could only contribute tokens. The exact excluded tokens
+ *    render separately and the known-dollar total is visibly floored.
  */
-export function pushSessionSubagentEvents(events: ConfidenceEvent[], raw: RawContributor, subagents: SubagentRow[]): void {
+export function pushSessionSubagentEvents(
+  events: ConfidenceEvent[],
+  raw: RawContributor,
+  subagents: SubagentRow[],
+  model: Pick<ReceiptModel, "unpricedTokens" | "unobservedCacheWriteTokens">,
+): void {
   if ((raw.session.droppedRecords ?? 0) > 0) {
     events.push({ kind: "dropped-transcript-records", sessionId: raw.summary.filePath });
+  }
+  if ((model.unpricedTokens?.total ?? 0) > 0) {
+    events.push({ kind: "partial-priced-coverage", sessionId: raw.summary.filePath });
+  }
+  if (model.unobservedCacheWriteTokens) {
+    events.push({ kind: "unobserved-cache-write-tokens", sessionId: raw.summary.filePath });
   }
   for (const row of subagents) {
     if ((row.droppedRecords ?? 0) > 0) {
@@ -271,6 +343,12 @@ export function pushSessionSubagentEvents(events: ConfidenceEvent[], raw: RawCon
     if (row.unreadable) {
       events.push({ kind: "unreadable-subagent", sessionId: row.filePath });
     }
+    if ((row.unpricedTokens?.total ?? 0) > 0) {
+      events.push({ kind: "partial-priced-coverage", sessionId: row.filePath });
+    }
+    if (row.unobservedCacheWriteTokens) {
+      events.push({ kind: "unobserved-cache-write-tokens", sessionId: row.filePath });
+    }
   }
 }
 
@@ -278,9 +356,11 @@ async function buildContributorView(raw: RawContributor, deps: PrDeps, excludedC
   const rendered = raw.slice.kind === "slice" ? sliceSessionForReceipt(raw.session, raw.slice) : raw.session;
   const model = await buildReceiptModel(rendered);
   const window: RollupWindow =
-    raw.slice.kind === "slice" && rendered.startedAt !== undefined && rendered.endedAt !== undefined
-      ? { start: rendered.startedAt, end: rendered.endedAt }
-      : null;
+    raw.slice.kind === "full"
+      ? { kind: "full" }
+      : rendered.startedAt !== undefined && rendered.endedAt !== undefined
+        ? { kind: "range", start: rendered.startedAt, end: rendered.endedAt }
+        : { kind: "unknown" };
   const subagents = await deps.rollup(raw.summary.filePath, window, excludedChildren);
   const view: ContributorView = {
     role: deriveRole(raw.summary, raw.session, subagents.length > 0),
@@ -289,6 +369,7 @@ async function buildContributorView(raw: RawContributor, deps: PrDeps, excludedC
     modelMix: model.modelMix,
     usd: model.totalUsd,
     tokens: model.totalTokens,
+    ...(model.unpricedTokens ? { unpricedTokens: model.unpricedTokens } : {}),
     subagents,
     basis: raw.basis,
     durationMs: model.durationMs,
@@ -486,7 +567,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     if (model.costLowerBoundCacheTier) {
       costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
     }
-    pushSessionSubagentEvents(costEvents, raw, view.subagents);
+    pushSessionSubagentEvents(costEvents, raw, view.subagents, model);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const { promoted, events: promoteEvents } = await promoteOrphanSidechains(resolved.sidechains, shas, covered, deps.loadSession);
@@ -495,7 +576,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     if (model.costLowerBoundCacheTier) {
       costEvents.push({ kind: "cost-lower-bound-cache-tier", sessionId: raw.summary.filePath });
     }
-    pushSessionSubagentEvents(costEvents, raw, view.subagents);
+    pushSessionSubagentEvents(costEvents, raw, view.subagents, model);
     entries.push({ view, model, startedAt: raw.session.startedAt ?? 0, id: raw.summary.id, raw });
   }
   const allEvents = [...resolved.events, ...promoteEvents, ...costEvents];
@@ -548,7 +629,11 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     const notAttributable: string[] = [];
     for (const e of fenceOrdered) {
       const label = detailLabel(e.view, e.model);
-      const segments = segmentSlice(e.raw.slice, anchorEvents(e.raw.session.turns, branchInfo.shas), branchInfo);
+      const segments = segmentSlice(
+        e.raw.slice,
+        anchorEvents(e.raw.session.turns, branchInfo.shas, e.raw.anchorAliases),
+        branchInfo,
+      );
       if (segments.length === 0) {
         notAttributable.push(label);
         sessions.push({ label, model: e.model });

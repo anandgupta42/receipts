@@ -64,7 +64,9 @@ export function partitionWindows(summaries: SessionSummary[], bounds: WindowBoun
   const current: SessionSummary[] = [];
   const prior: SessionSummary[] = [];
   for (const s of summaries) {
-    if (s.endedAt === undefined || !isAggregatableSession(s)) {
+    // A degraded summary has no reliable totals, so an all-zero vector cannot
+    // prove it is an empty artifact. Keep it in the timestamped denominator.
+    if (s.endedAt === undefined || (s.degraded === undefined && !isAggregatableSession(s))) {
       continue;
     }
     if (s.endedAt >= bounds.curStart && s.endedAt < bounds.curEnd) {
@@ -93,10 +95,24 @@ export interface ProjectSplit {
 }
 
 export interface WindowAggregate {
+  /** Loaded plus unreadable in-window summaries (the pricing coverage denominator). */
   sessionCount: number;
+  /** Loaded sessions with at least one priced usage component (full + partial). */
   pricedSessionCount: number;
-  /** Sessions whose `$` could not be computed (no priced turn / unpriceable) — the count excluded from the `$` total. */
+  /** Loaded sessions whose observed usage was completely priced. */
+  fullyPricedSessionCount: number;
+  /** Loaded sessions with both priced and unpriced observed usage. */
+  partiallyPricedSessionCount: number;
+  /** Partial sessions whose priced turns omitted a cache component for lack of a cited applicable rate. */
+  cacheRatePartialSessionCount: number;
+  /** Loaded sessions with no priced observed usage. */
+  unpricedSessionCount: number;
+  /** In-window summaries whose full session could not be loaded safely. */
+  unreadableSessionCount: number;
+  /** Sessions with no priced component, plus unreadable summaries. */
   excludedSessionCount: number;
+  /** Exact usage from unpriced request envelopes; cache-rate gaps are counted separately and do not inflate this subtotal. */
+  unpricedTokenTotal: TokenUsage;
   /** Sum of priced sessions' totals; `null` when zero sessions priced (never rendered as `$0` against unpriced work). */
   pricedUsd: number | null;
   /** Sum over ALL sessions in the window (present even for unpriceable sources). */
@@ -159,13 +175,19 @@ export async function aggregateWindow(
   sessions: Session[],
   byProject: boolean,
   dataDir: string = defaultDataDir(),
+  unreadableSummaries: SessionSummary[] = [],
 ): Promise<WindowAggregate> {
   const agents = new Map<string, SplitAcc>();
   const projects = new Map<string, SplitAcc>();
   let pricedUsd = 0;
   let anyPriced = false;
   let pricedSessionCount = 0;
+  let fullyPricedSessionCount = 0;
+  let partiallyPricedSessionCount = 0;
+  let cacheRatePartialSessionCount = 0;
+  let unpricedSessionCount = 0;
   let tokenTotal = emptyUsage();
+  let unpricedTokenTotal = emptyUsage();
 
   for (const session of sessions) {
     const attr = await attributeByTool(session, dataDir);
@@ -173,15 +195,39 @@ export async function aggregateWindow(
     const usd = attr.totalUsd;
 
     tokenTotal = addUsage(tokenTotal, sessionTokens);
+    unpricedTokenTotal = addUsage(unpricedTokenTotal, attr.unpricedTokens);
     if (usd !== null) {
       pricedUsd += usd;
       anyPriced = true;
       pricedSessionCount += 1;
+      if (attr.unpricedTokens.total > 0 || attr.costLowerBoundCacheTier) {
+        partiallyPricedSessionCount += 1;
+        if (attr.costLowerBoundCacheTier) {
+          cacheRatePartialSessionCount += 1;
+        }
+      } else {
+        fullyPricedSessionCount += 1;
+      }
+    } else {
+      unpricedSessionCount += 1;
     }
 
     addToSplit(accOf(agents, session.source), usd, sessionTokens);
     if (byProject) {
       addToSplit(accOf(projects, deriveProjectBucket(session.filePath)), usd, sessionTokens);
+    }
+  }
+
+  // A summary that parsed fully during discovery but failed to reload still
+  // contributes its already-observed tokens. A degraded summary's totals are
+  // explicitly unreliable, so it contributes only to the coverage denominator.
+  for (const summary of unreadableSummaries) {
+    const summaryTokens = summary.degraded === undefined ? summary.totals.tokens : emptyUsage();
+    tokenTotal = addUsage(tokenTotal, summaryTokens);
+    unpricedTokenTotal = addUsage(unpricedTokenTotal, summaryTokens);
+    addToSplit(accOf(agents, summary.source), null, summaryTokens);
+    if (byProject) {
+      addToSplit(accOf(projects, deriveProjectBucket(summary.filePath)), null, summaryTokens);
     }
   }
 
@@ -211,9 +257,15 @@ export async function aggregateWindow(
   const waste = await aggregateWaste(sessions, dataDir);
 
   return {
-    sessionCount: sessions.length,
+    sessionCount: sessions.length + unreadableSummaries.length,
     pricedSessionCount,
-    excludedSessionCount: sessions.length - pricedSessionCount,
+    fullyPricedSessionCount,
+    partiallyPricedSessionCount,
+    cacheRatePartialSessionCount,
+    unpricedSessionCount,
+    unreadableSessionCount: unreadableSummaries.length,
+    excludedSessionCount: unpricedSessionCount + unreadableSummaries.length,
+    unpricedTokenTotal,
     pricedUsd: anyPriced ? pricedUsd : null,
     tokenTotal,
     byAgent,
@@ -273,9 +325,24 @@ export interface WeekOptions {
   dataDir?: string;
 }
 
-async function loadAll(summaries: SessionSummary[]): Promise<Session[]> {
+interface LoadedWindow {
+  sessions: Session[];
+  unreadableSummaries: SessionSummary[];
+}
+
+async function loadAll(summaries: SessionSummary[]): Promise<LoadedWindow> {
   const loaded = await Promise.all(summaries.map((s) => loadSession(s)));
-  return loaded.filter((s): s is Session => s !== null);
+  const sessions: Session[] = [];
+  const unreadableSummaries: SessionSummary[] = [];
+  for (let index = 0; index < summaries.length; index += 1) {
+    const session = loaded[index];
+    if (session && session.degraded === undefined) {
+      sessions.push(session);
+    } else {
+      unreadableSummaries.push(summaries[index]);
+    }
+  }
+  return { sessions, unreadableSummaries };
 }
 
 /**
@@ -287,12 +354,18 @@ export async function assembleWeekDigest(
   bounds: WindowBounds,
   currentSessions: Session[],
   priorSessions: Session[],
-  opts: { sinceOverride: boolean; byProject: boolean; dataDir?: string },
+  opts: {
+    sinceOverride: boolean;
+    byProject: boolean;
+    dataDir?: string;
+    currentUnreadableSummaries?: SessionSummary[];
+    priorUnreadableSummaries?: SessionSummary[];
+  },
 ): Promise<WeekDigest> {
   const dataDir = opts.dataDir ?? defaultDataDir();
   const [current, prior] = await Promise.all([
-    aggregateWindow(currentSessions, opts.byProject, dataDir),
-    aggregateWindow(priorSessions, opts.byProject, dataDir),
+    aggregateWindow(currentSessions, opts.byProject, dataDir, opts.currentUnreadableSummaries),
+    aggregateWindow(priorSessions, opts.byProject, dataDir, opts.priorUnreadableSummaries),
   ]);
   return {
     windowStartMs: bounds.curStart,
@@ -315,13 +388,17 @@ export async function buildWeekDigest(opts: WeekOptions = {}): Promise<WeekDiges
   const dataDir = opts.dataDir ?? defaultDataDir();
   const bounds = windowBounds(now, opts.sinceMs);
 
-  const summaries = await listFullSessions();
+  const summaries = (await listFullSessions(undefined, { includeDegraded: true })).filter(
+    (summary) => summary.isSidechain !== true && summary.parentSessionId === undefined,
+  );
   const partitioned = partitionWindows(summaries, bounds);
-  const [curSessions, priSessions] = await Promise.all([loadAll(partitioned.current), loadAll(partitioned.prior)]);
+  const [current, prior] = await Promise.all([loadAll(partitioned.current), loadAll(partitioned.prior)]);
 
-  return assembleWeekDigest(bounds, curSessions, priSessions, {
+  return assembleWeekDigest(bounds, current.sessions, prior.sessions, {
     sinceOverride: opts.sinceMs !== undefined,
     byProject,
     dataDir,
+    currentUnreadableSummaries: current.unreadableSummaries,
+    priorUnreadableSummaries: prior.unreadableSummaries,
   });
 }

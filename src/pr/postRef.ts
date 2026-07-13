@@ -5,7 +5,7 @@
 // npm package never holds the write token (Codex trust-boundary review). Generation stays
 // local (I1/I4); this only re-renders what the producer already computed.
 import { renderPrBody } from "./body.js";
-import { deserializePrReceipt, sanitizePrReceiptPayload } from "./sanitize.js";
+import { deserializePrReceipt, preRenderedDollarViolation, sanitizePrReceiptPayload } from "./sanitize.js";
 import { receiptRefSlug } from "./payloadTypes.js";
 import { receiptRef } from "./store.js";
 
@@ -14,6 +14,10 @@ export function renderReceiptPayload(json: string): { ok: true; body: string } |
   const parsed = deserializePrReceipt(json);
   if (!parsed.ok) {
     return { ok: false, reason: parsed.reason };
+  }
+  const dollarViolation = preRenderedDollarViolation(parsed.payload);
+  if (dollarViolation !== null) {
+    return { ok: false, reason: dollarViolation };
   }
   const sanitized = sanitizePrReceiptPayload(parsed.payload);
   return { ok: true, body: renderPrBody(sanitized.bodyInput, sanitized.extras) };

@@ -1,4 +1,14 @@
-import type { AgentSource, Compaction, ListSessionsOptions, Session, SessionAdapter, SessionSummary, ToolCall, Turn } from "./types.js";
+import type {
+  AgentSource,
+  Compaction,
+  ListSessionsOptions,
+  Session,
+  SessionAdapter,
+  SessionSummary,
+  TokenUsage,
+  ToolCall,
+  Turn,
+} from "./types.js";
 import { claudeCodeFidelity } from "./fidelity/claudeCode.js";
 import { isUnderSubagents, parseChildPath } from "./children.js";
 import { lazyClaudeCodeSummary, nodeDiscoveryFs, type DiscoveryFs } from "./discovery.js";
@@ -11,20 +21,20 @@ import {
   parseTimestamp,
   pathExists,
   readJsonl,
+  safeTokenSum,
   truncate,
-  withTotal, sanitizeText } from "./util.js";
+  sanitizeText,
+  withTotal,
+} from "./util.js";
 
 /** Raw shapes from a Claude Code `.jsonl` transcript line. Only the fields we use. */
 interface RawUsage {
-  input_tokens?: number;
-  output_tokens?: number;
-  cache_read_input_tokens?: number;
-  cache_creation_input_tokens?: number;
+  input_tokens?: unknown;
+  output_tokens?: unknown;
+  cache_read_input_tokens?: unknown;
+  cache_creation_input_tokens?: unknown;
   /** Newer Claude Code sessions split the flat `cache_creation_input_tokens` total by ephemeral TTL tier. Older sessions omit this object entirely. */
-  cache_creation?: {
-    ephemeral_5m_input_tokens?: number;
-    ephemeral_1h_input_tokens?: number;
-  };
+  cache_creation?: unknown;
 }
 
 interface RawContentBlock {
@@ -40,11 +50,11 @@ interface RawContentBlock {
 
 interface RawMessage {
   role?: string;
-  /** The API message id (`msg_…`). One billed response = one id, even when the CLI writes several records for it. */
+  /** The API message id (`msg_…`). One observable response group = one id, even when the CLI writes several records for it. */
   id?: string;
   model?: string;
   content?: unknown;
-  usage?: RawUsage;
+  usage?: unknown;
 }
 
 interface RawRecord {
@@ -154,23 +164,115 @@ function stringifyToolResult(content: unknown): string {
  * as the `cacheCreation` total when set; the split-tier sum is only used as
  * a fallback for sessions where the flat field itself is missing.
  */
-function mapUsage(usage: RawUsage | undefined) {
-  if (!usage) {
-    return undefined;
+interface MappedClaudeUsage {
+  usage?: TokenUsage;
+  malformed: boolean;
+}
+
+interface ParsedTokenField {
+  value: number;
+  present: boolean;
+  valid: boolean;
+}
+
+function tokenField(owner: Record<string, unknown>, key: string): ParsedTokenField {
+  if (!Object.prototype.hasOwnProperty.call(owner, key)) {
+    return { value: 0, present: false, valid: true };
   }
-  const split = usage.cache_creation;
-  const has5m = split?.ephemeral_5m_input_tokens !== undefined;
-  const has1h = split?.ephemeral_1h_input_tokens !== undefined;
-  const splitSum = (split?.ephemeral_5m_input_tokens ?? 0) + (split?.ephemeral_1h_input_tokens ?? 0);
-  return withTotal({
-    input: usage.input_tokens ?? 0,
-    output: usage.output_tokens ?? 0,
-    cacheRead: usage.cache_read_input_tokens ?? 0,
-    cacheCreation: usage.cache_creation_input_tokens ?? (has5m || has1h ? splitSum : 0),
-    cacheCreation5m: has5m ? split.ephemeral_5m_input_tokens : undefined,
-    cacheCreation1h: has1h ? split.ephemeral_1h_input_tokens : undefined,
-    total: 0,
-  });
+  const value = owner[key];
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? { value, present: true, valid: true }
+    : { value: 0, present: true, valid: false };
+}
+
+/**
+ * Preserve every independently valid component from a malformed usage object,
+ * but flag the coherent snapshot as non-priceable. Missing fields are valid
+ * zeroes; present null/string/fractional/negative/unsafe values are not.
+ */
+function mapUsage(raw: unknown, present: boolean): MappedClaudeUsage {
+  if (!present) {
+    return { malformed: false };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { usage: emptyUsage(), malformed: true };
+  }
+  const usage = raw as RawUsage & Record<string, unknown>;
+  const input = tokenField(usage, "input_tokens");
+  const output = tokenField(usage, "output_tokens");
+  const cacheRead = tokenField(usage, "cache_read_input_tokens");
+  const flatCacheCreation = tokenField(usage, "cache_creation_input_tokens");
+
+  let splitMalformed = false;
+  let cacheCreation5m: ParsedTokenField = { value: 0, present: false, valid: true };
+  let cacheCreation1h: ParsedTokenField = { value: 0, present: false, valid: true };
+  if (Object.prototype.hasOwnProperty.call(usage, "cache_creation")) {
+    const split = usage.cache_creation;
+    if (!split || typeof split !== "object" || Array.isArray(split)) {
+      splitMalformed = true;
+    } else {
+      const splitRecord = split as Record<string, unknown>;
+      cacheCreation5m = tokenField(splitRecord, "ephemeral_5m_input_tokens");
+      cacheCreation1h = tokenField(splitRecord, "ephemeral_1h_input_tokens");
+      splitMalformed = !cacheCreation5m.valid || !cacheCreation1h.valid;
+    }
+  }
+
+  const splitSum = safeTokenSum([cacheCreation5m.value, cacheCreation1h.value]);
+  if (splitSum === undefined) {
+    return { usage: emptyUsage(), malformed: true };
+  }
+  const cacheCreation = flatCacheCreation.valid && flatCacheCreation.present
+    ? flatCacheCreation.value
+    : splitSum;
+  if (safeTokenSum([input.value, output.value, cacheRead.value, cacheCreation]) === undefined) {
+    return { usage: emptyUsage(), malformed: true };
+  }
+  const splitFitsTotal = splitSum <= cacheCreation;
+  const malformed =
+    !input.valid ||
+    !output.valid ||
+    !cacheRead.valid ||
+    !flatCacheCreation.valid ||
+    splitMalformed ||
+    !splitFitsTotal;
+
+  return {
+    malformed,
+    usage: withTotal({
+      input: input.value,
+      output: output.value,
+      cacheRead: cacheRead.value,
+      cacheCreation,
+      // A contradictory split is excluded as a breakdown rather than clamped.
+      cacheCreation5m: splitFitsTotal && cacheCreation5m.present && cacheCreation5m.valid
+        ? cacheCreation5m.value
+        : undefined,
+      cacheCreation1h: splitFitsTotal && cacheCreation1h.present && cacheCreation1h.valid
+        ? cacheCreation1h.value
+        : undefined,
+      total: 0,
+    }),
+  };
+}
+
+/**
+ * Claude Code can emit several records for one API response. Most repeat the
+ * same usage, but the Agent SDK documents that later records can carry a
+ * higher output count. Anthropic's documented rule is specifically to retain
+ * the response carrying the highest output count. Keep that record's complete
+ * usage vector together; independently maximizing input/cache buckets could
+ * fabricate a combination that no trace record ever reported. On an output
+ * tie, the later record wins as the final coherent snapshot.
+ */
+function mergeUsageSnapshot(current: TokenUsage | undefined, next: TokenUsage | undefined): TokenUsage | undefined {
+  if (!current) {
+    return next;
+  }
+  if (!next) {
+    return current;
+  }
+  return next.output >= current.output ? next : current;
 }
 
 async function parseTranscript(filePath: string, withTurns: boolean) {
@@ -182,26 +284,27 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
   let cwd: string | undefined;
   let gitBranch: string | undefined;
   let rawSidechain = false;
-  let totalUsage = emptyUsage();
-  let toolCallCount = 0;
   const turns: Turn[] = [];
+  let anonymousValidUsage: TokenUsage | undefined;
+  let anonymousMalformedUsage: TokenUsage | undefined;
+  let malformedUsageRecords = 0;
   const toolCallById = new Map<string, ToolCall>();
-  // One billed API response = one turn, keyed by `message.id`. Claude Code
-  // writes one `assistant` record per content block, and EVERY record of the
-  // same response repeats the same `message.id` and the same `usage` snapshot
-  // — so counting per record multiplies real cost by the block count (audited
-  // 2026-07-08 over 19 local transcripts: up to 12 records per id, usage
-  // byte-identical across them, ~2.8× session-cost inflation; see
-  // docs/internal/cost-attribution-evidence.md). The first record of an id
-  // opens the turn and books its usage once; follow-up records only add their
-  // tool_use blocks to that turn.
+  // One observable assistant response group = one turn, keyed by `message.id`. Claude Code
+  // writes one `assistant` record per content block. Records of the same
+  // response repeat the id, but usage snapshots are not guaranteed identical:
+  // the Agent SDK explicitly says to retain the highest cumulative value when
+  // duplicate ids disagree. The coherent snapshot with the highest output is
+  // retained; counting records would multiply cost, while keeping the first
+  // would miss later output. Tool blocks still merge into the single turn.
   const turnByMessageId = new Map<string, Turn>();
+  const turnsWithValidUsage = new Set<Turn>();
+  const malformedUsageByTurn = new Map<Turn, TokenUsage>();
   // SPEC-0017 R1/R2 — one entry per distinct next-assistant-turn index that a
   // compact summary/boundary record precedes. Keyed by `turnIndex` so an echo +
   // summary (or two summary shapes) at the same position collapse to one event.
   const compactionByTurn = new Map<number, number | undefined>();
 
-  const droppedRecords = await readJsonl(filePath, (raw) => {
+  const jsonDroppedRecords = await readJsonl(filePath, (raw) => {
     const r = raw as RawRecord;
 
     // SPEC-0017 R1 — extract compactions BEFORE the isMeta/command-echo filters
@@ -239,9 +342,12 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
       turns.length = 0;
       toolCallById.clear();
       turnByMessageId.clear();
+      turnsWithValidUsage.clear();
+      malformedUsageByTurn.clear();
+      anonymousValidUsage = undefined;
+      anonymousMalformedUsage = undefined;
+      malformedUsageRecords = 0;
       compactionByTurn.clear();
-      totalUsage = emptyUsage();
-      toolCallCount = 0;
       model = undefined;
       firstUserText = undefined;
       aiTitle = undefined;
@@ -279,21 +385,55 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
         }
       }
       turn.model ??= msg.model;
-      // Book the response's usage exactly once — duplicate records repeat the
-      // same snapshot, so the first one seen is the billed figure.
-      if (!turn.usage) {
-        const usage = mapUsage(msg.usage);
+      const mappedUsage = mapUsage(msg.usage, Object.prototype.hasOwnProperty.call(msg, "usage"));
+      if (mappedUsage.malformed) {
+        malformedUsageRecords++;
+      }
+      if (msg.id === undefined) {
+        // Without the provider response id, repeated content snapshots cannot
+        // be distinguished from separate requests. Retain one coherent
+        // highest-output usage vector as unattributed tokens and never attach
+        // a price to these anonymous records.
+        if (mappedUsage.malformed) {
+          anonymousMalformedUsage = mergeUsageSnapshot(anonymousMalformedUsage, mappedUsage.usage);
+        } else {
+          anonymousValidUsage = mergeUsageSnapshot(anonymousValidUsage, mappedUsage.usage);
+        }
+      } else {
+        let usage: TokenUsage | undefined;
+        if (mappedUsage.malformed) {
+          const malformedUsage = mergeUsageSnapshot(malformedUsageByTurn.get(turn), mappedUsage.usage);
+          if (malformedUsage) {
+            malformedUsageByTurn.set(turn, malformedUsage);
+          }
+          if (!turnsWithValidUsage.has(turn)) {
+            usage = malformedUsage;
+            // An empty explicit unit is a shared pricing safe-stop while the
+            // valid token components remain visible on the turn.
+            turn.pricingUnits = [];
+          }
+        } else if (mappedUsage.usage) {
+          usage = turnsWithValidUsage.has(turn)
+            ? mergeUsageSnapshot(turn.usage, mappedUsage.usage)
+            : mappedUsage.usage;
+          turnsWithValidUsage.add(turn);
+          delete turn.pricingUnits;
+        }
         if (usage) {
           turn.usage = usage;
           turn.outputTokens = usage.output;
-          totalUsage = addUsage(totalUsage, usage);
         }
       }
 
       if (Array.isArray(msg.content)) {
         for (const block of msg.content as RawContentBlock[]) {
           if (block.type === "tool_use") {
-            toolCallCount++;
+            // Cumulative/parallel snapshots may repeat a previously emitted
+            // tool block. A provider tool-use id identifies the logical call;
+            // id-less blocks cannot be matched safely and remain distinct.
+            if (block.id && toolCallById.has(block.id)) {
+              continue;
+            }
             const call: ToolCall = {
               name: sanitizeText(block.name ?? "tool"),
               input: block.input,
@@ -342,6 +482,18 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     }
   });
 
+  const droppedRecords = jsonDroppedRecords + malformedUsageRecords;
+  const anonymousUsage = anonymousValidUsage ?? anonymousMalformedUsage ?? emptyUsage();
+
+  // Totals are derived only after every duplicate snapshot has been merged.
+  // This also makes a fork reset authoritative: pre-marker turns are removed
+  // before either usage or tool counts are accumulated.
+  const itemizedUsage = turns.reduce(
+    (total, turn) => (turn.usage ? addUsage(total, turn.usage) : total),
+    emptyUsage(),
+  );
+  const totalUsage = addUsage(itemizedUsage, anonymousUsage);
+  const toolCallCount = turns.reduce((total, turn) => total + turn.toolCalls.length, 0);
   const totals = {
     tokens: totalUsage,
     durationMs: startedAt !== undefined && endedAt !== undefined ? endedAt - startedAt : undefined,
@@ -376,7 +528,13 @@ async function parseTranscript(filePath: string, withTurns: boolean) {
     .map(([turnIndex, atMs]) => (atMs === undefined ? { turnIndex } : { turnIndex, atMs }));
 
   return withTurns
-    ? { summary, turns, compactions, droppedRecords }
+    ? {
+        summary,
+        turns,
+        compactions,
+        droppedRecords,
+        ...(anonymousUsage.total > 0 ? { unattributedUsage: anonymousUsage } : {}),
+      }
     : { summary, turns: [] as Turn[], compactions: [] as Compaction[], droppedRecords: 0 };
 }
 
@@ -448,10 +606,16 @@ export class ClaudeCodeAdapter implements SessionAdapter {
       if (!(await pathExists(id))) {
         return null;
       }
-      const { summary, turns, compactions, droppedRecords } = await parseTranscript(id, true);
+      const { summary, turns, compactions, droppedRecords, unattributedUsage } = await parseTranscript(id, true);
       // SPEC-0044 B3: only present when > 0 (absent → clean), so a clean
       // session's shape is unchanged.
-      return { ...summary, turns, compactions, ...(droppedRecords > 0 ? { droppedRecords } : {}) };
+      return {
+        ...summary,
+        turns,
+        compactions,
+        ...(unattributedUsage ? { unattributedUsage } : {}),
+        ...(droppedRecords > 0 ? { droppedRecords } : {}),
+      };
     } catch {
       return null;
     }

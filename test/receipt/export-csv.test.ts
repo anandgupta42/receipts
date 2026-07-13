@@ -9,6 +9,8 @@ import type { ReceiptModel } from "../../src/receipt/model.js";
 import { buildReceiptModel } from "../../src/receipt/model.js";
 import { compareDeltaLine } from "../../src/receipt/compare.js";
 import { toCompareCsv, toSessionCsv, toToolCsv } from "../../src/receipt/csv.js";
+import { STANDARD_API_LIST_PRICE_EQUIVALENT } from "../../src/receipt/costEstimate.js";
+import { SCHEMA_VERSION } from "../../src/receipt/schemaVersion.js";
 
 const fixturesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../fixtures");
 
@@ -86,7 +88,7 @@ describe("R2: --csv=session", () => {
     const rows = parseCsv(toSessionCsv(await modelFor("claude-code", "claude-code/clean-multi-tool-2-models.jsonl")));
     expect(rows).toHaveLength(2);
     expect(rows[0][0]).toBe("schemaVersion");
-    expect(rows[1][0]).toBe("1");
+    expect(rows[1][0]).toBe(String(SCHEMA_VERSION));
   });
 
   it("a priced session populates the $ cell and token cells", async () => {
@@ -97,6 +99,48 @@ describe("R2: --csv=session", () => {
     expect(usd).not.toBe("");
     expect(Number(usd)).toBeGreaterThan(0);
     expect(Number(total)).toBeGreaterThan(0);
+    expect(data[header.indexOf("costKind")]).toBe("lower-bound");
+    expect(data[header.indexOf("costBasis")]).toBe(STANDARD_API_LIST_PRICE_EQUIVALENT);
+    expect(data[header.indexOf("totalUsdScope")]).toBe("parent-session");
+    expect(data[header.indexOf("combinedPricedUsd")]).toBe(usd);
+    expect(data[header.indexOf("combinedTotalTokens")]).toBe(total);
+    expect(data[header.indexOf("pricingCoverage")]).toBe("full");
+    expect(data[header.indexOf("unpricedTotalTokens")]).toBe("0");
+    expect(data[header.indexOf("unpricedTokensScope")]).toBe("parent-session");
+  });
+
+  it("exports parent, subagent, and combined floors as distinct scoped columns", async () => {
+    const model = await modelFor("claude-code", "claude-code/clean-multi-tool-2-models.jsonl");
+    model.subagents = {
+      count: 2,
+      pricedUsd: 0.03,
+      tokensTotal: 500,
+      unpricedTokens: { input: 40, output: 5, cacheRead: 100, cacheCreation: 2, total: 147 },
+      unpricedCount: 1,
+      unreadableCount: 1,
+    };
+    const [header, data] = parseCsv(toSessionCsv(model));
+    expect(Number(data[header.indexOf("subagentsPricedUsd")])).toBeCloseTo(0.03, 12);
+    expect(Number(data[header.indexOf("combinedPricedUsd")])).toBeCloseTo((model.totalUsd as number) + 0.03, 12);
+    expect(data[header.indexOf("combinedCostKind")]).toBe("lower-bound");
+    expect(data[header.indexOf("combinedCostBasis")]).toBe(STANDARD_API_LIST_PRICE_EQUIVALENT);
+    expect(data[header.indexOf("subagentsCostKind")]).toBe("lower-bound");
+    expect(data[header.indexOf("subagentsCostBasis")]).toBe(STANDARD_API_LIST_PRICE_EQUIVALENT);
+    expect(data[header.indexOf("subagentsUsdScope")]).toBe("readable-subagents");
+    expect(data[header.indexOf("subagentsTokens")]).toBe("500");
+    expect(data[header.indexOf("combinedTotalTokens")]).toBe(String(model.totalTokens.total + 500));
+    expect(data[header.indexOf("subagentCount")]).toBe("2");
+    expect(data[header.indexOf("subagentUnpricedCount")]).toBe("1");
+    expect(data[header.indexOf("subagentUnreadableCount")]).toBe("1");
+    expect(data[header.indexOf("subagentsUnpricedInputTokens")]).toBe("40");
+    expect(data[header.indexOf("subagentsUnpricedOutputTokens")]).toBe("5");
+    expect(data[header.indexOf("subagentsUnpricedCacheReadTokens")]).toBe("100");
+    expect(data[header.indexOf("subagentsUnpricedCacheCreationTokens")]).toBe("2");
+    expect(data[header.indexOf("subagentsUnpricedTotalTokens")]).toBe("147");
+    expect(data[header.indexOf("subagentsUnpricedTokensScope")]).toBe("readable-subagents");
+    expect(data[header.indexOf("combinedUnpricedTotalTokens")]).toBe("147");
+    expect(data[header.indexOf("combinedUnpricedTokensScope")]).toBe("parent-session-plus-readable-subagents");
+    expect(data[header.indexOf("combinedPricingCoverage")]).toBe("partial");
   });
 
   it("an unpriced session leaves the $ cell empty but populates token cells (I2)", () => {
@@ -104,6 +148,52 @@ describe("R2: --csv=session", () => {
     expect(data[header.indexOf("totalUsd")]).toBe("");
     expect(data[header.indexOf("totalTokens")]).toBe("2168");
     expect(data[header.indexOf("inputTokens")]).toBe("1900");
+    expect(data[header.indexOf("costKind")]).toBe("");
+    expect(data[header.indexOf("costBasis")]).toBe("");
+    expect(data[header.indexOf("totalUsdScope")]).toBe("parent-session");
+    expect(data[header.indexOf("combinedPricedUsd")]).toBe("");
+    expect(data[header.indexOf("subagentsCostKind")]).toBe("");
+    expect(data[header.indexOf("subagentsCostBasis")]).toBe("");
+    expect(data[header.indexOf("subagentsUsdScope")]).toBe("readable-subagents");
+    expect(data[header.indexOf("pricingCoverage")]).toBe("unpriced");
+    expect(data[header.indexOf("unpricedInputTokens")]).toBe("1900");
+    expect(data[header.indexOf("unpricedOutputTokens")]).toBe("268");
+    expect(data[header.indexOf("unpricedTotalTokens")]).toBe("2168");
+    expect(data[header.indexOf("subagentsUnpricedTotalTokens")]).toBe("0");
+    expect(data[header.indexOf("combinedUnpricedTotalTokens")]).toBe("2168");
+    expect(data[header.indexOf("combinedPricingCoverage")]).toBe("unpriced");
+  });
+
+  it("drops an impossible stale parent dollar from an explicitly unpriceable row", () => {
+    const model = unpricedModel();
+    model.totalUsd = 9.99;
+    const [header, data] = parseCsv(toSessionCsv(model));
+    expect(data[header.indexOf("totalUsd")]).toBe("");
+    expect(data[header.indexOf("costKind")]).toBe("");
+    expect(data[header.indexOf("combinedPricedUsd")]).toBe("");
+    expect(data[header.indexOf("combinedPricingCoverage")]).toBe("unpriced");
+  });
+
+  it("appends exact parent unpriced-token components and partial coverage", async () => {
+    const model = await modelFor("claude-code", "claude-code/mixed-priced-coverage.jsonl");
+    const [header, data] = parseCsv(toSessionCsv(model));
+    const unpriced = model.unpricedTokens;
+    expect(unpriced?.total).toBeGreaterThan(0);
+    expect(header.slice(header.indexOf("pricingCoverage"), header.indexOf("unpricedTokensScope") + 1)).toEqual([
+      "pricingCoverage",
+      "unpricedInputTokens",
+      "unpricedOutputTokens",
+      "unpricedCacheReadTokens",
+      "unpricedCacheCreationTokens",
+      "unpricedTotalTokens",
+      "unpricedTokensScope",
+    ]);
+    expect(data[header.indexOf("pricingCoverage")]).toBe("partial");
+    expect(data[header.indexOf("unpricedInputTokens")]).toBe(String(unpriced?.input));
+    expect(data[header.indexOf("unpricedOutputTokens")]).toBe(String(unpriced?.output));
+    expect(data[header.indexOf("unpricedCacheReadTokens")]).toBe(String(unpriced?.cacheRead));
+    expect(data[header.indexOf("unpricedCacheCreationTokens")]).toBe(String(unpriced?.cacheCreation));
+    expect(data[header.indexOf("unpricedTotalTokens")]).toBe(String(unpriced?.total));
   });
 });
 
@@ -119,6 +209,41 @@ describe("R2: --csv=tool", () => {
     const [header, data] = parseCsv(toToolCsv(unpricedModel()));
     expect(data[header.indexOf("usd")]).toBe("");
     expect(data[header.indexOf("totalTokens")]).toBe("812");
+    expect(data[header.indexOf("costKind")]).toBe("");
+    expect(data[header.indexOf("costBasis")]).toBe("");
+  });
+
+  it("appends lower-bound metadata for priced tool rows", async () => {
+    const [header, ...rows] = parseCsv(toToolCsv(await modelFor("claude-code", "claude-code/clean-multi-tool-2-models.jsonl")));
+    expect(header.slice(-5)).toEqual([
+      "costKind",
+      "costBasis",
+      "costScope",
+      "pricingCoverage",
+      "pricingCoverageLimitation",
+    ]);
+    for (const row of rows) {
+      if (row[header.indexOf("usd")] !== "") {
+        expect(row[header.indexOf("costKind")]).toBe("lower-bound");
+        expect(row[header.indexOf("costBasis")]).toBe(STANDARD_API_LIST_PRICE_EQUIVALENT);
+      }
+      expect(row[header.indexOf("costScope")]).toBe("parent-session-tool");
+      expect(row[header.indexOf("pricingCoverage")]).toBe("full");
+      expect(row[header.indexOf("pricingCoverageLimitation")]).toBe("");
+    }
+  });
+
+  it("labels the tool-row coverage limit for a partially priced session", async () => {
+    const model = await modelFor("claude-code", "claude-code/mixed-priced-coverage.jsonl");
+    const [header, ...rows] = parseCsv(toToolCsv(model));
+    const pricedRows = rows.filter((row) => row[header.indexOf("usd")] !== "");
+    expect(pricedRows.length).toBeGreaterThan(0);
+    expect(pricedRows.every((row) => row[header.indexOf("pricingCoverage")] === "indeterminate")).toBe(true);
+    expect(
+      pricedRows.every((row) =>
+        row[header.indexOf("pricingCoverageLimitation")].includes("not separable at tool-row granularity"),
+      ),
+    ).toBe(true);
   });
 });
 

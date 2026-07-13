@@ -12,7 +12,10 @@ npx aireceipts-cli setup
 
 `npx` fetches and runs the latest published version each time. The first command
 prints the newest receipt; `setup` prints what sessions were found and which
-local integrations are available. For occasional use, that's the whole story —
+local integrations are available. Its latest-session section reports the known
+priced floor, pricing coverage, exact known-unpriced tokens, and whether
+subagent discovery was complete; it does not collapse a mixed session into a
+single exact-looking total. For occasional use, that's the whole story —
 skip the rest of this page.
 
 ## Install it globally

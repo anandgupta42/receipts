@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Claude Code · claude-sonnet-5 · 1h 41m 00s
-total  $0.36
-top    mcp__postgres__query_098 · $0.00 (1 call)
-no waste detected
+total  ≥ $0.3602
+top    mcp__postgres__query_098 · ≥ $0.0037 (1 call)
+no flagged pattern detected
 run  aireceipts  for the full receipt

@@ -54,13 +54,14 @@ inferred into credit.
     unique match.
   - **Authorship guard — uniqueness is necessary but NOT sufficient.** Patch-id proves diff
     EQUALITY, not authorship. A promotion is additionally rejected when its target branch SHA is
-    already **directly** claimed by any session's own git-write output. So a session that merely
-    *reproduces* a different session's uniquely-diffed, already-landed commit — a `cherry-pick`,
-    or an independent rebuild of the same change — is never credited for it (the direct claimant
-    is the proven author). The amend case is unaffected: an amended branch SHA is never directly
-    claimed (the transcript holds only the orphaned pre-amend SHA). Without this guard a
-    cherry-pick of another session's unique commit would be promoted and bill the cherry-picker's
-    whole session to the PR — a direct I2 violation (found in adversarial review).
+    directly claimed by a **different** session's own git-write output. So a session that merely
+    *reproduces* another session's uniquely-diffed, already-landed commit — a `cherry-pick`, or an
+    independent rebuild — is never credited for it. A direct claim by the **same** session does
+    not reject recovery: the real commit-A → amend-B sequence can print both A and B, and A remains
+    necessary evidence for the slice's earlier boundary. The guard therefore stores owners per
+    branch SHA rather than a global claimed-SHA bit. Without the different-owner guard a
+    cherry-pick could bill the copier's whole session; without the same-owner exception a normal
+    amend truncates all work before B (issue #239).
   - **Commits with no computable patch-id are excluded as both orphan candidates and match
     targets:** empty commits (`--allow-empty`, no diff) and merge commits (no default patch-id).
     They are skipped, never promoted, never crash — under-credit only.
@@ -105,6 +106,15 @@ inferred into credit.
   (`src/pr/contributors.ts:115-159`) — preserving SPEC-0032 R3a's all-candidates-before-credit
   ordering. A patch-id-recovered claim poisons its SHA for every other candidate exactly like a
   direct match does today; `claimedBranchShas` alone cannot produce these recovered claims.
+- **R6 — one resolved-anchor truth for selection, slicing, and per-commit output.** Recovery must
+  retain a session-scoped mapping from each observed orphan SHA/prefix to its canonical branch SHA.
+  That same map feeds contributor inclusion, `computeSlice`, and `anchorEvents`; otherwise selection
+  can credit a recovered session while slicing still classifies its pre-amend anchor as foreign and
+  confidently cuts away real work. Per-commit segmentation canonicalizes A and B to B so the amend
+  does not manufacture two commits. When patch-id correctly declines a content-changing amend but
+  the same session directly prints the final branch SHA from a real `git commit --amend`, slicing
+  walks that explicit amend lineage backwards (including repeated amends); this affects boundaries
+  only and never grants contributor ownership. Ambiguous direct prefixes remain uncredited.
 
 ## Scenarios
 
@@ -132,9 +142,10 @@ inferred into credit.
 
 ## Non-goals
 
-- **Content-changing amends.** An amend that changes the diff produces a different patch-id — no
-  recovery; the existing floor stays, correctly, since the transcript's commit and the branch's
-  commit are genuinely different work.
+- **Content-changing amend recovery without a captured final SHA.** A changed diff produces a
+  different patch-id, so it cannot grant contributor ownership. If the same transcript directly
+  captures the final branch SHA from `git commit --amend`, that command does prove slice lineage
+  and R6 retains the earlier boundary; otherwise the session stays unanchored and floors.
 - **Pruned orphan objects.** If `git gc` (or object expiry) removed the pre-amend commit before
   receipt generation, `git cat-file -e` fails and R1 cannot run — no recovery, no crash.
 - **Empty and merge commits.** No computable default patch-id — excluded as orphan candidates and
@@ -179,6 +190,10 @@ inferred into credit.
 | R3 | confidence exhaustiveness | new `unanchored-git-write` variant | `summarizeConfidence` switch handles it; `isFloored` treats it as floor-triggering |
 | R4 | helper rule scope regression | Codex session with `writeCount > 0` and no resolvable anchor | never credited via `helper` (writeCount check unchanged) |
 | R5 | resolved-anchor pass ordering | R1-recovered claim, candidates in any list order | same recovered-SHA/claim set regardless of order; poisons other candidates (SPEC-0032 R3a parity) |
+| R6 | in-session amend boundary (#239) | work → commit A → amend B, branch contains B | A aliases to B; slice starts at session work, not after A |
+| R6 | foreign boundary + amend | foreign F → work → A → B | slice starts after F and includes work through B |
+| R6 | per-commit canonicalization | both A and B printed by the same session | one canonical B segment, no duplicate commit row |
+| R6 | content-changing/repeated amend lineage | A → `--amend` B → `--amend` C, final C directly captured | slice walks to A; no patch-id ownership is inferred |
 | — | backgrounded output, partially captured | `git commit -m x \| tee log` (own call output still has the line) | handled by existing `writeOutputShas`; unaffected |
 | — | fully swallowed output | `git commit -m x > log 2>&1 &`, disowned, zero hex run | no recovery (named non-goal); emits `unanchored-git-write` |
 | — | squash-merge guardrail | 3 session commits locally squashed into 1 pushed commit | no single orphan's patch-id equals the squash's; none falsely credited |
@@ -197,5 +212,22 @@ inferred into credit.
       session that made none (R3's new event, R4's locked scope).
 - [x] The resolved-anchor pass runs before the message-fallback claim pass, preserving SPEC-0032
       R3a order-independence.
+- [x] Recovered aliases feed selection, slicing, and per-commit segmentation; same-session direct
+      amend targets are allowed while a different session's direct ownership still blocks recovery.
 - [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, `node scripts/spec-lint.mjs` all pass unmasked.
+
+## 2026-07-10 amendment — issue #239
+
+PR #238 exposed a mismatch the original R1 implementation and spec wording missed. The same
+session printed pre-amend A (`d00be89`) and amended B (`81a7c5e`), whose stable patch-ids are
+identical. Selection knew about recovery, but slicing received only raw branch SHAs; the global
+direct-claim guard also rejected A→B because B was directly printed later by that same session.
+The result confidently rendered turn 118 only (`$0.44`) instead of turns 1–118 (`$44.97`).
+
+R1's guard is corrected to be owner-aware and R6 makes resolved-anchor propagation explicit.
+Regression coverage includes same-session A→B, recovered-only anchor-pool attribution, a genuine
+foreign boundary, multiple own commits followed by amend, pre-amend child rollup retention, and
+canonical per-commit deduplication. A follow-up adversarial review also caught content-changing and
+repeated amend chains: a directly captured final `--amend` now proves same-session slice lineage,
+while a changed amend with no captured final branch SHA remains unanchored and floors.

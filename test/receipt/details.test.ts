@@ -1,6 +1,6 @@
 // SPEC-0054 render surface: R1's price-delta percentage, R2's stuck-loop turn
 // location (text + SVG), and R4/R5's opt-in DETAILS section — presence AND
-// absence per line, the 50-char width contract, placement, cent-reconciled
+// absence per line, the 50-char width contract, placement, downward-rounded
 // BY MODEL rows, and the honesty battery over a details view. Real fixtures
 // carry the priced/loop paths; in-memory models pin the conditional edges the
 // fixtures don't reach (TTL split, unpriced sessions, absent peak turn).
@@ -34,9 +34,10 @@ async function pricedDetailsLines(): Promise<string[]> {
 }
 
 describe("SPEC-0054 R1 — price-delta percentage", () => {
-  it("appends the honest (N% less) suffix to the delta row and leaves the note line byte-identical", async () => {
+  it("renders the floor percentage separately and leaves the prediction note byte-identical", async () => {
     const text = renderReceipt(await modelFor(PRICED), { color: false });
-    expect(text).toMatch(/same tokens on claude-haiku-4-5\.+\$0\.04 \(78% less\)/u);
+    expect(text).toMatch(/same tokens on claude-haiku-4-5\.+≥ \$0\.03/u);
+    expect(text).toContain("  (78% lower observable floor)");
     expect(text).toContain("  (arithmetic, not a prediction)");
   });
 
@@ -44,16 +45,16 @@ describe("SPEC-0054 R1 — price-delta percentage", () => {
     const model = await modelFor(PRICED);
     const near100 = { ...model, priceDelta: { cheaperModel: "claude-haiku-4-5", usd: 0.0001, actualUsd: 100 } };
     const near0 = { ...model, priceDelta: { cheaperModel: "claude-haiku-4-5", usd: 99.999, actualUsd: 100 } };
-    expect(renderReceipt(near100, { color: false })).toContain("(>99% less)");
-    expect(renderReceipt(near0, { color: false })).toContain("(<1% less)");
+    expect(renderReceipt(near100, { color: false })).toContain("(>99% lower observable floor)");
+    expect(renderReceipt(near0, { color: false })).toContain("(<1% lower observable floor)");
   });
 
   it("renders no suffix when the delta is not a saving (usd >= actualUsd) or actualUsd is 0", async () => {
     const model = await modelFor(PRICED);
     const noSaving = { ...model, priceDelta: { cheaperModel: "claude-haiku-4-5", usd: 0.2, actualUsd: 0.18 } };
     const zeroActual = { ...model, priceDelta: { cheaperModel: "claude-haiku-4-5", usd: 0, actualUsd: 0 } };
-    expect(renderReceipt(noSaving, { color: false })).not.toContain("% less)");
-    expect(renderReceipt(zeroActual, { color: false })).not.toContain("% less)");
+    expect(renderReceipt(noSaving, { color: false })).not.toContain("% lower observable floor)");
+    expect(renderReceipt(zeroActual, { color: false })).not.toContain("% lower observable floor)");
   });
 });
 
@@ -87,7 +88,7 @@ describe("SPEC-0054 R4 — the DETAILS section", () => {
     expect(text).toMatch(/cache read \/ write\.+124k \/ 2\.1k/u);
     expect(text).toMatch(/turns \/ tool calls\.+10 \/ 8/u);
     expect(text).toMatch(/peak turn\.+24k tok \(turn 7\)/u);
-    expect(text).toMatch(/same reads at uncached input rate\.+\$0\.52/u);
+    expect(text).toMatch(/same reads at uncached input rate\.+≥ \$0\.51/u);
     expect(text).toContain("BY MODEL");
   });
 
@@ -106,13 +107,38 @@ describe("SPEC-0054 R4 — the DETAILS section", () => {
     expect(details).toBeLessThan(footer);
   });
 
-  it("BY MODEL rows are cent-reconciled and sum to TOTAL", async () => {
+  it("BY MODEL rows independently round down", async () => {
     const model = await modelFor(PRICED);
     const lines = renderReceiptLines(model, { color: false, details: true });
-    const byModel = lines.filter((l) => /% · \$\d/u.test(l));
+    const byModel = lines.filter((l) => /% · ≥ \$\d/u.test(l));
     expect(byModel.length).toBe(model.modelMix.length);
-    const cents = byModel.map((l) => Math.round(Number(l.match(/\$(\d+\.\d{2})$/u)![1]) * 100));
-    expect(cents.reduce((a, b) => a + b, 0)).toBe(Math.round((model.totalUsd as number) * 100));
+    const shown = byModel.map((l) => Number(l.match(/\$(\d+\.\d+)$/u)![1]));
+    model.modelMix.forEach((entry, index) => expect(shown[index]).toBeLessThanOrEqual(entry.usd as number));
+  });
+
+  it("uses one four-decimal ledger precision when sub-cent model atoms cross one cent", async () => {
+    const model = await modelFor(PRICED);
+    const first = model.modelMix[0]!;
+    model.modelMix = [
+      { ...first, model: "model-a", usd: 0.006, tokenShare: 0.5 },
+      { ...first, model: "model-b", usd: 0.006, tokenShare: 0.5 },
+    ];
+    model.toolRows = [{ ...model.toolRows[0], usd: 0.012 }];
+    model.totalUsd = 0.012;
+    model.priceDelta = null;
+    const text = renderReceiptLines(model, { color: false, details: true }).join("\n");
+    expect(text).toContain("TOTAL");
+    expect(text).toContain("≥ $0.0120");
+    expect(text).toContain("model-a");
+    expect(text.match(/≥ \$0\.0060/g)).toHaveLength(2);
+  });
+
+  it("labels model details as parent-only when TOTAL includes subagents", async () => {
+    const model = await modelFor(PRICED);
+    model.subagents = { count: 1, pricedUsd: 0.03, tokensTotal: 100, unpricedCount: 0, unreadableCount: 0 };
+    const text = renderReceiptLines(model, { color: false, details: true }).join("\n");
+    expect(text).toContain("BY PARENT MODEL");
+    expect(text.split("\n")).not.toContain("BY MODEL");
   });
 
   it("omits BY MODEL for a single-model session and the counterfactual when null", async () => {

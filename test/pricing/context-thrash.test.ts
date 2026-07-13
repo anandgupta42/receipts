@@ -179,6 +179,41 @@ describe("detectContextThrash — sliced prompt-only cost (R5)", () => {
     expect(f.tokens.total).toBeGreaterThan(0);
   });
 
+  it("reports usd null when a contributing turn is only partially priced", async () => {
+    const mixed = turn(4, 175_000);
+    mixed.pricingUnits = [
+      {
+        usage: { input: 100_000, output: 500, cacheRead: 0, cacheCreation: 0, total: 100_500 },
+        model: "claude-haiku-4-5",
+        timestamp: TS,
+        pricingProvider: "anthropic",
+      },
+      {
+        usage: { input: 75_000, output: 499, cacheRead: 0, cacheCreation: 0, total: 75_499 },
+        model: "claude-haiku-4-5",
+        timestamp: TS,
+        pricingProvider: null,
+      },
+    ];
+    const turns = [
+      turn(0, 100_000),
+      turn(1, 200_000),
+      turn(2, 180_000),
+      turn(3, 170_000),
+      mixed,
+      turn(5, 165_000),
+      turn(6, 190_000),
+      turn(7, 170_000),
+    ];
+    const [finding] = await detectContextThrash(
+      sess(turns, [{ turnIndex: 2 }, { turnIndex: 4 }, { turnIndex: 6 }]),
+      dataDir,
+    );
+
+    expect(finding.usd).toBeNull();
+    expect(finding.tokens.total).toBeGreaterThan(0);
+  });
+
   it("reports usd null for an unpriceable (cursor-style) session", async () => {
     const turns = [turn(0, 100_000), turn(1, 200_000), turn(2, 180_000), turn(3, 170_000), turn(4, 175_000), turn(5, 165_000)];
     const comps = [{ turnIndex: 2 }, { turnIndex: 4 }];

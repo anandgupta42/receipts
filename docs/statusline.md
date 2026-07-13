@@ -1,7 +1,7 @@
 # Statusline — the meter
 
 `aireceipts statusline` is the meter: one line in your status bar while the agent
-works — the model that's running, cost so far, burn rate, and the quota countdown —
+works — the model that's running, observable floor so far, floor rate, and the quota countdown —
 updated as the session runs. When the ride ends, `aireceipts` prints the receipt.
 Wired into Claude Code's `statusLine` command config, the fare is visible on every
 prompt without running anything yourself.
@@ -268,9 +268,10 @@ in tmux or another shell UI.
 ## Output
 
 ```
-[aireceipts] Opus · $4.20 · $9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
-[aireceipts] Opus · $2.50 · $6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
-[aireceipts · Codex] gpt-5.2-codex · $1.10 · $4/hr · 84k
+[aireceipts] Opus · ≥$4.20 · ≥$9/hr · 128k · ctx 42% · 5h 24% ↺2h13m
+[aireceipts] Opus · ≥$2.50 · ≥$6/hr · 20k · ⚠ Bash loop ×5 · 5h 41% ↺58m
+[aireceipts] gpt-5.6 · ≥$9.85 subtotal (58M known unpriced; partial) · 59M
+[aireceipts · Codex] gpt-5.2-codex · ≥$1.10 · ≥$4/hr · 84k
 [aireceipts · Cursor] 8k
 aireceipts: no sessions detected
 ```
@@ -278,9 +279,15 @@ aireceipts: no sessions detected
 - `Opus` (after the brand) is the model — in stdin mode, Claude Code's own current
   model name (a mid-session switch shows on the next render); in disk fallback, the
   session's dominant model by token share. Omitted when neither is known.
-- `$X.XX` is the session's priced cost (aireceipts' own cited-price figure, incl.
-  subagents); omitted when it can't be priced — never a fabricated `$` amount.
-- `$X/hr` is the session-average burn rate (that same priced cost over the session
+- `≥$X.XX` is the session's observable Standard-API list-price-equivalent floor
+  (including subagents), not an invoice. With mixed coverage it reads
+  `≥$X.XX subtotal (NM known unpriced; partial)`: the dollar is the known
+  priced subtotal and the parent-plus-readable-child token count is the exact
+  known usage excluded from it. If the trace signals an unmeasured gap (for
+  example Codex cache writes) but has no exact token count for that gap, it says
+  `≥$X.XX subtotal (coverage partial)` instead of displaying a misleading
+  zero. The cost segment is omitted only when no component has a cited price row.
+- `≥$X/hr` is the session-average floor rate (that same observable floor over the session
   wall-clock); omitted when the session isn't priced or has no duration yet.
 - `Nk` / `NM` is the session's token count, abbreviated (`12k`, `1.2M`, `501M`).
 - `ctx N%` is how full the current context window is — Claude Code's own
@@ -289,8 +296,9 @@ aireceipts: no sessions detected
   `rate_limits.five_hour.used_percentage`, subscribers only) plus the time until the
   window resets, derived from the real `resets_at` — the countdown is dropped (leaving
   `5h N%`) when `resets_at` is absent or already past, never a guessed time.
-- The waste flag (`⚠ ...`) appears only when a waste detector actually fired
-  on the session — its absence is not itself a claim that nothing was found.
+- The heuristic-pattern flag (`⚠ ...`) appears only when a detector actually
+  fired on the session. It identifies evidence to inspect, not proven waste or
+  savings; its absence is not itself a claim that nothing was found.
 - Outside a piped invocation (or when stdin carries no usable payload),
   `aireceipts statusline` falls back to the most-recently-ended session found
   on disk — the prefix then names whose session it is (`[aireceipts · Codex]`).
@@ -332,11 +340,11 @@ select known segments — it cannot inject text, colors, paths, or values.
 |---|---|---|
 | `brand` | `[aireceipts]` (stdin) / `[aireceipts · <agent>]` (disk fallback) | — |
 | `model` | `Opus` / `claude-opus-4-8` | stdin: Claude Code's own `model.display_name` (the **current** model, so a mid-session switch shows on the next render); disk fallback: the session's dominant model by token share (the mini receipt's value); omitted when neither exists (e.g. Cursor). Guarded: trimmed, ≤ 64 chars, no control characters. |
-| `cost` | `$X.XX` | priced session total incl. subagents; omitted when unpriced (I2) |
-| `burn` | `$X/hr` | session-average burn (priced cost ÷ wall-clock); omitted when unpriced or no duration |
+| `cost` | `≥$X.XX` / `≥$X.XX subtotal (NM known unpriced; partial)` | Standard-API-equivalent priced subtotal incl. subagents, with mixed or unmeasured coverage gaps explicit; omitted only when no component prices (I2) |
+| `burn` | `≥$X/hr` | session-average floor (observable floor ÷ wall-clock); omitted when coverage is partial/unpriced or no duration exists |
 | `tokens` | `Nk` / `NM` | session + subagent tokens, abbreviated |
 | `context` | `ctx N%` | Claude Code's `context_window.used_percentage` (stdin only) |
-| `waste` | `⚠ ...` | first fired waste detector |
+| `waste` | `⚠ ...` | first detector-flagged pattern (segment name retained for compatibility) |
 | `quota5h` / `quota7d` | `5h N% ↺Xh Ym` / `7d N% ↺…` | official `rate_limits` passthrough + reset countdown (stdin only) |
 | `quotaEta` | `≈ 5h cap HH:MM UTC` | labeled arithmetic, see below |
 
@@ -356,8 +364,10 @@ prediction of what you'll do next.
 
 - One line, one on-disk read per invocation — this is a snapshot, not a live
   view. Nothing streams mid-session (see the CLI's non-goals).
-- Sessions that can't be priced (missing price rows) render tokens-only —
-  `aireceipts` never estimates a dollar figure it can't source to a price row.
+- A session with no priced component renders tokens-only. If some components
+  price and others do not, the cited floor remains visible beside the exact
+  known-unpriced token count; `aireceipts` never assigns those tokens a guessed
+  rate.
 - Subagent spend is included (SPEC-0061): background agents write their
   transcripts to separate files under the session's `subagents/` directory,
   and the statusline's `$` and token counts fold that rollup in — the same

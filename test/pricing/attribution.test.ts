@@ -16,6 +16,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { attributeByTool, METHODOLOGY } from "../../src/pricing/attribution.js";
 import type { Session, SessionTotals, TokenUsage, Turn } from "../../src/parse/types.js";
 import type { PriceTable } from "../../src/pricing/types.js";
+import { buildReceiptModel } from "../../src/receipt/model.js";
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../data/prices");
 
@@ -109,6 +110,74 @@ describe("attributeByTool", () => {
     expect(result.totalUsd).toBeCloseTo(0.002, 10);
   });
 
+  it("honors model/provider evidence on each pricing unit inside one turn", async () => {
+    const haiku = usage({ input: 1000, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const opus = usage({ input: 1000, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      pricingProvider: "anthropic",
+      usage: usage({ input: 2000, output: 0, cacheRead: 0, cacheCreation: 0 }),
+      pricingUnits: [
+        { usage: haiku, model: "claude-haiku-4-5", pricingProvider: "anthropic", timestamp: JUNE_15_2026 },
+        { usage: opus, model: "claude-opus-4-8", pricingProvider: "anthropic", timestamp: JUNE_15_2026 },
+      ],
+      toolCalls: [],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+    expect(result.totalUsd).toBeCloseTo(0.006, 12);
+    expect(result.byModelUsd).toEqual([
+      { model: "claude-haiku-4-5", usd: 0.001 },
+      { model: "claude-opus-4-8", usd: 0.005 },
+    ]);
+  });
+
+  it("keeps a mixed-unit lower bound while exposing its exact unpriced coverage", async () => {
+    const pricedUnit = usage({ input: 1_000_000, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const routedUnit = usage({ input: 300, output: 100, cacheRead: 50, cacheCreation: 25 });
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 1_000_300, output: 100, cacheRead: 50, cacheCreation: 25 }),
+      pricingUnits: [
+        { usage: pricedUnit, model: "claude-haiku-4-5", pricingProvider: "anthropic", timestamp: JUNE_15_2026 },
+        { usage: routedUnit, model: "claude-haiku-4-5", pricingProvider: null, timestamp: JUNE_15_2026 },
+      ],
+      toolCalls: [{ name: "bash" }],
+    };
+    const source = session({ turns: [turn] });
+    const result = await attributeByTool(source, dataDir);
+
+    expect(result.totalUsd).toBeCloseTo(1, 12);
+    expect(result.totalTokens).toEqual(turn.usage);
+    expect(result.unpricedTokens).toEqual(routedUnit);
+    expect(result.usageTurnCount).toBe(1);
+    expect(result.unpricedUsageTurnCount).toBe(1);
+    expect(result.byModelUsd).toEqual([{ model: "claude-haiku-4-5", usd: 1 }]);
+    expect(result.cacheReadAtInputRateUsd).toBeNull();
+
+    const receipt = await buildReceiptModel(source, dataDir);
+    expect(receipt.totalUsd).toBeCloseTo(1, 12);
+    expect(receipt.unpricedTokens).toEqual(routedUnit);
+    expect(receipt.priceDelta).toBeNull();
+  });
+
+  it("keeps transcript token totals exact across a three-way tool split", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 5400, output: 420, cacheRead: 3200, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }, { name: "read" }, { name: "grep" }],
+    };
+    const result = await attributeByTool(session({ turns: [turn] }), dataDir);
+
+    expect(result.totalTokens).toEqual(turn.usage);
+    expect(Object.values(result.totalTokens).every((value) => value === undefined || Number.isSafeInteger(value))).toBe(true);
+  });
+
   it("accumulates tokens but leaves usd null when a turn's model has no matching price row", async () => {
     const turn: Turn = {
       index: 0,
@@ -125,6 +194,34 @@ describe("attributeByTool", () => {
     expect(entry.tokens).toMatchObject({ input: 800, output: 200, total: 1000 });
     // Nothing priced anywhere in the session -> total is null, not 0.
     expect(result.totalUsd).toBeNull();
+  });
+
+  it("tracks the exact tokens excluded from a partial dollar total", async () => {
+    const priced: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 1000, output: 0, cacheRead: 0, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const unpriced: Turn = {
+      index: 1,
+      timestamp: JUNE_15_2026,
+      model: "claude-unknown-model-xyz",
+      usage: usage({ input: 300, output: 100, cacheRead: 50, cacheCreation: 25 }),
+      toolCalls: [{ name: "bash" }, { name: "grep" }],
+    };
+
+    const result = await attributeByTool(session({ turns: [priced, unpriced] }), dataDir);
+
+    expect(result.totalUsd).toBeCloseTo(0.001, 10);
+    expect(result.unpricedTokens).toEqual({
+      input: 300,
+      output: 100,
+      cacheRead: 50,
+      cacheCreation: 25,
+      total: 475,
+    });
   });
 
   it("forces vendor resolution off for an unpriceable session even when source would otherwise resolve one", async () => {
@@ -174,7 +271,7 @@ describe("attributeByTool", () => {
     expect(result.totalUsd).toBeCloseTo(2.0, 10);
   });
 
-  it("SPEC-0044 A3: flags costLowerBoundCacheTier when a priced turn's cache-write falls back to an uncited rate (openai: no input_cache_write_5m cited)", async () => {
+  it("SPEC-0044 A3: flags costLowerBoundCacheTier when a priced turn's cache-write has no cited rate (openai: no input_cache_write_5m cited)", async () => {
     const turn: Turn = {
       index: 0,
       timestamp: JUNE_15_2026,
@@ -188,7 +285,7 @@ describe("attributeByTool", () => {
     expect(result.costLowerBoundCacheTier).toBe(true);
   });
 
-  it("SPEC-0044 A3: does NOT flag costLowerBoundCacheTier for an unsplit cache-write when the vendor cites the 5m rate (Anthropic priced exactly, even though the transcript never split it)", async () => {
+  it("SPEC-0044 A3: does NOT flag costLowerBoundCacheTier for an unsplit cache-write when the vendor cites the 5m rate (the observable component is included)", async () => {
     const turn: Turn = {
       index: 0,
       timestamp: JUNE_15_2026,
@@ -332,6 +429,22 @@ describe("attributeByTool cacheReadAtInputRateUsd (SPEC-0054 R4)", () => {
     expect(result.cacheReadAtInputRateUsd).toBeCloseTo(1.9, 10);
   });
 
+  it("is null when unattributed residual cache reads have no request/model join", async () => {
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-with-cache-rate",
+      usage: usage({ input: 1000, output: 0, cacheRead: 100_000, cacheCreation: 0 }),
+      toolCalls: [{ name: "bash" }],
+    };
+    const unattributedUsage = usage({ input: 0, output: 0, cacheRead: 50_000, cacheCreation: 0 });
+    const result = await attributeByTool(session({ turns: [turn], unattributedUsage }), cacheTestDir);
+
+    expect(result.totalUsd).not.toBeNull();
+    expect(result.unpricedTokens).toEqual(unattributedUsage);
+    expect(result.cacheReadAtInputRateUsd).toBeNull();
+  });
+
   it("is null when nothing in the session priced, even with cacheRead > 0 (an unpriced model's cache tokens can't be counterfactualized)", async () => {
     const turn: Turn = {
       index: 0,
@@ -370,7 +483,7 @@ describe("attributeByTool cacheReadAtInputRateUsd (SPEC-0054 R4)", () => {
     };
     const result = await attributeByTool(session({ turns: [turn] }), cacheTestDir);
 
-    // Still prices (costOf falls back to the base input rate for cacheRead), just not counterfactualizable.
+    // Other cited components still price; the uncited cache-read component contributes zero.
     expect(result.totalUsd).not.toBeNull();
     expect(result.cacheReadAtInputRateUsd).toBeNull();
   });

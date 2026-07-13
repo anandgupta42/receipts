@@ -21,7 +21,7 @@ The default statusline (`brand,cost,tokens,waste,quota5h`, SPEC-0062) renders `5
 is Claude Code's authoritative `rate_limits.five_hour.used_percentage`, but reads as ambiguous
 (26% of *what*?) and drops the reset time (the actionable part). It also renders `501,368k tok`
 for ~501M tokens. This spec makes the default line the researched best-in-class shape —
-`[aireceipts] $423 · $80/hr · 501M · ctx 42% · 5h 26% ↺2h13m` — by fixing token formatting,
+`[aireceipts] ≥$423 · ≥$80/hr · 501M · ctx 42% · 5h 26% ↺2h13m` — by fixing token formatting,
 adding a **burn rate** and **context %** segment, and giving the 5h window an inline reset
 countdown. **Kill criterion:** any segment that cannot be rendered from a real payload field or
 a priced ledger value (i.e. would require estimating) is cut, not faked.
@@ -35,14 +35,14 @@ a priced ledger value (i.e. would require estimating) is cut, not faked.
   (Claude Code sends a pre-calculated 0–100 value; docs confirm). Guarded exactly like the
   rate-limit windows: absent, non-numeric, or out of `[0,100]` → segment omitted (the same
   guard rejects the known CC epoch-timestamp bug). `N = Math.round(used_percentage)`.
-- **R3 — new `burn` segment (deterministic, from aireceipts' own ledger).** `$X/hr` where
+- **R3 — new `burn` segment (deterministic lower bound from aireceipts' own ledger).** `≥$X/hr` where
   `X` is `totalUsd / (durationMs / 3_600_000)` — the session's priced spend over its
   wall-clock, from `MiniSummary.totalUsd`/`durationMs` (aireceipts' cited-price figure, NOT
   Claude Code's estimate, for I2 consistency with the `cost` segment). Rendered as **whole
   dollars once ≥ `$1/hr`** (glanceable) and **cents below `$1/hr`** (so a real small burn is
   never rounded away to the misleading `$0/hr`). Omitted when `unpriceable`, `totalUsd` is
   `null`/non-finite/negative, `durationMs` is absent/non-finite/`≤ 0`, or the computed rate is
-  non-finite (no fabricated `$NaN`/`$Infinity`/negative rate — Codex #1). It is a session-average
+  non-finite (no fabricated `$NaN`/`$Infinity`/negative rate — Codex #1). It is a downward-rounded session-average floor
   rate (a labeled fact); a rolling-window burn is a non-goal (below).
 - **R4 — `quota5h` gains an inline reset countdown.** `5h N% ↺Xh Ym` (e.g. `5h 26% ↺2h13m`)
   where the countdown is `resets_at * 1000 - nowMs` (`resets_at` is epoch **seconds**, per
@@ -57,7 +57,7 @@ a priced ledger value (i.e. would require estimating) is cut, not faked.
   differentiator). `burn` and `context` are added to `SEGMENT_NAMES`
   so `--format` can name them; `quotaEta`/`quota7d` remain opt-in. A segment with nothing
   honest to say still returns `null` and is omitted (I2/I3) — so a cheap early session with no
-  duration/context/rate-limit data degrades to just `[aireceipts] $X · <tokens>`.
+  duration/context/rate-limit data degrades to just `[aireceipts] ≥$X · <tokens>`.
 - **R6 — no color in v1.** Segments return plain strings (the engine is plain-text). Threshold
   color-coding (burn/context green/yellow/red) is a deliberate follow-on non-goal.
 - **R7 — exact-string unit tests.** The statusline is verified by byte-exact `renderSegments`
@@ -70,7 +70,7 @@ a priced ledger value (i.e. would require estimating) is cut, not faked.
 
 - **Given** a full stdin payload (cost, duration, `context_window.used_percentage`, five_hour
   `used_percentage`+`resets_at`), **when** the default statusline renders, **then**
-  `[aireceipts] $423 · $80/hr · 501M · ctx 42% · 5h 26% ↺2h13m`.
+  `[aireceipts] ≥$423 · ≥$80/hr · 501M · ctx 42% · 5h 26% ↺2h13m`.
 - **Given** a payload with `rate_limits` but no `resets_at`, **when** it renders, **then**
   `… 5h 26%` (no countdown, no fabricated time).
 - **Given** a `resets_at` already in the past, **when** it renders, **then** `5h N%` (fallback,
@@ -100,7 +100,7 @@ a priced ledger value (i.e. would require estimating) is cut, not faked.
 | R1 tokens M/B | 501,368,000 tokens | `501M` |
 | R2 context | `context_window.used_percentage: 42` | `ctx 42%` |
 | R2 context guard | `used_percentage: 1.7e9` or absent | segment omitted |
-| R3 burn | totalUsd 40, durationMs 1.8e6 (0.5h) | `$80/hr` |
+| R3 burn | totalUsd 40, durationMs 1.8e6 (0.5h) | `≥$80/hr` |
 | R3 burn omitted | unpriceable / totalUsd null / durationMs 0 | segment omitted |
 | R4 countdown | `resets_at` 2h13m ahead | `5h 26% ↺2h13m` |
 | R4 sub-hour | `resets_at` 45m ahead | `↺45m` |
@@ -109,7 +109,7 @@ a priced ledger value (i.e. would require estimating) is cut, not faked.
 | R4 absurd reset | `resets_at` a ms value (huge) | `5h N%` (countdown omitted, not `↺…000h0m`) |
 | R4 quota7d | `seven_day` reset ahead | `7d N% ↺…` (same countdown) |
 | R5 default | full payload | the rich line, in order |
-| R5 degraded | payload with only cost | `[aireceipts] $X · <tokens>` |
+| R5 degraded | payload with only cost | `[aireceipts] ≥$X · <tokens>` |
 | R6 plain text | any rendered segment | no ANSI escape codes in the output |
 | R7 non-finite burn | `totalUsd` NaN / `durationMs` NaN | `burn` omitted (no `$NaN/hr`) |
 

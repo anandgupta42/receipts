@@ -24,7 +24,7 @@ describe("SPEC-0044 B3 — dropped transcript records surface, never silent", ()
     const model = await buildReceiptModel(session!, dataDir);
     const caveat = model.caveats.find((c) => c.kind === "dropped-transcript-records");
     expect(caveat).toBeDefined();
-    expect(caveat!.text).toContain("1 unreadable transcript record skipped");
+    expect(caveat!.text).toContain("1 transcript record unreadable or malformed");
     // still priced from the surviving turns — the drop lowers the total, not the session
     expect(model.totalUsd).not.toBeNull();
     expect(model.totalUsd!).toBeGreaterThan(0);

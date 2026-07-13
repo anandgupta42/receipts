@@ -9,9 +9,20 @@
 import type { SessionSummary, TokenUsage } from "../parse/types.js";
 import { compareDeltaLine } from "./compare.js";
 import { SCHEMA_VERSION } from "./exportSchema.js";
-import type { ModelMixEntry, PriceRowUsed, ReceiptModel, ToolRow, WasteLine } from "./model.js";
+import { combinedPricedUsd, combinedTokenTotal, parentPricedUsd, type ModelMixEntry, type PriceRowUsed, type ReceiptModel, type ToolRow, type WasteLine } from "./model.js";
 import type { WasteClassAggregate } from "../aggregate/waste.js";
 import { SLIP_RULE_LINES, couldHaveSavedOf, type HandoffCounts } from "./handoff.js";
+import {
+  HEURISTIC_PATTERN_PRICING_INTERPRETATION,
+  lowerBoundCostEstimate,
+  SAME_TOKENS_REPRICING_INTERPRETATION,
+} from "./costEstimate.js";
+import {
+  combinedPricingCoverageOf,
+  knownCombinedUnpricedTokens,
+  knownUnpricedTokens,
+  pricingCoverageOf,
+} from "./pricingCoverage.js";
 
 function tokenUsageJson(t: TokenUsage) {
   return {
@@ -37,6 +48,7 @@ function toolRowJson(row: ToolRow) {
   return {
     tool: row.tool,
     usd: row.usd,
+    costEstimate: lowerBoundCostEstimate(row.usd),
     tokens: tokenUsageJson(row.tokens),
     callCount: row.callCount,
   };
@@ -46,9 +58,11 @@ function wasteLineJson(waste: WasteLine) {
   if (waste.kind === "stuck-loop") {
     return {
       kind: waste.kind,
+      costInterpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION,
       tool: waste.tool,
       runLength: waste.runLength,
       usd: waste.usd,
+      costEstimate: lowerBoundCostEstimate(waste.usd),
       tokens: tokenUsageJson(waste.tokens),
       wallClockMs: waste.wallClockMs,
     };
@@ -56,17 +70,21 @@ function wasteLineJson(waste: WasteLine) {
   if (waste.kind === "context-thrash") {
     return {
       kind: waste.kind,
+      costInterpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION,
       compactionCount: waste.compactionCount,
       turnSpan: waste.turnSpan,
       turnIndices: waste.turnIndices,
       tokens: tokenUsageJson(waste.tokens),
       usd: waste.usd,
+      costEstimate: lowerBoundCostEstimate(waste.usd),
     };
   }
   return {
     kind: waste.kind,
+    costInterpretation: HEURISTIC_PATTERN_PRICING_INTERPRETATION,
     eligibleTurnCount: waste.eligibleTurnCount,
     usd: waste.usd,
+    costEstimate: lowerBoundCostEstimate(waste.usd),
     tokens: tokenUsageJson(waste.tokens),
     cheaperModel: waste.cheaperModel,
   };
@@ -79,8 +97,18 @@ function priceRowUsedJson(row: PriceRowUsed) {
     input: row.input,
     output: row.output,
     input_cached: row.input_cached ?? null,
+    input_cache_write: row.input_cache_write ?? null,
     input_cache_write_5m: row.input_cache_write_5m ?? null,
     input_cache_write_1h: row.input_cache_write_1h ?? null,
+    context_tiers: (row.context_tiers ?? []).map((tier) => ({
+      above_input_tokens: tier.above_input_tokens,
+      input: tier.input,
+      output: tier.output,
+      input_cached: tier.input_cached ?? null,
+      input_cache_write: tier.input_cache_write ?? null,
+      input_cache_write_5m: tier.input_cache_write_5m ?? null,
+      input_cache_write_1h: tier.input_cache_write_1h ?? null,
+    })),
     from_date: row.from_date,
     to_date: row.to_date,
     sources: row.sources.map((s) => ({
@@ -91,8 +119,28 @@ function priceRowUsedJson(row: PriceRowUsed) {
   };
 }
 
+function subagentAggregateJson(model: ReceiptModel) {
+  if (!model.subagents) {
+    return null;
+  }
+  return {
+    count: model.subagents.count,
+    pricedUsd: model.subagents.pricedUsd,
+    pricedCostEstimate: lowerBoundCostEstimate(model.subagents.pricedUsd),
+    tokensTotal: model.subagents.tokensTotal,
+    unpricedTokens: tokenUsageJson(model.subagents.unpricedTokens),
+    unpricedTokensScope: "readable-subagents" as const,
+    unpricedCount: model.subagents.unpricedCount,
+    unreadableCount: model.subagents.unreadableCount,
+  };
+}
+
 /** The receipt body — every field of a single-session receipt, minus the `schemaVersion` envelope. Reused verbatim as `compare`'s `a`/`b` so both surfaces share one shape (single-source-of-truth). */
 function receiptBody(model: ReceiptModel) {
+  const parentUsd = parentPricedUsd(model);
+  const combinedUsd = combinedPricedUsd(model);
+  const parentUnpricedTokens = knownUnpricedTokens(model);
+  const combinedUnpricedTokens = knownCombinedUnpricedTokens(model);
   return {
     agentLabel: model.agentLabel,
     source: model.source,
@@ -103,16 +151,33 @@ function receiptBody(model: ReceiptModel) {
     unpriceable: model.unpriceable,
     modelMix: modelMixJson(model.modelMix),
     toolRows: model.toolRows.map(toolRowJson),
-    totalUsd: model.totalUsd,
+    totalUsd: parentUsd,
+    totalCostEstimate: lowerBoundCostEstimate(parentUsd),
+    totalUsdScope: "parent-session" as const,
+    combinedPricedUsd: combinedUsd,
+    combinedPricedCostEstimate: lowerBoundCostEstimate(combinedUsd),
+    combinedScope: "parent-session-plus-readable-subagents" as const,
+    combinedTotalTokens: combinedTokenTotal(model),
     totalTokens: tokenUsageJson(model.totalTokens),
     sessionTotalTokens: tokenUsageJson(model.sessionTotalTokens),
+    pricingCoverage: pricingCoverageOf(model),
+    unpricedTokens: tokenUsageJson(parentUnpricedTokens),
+    unpricedTokensScope: "parent-session" as const,
+    combinedUnpricedTokens: tokenUsageJson(combinedUnpricedTokens),
+    combinedUnpricedTokensScope: "parent-session-plus-readable-subagents" as const,
+    combinedPricingCoverage: combinedPricingCoverageOf(model),
     wasteLines: model.wasteLines.map(wasteLineJson),
     caveats: model.caveats.map((c) => ({ kind: c.kind, text: c.text })),
     priceDelta: model.priceDelta
       ? {
           cheaperModel: model.priceDelta.cheaperModel,
+          interpretation: SAME_TOKENS_REPRICING_INTERPRETATION,
           usd: model.priceDelta.usd,
+          costEstimate: lowerBoundCostEstimate(model.priceDelta.usd),
           actualUsd: model.priceDelta.actualUsd,
+          actualCostEstimate: lowerBoundCostEstimate(model.priceDelta.actualUsd),
+          baselineUsd: model.priceDelta.baselineUsd ?? model.priceDelta.actualUsd,
+          baselineCostEstimate: lowerBoundCostEstimate(model.priceDelta.baselineUsd ?? model.priceDelta.actualUsd),
         }
       : null,
     methodology: model.methodology,
@@ -123,7 +188,9 @@ function receiptBody(model: ReceiptModel) {
     costShape: {
       preEdit: {
         preEditUsd: model.costShape.preEdit.preEditUsd,
+        preEditCostEstimate: lowerBoundCostEstimate(model.costShape.preEdit.preEditUsd),
         postEditUsd: model.costShape.preEdit.postEditUsd,
+        postEditCostEstimate: lowerBoundCostEstimate(model.costShape.preEdit.postEditUsd),
         preEditPct: model.costShape.preEdit.preEditPct,
         preEditTokenPct: model.costShape.preEdit.preEditTokenPct,
         firstEditTurn: model.costShape.preEdit.firstEditTurn,
@@ -139,11 +206,12 @@ function receiptBody(model: ReceiptModel) {
           turnIndices: model.sameFileReReads.turnIndices,
           tokens: tokenUsageJson(model.sameFileReReads.tokens),
           usd: model.sameFileReReads.usd,
+          costEstimate: lowerBoundCostEstimate(model.sameFileReReads.usd),
           confidence: model.sameFileReReads.confidence,
         }
       : null,
     // SPEC-0061 R5 — aggregate only (counts + sums); child ids/titles/paths never export.
-    ...(model.subagents ? { subagents: { ...model.subagents } } : {}),
+    ...(model.subagents ? { subagents: subagentAggregateJson(model) } : {}),
   };
 }
 
@@ -198,6 +266,11 @@ export function toHandoffJson(
   counts: HandoffCounts,
   aggregates: WasteClassAggregate[],
 ) {
+  const couldHaveSaved = couldHaveSavedOf(model.wasteLines, model.totalUsd);
+  const parentUsd = parentPricedUsd(model);
+  const combinedUsd = combinedPricedUsd(model);
+  const parentUnpricedTokens = knownUnpricedTokens(model);
+  const combinedUnpricedTokens = knownCombinedUnpricedTokens(model);
   return {
     schemaVersion: SCHEMA_VERSION,
     source: model.source,
@@ -209,12 +282,36 @@ export function toHandoffJson(
       tokens: tokenUsageJson(model.sessionTotalTokens),
       turnCount: counts.turns,
       toolCallCount: counts.toolCalls,
+      scope: "parent-session" as const,
     },
+    pricingCoverage: pricingCoverageOf(model),
+    unpricedTokens: tokenUsageJson(parentUnpricedTokens),
+    unpricedTokensScope: "parent-session" as const,
+    combinedUnpricedTokens: tokenUsageJson(combinedUnpricedTokens),
+    combinedUnpricedTokensScope: "parent-session-plus-readable-subagents" as const,
+    combinedPricingCoverage: combinedPricingCoverageOf(model),
+    totalUsd: parentUsd,
+    totalCostEstimate: lowerBoundCostEstimate(parentUsd),
+    totalUsdScope: "parent-session" as const,
+    combinedPricedUsd: combinedUsd,
+    combinedPricedCostEstimate: lowerBoundCostEstimate(combinedUsd),
+    combinedTotalTokens: combinedTokenTotal(model),
+    combinedScope: "parent-session-plus-readable-subagents" as const,
+    subagents: subagentAggregateJson(model),
     wasteLines: model.wasteLines.map((w) => ({ ...wasteLineJson(w), rule: SLIP_RULE_LINES[w.kind] ?? null })),
-    couldHaveSaved: couldHaveSavedOf(model.wasteLines, model.totalUsd),
+    wasteLinesScope: "parent-session" as const,
+    couldHaveSaved: {
+      interpretation: couldHaveSaved.interpretation,
+      scope: "parent-session" as const,
+      usd: couldHaveSaved.usd,
+      costEstimate: lowerBoundCostEstimate(couldHaveSaved.usd),
+      tokens: couldHaveSaved.tokens,
+      pctOfTotal: couldHaveSaved.pctOfTotal,
+    },
     suggestions,
     threshold,
     coverage: {
+      scope: "parent-session" as const,
       turns: counts.turns,
       toolCalls: counts.toolCalls,
       compactions: counts.compactions,

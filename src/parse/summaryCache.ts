@@ -114,10 +114,17 @@ function parseCache(raw: string): Record<string, CacheEntry> {
 
 function stripTurns(session: Session): SessionSummary {
   const summary: Partial<Session> = { ...session };
-  // Both are full-Session-only concepts — the cache stores SessionSummary rows,
-  // and SPEC-0017 compactions (like turns) are recomputed on a full load.
+  // These are full-Session-only concepts. The cache stores SessionSummary rows;
+  // request-boundary evidence and confidence flags are recomputed on a full
+  // load, just like turns and compactions. Keeping them here would make a
+  // cache hit return a different public summary shape than an uncached scan.
   delete summary.turns;
   delete summary.compactions;
+  delete summary.unattributedUsage;
+  delete summary.conflictingAggregateUsage;
+  delete summary.usageReconciliationFailed;
+  delete summary.excludedUnattributedUsage;
+  delete summary.droppedRecords;
   return summary as SessionSummary;
 }
 

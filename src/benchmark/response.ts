@@ -27,5 +27,5 @@ export function renderBenchmarkResult(response: BenchmarkCohortResponse): string
   if (response.cohortSize < MIN_COHORT_SIZE) {
     return "not enough data yet";
   }
-  return `This session's cost-per-turn is in the ${response.percentile}th percentile vs. a cohort of ${response.cohortSize} similar sessions.`;
+  return `This session's Standard-API floor-per-turn bucket is in the ${response.percentile}th percentile vs. a cohort of ${response.cohortSize} similar sessions.`;
 }

@@ -100,10 +100,42 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     const model = await buildReceiptModel(session({ turns }), dataDir);
 
     expect(model.totalUsd).not.toBeNull();
+    expect(model.unpricedTokens).toMatchObject({ input: 500, output: 0, total: 500 });
+    expect(model.priceDelta).toBeNull();
     const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
     expect(coverage).toHaveLength(1);
-    expect(coverage[0].text).toBe("caveat: 1 of 2 turns unpriced — TOTAL excludes their tokens");
+    expect(coverage[0].text).toBe("caveat: 1 of 2 usage turns include unpriced tokens — TOTAL excludes those tokens");
     expect(coverage[0].text).not.toContain("$");
+  });
+
+  it("suppresses whole-session repricing when unattributed usage has no model join", async () => {
+    const priced = turn(0, {
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 1000, output: 0 }),
+      toolCalls: [call("Bash")],
+    });
+    const unattributedUsage = usage({ input: 500, output: 0 });
+    const model = await buildReceiptModel(session({ turns: [priced], unattributedUsage }), dataDir);
+
+    expect(model.totalUsd).not.toBeNull();
+    expect(model.unpricedTokens).toEqual(unattributedUsage);
+    expect(model.priceDelta).toBeNull();
+  });
+
+  it("uses deterministic comma grouping in aggregate-usage caveats", async () => {
+    const model = await buildReceiptModel(session({
+      turns: [],
+      unattributedUsage: usage({ input: 1_234_567, output: 0 }),
+      excludedUnattributedUsage: usage({ input: 2_345_678, output: 0 }),
+      conflictingAggregateUsage: usage({ input: 3_456_789, output: 0 }),
+    }), dataDir);
+
+    const aggregateCaveats = model.caveats
+      .filter((c) => c.kind === "unattributed-aggregate-usage")
+      .map((c) => c.text);
+    expect(aggregateCaveats).toContain("caveat: 1,234,567 unattributed tokens lack a trustworthy request/model join — floor excludes them");
+    expect(aggregateCaveats).toContain("caveat: 2,345,678 session-level aggregate-only tokens cannot be assigned to this slice — excluded");
+    expect(aggregateCaveats).toContain("caveat: 3,456,789 session-aggregate tokens conflict with itemized components — excluded from totals and floor");
   });
 
   it("fires even when one tool row spans a priced AND an unpriced turn (the row shows a $, so only the turn count discloses the gap — S2 round 3)", async () => {
@@ -117,10 +149,11 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     expect(model.totalUsd).not.toBeNull();
     expect(model.toolRows).toHaveLength(1);
     expect(model.toolRows[0].usd).not.toBeNull();
+    expect(model.unpricedTokens).toMatchObject({ input: 500, output: 0, total: 500 });
     // ...but the caveat still fires: row-level coverage would miss this.
     const coverage = model.caveats.filter((c) => c.kind === "partial-priced-coverage");
     expect(coverage).toHaveLength(1);
-    expect(coverage[0].text).toBe("caveat: 1 of 2 turns unpriced — TOTAL excludes their tokens");
+    expect(coverage[0].text).toBe("caveat: 1 of 2 usage turns include unpriced tokens — TOTAL excludes those tokens");
   });
 
   it("stays silent when every tool row priced", async () => {
@@ -131,7 +164,38 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     const model = await buildReceiptModel(session({ turns }), dataDir);
 
     expect(model.totalUsd).not.toBeNull();
+    expect(model.unpricedTokens).toBeUndefined();
+    expect(model.priceDelta).not.toBeNull();
     expect(model.caveats.some((c) => c.kind === "partial-priced-coverage")).toBe(false);
+  });
+
+  it("keeps price-delta arithmetic for a fully priced three-tool turn", async () => {
+    const turns = [
+      turn(0, {
+        model: "claude-haiku-4-5",
+        usage: usage({ input: 5400, output: 420, cacheRead: 3200 }),
+        toolCalls: [call("Bash"), call("Read"), call("Grep")],
+      }),
+    ];
+    const model = await buildReceiptModel(session({ turns }), dataDir);
+
+    expect(model.totalTokens).toEqual(turns[0].usage);
+    expect(model.priceDelta).not.toBeNull();
+  });
+
+  it("suppresses repricing when a cited cache-write component rate is missing", async () => {
+    const turns = [
+      turn(0, {
+        model: "gpt-5.4-mini",
+        usage: usage({ input: 1000, output: 10, cacheCreation: 500 }),
+        toolCalls: [call("Read")],
+      }),
+    ];
+    const model = await buildReceiptModel(session({ source: "codex", turns }), dataDir);
+
+    expect(model.totalUsd).not.toBeNull();
+    expect(model.costLowerBoundCacheTier).toBe(true);
+    expect(model.priceDelta).toBeNull();
   });
 
   it("stays silent when nothing priced at all (totalUsd null — a partial-coverage claim would be meaningless without a total to bound)", async () => {
@@ -142,6 +206,7 @@ describe("buildReceiptModel — partial-priced-coverage caveat (SPEC-0054 R3)", 
     const model = await buildReceiptModel(session({ turns }), dataDir);
 
     expect(model.totalUsd).toBeNull();
+    expect(model.unpricedTokens).toBeUndefined();
     expect(model.caveats.some((c) => c.kind === "partial-priced-coverage")).toBe(false);
   });
 });

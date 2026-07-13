@@ -140,6 +140,26 @@ describe("R3 render-first ordering", () => {
     expect(out[0]).toContain("session slice: turns 2–4 of 6");
   });
 
+  it("marks a selected slice with no turn timestamps as an unknown subagent window", async () => {
+    const session = (await loadById("claude-code", ANCHORS))!;
+    const timeless = {
+      ...session,
+      turns: session.turns.map((turn) => ({ ...turn, timestamp: undefined })),
+    };
+    let observedWindow: Parameters<PrDeps["rollup"]>[1] | undefined;
+    const { deps } = await makeDeps({
+      listSessions: async () => [timeless],
+      loadSession: async () => timeless,
+      rollup: async (_parentFilePath, window) => {
+        observedWindow = window;
+        return [];
+      },
+    });
+
+    expect(await runPr({ post: false }, deps)).toBe(0);
+    expect(observedWindow).toEqual({ kind: "unknown" });
+  });
+
   it("SPEC-0070 R1 end-to-end — opts.samosa threads through pr → PrOptions → the rendered comment; off by default", async () => {
     // Off by default: the dry-run body carries no tip link.
     const base = await makeDeps();
@@ -303,6 +323,73 @@ describe("R1d selection outcomes", () => {
     expect(code).toBe(1);
     expect(out).toHaveLength(0);
     expect(err.join("\n")).toContain('no session matched "missing-child"');
+  });
+
+  it("repeated --session selectors append explicit sessions without replacing auto-selection", async () => {
+    const fixture = (await loadById("claude-code", ANCHORS))!;
+    const auto = { ...fixture, id: "auto", filePath: "auto.jsonl" };
+    // Same repo/window, but no git-write evidence: auto-selection declines it.
+    // Repeating --session is the user's explicit attribution claim and must add
+    // both declined sessions while keeping the unlisted auto contributor.
+    const manualOne = {
+      ...fixture,
+      id: "manual-one",
+      filePath: "manual-one.jsonl",
+      turns: fixture.turns.map((turn) => ({ ...turn, toolCalls: [] })),
+    };
+    const manualTwo = { ...manualOne, id: "manual-two", filePath: "manual-two.jsonl" };
+    const byId = new Map([
+      [auto.id, auto],
+      [manualOne.id, manualOne],
+      [manualTwo.id, manualTwo],
+    ]);
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [auto, manualOne, manualTwo],
+      loadSession: async (summary) => byId.get(summary.id) ?? null,
+    });
+
+    const code = await runPr({ post: false, sessions: [manualOne.id, manualTwo.id] }, deps);
+
+    expect(code).toBe(0);
+    expect(out[0]).toContain("3 sessions behind this PR");
+    expect(out[0]).toContain("counted: 3 sessions");
+    expect(out[0]).not.toContain("not attributed");
+  });
+
+  it("repeated --session deduplicates a transcript that auto-selection already found", async () => {
+    const fixture = (await loadById("claude-code", ANCHORS))!;
+    const auto = { ...fixture, id: "auto", filePath: "auto.jsonl" };
+    const manual = {
+      ...fixture,
+      id: "manual",
+      filePath: "manual.jsonl",
+      turns: fixture.turns.map((turn) => ({ ...turn, toolCalls: [] })),
+    };
+    const byId = new Map([
+      [auto.id, auto],
+      [manual.id, manual],
+    ]);
+    const { deps, out } = await makeDeps({
+      listSessions: async () => [auto, manual],
+      loadSession: async (summary) => byId.get(summary.id) ?? null,
+    });
+
+    const code = await runPr({ post: false, sessions: [auto.id, manual.id] }, deps);
+
+    expect(code).toBe(0);
+    expect(out[0]).toContain("2 sessions behind this PR");
+    expect(out[0]).toContain("counted: 2 sessions");
+  });
+
+  it("repeated --session fails before rendering when any explicit selector is invalid", async () => {
+    const session = (await loadById("claude-code", ANCHORS))!;
+    const { deps, out, err } = await makeDeps();
+
+    const code = await runPr({ post: false, sessions: [session.id, "missing-helper"] }, deps);
+
+    expect(code).toBe(1);
+    expect(out).toHaveLength(0);
+    expect(err.join("\n")).toContain('no session matched "missing-helper"');
   });
 });
 
@@ -709,7 +796,7 @@ describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e thro
     const code = await runPr({ post: false, session: session.id }, deps);
     expect(code).toBe(0);
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
-    expect(out[0]).toContain("1 session had a cache-write cost that is a lower bound");
+    expect(out[0]).toContain("1 session had cache tokens with no cited applicable rate");
     expect(out[0]).toContain("(see docs/cost-model.md)");
     // The `≥` floor prefix (isFloored) fires for this event kind (A3's own
     // "at least this much" meaning matches the existing floor semantics —
@@ -728,7 +815,8 @@ describe("SPEC-0044 A3 · cache-tier lower-bound floors the PR receipt (e2e thro
     expect(out[0].startsWith(DOGFOOD_MARKER)).toBe(true);
     expect(out[0]).not.toContain("cache-write cost that is a lower bound");
     expect(out[0]).not.toContain("cost-model.md");
-    expect(out[0]).not.toMatch(/TOTAL priced\.+≥/);
+    expect(out[0]).toMatch(/TOTAL priced\.+≥/);
+    expect(out[0]).toContain("standard API-equivalent floor; not an invoice");
   });
 });
 
@@ -761,8 +849,8 @@ describe("SPEC-0059 handoff section (e2e through runPr)", () => {
     expect(result.code).toBe(0);
     expect(result.handoffSectionIncluded).toBe(true);
     const body = out[0];
-    expect(body).toContain("<details><summary>handoff — could have saved ≤ $");
-    expect(body).toContain("COULD HAVE SAVED");
+    expect(body).toContain("<details><summary>handoff — flagged pattern cost ≈ $");
+    expect(body).toContain("FLAGGED PATTERN COST");
     expect(body).toContain("→ change or stop after two identical failures");
     expect(body).toContain("covers: 1 session ·");
     expect(body.indexOf("full receipts (")).toBeLessThan(body.indexOf("<details><summary>handoff — "));

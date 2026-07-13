@@ -8,10 +8,12 @@
 [##########] = priciest line; others in proportion
 
 --- TOOL CALLS ---
-Edit............................$0.01 [##########]
+Edit........................≥ $0.0084 [##########]
 --------------------------------------------------
-TOTAL........................................$0.01
-same tokens on claude-haiku-4-5...$0.00 (50% less)
+TOTAL....................................≥ $0.0084
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5..........≥ $0.0042
+  (50% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

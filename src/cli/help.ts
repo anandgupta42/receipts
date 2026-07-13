@@ -6,7 +6,7 @@
 // module — while `goldens/cli/help.txt` gates the assembled bytes.
 import type { CommandDef, HelpEntry } from "./types.js";
 
-const HEADER = "aireceipts — local, deterministic cost receipts for AI coding-agent sessions\n\nUsage:";
+const HEADER = "aireceipts — local, deterministic Standard-API cost floors for AI coding-agent sessions\n\nUsage:";
 
 const FOOTER = [
   "flags: --svg renders an SVG file; --png rasterizes it (receipt only, not compare);",

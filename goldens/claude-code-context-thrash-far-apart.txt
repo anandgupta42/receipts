@@ -7,10 +7,11 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-(thinking/reply).................$5.50  (30 turns)
+(thinking/reply)...............≥ $5.50  (30 turns)
 --------------------------------------------------
-TOTAL........................................$5.50
-same tokens on claude-haiku-4-5...$5.50 (<1% less)
+TOTAL......................................≥ $5.50
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5............≥ $5.50
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

@@ -55,9 +55,9 @@ Now, whenever a Claude Code session ends, you'll see the mini receipt:
 ```
 aireceipts · session receipt
 Claude Code · claude-opus-4-8 · 10m 30s
-total  $0.18
-top    Bash · $0.05 (3 calls)
-no waste detected
+total  ≥ $0.1767
+top    Bash · ≥ $0.0517 (3 calls)
+no flagged pattern detected
 run  aireceipts  for the full receipt
 ```
 

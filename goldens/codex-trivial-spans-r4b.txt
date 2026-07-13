@@ -8,13 +8,15 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-(thinking/reply)..................$0.00  (3 turns)
+(thinking/reply)..............≥ $0.0024  (3 turns)
 
-≈ re-priced eligible trivial spans...........$0.00
+≈ re-priced eligible trivial spans.......≈ $0.0008
   (3 tiny turns, priced at gpt-5.4-mini)
 --------------------------------------------------
-TOTAL........................................$0.00
-same tokens on gpt-5.4-mini.......$0.00 (65% less)
+TOTAL....................................≥ $0.0024
+standard API-equivalent floor; not an invoice
+same tokens on gpt-5.4-mini..............≥ $0.0008
+  (65% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

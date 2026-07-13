@@ -6,7 +6,8 @@
 // + buildReceiptModel over a sub-range — never a new pricing path (I2).
 import type { Session } from "../parse/types.js";
 import { buildReceiptModel, sliceSessionForReceipt, type ReceiptModel } from "../receipt/model.js";
-import { formatUsd } from "../receipt/format.js";
+import { formatUsdFloor } from "../receipt/format.js";
+import { lowerBoundCostEstimate, type CostEstimate } from "../receipt/costEstimate.js";
 import type { BranchCommits } from "./git.js";
 import type { AnchorEvent, SliceResult } from "./slice.js";
 
@@ -37,7 +38,11 @@ export interface PerCommitRow {
   turnCount: number;
   /** null when the segment priced nothing — tokens shown instead, zero `$` bytes (I2). */
   usd: number | null;
+  /** Machine-readable lower-bound meaning for `usd`; null whenever `usd` is null. */
+  costEstimate?: CostEstimate | null;
   totalTokens: number;
+  /** Exact tokens excluded from a partial `usd`; absent unless this segment mixes priced and unpriced turns. */
+  unpricedTokens?: number;
   extraCount: number;
 }
 
@@ -103,7 +108,9 @@ export async function buildPerCommitRows(session: Session, segments: PerCommitSe
       subject: seg.subject,
       turnCount: seg.endTurn - seg.startTurn + 1,
       usd: model.totalUsd,
+      costEstimate: lowerBoundCostEstimate(model.totalUsd),
       totalTokens: t.input + t.output + t.cacheRead + t.cacheCreation,
+      ...(model.unpricedTokens ? { unpricedTokens: model.unpricedTokens.total } : {}),
       extraCount: seg.extraShas.length,
     });
   }
@@ -113,7 +120,12 @@ export async function buildPerCommitRows(session: Session, segments: PerCommitSe
 /** Fixed-format table lines for the artifact page (rendered inside a <pre>). */
 export function renderPerCommitLines(rows: PerCommitRow[]): string[] {
   const lines = rows.map((r) => {
-    const cost = r.usd !== null ? `$${formatUsd(r.usd)}` : `${r.totalTokens} tokens`;
+    let cost = `${r.totalTokens} tokens`;
+    if (r.usd !== null) {
+      cost = r.unpricedTokens !== undefined && r.unpricedTokens > 0
+        ? `≥ $${formatUsdFloor(r.usd)} + ${r.unpricedTokens} unpriced tokens`
+        : `≥ $${formatUsdFloor(r.usd)}`;
+    }
     const extra = r.extraCount > 0 ? `  (+${r.extraCount} more in this turn)` : "";
     const turns = `${r.turnCount} ${r.turnCount === 1 ? "turn" : "turns"}`;
     return `${r.shortSha}  ${r.subject}  ·  ${turns}  ·  ${cost}${extra}`;

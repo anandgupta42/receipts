@@ -1,7 +1,7 @@
 {
   "name": "aireceipts-cli",
   "version": "0.8.2",
-  "description": "Your AI coding agent just billed you. Here's the receipt.",
+  "description": "Your AI coding agent used millions of tokens. Here is the observable cost floor.",
   "keywords": [
     "ai",
     "claude-code",

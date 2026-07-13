@@ -2,9 +2,10 @@
 // provable from the normalized Session. Duplicate raw-record detection is a
 // named non-goal here (the normalized surface can't prove it) — it is handled
 // upstream at parse time, where the adapter merges same-`message.id` records
-// into one turn (src/parse/claudeCode.ts). These invariants catch component
-// corruption and total-arithmetic breakage over real data — the `withTotal`
-// discipline (src/parse/util.ts:46) holding outside fixtures.
+// into one turn and keeps the maximum reported value of every billed usage
+// component. The validator therefore expects already-merged, non-negative
+// components and exact total arithmetic; it must never try to re-sum raw
+// duplicate snapshots after normalization.
 import type { AdapterFidelity, FidelityFinding, Session, TokenUsage } from "../types.js";
 
 const COMPONENTS: readonly (keyof Pick<TokenUsage, "input" | "output" | "cacheRead" | "cacheCreation">)[] = [

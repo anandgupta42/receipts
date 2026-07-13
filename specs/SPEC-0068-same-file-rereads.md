@@ -1,6 +1,6 @@
 ---
 id: SPEC-0068
-title: "Same-file re-reads — a neutral diagnostic fact, kept out of the waste/savings math"
+title: "Same-file re-reads — a neutral diagnostic fact, kept out of flagged-pattern math"
 status: approved
 milestone: M5
 depends: [SPEC-0001, SPEC-0017]
@@ -21,8 +21,8 @@ own data (measured 2026-07-06: 41% re-read rate over 38 substantial Claude Code 
 re-reads** had no recorded edit, compaction, or shell touch between — across 25/38 sessions). The
 byte-identical `duplicate-reads` attempt was cut (0 in the wild + unobservable "waste"). This spec
 lands the correctly-scoped signal — **same-file** re-reads (any range) with no recorded cause — as
-a **neutral diagnostic fact with token cost**, explicitly **outside** the `WasteLine`/"could have
-saved" machinery (S2: waste lines feed `COULD HAVE SAVED` in handoff and PR body, which would
+a **neutral diagnostic fact with token cost**, explicitly **outside** the `WasteLine`/
+flagged-pattern machinery (S2: waste lines feed a handoff detector subtotal, which would
 contradict the caveat). **Kill criterion:** on the labeled ≥20-session corpus the no-recorded-cause
 set must (a) be non-trivial and (b) survive a maintainer spot-check as not dominated by causes the
 exclusions miss (whole-tree shell ops, external edits, user-requested re-reads); if not, it ships
@@ -53,24 +53,24 @@ tokens-only or stays draft.
   (the `flattenCalls` even-split convention, `src/pricing/waste.ts:52` — an attribution convention,
   not measured tool-output cost, stated in R4) to `tokens`; `usd` is the summed priced share,
   `null` if any counted read is unpriced (I2). `turnIndices` = sorted distinct turn indices.
-- **R4 — LOW-confidence framing and savings exclusion (the crux, I6; maintainer directive).**
+- **R4 — LOW-confidence framing and handoff exclusion (the crux, I6; maintainer directive).**
   Per the maintainer directive (2026-07-06), this ships as a **confidence-marked** signal rather than
   being cut. It carries `confidence: "low"`. **Correct mechanism (S2 re-review 2026-07-06):**
-  `isFloored(confidence)` only nulls the savings *denominator* — it suppresses the `%` but NOT the
-  `$`, which is summed directly from `WasteLine.usd` (`src/receipt/handoff.ts:63,71`) and re-rendered
-  as "could have saved ≤ $…" in the PR body (`src/pr/body.ts:591`). And `WasteLine` currently has
+  `isFloored(confidence)` only nulls a historical handoff *denominator* — it suppresses the `%` but NOT the
+  `$`, which was summed directly from `WasteLine.usd` (`src/receipt/handoff.ts:63,71`) and re-rendered
+  in the PR body (`src/pr/body.ts:591`). And `WasteLine` currently has
   **no** `confidence` field (`src/receipt/model.ts:61`). Therefore this spec must: **(i)** add a
   `confidence` field to the waste/diagnostic model; and **(ii)** exclude low-confidence signals from
-  the recoverable-`$` **sum on both surfaces** — the handoff `$` (`handoff.ts:63`) and the PR-body
-  "could have saved" `$` line (`pr/body.ts:591`) — in addition to the existing `%` suppression. Net:
-  **neither a `$` nor a `%` "could have saved" is ever attributed to re-reads**, while the diagnostic
+  the flagged-pattern `$` **sum on both surfaces** — the handoff `$` (`handoff.ts:63`) and the PR-body
+  subtotal (`pr/body.ts:591`) — in addition to the existing `%` suppression. Net:
+  **neither a `$` nor a `%` handoff subtotal is ever attributed to re-reads**, while the diagnostic
   + tokens still render. The line states only what is recorded: `same-file re-reads: N (≈X tokens,
   low confidence) — no recorded edit, compaction, or matching shell command between; may include
   legitimate re-grounding.` Never "wasted"/"avoidable". A test asserts no savings `$` AND no `%` is
   attributed on **both** the handoff and the PR body.
   **Implementation note (2026-07-07):** realized as a **standalone diagnostic block** (R5's
   `sameFileReReads` field on `ReceiptModel`, mirroring `costShape`), NOT a `WasteLine`. It is
-  therefore structurally never in `handoff.ts`'s `WasteLine.usd` sum or `pr/body.ts`'s savings line,
+  therefore structurally never in `handoff.ts`'s `WasteLine.usd` sum or `pr/body.ts`'s flagged-pattern line,
   achieving the Net above **by construction** — the (i)/(ii) WasteLine-confidence-exclusion mechanism
   is unnecessary. The `confidence: "low"` field lives on the standalone block, and a test asserts the
   signal is never a `same-file-rereads` waste-row kind. Rendered in `--details` + `--json` only (a
@@ -95,7 +95,7 @@ tokens-only or stays draft.
 
 - **Given** `Read a.ts` at turns 2, 9, 20 with no edit/compaction/shell touch of `a.ts` between,
   **when** the receipt renders, **then** one neutral `same-file re-reads: 2` line, priced from the
-  two later reads, **absent** from any "could have saved" total.
+  two later reads, **absent** from any flagged-pattern subtotal.
 - **Given** `Read a.ts → Edit a.ts → Read a.ts`, **when** it renders, **then** no line.
 - **Given** `Read a.ts → shell "git checkout ." → Read a.ts`, **when** it renders, **then** no line
   (whole-tree mutator).
@@ -114,9 +114,9 @@ tokens-only or stays draft.
 
 ## Non-goals
 
-- **Attributing a recoverable `$`/`%` "could have saved" to re-reads** (I6) — the signal ships at
-  low confidence, which suppresses the savings figure via the existing floored path (R4); the
-  diagnostic + tokens show, the savings claim never does.
+- **Attributing a handoff `$`/`%` flagged-pattern subtotal to re-reads** (I6) — the signal ships at
+  low confidence and remains structurally outside that path (R4); the diagnostic
+  + tokens show, and no avoidability claim appears.
 - **Byte-identical `duplicate-reads`** — cut; superseded.
 - **Any "$ wasted"/"avoidable" verdict** — the caveated fact is the ceiling of what the transcript
   supports; external edits, user-requested re-reads, subagent edits, and non-shell mutators cannot
@@ -143,8 +143,8 @@ tokens-only or stays draft.
 | R2 same-turn ordering | multiple ordered calls in one turn | ordinal within the turn respected |
 | R3 pricing | priced re-reads | summed share, real `usd` |
 | R3 unpriced | one counted read unpriced | tokens only, `usd:null` |
-| R4 no-savings handoff | fixture that fires | no `$` AND no `%` "could have saved" from re-reads in `handoff.ts` (both the usd sum and %) |
-| R4 no-savings PR body | fixture that fires | no `$` AND no `%` from re-reads in `pr/body.ts` "could have saved ≤ $…" |
+| R4 no-handoff subtotal | fixture that fires | no `$` AND no `%` flagged-pattern contribution from re-reads in `handoff.ts` |
+| R4 no-PR subtotal | fixture that fires | no `$` AND no `%` flagged-pattern contribution from re-reads in `pr/body.ts` |
 | R4 confidence field | fixture that fires | `confidence:"low"` present on the model + json + line; low-confidence excluded from recoverable-$ by construction |
 | R5 json shape | fixture | top-level `sameFileReReads` block, not a `waste[]` row |
 | R5 handoff | fixture | `--handoff` unchanged (no suggestion this spec) |
@@ -155,7 +155,7 @@ tokens-only or stays draft.
 
 - [ ] Fires on the true-positive and path-alias fixtures; silent on edit/compaction/basename-shell/
       whole-tree-shell/different-dir/failed-retry negatives.
-- [ ] A test asserts the fact never enters handoff/PR "could have saved" and carries no "wasted/
+- [ ] A test asserts the fact never enters the handoff/PR flagged-pattern subtotal and carries no "wasted/
       avoidable" phrasing (I6, S2's biggest risk).
 - [ ] ≥20-session labeled corpus (SPEC-0065 store) reported with a maintainer spot-check and the
       false-attribution rate written into the PR.
@@ -166,12 +166,12 @@ tokens-only or stays draft.
 
 ## Validation
 
-**2026-07-06 · S1 (self):** clean on I2/I5; missed the "could have saved" leak and the
+**2026-07-06 · S1 (self):** clean on I2/I5; missed the handoff-subtotal leak and the
 "genuinely unexplained" overclaim that S2 caught.
 
 **2026-07-06 · S2 (Codex): reworked, findings accepted.** Applied: wording "genuinely unexplained"
 → "no **recorded** edit/compaction/matching shell command" [#1]; **not a `WasteLine`** — kept out of
-handoff/PR "could have saved" as its own neutral block [#5, the biggest risk]; implement inside
+handoff/PR flagged-pattern subtotal as its own neutral block [#5, the biggest risk]; implement inside
 `waste.ts` extending the private `FlatCall` with raw name/input/shell + global ordinal, compaction
 as a synthetic pre-turn ordinal — no exported privates [#3]; path normalization resolves `.`/`..`
 but does not equate different dirs/basenames [#2]; failed-read-then-retry excluded [#2]; whole-tree

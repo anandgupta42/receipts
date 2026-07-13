@@ -6,10 +6,12 @@
 
 TXN #61157EA5
 ITEM                              QTY          AMT
-Bash                                1   $12,500.00
+Bash                                1 ≥ $12,500.00
 --------------------------------------------------
-TOTAL                                   $12,500.00
-same tokens on claude-haik…...$2,500.00 (80% less)
+TOTAL                                 ≥ $12,500.00
+standard API-equivalent floor; not an invoice
+same tokens on claude-haiku-4-5........≥ $2,500.00
+  (80% lower observable floor)
   (arithmetic, not a prediction)
 
 CARDHOLDER: claude-opus-4-8

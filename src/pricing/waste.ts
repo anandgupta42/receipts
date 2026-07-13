@@ -2,7 +2,18 @@ import { posix as posixPath } from "node:path";
 import type { Compaction, Session, TokenUsage, ToolCallStatus, Turn } from "../parse/types.js";
 import { addUsage, emptyUsage, scaleUsage, withTotal } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
-import { cheapestCurrentRow, costOf, isoDateOf, priceTurn, resolvePrice, vendorForSource, vendorForTurn } from "./resolve.js";
+import {
+  cheapestCurrentRow,
+  costOf,
+  costTurnAtRow,
+  isoDateOf,
+  isPriceableUsage,
+  priceSessionTurn,
+  pricingUnitsForTurn,
+  resolvePrice,
+  vendorForSource,
+  vendorForTurn,
+} from "./resolve.js";
 
 /** Deterministically stringify `value` with object keys sorted, so structurally-identical tool inputs compare equal regardless of key order. */
 function stableStringify(value: unknown): string {
@@ -62,10 +73,8 @@ async function flattenCalls(session: Session, dataDir: string): Promise<FlatCall
     if (turn.toolCalls.length === 0) {
       continue;
     }
-    const model = turn.model ?? session.model;
-    const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
-    const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
+    const priced = await priceSessionTurn(session, turn, dataDir);
+    const completeUsd = priced && priced.unpricedUsage.total === 0 ? priced.usd : null;
     const share = 1 / turn.toolCalls.length;
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
     for (const call of turn.toolCalls) {
@@ -75,7 +84,7 @@ async function flattenCalls(session: Session, dataDir: string): Promise<FlatCall
         input: call.input,
         shell: call.shell,
         status: call.status,
-        usd: priced !== null ? priced.usd * share : null,
+        usd: completeUsd !== null ? completeUsd * share : null,
         tokens: tokenShare,
         turnIndex: turn.index,
         startedAt: call.startedAt,
@@ -262,17 +271,18 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
   if (session.unpriceable) {
     return null;
   }
-  const vendor = vendorForSource(session.source);
-  if (!vendor) {
+  const sourceVendor = vendorForSource(session.source);
+  if (!sourceVendor) {
     return null;
   }
-  const cheapest = await cheapestCurrentRow(vendor, dataDir);
+  const cheapest = await cheapestCurrentRow(sourceVendor, dataDir);
   if (!cheapest) {
     return null;
   }
 
   let eligibleTurnCount = 0;
   let tokens = emptyUsage();
+  let usd = 0;
   const turnIndices: number[] = [];
 
   for (const turn of session.turns) {
@@ -286,17 +296,38 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
     if (!turn.usage) {
       continue;
     }
-    const model = turn.model ?? session.model;
-    const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    if (!model || !dateISO) {
+    if (!isPriceableUsage(turn.usage)) {
       continue;
     }
-    const row = await resolvePrice(vendor, model, dateISO, dataDir);
-    if (!row || !(cheapest.row.input < row.input)) {
+    const units = pricingUnitsForTurn(turn);
+    if (!units) {
+      continue;
+    }
+    let identitiesEligible = true;
+    for (const unit of units) {
+      const model = unit.model;
+      const dateISO = isoDateOf(unit.timestamp);
+      const vendor = vendorForTurn(session.source, model, unit.pricingProvider);
+      if (!model || !dateISO || vendor !== sourceVendor) {
+        identitiesEligible = false;
+        break;
+      }
+      const row = await resolvePrice(vendor, model, dateISO, dataDir);
+      if (!row || !(cheapest.row.input < row.input)) {
+        identitiesEligible = false;
+        break;
+      }
+    }
+    if (!identitiesEligible) {
       continue;
     }
     eligibleTurnCount += 1;
     tokens = addUsage(tokens, turn.usage);
+    const repriced = costTurnAtRow(turn, cheapest.row);
+    if (repriced === null) {
+      return null;
+    }
+    usd += repriced;
     turnIndices.push(turn.index);
   }
 
@@ -304,7 +335,7 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
     return null;
   }
 
-  return { eligibleTurnCount, tokens, usd: costOf(tokens, cheapest.row), cheaperModel: cheapest.model, turnIndices };
+  return { eligibleTurnCount, tokens, usd, cheaperModel: cheapest.model, turnIndices };
 }
 
 // SPEC-0017 R3/R4 — provisional, evidence-bound constants (not user knobs). See
@@ -432,11 +463,13 @@ export async function detectContextThrash(session: Session, dataDir: string = de
       contributing.push(i);
       const sliced = promptOnlyUsage(turn.usage);
       tokens = addUsage(tokens, sliced);
-      const model = turn.model ?? session.model;
-      const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-      const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
-      const priced = await priceTurn(vendor, model, dateISO, sliced, dataDir);
-      if (priced === null) {
+      const slicedTurn: Turn = {
+        ...turn,
+        usage: sliced,
+        pricingUnits: turn.pricingUnits?.map((unit) => ({ ...unit, usage: promptOnlyUsage(unit.usage) })),
+      };
+      const priced = await priceSessionTurn(session, slicedTurn, dataDir);
+      if (priced === null || priced.unpricedUsage.total > 0) {
         usd = null;
       } else if (usd !== null) {
         usd += priced.usd;
@@ -457,12 +490,15 @@ export async function detectContextThrash(session: Session, dataDir: string = de
 export interface PriceDeltaFootnote {
   cheaperModel: string;
   usd: number;
+  /** Explicit name for the observed session's Standard-API floor. */
+  baselineUsd?: number;
+  /** @deprecated Compatibility alias for `baselineUsd`; never an invoice amount. */
   actualUsd: number;
 }
 
 /**
  * R5's price-delta arithmetic footnote: the session's already-priced total
- * token volume (`totalTokens`/`actualUsd`, computed upstream by
+ * token volume (`totalTokens`/the observed baseline floor, computed upstream by
  * `attributeByTool`) re-priced at the vendor's cheapest current row. A pure
  * primitive — it takes the totals as parameters rather than recomputing
  * them, so the receipt renderer (surface role) wires it to whatever total
@@ -476,16 +512,61 @@ export async function priceDeltaFootnote(
   actualUsd: number,
   dataDir: string = defaultDataDir(),
 ): Promise<PriceDeltaFootnote | null> {
-  if (session.unpriceable) {
+  if (session.unpriceable || !isPriceableUsage(totalTokens)) {
     return null;
   }
   const vendor = vendorForSource(session.source);
   if (!vendor) {
     return null;
   }
+  for (const turn of session.turns) {
+    if (turn.usage && turn.usage.total > 0) {
+      const units = pricingUnitsForTurn(turn);
+      if (!units) {
+        return null;
+      }
+      for (const unit of units) {
+        const model = unit.model;
+        const provider = unit.pricingProvider;
+        if (!model || isoDateOf(unit.timestamp) === undefined) {
+          return null;
+        }
+        if (vendorForTurn(session.source, model, provider) !== vendor) {
+          return null;
+        }
+      }
+    }
+  }
   const cheapest = await cheapestCurrentRow(vendor, dataDir);
   if (!cheapest) {
     return null;
   }
-  return { cheaperModel: cheapest.model, usd: costOf(totalTokens, cheapest.row), actualUsd };
+  let alternativeUsd = 0;
+  let usageTurnCount = 0;
+  for (const turn of session.turns) {
+    if (!turn.usage || turn.usage.total === 0) {
+      continue;
+    }
+    usageTurnCount++;
+    const repriced = costTurnAtRow(turn, cheapest.row);
+    if (repriced === null) {
+      return null;
+    }
+    alternativeUsd += repriced;
+  }
+  // Compatibility for callers that provide only a normalized total: grouping
+  // is irrelevant for a linear row, but a tiered row cannot be selected safely
+  // without request boundaries.
+  if (usageTurnCount === 0) {
+    if ((cheapest.row.context_tiers?.length ?? 0) > 0) {
+      return null;
+    }
+    alternativeUsd = costOf(totalTokens, cheapest.row);
+  }
+  return {
+    cheaperModel: cheapest.model,
+    usd: alternativeUsd,
+    baselineUsd: actualUsd,
+    actualUsd,
+  };
 }

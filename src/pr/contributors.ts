@@ -10,7 +10,13 @@
 // builder.
 import type { Session, SessionSummary } from "../parse/types.js";
 import { orphanCommitOutputShas, recoverBranchAnchors, type OrphanCommitCandidate } from "./anchorRecovery.js";
-import { classifyBranchAnchors, computeSlice, type BranchAnchorSummary, type SliceResult } from "./slice.js";
+import {
+  classifyBranchAnchors,
+  computeSlice,
+  type AnchorAliases,
+  type BranchAnchorSummary,
+  type SliceResult,
+} from "./slice.js";
 import { cwdInsideRoots, type CommandRunner } from "./git.js";
 import { isCodexExec, toolCallInvocations } from "./gitWrite.js";
 import { claimedBranchShas, eligibleSubjects, hasForeignShaWrites, sessionCommitSubjects } from "./messageAnchor.js";
@@ -38,6 +44,8 @@ export interface RawContributor {
   summary: SessionSummary;
   session: Session;
   slice: SliceResult;
+  /** Session-scoped orphan-output aliases used to canonicalize slicing and per-commit anchors. */
+  anchorAliases?: AnchorAliases;
   /** `anchor` = own branch-SHA proof; `helper` = the SHA-less current-worktree Codex rule; `message` = the SPEC-0032 commit-message fallback (weaker, labeled on the row). */
   basis: "anchor" | "helper" | "message";
 }
@@ -133,21 +141,22 @@ export async function selectContributors(
     }
   }
   // SPEC-0072 R1 authorship guard — patch-id proves diff-EQUALITY, not authorship.
-  // A branch SHA that a session's own git-write OUTPUT already directly claims has
-  // a proven author; never re-credit it to a different session whose orphan merely
-  // *reproduces* the diff (a cherry-pick, or an independent rebuild of the same
-  // change). Computed from direct claims only, so it is available before recovery.
-  // The amend case is unaffected: an amended branch SHA is never directly claimed
-  // (the transcript holds only the orphaned pre-amend SHA).
-  const directlyClaimed = new Set<string>();
+  // A branch SHA that a DIFFERENT session directly claims must never be recovered
+  // onto an orphan owner whose commit merely reproduces the diff (cherry-pick or
+  // independent rebuild). Keep owners, not just a global set: commit A -> amend B
+  // in one session directly prints B, and A must remain a same-owner slicing alias.
+  const directOwnersBySha = new Map<string, Set<string>>();
   for (const l of loaded) {
     if (l.session) {
       for (const sha of claimedBranchShas(l.session, branchShas)) {
-        directlyClaimed.add(sha);
+        const owners = directOwnersBySha.get(sha) ?? new Set<string>();
+        owners.add(l.summary.filePath);
+        directOwnersBySha.set(sha, owners);
       }
     }
   }
   const recoveredByLoaded = new Map<Loaded, Set<string>>();
+  const aliasesByLoaded = new Map<Loaded, Map<string, string>>();
   const recovered = recoverBranchAnchors({
     branchShas,
     candidates: orphanCandidates,
@@ -155,14 +164,20 @@ export async function selectContributors(
     cwd: deps.currentWorktreeRoot ?? undefined,
   });
   for (const [orphanSha, branchSha] of recovered) {
-    // Never promote onto a branch SHA a different session already directly proved.
-    if (directlyClaimed.has(branchSha)) {
-      continue;
-    }
     for (const owner of orphanOwners.get(orphanSha) ?? []) {
+      // Same-owner direct evidence is the normal in-session amend shape. Any
+      // different direct owner preserves SPEC-0072's authorship guard.
+      const claimedByDifferentSession = [...(directOwnersBySha.get(branchSha) ?? [])]
+        .some((directOwner) => directOwner !== owner.summary.filePath);
+      if (claimedByDifferentSession) {
+        continue;
+      }
       const shas = recoveredByLoaded.get(owner) ?? new Set<string>();
       shas.add(branchSha);
       recoveredByLoaded.set(owner, shas);
+      const aliases = aliasesByLoaded.get(owner) ?? new Map<string, string>();
+      aliases.set(orphanSha, branchSha);
+      aliasesByLoaded.set(owner, aliases);
     }
   }
   const hasRecoveredOwn = (l: Loaded): boolean => (recoveredByLoaded.get(l)?.size ?? 0) > 0;
@@ -251,7 +266,8 @@ export async function selectContributors(
     const recoveredOwn = hasRecoveredOwn(l);
     const include = anchors.hasOwn || recoveredOwn || (isCodex && anchors.writeCount === 0 && here);
     if (include) {
-      const slice = computeSlice(session.turns, branchShas);
+      const anchorAliases = aliasesByLoaded.get(l);
+      const slice = computeSlice(session.turns, branchShas, anchorAliases);
       // SPEC-0038 R2a — an anchor-pool session contributes ONLY with a
       // sliceable own commit anchor. Entire-session + full rollup landing
       // cross-project was PR #87's maximum-misstatement shape; a full-
@@ -270,6 +286,7 @@ export async function selectContributors(
         summary,
         session,
         slice,
+        ...(anchorAliases !== undefined ? { anchorAliases } : {}),
         basis: anchors.hasOwn || recoveredOwn ? "anchor" : "helper",
       });
     } else if (messageCredited.has(l)) {

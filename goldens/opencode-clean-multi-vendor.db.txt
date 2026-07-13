@@ -8,12 +8,14 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-bash...............................$0.01  (1 call)
-read...............................$0.00  (1 call)
+bash...........................≥ $0.0066  (1 call)
+read...........................≥ $0.0030  (1 call)
 
-caveat: cache-write cost is a lower bound for this session (no published cache-write rate for some tokens' model)
+caveat: some observed cache tokens have no cited applicable rate — floor excludes them
 --------------------------------------------------
-TOTAL........................................$0.01
+KNOWN PRICED SUBTOTAL....................≥ $0.0096
+standard API-equivalent floor; not an invoice
+partial pricing coverage; invoice total unknown
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                
          github.com/anandgupta42/receipts         

@@ -8,6 +8,7 @@ import { handoffJsonSchema } from "../../src/receipt/exportSchema.js";
 import { renderHandoff, type HandoffCounts } from "../../src/receipt/handoff.js";
 import { toHandoffJson } from "../../src/receipt/json.js";
 import type { ReceiptModel, WasteLine } from "../../src/receipt/model.js";
+import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "../../src/receipt/costEstimate.js";
 
 const usage = (input: number) => ({ input, output: 0, cacheRead: 0, cacheCreation: 0, total: input });
 
@@ -45,17 +46,17 @@ describe("SPEC-0042 R1 — state header", () => {
       "handoff: Fix the flaky login test",
       "Claude Code · Jun 15 2026 14:00:25 UTC · 4m 35s",
       "claude-opus-4-8 100%",
-      "total $0.09 · 6 turns · 5 tool calls",
+      "total ≥ $0.09 · 6 turns · 5 tool calls",
       "compactions: 2",
       "--------------------------------------------------",
-      "COULD HAVE SAVED...........................≤ $0.08",
-      "  89% of $0.09 · arithmetic, not a prediction",
+      "FLAGGED PATTERN COST.......................≈ $0.08",
+      "  heuristic pattern subtotal · not proven savings",
       "",
-      "⚠ Bash loop ×5......................$0.08 (3m 45s)",
+      "⚠ Bash loop ×5....................≥ $0.08 (3m 45s)",
       "  at turns 2-6",
       "  → change or stop after two identical failures",
       "",
-      "covers: 6 turns · 5 tool calls · 2 compactions · 1 waste line",
+      "covers: 6 turns · 5 tool calls · 2 compactions · 1 flagged-pattern line",
     ]);
   });
 
@@ -63,13 +64,35 @@ describe("SPEC-0042 R1 — state header", () => {
     const out = renderHandoff(model({ modelMix: [] }), [], { ...counts, compactions: 0 });
     expect(out).not.toContain("claude-opus-4-8");
     expect(out).not.toContain("compactions:");
-    expect(out).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 waste line");
+    expect(out).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 flagged-pattern line");
   });
 
   it("shows tokens, never `$`, when the session is unpriced (I2)", () => {
     const out = renderHandoff(model({ totalUsd: null, unpriceable: true }), [], counts);
     expect(out).toContain("total 9,000 tok · 6 turns · 5 tool calls");
     expect(out).not.toContain("total $");
+  });
+
+  it("separates a priced-child floor from the unpriced parent and marks partial coverage", () => {
+    const out = renderHandoff(
+      model({
+        totalUsd: null,
+        subagents: {
+          count: 1,
+          pricedUsd: 0.03,
+          tokensTotal: 500,
+          unpricedTokens: usage(0),
+          unpricedCount: 0,
+          unreadableCount: 0,
+        },
+      }),
+      [],
+      counts,
+    );
+    expect(out).toContain(
+      "known priced subtotal ≥ $0.03 · known unpriced 9,000 tok · 6 parent turns · 5 parent tool calls · 1 subagent",
+    );
+    expect(out).toContain("1 parent flagged-pattern line · pricing coverage partial");
   });
 });
 
@@ -92,10 +115,10 @@ describe("SPEC-0042 R6 — SPEC-0013 contracts preserved byte-for-byte", () => {
     expect(out.split("\n")).toEqual([
       "handoff: Fix the flaky login test",
       "--------------------------------------------------",
-      "COULD HAVE SAVED...........................≤ $0.08",
-      "  89% of $0.09 · arithmetic, not a prediction",
+      "FLAGGED PATTERN COST.......................≈ $0.08",
+      "  heuristic pattern subtotal · not proven savings",
       "",
-      "⚠ Bash loop ×5......................$0.08 (3m 45s)",
+      "⚠ Bash loop ×5....................≥ $0.08 (3m 45s)",
       "  at turns 2-6",
       "  → change or stop after two identical failures",
     ]);
@@ -110,6 +133,17 @@ describe("SPEC-0042 R3/R4 — machine-readable packet", () => {
   it("validates against handoffJsonSchema with the pinned key order", () => {
     const json = toHandoffJson(model(), ["rule one"], 3, counts, aggregates);
     expect(() => handoffJsonSchema.parse(json)).not.toThrow();
+    expect(json.wasteLines[0]?.costEstimate).toMatchObject({ kind: "lower-bound", minUsd: 0.08 });
+    expect(json.wasteLines[0]?.costInterpretation).toBe(HEURISTIC_PATTERN_PRICING_INTERPRETATION);
+    expect(json.couldHaveSaved.costEstimate).toMatchObject({ kind: "lower-bound", minUsd: 0.08 });
+    expect(json.couldHaveSaved.interpretation).toBe(HEURISTIC_PATTERN_PRICING_INTERPRETATION);
+    expect(json.couldHaveSaved.scope).toBe("parent-session");
+    expect(json.totals.scope).toBe("parent-session");
+    expect(json.totalUsdScope).toBe("parent-session");
+    expect(json.combinedScope).toBe("parent-session-plus-readable-subagents");
+    expect(json.wasteLinesScope).toBe("parent-session");
+    expect(json.coverage.scope).toBe("parent-session");
+    expect(json.subagents).toBeNull();
     expect(Object.keys(json)).toEqual([
       "schemaVersion",
       "source",
@@ -118,13 +152,61 @@ describe("SPEC-0042 R3/R4 — machine-readable packet", () => {
       "startedAtMs",
       "durationMs",
       "totals",
+      "pricingCoverage",
+      "unpricedTokens",
+      "unpricedTokensScope",
+      "combinedUnpricedTokens",
+      "combinedUnpricedTokensScope",
+      "combinedPricingCoverage",
+      "totalUsd",
+      "totalCostEstimate",
+      "totalUsdScope",
+      "combinedPricedUsd",
+      "combinedPricedCostEstimate",
+      "combinedTotalTokens",
+      "combinedScope",
+      "subagents",
       "wasteLines",
+      "wasteLinesScope",
       "couldHaveSaved",
       "suggestions",
       "threshold",
       "coverage",
       "aggregates",
     ]);
+  });
+
+  it("exports parent and combined pricing as separate scoped fields", () => {
+    const withChildren = model({
+      unpricedTokens: usage(250),
+      subagents: {
+        count: 2,
+        pricedUsd: 0.03,
+        tokensTotal: 500,
+        unpricedTokens: usage(75),
+        unpricedCount: 1,
+        unreadableCount: 1,
+      },
+    });
+    const json = toHandoffJson(withChildren, [], 3, counts, aggregates);
+
+    expect(json.pricingCoverage).toBe("partial");
+    expect(json.unpricedTokens.total).toBe(250);
+    expect(json.unpricedTokensScope).toBe("parent-session");
+    expect(json.subagents?.unpricedTokens.total).toBe(75);
+    expect(json.subagents?.unpricedTokensScope).toBe("readable-subagents");
+    expect(json.combinedUnpricedTokens.total).toBe(325);
+    expect(json.combinedUnpricedTokensScope).toBe("parent-session-plus-readable-subagents");
+    expect(json.combinedPricingCoverage).toBe("partial");
+    expect(json.totalUsd).toBe(0.09);
+    expect(json.totalCostEstimate).toMatchObject({ minUsd: 0.09 });
+    expect(json.totalUsdScope).toBe("parent-session");
+    expect(json.combinedPricedUsd).toBeCloseTo(0.12, 12);
+    expect(json.combinedPricedCostEstimate).toMatchObject({ minUsd: 0.12 });
+    expect(json.combinedTotalTokens).toBe(9_500);
+    expect(json.combinedScope).toBe("parent-session-plus-readable-subagents");
+    expect(json.subagents).toMatchObject({ count: 2, tokensTotal: 500, unpricedCount: 1, unreadableCount: 1 });
+    expect(handoffJsonSchema.safeParse(json).success).toBe(true);
   });
 
   it("keeps a below-threshold fired class inspectable in aggregates while absent from suggestions", () => {
@@ -138,7 +220,7 @@ describe("SPEC-0042 R3/R4 — machine-readable packet", () => {
     expect(() => handoffJsonSchema.parse(json)).not.toThrow();
     expect(json.wasteLines).toEqual([]);
     expect(json.aggregates).toEqual([]);
-    expect(json.coverage).toEqual({ turns: 0, toolCalls: 0, compactions: 0, wasteLines: 0 });
+    expect(json.coverage).toEqual({ scope: "parent-session", turns: 0, toolCalls: 0, compactions: 0, wasteLines: 0 });
   });
 
   it("R4: none of the six banned attribution fields appear in text or JSON", () => {

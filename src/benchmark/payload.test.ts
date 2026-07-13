@@ -121,9 +121,54 @@ describe("buildBenchmarkPayload", () => {
     expect(payload.properties.hasTrivialSpanWaste).toBe(false);
   });
 
+  it("buckets parent plus readable subagent spend per top-level orchestration turn", () => {
+    const payload = buildBenchmarkPayload(
+      baseModel({
+        totalUsd: 0.04,
+        subagents: {
+          count: 2,
+          pricedUsd: 0.2,
+          tokensTotal: 10_000,
+          unpricedTokens: EMPTY_USAGE,
+          unpricedCount: 0,
+          unreadableCount: 0,
+        },
+      }),
+      1,
+    );
+    expect(payload.properties.costPerTurnBucket).toBe("$0.05-$0.25");
+    expect(payload.properties.pricingCoverage).toBe("full");
+  });
+
+  it("carries a priced-child floor bucket plus partial coverage when the parent is unpriced", () => {
+    const payload = buildBenchmarkPayload(
+      baseModel({
+        totalUsd: null,
+        subagents: {
+          count: 1,
+          pricedUsd: 2,
+          tokensTotal: 10_000,
+          unpricedTokens: EMPTY_USAGE,
+          unpricedCount: 0,
+          unreadableCount: 0,
+        },
+      }),
+      1,
+    );
+    expect(payload.properties.costPerTurnBucket).toBe(">$1");
+    expect(payload.properties.pricingCoverage).toBe("partial");
+  });
+
   it("never carries the sessionId, agentLabel, or any other free-text field from ReceiptModel", () => {
     const payload = buildBenchmarkPayload(baseModel({ sessionId: "sess-should-not-leak", agentLabel: "should-not-leak" }), 3);
     const keys = Object.keys(payload.properties);
-    expect(keys.sort()).toEqual(["agentType", "costPerTurnBucket", "hasStuckLoopWaste", "hasTrivialSpanWaste", "modelFamily"]);
+    expect(keys.sort()).toEqual([
+      "agentType",
+      "costPerTurnBucket",
+      "hasStuckLoopWaste",
+      "hasTrivialSpanWaste",
+      "modelFamily",
+      "pricingCoverage",
+    ]);
   });
 });

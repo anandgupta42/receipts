@@ -9,6 +9,7 @@ async function run(ctx: CommandContext): Promise<number> {
   const result = await runPrDetailed({
     post: ctx.options.post,
     session: ctx.options.prSession,
+    sessions: ctx.options.prSessions,
     artifact: ctx.options.artifact,
     details: !ctx.options.noDetails,
     share: ctx.options.share,

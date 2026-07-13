@@ -21,11 +21,20 @@ async function tpModel() {
 }
 
 describe("R7 — --json row shape and key order", () => {
-  it("emits kind/compactionCount/turnSpan/turnIndices/tokens/usd in that order", async () => {
+  it("emits the heuristic interpretation immediately after kind", async () => {
     const json = toJsonModel(await tpModel());
     const row = json.wasteLines.find((w) => w.kind === "context-thrash");
     expect(row).toBeDefined();
-    expect(Object.keys(row!)).toEqual(["kind", "compactionCount", "turnSpan", "turnIndices", "tokens", "usd"]);
+    expect(Object.keys(row!)).toEqual([
+      "kind",
+      "costInterpretation",
+      "compactionCount",
+      "turnSpan",
+      "turnIndices",
+      "tokens",
+      "usd",
+      "costEstimate",
+    ]);
     expect(row).toMatchObject({ kind: "context-thrash", compactionCount: 3, turnSpan: 4, turnIndices: [4, 5, 6, 7] });
     expect((row as { usd: number }).usd).toBeGreaterThan(0);
     expect((row as { tokens: { output: number } }).tokens.output).toBe(0);
@@ -33,9 +42,9 @@ describe("R7 — --json row shape and key order", () => {
 });
 
 describe("R7 — text receipt line + methodology sentence", () => {
-  it("renders `≈ context thrash: N compactions in M turns` and one methodology sub-line", async () => {
+  it("renders the compact compaction/turn-span label and one methodology sub-line", async () => {
     const text = renderReceipt(await tpModel(), { color: false });
-    expect(text).toContain("≈ context thrash: 3 compactions in 4 turns");
+    expect(text).toContain("≈ context thrash: 3 compactions (4t)");
     expect(text).toContain("context refilled ≥80% of peak within 5 turns");
   });
 });
@@ -44,7 +53,7 @@ describe("R7 — --handoff static suggestion", () => {
   it("pairs the context-thrash evidence line with the clear/split-context rule (SPEC-0059 R3 form)", async () => {
     const handoff = renderHandoff(await tpModel());
     // Evidence via the receipt's own wasteRowBlock label (shared, not re-derived).
-    expect(handoff).toContain("≈ context thrash: 3 compactions in 4 turns");
+    expect(handoff).toContain("≈ context thrash: 3 compactions (4t)");
     expect(handoff).toContain("→ clear or split context at task boundaries");
   });
 });

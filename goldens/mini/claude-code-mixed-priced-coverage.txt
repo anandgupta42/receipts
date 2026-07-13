@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Claude Code · claude-opus-4-legacy · 1m 50s
-total  $0.01
-top    Read · $0.01 (1 call)
-no waste detected
+total  known priced ≥ $0.0071 · 4,495 tok known unpriced · coverage partial
+top    Read · ≥ $0.0071 (1 call)
+no flagged pattern detected
 run  aireceipts  for the full receipt

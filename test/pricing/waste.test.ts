@@ -172,6 +172,30 @@ describe("detectStuckLoops", () => {
     expect(finding.turnIndices).toEqual([0, 1]);
   });
 
+  it("keeps usd null when a loop's single turn contains a routed request unit", async () => {
+    const first = usage({ input: 2_000_000, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const second = usage({ input: 1_000_000, output: 0, cacheRead: 0, cacheCreation: 0 });
+    const turn: Turn = {
+      index: 0,
+      timestamp: JUNE_15_2026,
+      model: "claude-haiku-4-5",
+      usage: usage({ input: 3_000_000, output: 0, cacheRead: 0, cacheCreation: 0 }),
+      pricingUnits: [
+        { usage: first, model: "claude-haiku-4-5", timestamp: JUNE_15_2026, pricingProvider: "anthropic" },
+        { usage: second, model: "claude-haiku-4-5", timestamp: JUNE_15_2026, pricingProvider: null },
+      ],
+      toolCalls: [
+        call("bash", { input: { cmd: "x" } }),
+        call("bash", { input: { cmd: "x" } }),
+        call("bash", { input: { cmd: "x" } }),
+      ],
+    };
+
+    const [finding] = await detectStuckLoops(session({ turns: [turn] }), dataDir);
+    expect(finding.usd).toBeNull();
+    expect(finding.tokens.input).toBe(3_000_000);
+  });
+
   it("detects loop structure with usd always null for an unpriceable/cursor session", async () => {
     const turn: Turn = {
       index: 0,
@@ -266,6 +290,22 @@ describe("detectTrivialSpans guard chain", () => {
     expect(result).toBeNull();
   });
 
+  it("skips malformed usage instead of emitting a dollar through direct costOf", async () => {
+    const turn: Turn = {
+      ...eligibleTurn,
+      usage: usage({
+        input: 100,
+        output: 50,
+        cacheRead: 0,
+        cacheCreation: 100,
+        cacheCreation5m: 70,
+        cacheCreation1h: 40,
+      }),
+    };
+    const result = await detectTrivialSpans(session({ turns: [turn] }), dataDir);
+    expect(result).toBeNull();
+  });
+
   it("skips a turn whose model cannot be resolved (no turn.model and no session.model)", async () => {
     const turn: Turn = { index: 0, timestamp: JUNE_15_2026, outputTokens: 10, usage: usage({ input: 10, output: 10, cacheRead: 0, cacheCreation: 0 }), toolCalls: [] };
     const result = await detectTrivialSpans(session({ turns: [turn] }), dataDir);
@@ -286,6 +326,30 @@ describe("detectTrivialSpans guard chain", () => {
     expect(r1).toBeNull();
     const r2 = await detectTrivialSpans(session({ turns: [alreadyCheapest] }), dataDir);
     expect(r2).toBeNull();
+  });
+
+  it("suppresses counterfactual dollars when any request unit is routed or lacks its own identity", async () => {
+    const first = usage({ input: 100, output: 25, cacheRead: 0, cacheCreation: 0 });
+    const second = usage({ input: 100, output: 25, cacheRead: 0, cacheCreation: 0 });
+    const turn: Turn = {
+      ...eligibleTurn,
+      usage: usage({ input: 200, output: 50, cacheRead: 0, cacheCreation: 0 }),
+      pricingProvider: "anthropic",
+      pricingUnits: [
+        { usage: first, model: "claude-sonnet-5", timestamp: JUNE_15_2026, pricingProvider: "anthropic" },
+        { usage: second, model: "claude-sonnet-5", timestamp: JUNE_15_2026, pricingProvider: null },
+      ],
+    };
+
+    expect(await detectTrivialSpans(session({ turns: [turn] }), dataDir)).toBeNull();
+    expect(
+      await detectTrivialSpans(
+        session({
+          turns: [{ ...turn, pricingUnits: [{ usage: first }, { usage: second, model: "claude-sonnet-5", timestamp: JUNE_15_2026 }] }],
+        }),
+        dataDir,
+      ),
+    ).toBeNull();
   });
 
   it("aggregates exactly the eligible turns out of a mixed session with hand-computed tokens/usd/cheaperModel", async () => {
@@ -373,5 +437,10 @@ describe("priceDeltaFootnote", () => {
     // Same arithmetic as the comprehensive detectTrivialSpans case: rate(1,500) + rate(5,220) = 0.0016.
     expect(result?.usd).toBeCloseTo(0.0016, 10);
     expect(result?.actualUsd).toBe(1.23);
+  });
+
+  it("returns null for internally inconsistent totals instead of pricing them through direct costOf", async () => {
+    const malformed = usage({ input: 500, output: 220, cacheRead: 0, cacheCreation: 0, total: 721 });
+    expect(await priceDeltaFootnote(session({ turns: [] }), malformed, 1.23, dataDir)).toBeNull();
   });
 });

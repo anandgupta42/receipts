@@ -72,10 +72,14 @@ directive is not advisory.
   optional per-adapter surface on `SessionAdapter` (absent means no validator), each returning
   named findings:
   - **codex** — self-consistency: our summed per-turn `TokenUsage` must
-    equal the rollout's final cumulative `total_token_usage` envelope, the
-    same stream the adapter derives deltas from
-    (`src/parse/codex.ts:145-155`); any dropped/double-counted event shows
-    as drift. Tolerance 0 — same stream, so exact equality is the contract.
+    equal the rollout's **local** cumulative envelope: final
+    `total_token_usage` minus any inherited baseline established by the first
+    snapshot and its `last_token_usage`. Identical cumulative snapshots are
+    replay records, not new billed turns, even when they retain a stale
+    non-zero `last_token_usage`; after the first snapshot, a changed cumulative
+    vector books its own component-wise difference rather than trusting a
+    disagreeing `last` field. Any dropped/double-counted event still shows as
+    drift. Tolerance 0 — same stream, so exact equality is the contract.
   - **claude-code** — usage-shape invariants provable from the normalized
     `Session`: per-turn `TokenUsage` components are non-negative, `total`
     equals the component sum (`src/parse/util.ts` `withTotal` discipline
@@ -138,9 +142,10 @@ directive is not advisory.
   denominator/corpus definition yet, easy to dodge by editing timestamps,
   and it does not improve capture accuracy. Revisit only with a labeled
   corpus that defines the ceiling honestly.
-- **Duplicate raw-record detection for Claude Code.** The normalized
-  `Session` cannot prove it; requires a raw-reading validator — revisit
-  when a real double-count is observed.
+- **Authoritative Claude invoice reconciliation.** The raw adapter now groups
+  same-`message.id` snapshots coherently and fails malformed/id-less evidence
+  closed, but the local transcript still cannot prove auth route, discounts,
+  credits, or an invoice join.
 - **Cross-vendor billing reconciliation** (console invoices, OTEL). External
   systems, not local transcripts; out of scope for a deterministic gate.
 - **CI enforcement of the harness.** Transcripts are local-only (I4); like
@@ -265,3 +270,82 @@ time (src/telemetry/notice.ts). Not an assertion change — the failing
 tests were right.
 
 **2026-07-04 · shipped:** merged via #65; ledger sweep pre-release.
+
+**2026-07-10 · live Codex reconciliation correction.** A content-free scan of
+754 local rollouts found 535 repeated cumulative snapshots across 114 files,
+five forked/subagent rollouts with inherited parent-inclusive baselines, and
+five sessions that switched models mid-stream. The adapter now (1) ignores an
+unchanged cumulative vector, (2) subtracts the first snapshot's inherited
+baseline from the final envelope, (3) derives every later turn from cumulative
+differences, and (4) stamps usage with the currently active `turn_context` model
+instead of freezing the first model. Fixed regressions and
+two fast-check properties cover arbitrary duplicate counts and inherited
+baselines. `node scripts/cost-reconcile.mjs` then reconciled 40/40 recent Codex
+sessions with zero drift (previous run: 30 reconciled, 10 failed).
+
+**2026-07-10 · billing-observability correction (amends R1).** A larger
+content-free audit of 792 recent Codex rollouts found 51,465 changed cumulative
+envelopes; every later changed delta matched `last_token_usage`, so the local
+stream can select the `>272K` context tier per response. It found zero persisted
+cache-write counts, request ids, explicit dollar costs, or session-local auth
+mode. OpenAI's API now reports `cache_write_tokens` for GPT-5.6+, but Codex's
+rollout `TokenUsage` omits it. Therefore a complete-looking local receipt is
+still not an invoice: all computed dollar totals render as standard-API-
+equivalent lower bounds (`≥ $X`). Known PR-attribution gaps continue to floor
+token totals as R1 already required. Tests assert exact internal arithmetic and
+the visible qualifier independently.
+
+**2026-07-10 · request-granularity correction.** A user-facing Codex turn can
+contain many model requests. A content-free scan of 792 local rollouts found
+51,465 changed request envelopes; among 216 GPT-5.6 turn groups, 136 exceeded
+272K only after multiple sub-threshold requests were incorrectly aggregated.
+The adapter now retains each changed cumulative delta as a non-exported pricing
+unit (usage + model/provider/time evidence), requires those units to sum exactly
+to the turn envelope, and selects context tiers per unit. Invalid unit evidence
+safe-stops to tokens-only; it never falls back to aggregate tier selection.
+Cost shape, attribution, loop/read diagnostics, context thrash, trivial-span
+re-pricing, price delta, model mix, and price-row provenance all consume the
+same units. GPT-5.6 missing-cache-write caveats propagate through standalone,
+PR, and subagent surfaces.
+
+**2026-07-10 · OpenCode aggregate-coherence correction.** A session aggregate
+may dominate the sum of itemized messages in every token component; only then
+is its exact positive residual retained as an unpriced, unattributed bucket. If
+the two vectors cross (the aggregate is larger in some components and smaller
+in others), component-wise maxima would construct a vector reported by neither
+source. The parser therefore keeps the coherent itemized total, retains the
+positive aggregate-only components as explicitly conflicting/excluded
+evidence, and adds none of them to tokens or dollars. Regression coverage pins
+both the dominating and crossed permutations, including the receipt caveat.
+
+**2026-07-10 · normal-path evidence-gate amendment.** Request-level Codex
+pricing is no longer justified by final-sum reconciliation alone. After the
+inherited baseline, cumulative vectors must remain componentwise monotone and
+every changed delta must equal a present non-zero `last_token_usage`; a file may
+not mix legacy and cumulative usage, drop a JSONL record, or disagree with the
+final local envelope. A first non-zero total with missing or zero
+`last_token_usage` cannot distinguish inherited usage from the root rollout's
+first request, so it invalidates the stream without inferring a baseline; the
+full final cumulative envelope is retained once as unattributed usage. Any
+failure removes usage/pricing units from every turn and renders the
+request-reconciliation caveat. A reset is therefore a safe stop, not an
+inferred normalization. Every surviving pricing unit uses only its own model,
+provider field, timestamp, and usage; no enclosing turn/session fallback may
+supply identity or date.
+
+Claude assistant records without `message.id` likewise cannot establish
+response boundaries. Their tools remain observable, but their usage is reduced
+to one coherent highest-output envelope and carried as unattributed tokens,
+never as independently priced turns. Trivial-span repricing consumes the same
+strict units and fires only when every unit has complete direct-vendor
+model/date/provider evidence and a cited eligible row.
+
+Claude and OpenCode usage fields are valid only when every present counter is a
+non-negative safe integer; missing fields may represent zero, but present null,
+string, negative, fractional, or unsafe values may not be coerced to zero for
+pricing. The adapters retain independently valid components as tokens-only and
+increment the incomplete-record signal. A malformed Claude snapshot cannot
+replace a coherent valid snapshot for the same `message.id`. OpenCode accepts
+numeric SQLite strings only when they parse to non-negative safe integers, and
+one malformed session/message aggregate field excludes that whole projection
+from dominance and residual reconciliation.

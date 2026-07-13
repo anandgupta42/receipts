@@ -29,18 +29,23 @@ describe("SPEC-0044 · summarizeConfidence", () => {
       { kind: "silenced-git-write", sessionId: "c" },
       { kind: "unanchored-git-write", sessionId: "e" },
       { kind: "cost-lower-bound-cache-tier", sessionId: "d" },
+      { kind: "unobserved-cache-write-tokens", sessionId: "w" },
+      { kind: "partial-priced-coverage", sessionId: "p" },
     ];
     const s = summarizeConfidence(events);
     expect(s.unattributableAnchorPool).toBe(2);
     expect(s.silencedGitWrite).toBe(1);
     expect(s.unanchoredGitWrite).toBe(1);
     expect(s.costLowerBoundCacheTier).toBe(1);
+    expect(s.unobservedCacheWriteTokens).toBe(1);
+    expect(s.partialPricedCoverage).toBe(1);
     expect(s.unreadableSubagent).toBe(0);
   });
 
   it("isFloored is true iff any incompleteness/lower-bound event exists", () => {
     expect(isFloored(summarizeConfidence([]))).toBe(false);
     expect(isFloored(summarizeConfidence([{ kind: "cost-lower-bound-cache-tier", sessionId: "x" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "unobserved-cache-write-tokens", sessionId: "w" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "unattributable-anchor-pool", sessionId: "y" }]))).toBe(true);
     // each disjunct isolated (so a deleted one is caught, not masked by a sibling):
     expect(isFloored(summarizeConfidence([{ kind: "silenced-git-write", sessionId: "s" }]))).toBe(true);
@@ -48,6 +53,32 @@ describe("SPEC-0044 · summarizeConfidence", () => {
     expect(isFloored(summarizeConfidence([{ kind: "unreadable-subagent", sessionId: "sub" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "unreadable-session", sessionId: "u" }]))).toBe(true);
     expect(isFloored(summarizeConfidence([{ kind: "dropped-transcript-records", sessionId: "d" }]))).toBe(true);
+    expect(isFloored(summarizeConfidence([{ kind: "partial-priced-coverage", sessionId: "p" }]))).toBe(true);
+  });
+});
+
+describe("GPT-5.6 omitted cache-write tokens render (not silent)", () => {
+  it("floors the total and names the missing trace bucket", () => {
+    const body = renderPrReceiptText({
+      contributors: [builder()],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "unobserved-cache-write-tokens", sessionId: "gpt56.jsonl" }]),
+    });
+    expect(body).toContain("1 GPT-5.6 Codex session omitted cache-write tokens");
+    expect(body).toContain("floor excludes any write premium");
+  });
+});
+
+describe("partial-priced-coverage renders (not silent)", () => {
+  it("floors the priced total and names the excluded unpriced turns", () => {
+    const body = renderPrReceiptText({
+      contributors: [builder({ unpricedTokens: tokens(200, 50) })],
+      excludedCount: 0,
+      confidence: summarizeConfidence([{ kind: "partial-priced-coverage", sessionId: "mixed.jsonl" }]),
+    });
+    expect(body).toMatch(/TOTAL priced\.+≥/);
+    expect(body).toMatch(/TOTAL unpriced\.+≥ 250 tokens/);
+    expect(body).toContain("1 session had partial price coverage");
   });
 });
 
@@ -80,7 +111,8 @@ describe("SPEC-0044 A1 · counted-absence renders (not silent)", () => {
   it("with excludedCount==0 and no confidence, the note is absent (no false positive)", () => {
     const body = renderPrReceiptText({ contributors: [builder()], excludedCount: 0 });
     expect(body).not.toContain("couldn't be attributed precisely");
-    expect(body).not.toMatch(/TOTAL priced\.+≥/);
+    expect(body).toMatch(/TOTAL priced\.+≥/);
+    expect(body).toContain("standard API-equivalent floor; not an invoice");
   });
 });
 

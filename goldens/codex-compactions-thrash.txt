@@ -8,13 +8,15 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-exec_command......................$0.23  (3 calls)
+exec_command..................≥ $0.2320  (3 calls)
 
-≈ context thrash: 2 compactions in 1 turns...$0.06
+≈ context thrash: 2 compactions (1t).....≥ $0.0595
   context refilled ≥80% of peak within 5 turns
 --------------------------------------------------
-TOTAL........................................$0.23
-same tokens on gpt-5.4-mini.......$0.10 (59% less)
+TOTAL....................................≥ $0.2320
+standard API-equivalent floor; not an invoice
+same tokens on gpt-5.4-mini..............≥ $0.0953
+  (59% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

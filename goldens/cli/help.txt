@@ -1,4 +1,4 @@
-aireceipts — local, deterministic cost receipts for AI coding-agent sessions
+aireceipts — local, deterministic Standard-API cost floors for AI coding-agent sessions
 
 Usage:
   aireceipts [selector] [--json|--csv]  print a receipt (default: newest session)
@@ -13,8 +13,8 @@ Usage:
   aireceipts stats                      local usage counters (receipts generated on this machine)
   aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
   aireceipts --handoff [selector] [--handoff-threshold N] [--json]
-                                        paste-ready block of fired waste lines;
-                                         suggests CLAUDE.md rules for waste classes
+                                        paste-ready block of detector-flagged patterns;
+                                         suggests CLAUDE.md rules for detector classes
                                          recurring in N+ recent sessions (default 3)
   aireceipts --quota                    current Claude Code rate-limit window usage
                                          (statusline stdin mode only; silent if unavailable)
@@ -40,8 +40,8 @@ Usage:
                                          comment + artifact, off by default)
   aireceipts --check-budget             exit 1 if ~/.aireceipts/budget.json's cap is
                                          exceeded (advisory; see docs)
-  aireceipts benchmark [--dry-run]      opt-in cost-per-turn benchmark (v1: client
-                                         contract only, sends disabled)
+  aireceipts benchmark [--dry-run]      opt-in floor-per-turn benchmark (Standard API; v1:
+                                         client contract only, sends disabled)
   aireceipts [selector] --template <name>  render a receipt style (classic|grocery|datavis)
   aireceipts [selector] --details       add a DETAILS section (token composition, session
                                          shape, per-model split; classic template only)
@@ -49,7 +49,7 @@ Usage:
   aireceipts --mini [selector]          6-line mini-receipt (newest session)
   aireceipts install-hook               add a Claude Code SessionEnd auto-receipt hook
   aireceipts uninstall-hook             remove that hook
-  aireceipts statusline [--format <s>] [--cwd <path>]  the meter — model + running cost for Claude Code's statusLine (any bar via --cwd)
+  aireceipts statusline [--format <s>] [--cwd <path>]  model + running Standard-API floor for Claude Code's statusLine (any bar via --cwd)
   aireceipts --help                     show this help
   aireceipts --version                  print the installed version
 

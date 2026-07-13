@@ -8,13 +8,15 @@
 pre-edit: no named edit tool observed
   (share before the first named edit tool)
 
-exec_command......................$0.01  (3 calls)
+exec_command..................≥ $0.0102  (3 calls)
 
-⚠ exec_command loop ×3.................$0.01 (30s)
+⚠ exec_command loop ×3.............≥ $0.0102 (30s)
   at turn 1
 --------------------------------------------------
-TOTAL........................................$0.01
-same tokens on gpt-5.4-mini.......$0.00 (63% less)
+TOTAL....................................≥ $0.0102
+standard API-equivalent floor; not an invoice
+same tokens on gpt-5.4-mini..............≥ $0.0037
+  (63% lower observable floor)
   (arithmetic, not a prediction)
 - - - - - - - - - - - - - - - - - - - - - - - - -
                 npx aireceipts-cli                

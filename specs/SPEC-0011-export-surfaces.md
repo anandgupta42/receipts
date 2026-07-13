@@ -96,3 +96,20 @@ I4 exception, and a precise OTLP/HTTP JSON emit definition none of which belong 
 CSV spec; the exporter SEAM ships here instead so that spec plugs in cleanly. Real
 dependencies added (SPEC-0002 for zod, SPEC-0003 for the shared ReceiptModel — the
 cited `src/receipt/**` did not yet exist when drafted). **S4:** spec-lint green.
+
+## 2026-07-10 schema v2 amendment
+
+The public receipt/handoff/CSV contract is now schema version 2. Existing
+numeric dollar fields remain for compatibility but normatively contain
+Standard-API list-price-equivalent lower bounds, with adjacent structured cost
+semantics. The version bump prevents v1 consumers from silently interpreting
+those scalars as exact costs. The separate strict PR receipt-ref transport stays
+at `PR_RECEIPT_SCHEMA_VERSION = 1` and does not add a top-level field.
+
+For `week --json`, each window now carries a `pricingCoverage` object with full,
+partial, unpriced, and unreadable session counts plus the exact observable
+`unpricedTokenTotal`; `cacheRatePartialSessionCount` separately counts partial
+sessions whose cached component lacked a cited applicable rate. The window `sessionCount` is the coverage denominator and
+therefore includes in-window summaries whose full load failed. The root `scope`
+object states `childSessionsIncluded: false`; week aggregation does not currently
+perform the single-session/PR child rollup.

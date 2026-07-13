@@ -1,6 +1,6 @@
 aireceipts · session receipt
 opencode · gpt-5.3-codex · 50s
-total  $0.01
-top    bash · $0.01 (3 calls)
-⚠ bash loop ×3 · $0.01
+total  ≥ $0.0094
+top    bash · ≥ $0.0094 (3 calls)
+⚠ bash loop ×3 · ≈ $0.0094
 run  aireceipts  for the full receipt

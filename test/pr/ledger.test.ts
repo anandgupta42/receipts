@@ -3,17 +3,13 @@
 // arbitrary receipts, proven end-to-end THROUGH the renderer (parse the
 // rendered text back, never trust the internals that produced it).
 //
-// Two tiers:
-//  - exact: the displayed TOTAL must equal the formatted sum of the RAW atom
-//    values (catches missed/double-counted atoms anywhere in the pipeline);
-//    token totals are integers and must be exact to the digit.
-//  - display equality (B1): every priced row is cent-reconciled against the
-//    total (largest-remainder method), so the sum of displayed rows must
-//    equal the displayed total EXACTLY — never merely "close."
+// Every dollar row is a downward-rounded view of deterministic raw arithmetic;
+// the displayed dollar total is the exact sum of those row floors, and token
+// totals remain exact to the digit. No row may borrow a decimal unit.
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
 import { emptyUsage, withTotal } from "../../src/parse/util.js";
-import { formatUsd } from "../../src/receipt/format.js";
+import { formatUsdFloorLedger } from "../../src/receipt/format.js";
 import { renderPrBody, type ContributorView } from "../../src/pr/body.js";
 import type { SubagentRow } from "../../src/pr/rollup.js";
 
@@ -50,7 +46,7 @@ const arbContributor: fc.Arbitrary<ContributorView> = fc
     // SPEC-0044/B1: helpers keep their generated subagents here (not forced to
     // []) so the property exercises them — helper subagents are counted in the
     // TOTAL and are now drawn as their own rows (helperGroupBlocks), so the
-    // displayed rows must still sum to the TOTAL. (In production, Codex helpers
+    // every displayed row must remain a true floor. (In production, Codex helpers
     // carry none; this proves the invariant holds regardless.)
   }));
 
@@ -59,15 +55,21 @@ const arbInput = fc.record({
   excludedCount: fc.integer({ min: 0, max: 3 }),
 });
 
-/** Every dollar amount rendered on a fence row/sub-row line (never the TOTAL lines), in cents. */
-function displayedRowCents(fence: string): number[] {
+/** Every dollar amount rendered on a fence row/sub-row line (never the TOTAL lines). */
+function displayedRowDollarTexts(fence: string): string[] {
   return fence
     .split("\n")
     .filter((l) => !l.includes("TOTAL"))
     .flatMap((l) => {
-      const m = /\$([\d,]+\.\d{2})\s*$/.exec(l);
-      return m ? [Math.round(Number(m[1].replace(/,/g, "")) * 100)] : [];
+      const m = /\$([\d,]+\.\d+)\s*$/.exec(l);
+      return m ? [m[1].replace(/,/g, "")] : [];
     });
+}
+
+function decimalUnits(value: string, precision: number): bigint {
+  const [whole, fraction = ""] = value.replace("$", "").split(".");
+  return (BigInt(whole.replaceAll(",", "")) * (10n ** BigInt(precision)))
+    + BigInt(fraction.padEnd(precision, "0"));
 }
 
 function displayedTotal(fence: string, label: string): { floored: boolean; text: string } | null {
@@ -75,12 +77,12 @@ function displayedTotal(fence: string, label: string): { floored: boolean; text:
   if (!line) {
     return null;
   }
-  const m = /\.(≥ )?(\$[\d,]+\.\d{2}|[\d,]+ tokens)\s*$/.exec(line);
+  const m = /\.(≥ )?(\$[\d,]+\.\d+|[\d,]+ tokens)\s*$/.exec(line);
   return m ? { floored: m[1] !== undefined, text: m[2] } : null;
 }
 
 describe("SPEC-0028 · the ledger check (math always maths, through the renderer)", () => {
-  it("displayed TOTAL priced equals the formatted raw sum; tokens are exact; rows sum to the total exactly (B1)", () => {
+  it("displayed dollar floors never exceed raw arithmetic; token totals stay exact", () => {
     fc.assert(
       fc.property(arbInput, (input) => {
         const body = renderPrBody(input);
@@ -90,12 +92,20 @@ describe("SPEC-0028 · the ledger check (math always maths, through the renderer
         ]);
         const priced = atoms.filter((a) => a.usd !== null);
         const rawSum = priced.reduce((sum, a) => sum + (a.usd ?? 0), 0);
+        const displayedAtomValues = input.contributors.flatMap((contributor) => {
+          const childUsd = contributor.subagents
+            .filter((child) => !child.unreadable && child.usd !== null)
+            .reduce((sum, child) => sum + (child.usd ?? 0), 0);
+          return [contributor.usd, childUsd > 0 ? childUsd : null];
+        });
+        const displayedValues = displayedAtomValues.filter((value): value is number => value !== null);
+        const ledger = formatUsdFloorLedger(displayedValues, undefined, rawSum);
 
-        // Tier 1 — exact: the shown total IS the formatted raw sum.
+        // Tier 1 — exact: the shown total IS the sum of the shown row floors.
         const total = displayedTotal(body, "TOTAL priced");
         if (priced.length > 0) {
           expect(total).not.toBeNull();
-          expect(total!.text).toBe(`$${formatUsd(rawSum)}`);
+          expect(total!.text).toBe(`$${ledger.total}`);
         }
 
         // Tokens-only subtotal is integer arithmetic — exact to the digit.
@@ -107,19 +117,22 @@ describe("SPEC-0028 · the ledger check (math always maths, through the renderer
           expect(shown).toBe(tokensOnly.reduce((sum, a) => sum + a.tokens.total, 0));
         }
 
-        // Tier 2 — display equality (B1): rows are cent-reconciled against the
-        // total, so their sum must equal the shown total exactly, no drift.
+        // Independently floored contributor/aggregate rows sum exactly to the
+        // displayed total and cannot exceed the raw priced atom sum.
         if (priced.length > 0 && total !== null) {
-          const rowSum = displayedRowCents(body).reduce((a, b) => a + b, 0);
-          const totalCents = Math.round(Number(total.text.replace(/[$,]/g, "")) * 100);
-          expect(rowSum).toBe(totalCents);
+          const rows = displayedRowDollarTexts(body);
+          const precision = total.text.split(".")[1]?.length ?? 0;
+          expect(rows.every((row) => (row.split(".")[1]?.length ?? 0) === precision)).toBe(true);
+          const rowUnits = rows.reduce((sum, row) => sum + decimalUnits(row, precision), 0n);
+          expect(rowUnits).toBe(decimalUnits(total.text, precision));
+          expect(Number(total.text.replace(/[$,]/g, ""))).toBeLessThanOrEqual(rawSum + 1e-9);
         }
 
-        // Floors mark incompleteness, never change arithmetic (SPEC-0028 R1).
-        const shouldFloor =
-          input.excludedCount > 0 || input.contributors.some((c) => c.subagents.some((s) => s.unreadable));
+        // Human-rendered dollars are always API-equivalent floors. Specific
+        // incompleteness still has its own caveat; it no longer controls this
+        // shared display prefix and never changes the arithmetic above.
         if (total !== null) {
-          expect(total.floored).toBe(shouldFloor);
+          expect(total.floored).toBe(true);
         }
       }),
       { numRuns: 300 },

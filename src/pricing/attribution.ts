@@ -1,30 +1,33 @@
 import type { Session, TokenUsage } from "../parse/types.js";
 import { addUsage, emptyUsage, scaleUsage } from "../parse/util.js";
 import { defaultDataDir } from "./priceTable.js";
-import { isoDateOf, priceTurn, resolvePrice, vendorForTurn } from "./resolve.js";
+import { priceSessionTurn } from "./resolve.js";
 
 const THINKING_REPLY = "(thinking/reply)";
+const UNATTRIBUTED_USAGE = "(unattributed usage)";
 
 /** R3's one exported methodology string — `aireceipts --methodology` prints this verbatim and `--json` ships it, so the attribution is self-explaining (I3; SPEC-0055 removed the on-card brief). */
 export const METHODOLOGY =
-  "Cost is attributed per assistant turn. A turn is one billed API response: when " +
-  "an agent's transcript repeats a response across several records (Claude Code " +
-  "writes one record per content block, each carrying the same message id and the " +
-  "same usage snapshot), the response is counted once, deduplicated by message id. " +
-  "Each turn's priced usage (tokens × the " +
-  "dated price row matching its model and date) is split evenly across the tool(s) " +
+  "Cost is attributed per observable assistant turn. Records sharing a response id " +
+  "are one turn; evolving Claude Code snapshots are merged by the maximum observed " +
+  "output count, and repeated tool_use ids are counted once. When a trace exposes " +
+  "several model requests inside one turn, context tiers are selected for each request. Each " +
+  "turn's observed usage (tokens × the dated Standard API list-price row matching " +
+  "its model and date) is split evenly across the tool(s) " +
   'it called; a turn with no tool calls is attributed to "(thinking/reply)". Turns ' +
   "whose model has no matching price row contribute tokens only — never a guessed " +
-  "dollar amount. Cache-write tokens are priced per known TTL tier when the " +
+  "dollar amount. A dominating session aggregate with no request/model join appears in an " +
+  'explicit "(unattributed usage)" token bucket; an aggregate that conflicts with itemized components remains excluded evidence. Both contribute zero dollars. Every computed dollar is a Standard-API list-price-equivalent ' +
+  "lower bound, never an invoice or subscription charge. Cache-write tokens are priced per known TTL tier when the " +
   "transcript splits them (5-minute and 1-hour rates); any unsplit cache-write " +
   "tokens are assumed to be 5-minute-tier (Claude Code's default cache TTL) and " +
-  "priced at that rate, or the plain input rate if the price row cites neither — " +
-  "a conservative fallback that may understate real cost (cache-write billing " +
-  "runs ≥1.25× input) but never overstates it with a guessed premium.";
+  "priced only when that rate is cited. Cached reads or writes with no cited " +
+  "applicable rate contribute zero dollars to the floor. Billing route, service tier, regional uplift, discounts, " +
+  "subscription allocation, and unrecorded token buckets are never guessed.";
 
 export interface ToolAttribution {
   tool: string;
-  /** `null` when none of this tool's contributing turns resolved a price. */
+  /** Compatibility lower-bound scalar; `null` when no contributing turn resolved a price. */
   usd: number | null;
   tokens: TokenUsage;
   callCount: number;
@@ -32,18 +35,21 @@ export interface ToolAttribution {
 
 export interface AttributionResult {
   byTool: ToolAttribution[];
-  /** Sum of `byTool[].usd` over priced entries only, so this total holds by construction — never a separately-computed figure that could drift from the rows above it. `null` when nothing in the session priced. */
+  /** Sum of lower-bound `byTool[].usd` over priced entries only; `null` when nothing priced. */
   totalUsd: number | null;
   totalTokens: TokenUsage;
+  /** Exact usage from turns that had no matching dated price row. A partial `totalUsd` excludes these tokens (I2). */
+  unpricedTokens: TokenUsage;
   methodology: string;
   /**
-   * SPEC-0044 A3 — true when at least one PRICED turn's cache-write cost took
-   * the unsplit-remainder fallback (assumed 5m tier), so `totalUsd` may be a
-   * lower bound rather than an exact figure. Checked only for priced turns
-   * (`turnUsd !== null`) — an unpriced turn's tokens don't affect any `$`.
+   * SPEC-0044 A3 — true when at least one PRICED turn carried cached reads or
+   * writes without a cited applicable rate, so those components contributed
+   * zero dollars. This is an additional
+   * cause flag; every computed dollar is a lower bound regardless. Checked only for priced turns
+   * cause flag; an entirely unpriced turn's tokens don't affect any dollar floor.
    */
   costLowerBoundCacheTier: boolean;
-  /** SPEC-0054 R4 — priced cost per model (`turn.model ?? session.model`), summed over PRICED turns only; an unpriced turn contributes nothing (I2). */
+  /** SPEC-0054 R4 — Standard-API floor per model, summed over priced turns only. */
   byModelUsd: { model: string; usd: number }[];
   /**
    * SPEC-0054 R3 — turn-level coverage: of the turns that carried token usage,
@@ -88,36 +94,60 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
   let cacheReadAtInputRateUsd = 0;
   let usageTurnCount = 0;
   let unpricedUsageTurnCount = 0;
+  let unpricedTokens = emptyUsage();
+  // Preserve the exact transcript-domain integers. Reconstructing this from
+  // per-tool fractional shares (for example, a three-way split) can introduce
+  // IEEE-754 residue and make a valid total fail the pricing-domain guard.
+  let totalTokens = emptyUsage();
   // SPEC-0054 R4 — starts true; any cacheRead-carrying turn that can't cite
   // both rates flips it false, making the counterfactual all-or-null (I2).
   let cacheReadCounterfactualComplete = true;
 
+  if (session.unattributedUsage && session.unattributedUsage.total > 0) {
+    totalTokens = addUsage(totalTokens, session.unattributedUsage);
+    unpricedTokens = addUsage(unpricedTokens, session.unattributedUsage);
+    if (session.unattributedUsage.cacheRead > 0) {
+      cacheReadCounterfactualComplete = false;
+    }
+    acc.set(UNATTRIBUTED_USAGE, {
+      usd: 0,
+      priced: false,
+      tokens: session.unattributedUsage,
+      callCount: 0,
+    });
+  }
+
   for (const turn of session.turns) {
     const units = turn.toolCalls.length > 0 ? turn.toolCalls.map((c) => c.name) : [THINKING_REPLY];
     const share = 1 / units.length;
-    const model = turn.model ?? session.model;
-    const dateISO = isoDateOf(turn.timestamp) ?? isoDateOf(session.startedAt);
-    const vendor = session.unpriceable ? undefined : vendorForTurn(session.source, model);
-    const priced = await priceTurn(vendor, model, dateISO, turn.usage, dataDir);
+    const priced = await priceSessionTurn(session, turn, dataDir);
     const tokenShare: TokenUsage = turn.usage ? scaleUsage(turn.usage, share) : emptyUsage();
 
+    if (turn.usage) {
+      totalTokens = addUsage(totalTokens, turn.usage);
+    }
     if (turn.usage && turn.usage.total > 0) {
       usageTurnCount++;
       if (priced === null) {
         unpricedUsageTurnCount++;
+        unpricedTokens = addUsage(unpricedTokens, turn.usage);
+      } else if (priced.unpricedUsage.total > 0) {
+        unpricedUsageTurnCount++;
+        unpricedTokens = addUsage(unpricedTokens, priced.unpricedUsage);
       }
     }
-    if (priced !== null && priced.cacheWriteLowerBound) {
+    if (priced !== null && priced.cacheRateLowerBound) {
       costLowerBoundCacheTier = true;
     }
-    if (priced !== null && model !== undefined) {
-      modelUsdAcc.set(model, (modelUsdAcc.get(model) ?? 0) + priced.usd);
+    if (priced !== null) {
+      for (const modelCost of priced.byModelUsd) {
+        modelUsdAcc.set(modelCost.model, (modelUsdAcc.get(modelCost.model) ?? 0) + modelCost.usd);
+      }
     }
 
     if (turn.usage && turn.usage.cacheRead > 0) {
-      const row = vendor !== undefined && model !== undefined && dateISO !== undefined ? await resolvePrice(vendor, model, dateISO, dataDir) : null;
-      if (row && row.input_cached !== undefined) {
-        cacheReadAtInputRateUsd += (turn.usage.cacheRead * (row.input - row.input_cached)) / 1_000_000;
+      if (priced?.cacheReadAtInputRateUsd !== null && priced?.cacheReadAtInputRateUsd !== undefined) {
+        cacheReadAtInputRateUsd += priced.cacheReadAtInputRateUsd;
       } else {
         cacheReadCounterfactualComplete = false;
       }
@@ -144,13 +174,13 @@ export async function attributeByTool(session: Session, dataDir: string = defaul
 
   const pricedEntries = byTool.filter((t) => t.usd !== null);
   const totalUsd = pricedEntries.length > 0 ? pricedEntries.reduce((sum, t) => sum + (t.usd as number), 0) : null;
-  const totalTokens = byTool.reduce((sum, t) => addUsage(sum, t.tokens), emptyUsage());
   const byModelUsd = [...modelUsdAcc.entries()].map(([model, usd]) => ({ model, usd }));
 
   return {
     byTool,
     totalUsd,
     totalTokens,
+    unpricedTokens,
     methodology: METHODOLOGY,
     costLowerBoundCacheTier,
     byModelUsd,

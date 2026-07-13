@@ -1,6 +1,7 @@
 import type { AgentSource } from "../parse/types.js";
 import { vendorForSource } from "../pricing/resolve.js";
-import type { ReceiptModel } from "../receipt/model.js";
+import { combinedPricedUsd, type ReceiptModel } from "../receipt/model.js";
+import { combinedPricingCoverageOf } from "../receipt/pricingCoverage.js";
 import type { BenchmarkAgentTypeValue, BenchmarkRunEvent, CostPerTurnBucketValue, ModelFamilyValue } from "./schemas.js";
 
 /**
@@ -50,12 +51,17 @@ function hasWasteKind(model: ReceiptModel, kind: "stuck-loop" | "trivial-spans")
 }
 
 export function buildBenchmarkPayload(model: ReceiptModel, turnCount: number): BenchmarkRunEvent {
+  // A benchmark turn is a top-level orchestration turn. Its cost bucket covers
+  // every observable priced parent/child component. Coverage is a separate
+  // allowlisted enum, so a partial lower-bound bucket never poses as complete.
+  const fullSessionUsd = combinedPricedUsd(model);
   return {
     name: "benchmark_run",
     properties: {
       agentType: toBenchmarkAgentType(model.source),
       modelFamily: toModelFamily(model.source),
-      costPerTurnBucket: bucketCostPerTurn(model.totalUsd, turnCount),
+      costPerTurnBucket: bucketCostPerTurn(fullSessionUsd, turnCount),
+      pricingCoverage: combinedPricingCoverageOf(model),
       hasStuckLoopWaste: hasWasteKind(model, "stuck-loop"),
       hasTrivialSpanWaste: hasWasteKind(model, "trivial-spans"),
     },

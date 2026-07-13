@@ -1,6 +1,6 @@
 aireceipts · session receipt
 Claude Code · claude-opus-4-8 · 50s
-total  $0.01
-top    (thinking/reply) · $0.01 (3 turns)
-⚠ 3 trivial spans → claude-haiku-4-5 · $0.00
+total  ≥ $0.0101
+top    (thinking/reply) · ≥ $0.0101 (3 turns)
+⚠ 3 trivial spans → claude-haiku-4-5 · ≈ $0.0020
 run  aireceipts  for the full receipt
