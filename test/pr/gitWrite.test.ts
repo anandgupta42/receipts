@@ -2,7 +2,15 @@
 // authorship. The load-bearing case: an orchestrator running
 // `codex exec "…git push…"` must NEVER be read as a real push.
 import { describe, expect, it } from "vitest";
-import { classifyPush, gitWriteVerb, hexRuns, matchesBranchSha, toolCallGitVerb, toolCallInvocations } from "../../src/pr/gitWrite.js";
+import {
+  classifyPush,
+  gitWriteVerb,
+  hexRuns,
+  matchesBranchSha,
+  stripShellRedirections,
+  toolCallGitVerb,
+  toolCallInvocations,
+} from "../../src/pr/gitWrite.js";
 import type { ToolCall } from "../../src/parse/types.js";
 
 describe("gitWriteVerb (tokenized argv)", () => {
@@ -105,7 +113,7 @@ describe("SPEC-0073 classifyPush", () => {
     expect(classifyPush(argv).attach).toBe(false);
   });
 
-  it("uses the tokenized invocation view so quoted, heredoc, and compound pushes do not attach", () => {
+  it("uses the tokenized invocation view so quoted and heredoc pushes do not attach", () => {
     const attaches = (command: string) => {
       const call: ToolCall = { name: "Bash", shell: true, input: { command } };
       const invocations = toolCallInvocations(call);
@@ -114,7 +122,39 @@ describe("SPEC-0073 classifyPush", () => {
 
     expect(attaches('echo "git push"')).toBe(false);
     expect(attaches("cat <<'EOF'\ngit push\nEOF")).toBe(false);
-    expect(attaches("npm test && git push")).toBe(false);
+  });
+});
+
+describe("stripShellRedirections", () => {
+  it.each([
+    [["git", "push", ">", "/tmp/out"], ["git", "push"]],
+    [["git", "push", ">>", "/tmp/out"], ["git", "push"]],
+    [["git", "push", "<", "/tmp/in"], ["git", "push"]],
+    [["git", "push", "&>", "/tmp/all"], ["git", "push"]],
+    [["git", "push", "&>>", "/tmp/all"], ["git", "push"]],
+    [["git", "push", "2>", "/tmp/err"], ["git", "push"]],
+    [["git", "push", "3>>", "/tmp/trace"], ["git", "push"]],
+  ])("strips a standalone operator and its filename from argv %j", (argv, expected) => {
+    expect(stripShellRedirections(argv)).toEqual(expected);
+  });
+
+  it("strips attached redirections without consuming the following argv", () => {
+    expect(stripShellRedirections(["git", "push", ">/tmp/out", "2>err.log", "3>>trace.log", "<input", "&>all.log", "&>>append.log", "origin", "feat"])).toEqual([
+      "git",
+      "push",
+      "origin",
+      "feat",
+    ]);
+  });
+
+  it("distinguishes descriptor duplication from file redirection", () => {
+    expect(stripShellRedirections(["git", "push", "2>&1", "origin", "feat"])).toEqual(["git", "push", "origin", "feat"]);
+    expect(stripShellRedirections(["git", "push", ">&2", "origin", "feat"])).toEqual(["git", "push", "origin", "feat"]);
+    expect(stripShellRedirections(["git", "push", "2>file", "origin", "feat"])).toEqual(["git", "push", "origin", "feat"]);
+  });
+
+  it("strips a standalone operator plus a quoted filename token", () => {
+    expect(stripShellRedirections(["git", "push", ">", "a b.txt", "origin", "feat"])).toEqual(["git", "push", "origin", "feat"]);
   });
 });
 

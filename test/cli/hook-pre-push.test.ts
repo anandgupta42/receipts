@@ -72,6 +72,13 @@ describe("SPEC-0073 hook pre-push command", () => {
     { tool_name: "exec_command", tool_input: { cmd: "git push origin feat" } },
     { name: "functions.exec_command", arguments: JSON.stringify({ command: ["git", "push", "origin", "feat"] }) },
     { tool_name: "Bash", command: "git push origin feat" },
+    claudePayload("git add -A && git commit -m msg && git push -u origin feat/x"),
+    claudePayload("git push origin feat/x && gh pr create --fill"),
+    claudePayload("git push -u origin feat/x 2>&1"),
+    claudePayload("git commit -m x; git push 2>&1 | tail -3"),
+    claudePayload("npm test && git push"),
+    claudePayload("git push -u origin HEAD 2>&1 | tee /tmp/push.log"),
+    claudePayload("git push && git push origin feat/x"),
   ])("attaches silently for branch push payload %#", async (payload) => {
     const result = await runPayload(payload);
     expect(result).toEqual({ code: 0, out: "", err: "", attaches: ["/repo"] });
@@ -104,8 +111,13 @@ describe("SPEC-0073 hook pre-push command", () => {
     claudePayload("git -C sub push origin feat"),
     claudePayload("git --git-dir=/other/.git --work-tree=/other push origin feat"),
     claudePayload('echo "git push"'),
+    claudePayload('echo "git push origin main && more"'),
     claudePayload("cat <<'EOF'\ngit push\nEOF"),
-    claudePayload("npm test && git push"),
+    claudePayload("cd /elsewhere && git push"),
+    claudePayload("MODE=quiet cd /elsewhere && git push"),
+    claudePayload("git push; cd /elsewhere"),
+    claudePayload("pushd /elsewhere && git push && popd"),
+    claudePayload("git push --dry-run 2>&1"),
     { tool_name: "Read", tool_input: { command: "git push" } },
     {},
     "",

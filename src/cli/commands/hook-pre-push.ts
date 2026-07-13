@@ -3,7 +3,7 @@
 // best-effort attaches `refs/aireceipts/<slug>` without ever writing a hook
 // decision object or blocking the developer's push.
 import { runPrDetailed, defaultPrDeps } from "../../pr/index.js";
-import { classifyPush, toolCallInvocations } from "../../pr/gitWrite.js";
+import { classifyPush, stripShellRedirections, toolCallInvocations } from "../../pr/gitWrite.js";
 import type { ToolCall } from "../../parse/types.js";
 import { readStdin } from "./statusline.js";
 import type { CommandContext, CommandDef } from "../types.js";
@@ -83,6 +83,36 @@ function commandSource(payload: Record<string, unknown>, input: Record<string, u
   return input.command ?? input.cmd ?? payload.command ?? payload.cmd;
 }
 
+const CWD_CHANGING_COMMANDS = new Set(["cd", "pushd", "popd"]);
+
+function containsHeredoc(source: string | string[]): boolean {
+  const parts = typeof source === "string" ? [source] : source;
+  return parts.some((part) => {
+    let quote: "'" | '"' | undefined;
+    for (let i = 0; i < part.length - 1; i++) {
+      const char = part[i];
+      if (quote) {
+        if (char === quote) quote = undefined;
+        else if (quote === '"' && char === "\\") i++;
+        continue;
+      }
+      if (char === "\\") {
+        i++;
+      } else if (char === "'" || char === '"') {
+        quote = char;
+      } else if (char === "<" && part[i + 1] === "<") {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+function changesWorkingDirectory(argv: string[]): boolean {
+  const command = argv.find((token) => !/^[A-Za-z_][A-Za-z0-9_]*=.*/.test(token));
+  return command !== undefined && CWD_CHANGING_COMMANDS.has(command);
+}
+
 function shouldAttach(payload: unknown): boolean {
   if (!isObject(payload) || !isShellTool(payloadToolName(payload))) {
     return false;
@@ -92,12 +122,15 @@ function shouldAttach(payload: unknown): boolean {
   if (typeof source !== "string" && (!Array.isArray(source) || !source.every((v) => typeof v === "string"))) {
     return false;
   }
-  const call: ToolCall = { name: String(payloadToolName(payload)), shell: true, input: { command: source } };
-  const invocations = toolCallInvocations(call);
-  if (invocations.length !== 1) {
+  if (containsHeredoc(source)) {
     return false;
   }
-  return classifyPush(invocations[0]).attach;
+  const call: ToolCall = { name: String(payloadToolName(payload)), shell: true, input: { command: source } };
+  const invocations = toolCallInvocations(call).map(stripShellRedirections);
+  if (invocations.some(changesWorkingDirectory)) {
+    return false;
+  }
+  return invocations.some((argv) => classifyPush(argv).attach);
 }
 
 export async function runHookPrePush(ctx: CommandContext, deps: HookPrePushDeps = defaultHookPrePushDeps): Promise<number> {

@@ -444,7 +444,7 @@ jobs:
 
 <h4 id="claude-code">Claude Code</h4>
 
-<p>Commit <code>.claude/settings.json</code> (<a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/claude-settings.json">template</a>):</p>
+<p>Commit <code>.claude/settings.json</code> (<a href="https://github.com/anandgupta42/receipts/blob/main/docs/adopt/claude-settings.json">template</a>): The <code>|| true</code> matters: the CLI itself exits 0 on every path, but if <code>npx</code> cannot even fetch or start it (registry outage, cold cache timeout), the hook must still succeed — a receipt is never worth blocking a push.</p>
 
 <pre class="doc-code"><code class="language-json">{
   &quot;hooks&quot;: {
@@ -454,7 +454,7 @@ jobs:
         &quot;hooks&quot;: [
           {
             &quot;type&quot;: &quot;command&quot;,
-            &quot;command&quot;: &quot;npx -y aireceipts-cli@latest hook pre-push&quot;,
+            &quot;command&quot;: &quot;npx -y aireceipts-cli@latest hook pre-push || true&quot;,
             &quot;timeout&quot;: 60
           }
         ]
@@ -475,7 +475,7 @@ jobs:
         &quot;hooks&quot;: [
           {
             &quot;type&quot;: &quot;command&quot;,
-            &quot;command&quot;: &quot;npx -y aireceipts-cli@latest hook pre-push&quot;,
+            &quot;command&quot;: &quot;npx -y aireceipts-cli@latest hook pre-push || true&quot;,
             &quot;timeout&quot;: 60
           }
         ]
@@ -485,6 +485,8 @@ jobs:
 }</code></pre>
 
 <p><a href="https://learn.chatgpt.com/docs/hooks">Codex loads project hooks</a> only for trusted projects. Review and trust the exact hook definition once through <code>/hooks</code>; changed definitions require review again.</p>
+
+<p>Chained agent commands still auto-attach when they contain an unambiguous branch push and keep the same working directory; output redirections are ignored and the hook attaches once.</p>
 
 <h3 id="step-3-keep-the-codex-finalizer-instruction">Step 3 — Keep the Codex finalizer instruction</h3>
 
