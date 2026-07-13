@@ -336,6 +336,12 @@ footer{
 
 <p>All notable changes to <code>aireceipts-cli</code>. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
 
+<h2 id="v091-2026-07-13">v0.9.1 — 2026-07-13</h2>
+
+<p>Patch: <strong>the SPEC-0073 auto-attach hook now fires for the commands coding agents actually run</strong> (fixes #241, PR #252). <code>hook pre-push</code> previously refused any Bash command with more than one tokenized invocation, and a trailing <code>2&gt;&amp;1</code> defeated even a single plain push — so chained agent pushes (<code>git add &amp;&amp; git commit &amp;&amp; git push</code>, <code>git push 2&gt;&amp;1 | tail</code>) never attached a receipt ref. The issue's &quot;worktree&quot; correlation was an agent-command-style correlation. Now: shell redirections are stripped per invocation, the hook attaches once when at least one invocation is an unambiguous branch push, any <code>cd</code>/<code>pushd</code>/<code>popd</code> in the command still refuses (the push may target a different repo than the hook's cwd), and heredoc payloads keep refusing via an explicit guard. SPEC-0073 R1 amended accordingly.</p>
+
+<p>Also hardened the adopter kit (org-rollout review finding): the hook commands in <code>docs/adopt/claude-settings.json</code>, <code>docs/adopt/codex-hooks.json</code>, the <code>docs/pr-receipts.md</code> snippets, and the <code>integrations</code> command's recipes now end <code>|| true</code> — an <code>npx</code>/registry failure can never block a push.</p>
+
 <h2 id="v090-2026-07-13">v0.9.0 — 2026-07-13</h2>
 
 <p>Minor: <strong>receipt dollars are now explicit observable lower bounds — <code>≥ $X</code>, never an exact-looking bill — and the <code>--json</code> export schema moves to v2 to say so in a machine-readable way.</strong> A second, deeper cost-correctness pass after v0.7.1's #196: PR #242 fixed real undercounting (a commit/amend truncation had sliced a <code>$0.44</code> receipt out of work independently reconstructed at <code>≥ $44.97</code>, issue #239) and made every surface state what the number is and what it excludes.</p>

@@ -3,6 +3,24 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.9.1 — 2026-07-13
+
+Patch: **the SPEC-0073 auto-attach hook now fires for the commands coding agents
+actually run** (fixes #241, PR #252). `hook pre-push` previously refused any Bash
+command with more than one tokenized invocation, and a trailing `2>&1` defeated
+even a single plain push — so chained agent pushes (`git add && git commit && git
+push`, `git push 2>&1 | tail`) never attached a receipt ref. The issue's "worktree"
+correlation was an agent-command-style correlation. Now: shell redirections are
+stripped per invocation, the hook attaches once when at least one invocation is an
+unambiguous branch push, any `cd`/`pushd`/`popd` in the command still refuses (the
+push may target a different repo than the hook's cwd), and heredoc payloads keep
+refusing via an explicit guard. SPEC-0073 R1 amended accordingly.
+
+Also hardened the adopter kit (org-rollout review finding): the hook commands in
+`docs/adopt/claude-settings.json`, `docs/adopt/codex-hooks.json`, the
+`docs/pr-receipts.md` snippets, and the `integrations` command's recipes now end
+`|| true` — an `npx`/registry failure can never block a push.
+
 ## v0.9.0 — 2026-07-13
 
 Minor: **receipt dollars are now explicit observable lower bounds — `≥ $X`, never an
