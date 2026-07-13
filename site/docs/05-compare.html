@@ -354,7 +354,7 @@ Edit..........................≥ $0.0455  (2 calls)
 Write.........................≥ $0.0290  (2 calls)
 Read...........................≥ $0.0192  (1 call)
 --------------------------------------------------
-TOTAL....................................≥ $0.1767
+TOTAL....................................≥ $0.1764
 standard API-equivalent floor; not an invoice
 same tokens on claude-haiku-4-5..........≥ $0.0392
   (78% lower observable floor)
@@ -388,7 +388,7 @@ same tokens on claude-haiku-4-5..........≥ $0.0189
 
 Add email format validation…'s standard-API floor is 1.9× Can you fix the flaky login test…'s (≥ $0.1767 vs ≥ $0.0945)</code></pre>
 
-<p>The closing line is the whole point: the first observable floor is <strong>1.9×</strong> the second (<code>≥ $0.1767</code> vs <code>≥ $0.0945</code>). This is a ratio of cited floor arithmetic, not a ratio of invoices, and aireceipts emits it only when both parent-plus-subagent ledgers have full pricing coverage. If either side is partial, the closing line says the sessions are not directly comparable and lists each side's known <code>≥ $</code> subtotal plus exact known-unpriced tokens; it never gives an unsupported directional ratio. Note the second receipt also surfaces a <code>⚠ Bash loop ×5</code> flagged-pattern line — comparison shows where the detector found a repeated loop; it does not prove that the subtotal was avoidable savings.</p>
+<p>The closing line is the whole point: the first observable floor is <strong>1.9×</strong> the second (<code>≥ $0.1767</code> vs <code>≥ $0.0945</code>). Compare works on the raw session floors, which can sit a fraction of a cent above each ledger's displayed <code>TOTAL</code> (the ledger is derived from its displayed rows so they always sum exactly; both are true floors of the same session). This is a ratio of cited floor arithmetic, not a ratio of invoices, and aireceipts emits it only when both parent-plus-subagent ledgers have full pricing coverage. If either side is partial, the closing line says the sessions are not directly comparable and lists each side's known <code>≥ $</code> subtotal plus exact known-unpriced tokens; it never gives an unsupported directional ratio. Note the second receipt also surfaces a <code>⚠ Bash loop ×5</code> flagged-pattern line — comparison shows where the detector found a repeated loop; it does not prove that the subtotal was avoidable savings.</p>
 
 <p>On a wide terminal the two receipts render side by side; on a narrow one they stack, as above. Either way the numbers are identical.</p>
 

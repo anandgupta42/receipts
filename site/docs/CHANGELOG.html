@@ -336,6 +336,35 @@ footer{
 
 <p>All notable changes to <code>aireceipts-cli</code>. Factual, grouped by conventional-commit type (I6: a log, not marketing). Dates are UTC.</p>
 
+<h2 id="v090-2026-07-13">v0.9.0 — 2026-07-13</h2>
+
+<p>Minor: <strong>receipt dollars are now explicit observable lower bounds — <code>≥ $X</code>, never an exact-looking bill — and the <code>--json</code> export schema moves to v2 to say so in a machine-readable way.</strong> A second, deeper cost-correctness pass after v0.7.1's #196: PR #242 fixed real undercounting (a commit/amend truncation had sliced a <code>$0.44</code> receipt out of work independently reconstructed at <code>≥ $44.97</code>, issue #239) and made every surface state what the number is and what it excludes.</p>
+
+<h3 id="feat">feat</h3>
+
+<ul>
+  <li><strong>GPT-5.6 (Sol/Terra/Luna) sessions are now priced.</strong> The price schema gained per-request context tiers (<code>context_tiers</code>, <code>input_cache_write</code>), so Codex request envelopes select the cited <code>&gt;272K</code> Standard tier per request; the unpersisted cache-write quantity stays outside the floor with a caveat. GPT-5.5 remains tokens-only because its published long-context threshold is full-session scoped, which a request stream cannot select honestly (PR #242, cited from the official model pages in <code>data/prices/openai.json</code>).</li>
+  <li><strong>Statusline model segment + the meter</strong> (SPEC-0076, PR #233): the statusline can show the session's model mix, and the landing page gained the meter story and redesign.</li>
+  <li><strong>PR-receipt provenance footer</strong> (SPEC-0078, PR #236): posted receipts carry a footer stating how the numbers were produced and where the raw data lives.</li>
+  <li><strong>Samosa story page</strong> (SPEC-0079, PRs #238/#240): a Ko-fi tip jar behind an own-surfaces-only story page; a single Sponsor row and README section link to it. Receipts, PR comments, and artifacts never carry the tip link by default.</li>
+  <li><strong>Landing SEO/AEO</strong> (SPEC-0080, PR #243): share cards, JSON-LD, sitemap, <code>llms.txt</code>.</li>
+  <li>Exports: schema v2 adds <code>minUsd</code> lower-bound estimates (<code>kind: &quot;lower-bound&quot;</code>, <code>basis: &quot;standard-api-list-price-equivalent&quot;</code>), exact parent/child/combined unpriced-token vectors, explicit dollar/token scopes, combined pricing-coverage fields, and tool-CSV granularity warnings (PR #242).</li>
+</ul>
+
+<h3 id="fix">fix</h3>
+
+<ul>
+  <li><strong>Cost attribution across all agents</strong> (PR #242, fixes #239): PR anchors resolve one recovered SHA-alias truth for contributor selection, slicing, per-commit rows, and same-session amend lineage (with HEAD-change barriers so a branch switch can never pull a foreign commit into a slice). Codex parsing gains replay dedupe, inherited-baseline removal, model/provider switching, exact cumulative/last reconciliation, and fail-closed handling of malformed/reset/mixed streams — every observable envelope is retained as tokens even when pricing must be refused. Claude Code deduplicates by <code>message.id</code> and keeps id-less usage as one unattributed envelope; malformed counters can never become priceable zeroes. OpenCode prices provider-aware and reconciles aggregates componentwise — contradictory vectors are excluded, never fabricated.</li>
+  <li><strong>Uncited cache rates contribute zero with a caveat</strong> — no fallback to an uncited input rate, ever (I2).</li>
+  <li>Displayed ledger rows sum exactly to <code>TOTAL</code>, and no displayed amount ever exceeds its raw value; tiny positive floors keep up to twelve decimals rather than collapsing to <code>$0.0000</code> (PR #242).</li>
+  <li>Detector language: flagged patterns read <code>FLAGGED PATTERN COST ≈ … · not proven savings</code> — no &quot;waste floor&quot; claim (PR #242).</li>
+  <li><strong>PR receipt attachment is reliable across Codex and CI</strong> (PR #232).</li>
+</ul>
+
+<h3 id="breaking-migration-from-schemaversion-1">BREAKING / migration from schemaVersion 1</h3>
+
+<p><code>--json</code> <code>schemaVersion</code> is now <code>2</code>. <code>totalUsd</code> is scoped to the <strong>parent session only</strong> and is an explicit lower bound (rounded down); the old combined meaning lives in <code>combinedPricedUsd</code> / <code>combinedPricedCostEstimate</code>. Scripts that consumed v1's <code>totalUsd</code> should check <code>schemaVersion</code> and read the combined fields if they want parent+subagent totals. All dollar fields carry lower-bound semantics objects; known unpriced usage is exported beside the floor instead of disappearing. Details in <code>docs/json-schema.md</code>.</p>
+
 <h2 id="v082-2026-07-10">v0.8.2 — 2026-07-10</h2>
 
 <p>Patch: <strong>the auto-attach hook now fires on bare-<code>HEAD</code> branch publishes</strong> — <code>git push -u origin HEAD</code> (and <code>--force-with-lease</code> / <code>HEAD:refs/heads/&lt;x&gt;</code> forms), the dominant idiom for coding agents, previously classified as not-a-branch-publish and the SPEC-0073 hook silently wrote no receipt ref. Root-caused from the org dogfood pilots producing zero receipts (issue #228, PR #230): the sibling hook on the same event fired while ours declined classification. The receipt ref slug always derives from the resolved checked-out branch; detached <code>HEAD</code> still attaches nothing (fail-safe), and tag/sha/receipt-ref/delete publishes stay excluded.</p>
@@ -352,7 +381,7 @@ footer{
 
 <p>Minor: <strong>the statusline now works at the terminal level — tmux, starship, zsh/bash, PowerShell, terminal titles — so Codex and opencode sessions get a live cost line too, not just Claude Code.</strong> Neither Codex nor opencode exposes a command-backed status hook (openai/codex#17827 and sst/opencode#8619 are open), so the surface moved to the terminal itself (SPEC-0075, PRs #217/#221).</p>
 
-<h3 id="feat">feat</h3>
+<h3 id="feat-2">feat</h3>
 
 <ul>
   <li><code>aireceipts statusline --cwd &lt;path&gt;</code> selects the newest session <strong>attributed to that path</strong> instead of the machine's globally newest one, so a tmux <code>status-right</code> line (<code>--cwd &quot;#{pane_current_path}&quot;</code>) shows each pane its own session. Attribution is guarded: Claude Code's lossy project-directory encoding is confirmed against the transcript's own recorded <code>cwd</code> after load, sessions launched from the home directory (or <code>/</code>) never ancestor-match everything, dot-segments resolve lexically, full-parse work is capped, and no match renders the neutral placeholder — never another project's line. Cursor sessions carry no cwd and are excluded. Relative paths resolve against the invocation directory; a usable Claude Code stdin payload still wins. Recipes for tmux, starship, plain zsh/bash, PowerShell, and OSC terminal titles are in <code>docs/statusline.md</code> — the Claude Code native <code>statusLine</code> hook remains the recommended (richer, faster) surface where it exists (PRs #217, #221).</li>
@@ -360,7 +389,7 @@ footer{
   <li>Telemetry: <code>--cwd</code> invocations are polling surfaces, so they count locally but never network-flush (a 15-second tmux poll adds zero events). The <code>integration_surface_rendered</code> event gains <code>scoped</code> and <code>configFile</code> booleans — never the path or the format string (<code>docs/telemetry.md</code>, PR #221).</li>
 </ul>
 
-<h3 id="fix">fix</h3>
+<h3 id="fix-2">fix</h3>
 
 <ul>
   <li><strong>The published CLI is ~3.5× faster wherever sqlite-backed sessions (opencode, Cursor) are read</strong> (PR #214). tsup's <code>removeNodeProtocol</code> default rewrote <code>import(&quot;node:sqlite&quot;)</code> to <code>import(&quot;sqlite&quot;)</code> in <code>dist/</code>, which fails at runtime, so every published build silently fell back to spawning the <code>sqlite3</code> CLI per query — measured 4.0s → 1.15s for one statusline render on a sqlite-heavy machine. On Node ≥ 22.13 the <code>sqlite3</code> binary is no longer needed at all; older runtimes keep the fallback. Built-artifact regression tests now pin the import specifier and the in-process read path.</li>

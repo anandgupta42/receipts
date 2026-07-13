@@ -26,7 +26,7 @@ Edit..........................≥ $0.0455  (2 calls)
 Write.........................≥ $0.0290  (2 calls)
 Read...........................≥ $0.0192  (1 call)
 --------------------------------------------------
-TOTAL....................................≥ $0.1767
+TOTAL....................................≥ $0.1764
 standard API-equivalent floor; not an invoice
 same tokens on claude-haiku-4-5..........≥ $0.0392
   (78% lower observable floor)
@@ -165,7 +165,11 @@ no flagged pattern detected
 run  aireceipts  for the full receipt
 ```
 
-This is exactly what the [SessionEnd hook](03-install-hook.md) prints.
+This is exactly what the [SessionEnd hook](03-install-hook.md) prints. The mini
+`total` floors the raw session value directly (here `≥ $0.1767`), so it can sit a
+fraction of a cent above the full ledger's `TOTAL` — which is derived from the
+displayed rows so that they always sum exactly. Both are true floors of the same
+session.
 
 ## When there's no price
 

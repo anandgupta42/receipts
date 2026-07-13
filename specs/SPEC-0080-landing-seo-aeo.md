@@ -1,7 +1,7 @@
 ---
 id: SPEC-0080
 title: "Landing SEO + AEO: absolute share cards, structured data, sitemap, llms.txt"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0021, SPEC-0025, SPEC-0079]
 ---
@@ -118,11 +118,11 @@ consumer requires fabricated fields, it is not served.
 
 ## Success criteria
 
-- [ ] Landing and samosa share cards carry absolute image URLs; samosa unfurls with the
+- [x] Landing and samosa share cards carry absolute image URLs; samosa unfurls with the
       maintainer's card image.
-- [ ] JSON-LD, robots.txt, sitemap.xml, llms.txt ship, each pinned by its test.
-- [ ] SPEC-0079 contract amendment recorded; its tests green with anchor counting.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] JSON-LD, robots.txt, sitemap.xml, llms.txt ship, each pinned by its test.
+- [x] SPEC-0079 contract amendment recorded; its tests green with anchor counting.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked

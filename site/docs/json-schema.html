@@ -442,7 +442,7 @@ footer{
   <thead><tr><th>Field</th><th>Type</th><th>Notes</th></tr></thead>
   <tbody>
     <tr><td><code>count</code></td><td>number</td><td>No-recorded-cause re-reads (2nd..Nth reads of a path).</td></tr>
-    <tr><td><code>turnIndices</code></td><td>array</td><td>1-/0-based transcript turn indices of the counted re-reads, ascending.</td></tr>
+    <tr><td><code>turnIndices</code></td><td>array</td><td>Zero-based transcript turn indices of the counted re-reads, ascending. (Human-rendered receipts print the same turns one-based.)</td></tr>
     <tr><td><code>tokens</code></td><td>TokenUsage</td><td>Per-call token share of the counted re-reads.</td></tr>
     <tr><td><code>usd</code></td><td>number | null</td><td>Compatibility scalar containing the priced lower-bound share; null if any counted re-read is unpriced (I2).</td></tr>
     <tr><td><code>costEstimate</code></td><td>CostEstimate | null</td><td>Structured lower-bound semantics for the adjacent <code>usd</code>, or null when unpriced.</td></tr>

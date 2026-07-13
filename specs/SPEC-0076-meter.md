@@ -1,7 +1,7 @@
 ---
 id: SPEC-0076
 title: "The meter — model segment in the statusline + meter-and-receipt positioning"
-status: draft
+status: shipped
 milestone: M5
 depends: [SPEC-0062, SPEC-0071, SPEC-0075]
 ---
@@ -187,13 +187,13 @@ real-time) is cut, not softened.
 
 ## Success criteria
 
-- [ ] `model` segment renders per R1–R3 with every guard and the stale-payload gate;
+- [x] `model` segment renders per R1–R3 with every guard and the stale-payload gate;
       exact-string + integration tests pin the default, fallback, and omission paths.
-- [ ] README leads with the ride-order three-feature arc (R5); meter phrasing present on
+- [x] README leads with the ride-order three-feature arc (R5); meter phrasing present on
       all R4 surfaces; forbidden-phrase grep is clean.
-- [ ] Docs/site examples all show the model segment (R6); `npm run docs:site` output
+- [x] Docs/site examples all show the model segment (R6); `npm run docs:site` output
       committed; the segment table documents `model` with per-mode semantics.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`, determinism check, `node scripts/spec-lint.mjs`,
       `node scripts/hygiene.mjs` all pass unmasked (`echo $?`).
 

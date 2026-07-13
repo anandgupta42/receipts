@@ -24,8 +24,9 @@
 not the token ledger. aireceipts reconstructs an observable Standard-API list-price
 floor: live in your status bar, itemized when the session ends, attached to the PR.
 It is not an invoice or subscription allocation. Local and deterministic —
-transcripts never leave your machine, and a shared receipt carries figures, never code
-([how](docs/pr-receipts.md)).
+transcripts never leave your machine, and a shared receipt carries figures plus the
+session's one-line title (drawn from your opening prompt, truncated) — never your
+diff, file contents, or transcript ([how](docs/pr-receipts.md)).
 
 
 ## Start here — the meter, the receipt, the PR

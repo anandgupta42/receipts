@@ -573,7 +573,7 @@ aireceipts: no sessions detected</code></pre>
 <h2 id="notes">Notes</h2>
 
 <ul>
-  <li>One line, one on-disk read per invocation — this is a snapshot, not a live view. Nothing streams mid-session (see the CLI's non-goals).</li>
+  <li>One line per invocation, read freshly from disk — this is a snapshot, not a live view. Nothing streams mid-session (see the CLI's non-goals). A render may read several local files (the config, candidate transcripts, subagent transcripts) but never watches, polls, or holds anything open.</li>
   <li>A session with no priced component renders tokens-only. If some components price and others do not, the cited floor remains visible beside the exact known-unpriced token count; <code>aireceipts</code> never assigns those tokens a guessed rate.</li>
   <li>Subagent spend is included (SPEC-0061): background agents write their transcripts to separate files under the session's <code>subagents/</code> directory, and the statusline's <code>$</code> and token counts fold that rollup in — the same aggregate the session receipt draws as its <code>SUBAGENTS (N)</code> row.</li>
 </ul>

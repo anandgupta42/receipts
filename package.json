@@ -1,6 +1,6 @@
 {
   "name": "aireceipts-cli",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "description": "Your AI coding agent used millions of tokens. Here is the observable cost floor.",
   "keywords": [
     "ai",

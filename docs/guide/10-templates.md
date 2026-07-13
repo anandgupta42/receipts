@@ -16,29 +16,32 @@ prints a short live preview of each built-in template:
 
 ```
 ── classic  (default) ──
-Bash..........................≥ $0.0517  (3 calls)
-Edit..........................≥ $0.0455  (2 calls)
-(thinking/reply)..............≥ $0.0310  (2 turns)
-Write.........................≥ $0.0290  (2 calls)
-Read...........................≥ $0.0192  (1 call)
+Bash............................≥ $0.05  (3 calls)
+Edit............................≥ $0.05  (2 calls)
+(thinking/reply)................≥ $0.03  (2 turns)
+Write...........................≥ $0.03  (2 calls)
+Read.............................≥ $0.02  (1 call)
 --------------------------------------------------
 
 ── grocery ──
 TXN #A2998369
 ITEM                              QTY          AMT
-Bash                                3    ≥ $0.0517
-Edit                                2    ≥ $0.0455
-(thinking/reply)                    2    ≥ $0.0310
-Write                               2    ≥ $0.0290
+Bash                                3      ≥ $0.05
+Edit                                2      ≥ $0.05
+(thinking/reply)                    2      ≥ $0.03
+Write                               2      ≥ $0.03
 
 ── datavis ──
 [##########] = priciest line; others in proportion
 
 --- MODEL OUTPUT ---
-(thinking/reply)............≥ $0.0310 [######----]
+(thinking/reply)..............≥ $0.03 [######----]
 
 --- TOOL CALLS ---
 ```
+
+(The preview uses small synthetic numbers; your own receipts show your session's
+actual floors.)
 
 ## Apply one
 
@@ -64,7 +67,7 @@ Edit                                2    ≥ $0.0455
 Write                               2    ≥ $0.0290
 Read                                1    ≥ $0.0192
 --------------------------------------------------
-TOTAL                                    ≥ $0.1767
+TOTAL                                    ≥ $0.1764
 standard API-equivalent floor; not an invoice
 same tokens on claude-haiku-4-5..........≥ $0.0392
   (78% lower observable floor)

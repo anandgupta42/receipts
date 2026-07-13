@@ -1,7 +1,7 @@
 ---
 id: SPEC-0078
 title: receipt provenance footer
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0020, SPEC-0055, SPEC-0070]
 ---

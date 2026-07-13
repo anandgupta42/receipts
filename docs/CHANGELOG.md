@@ -3,6 +3,70 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.9.0 — 2026-07-13
+
+Minor: **receipt dollars are now explicit observable lower bounds — `≥ $X`, never an
+exact-looking bill — and the `--json` export schema moves to v2 to say so in a
+machine-readable way.** A second, deeper cost-correctness pass after v0.7.1's #196:
+PR #242 fixed real undercounting (a commit/amend truncation had sliced a `$0.44`
+receipt out of work independently reconstructed at `≥ $44.97`, issue #239) and made
+every surface state what the number is and what it excludes.
+
+### feat
+
+- **GPT-5.6 (Sol/Terra/Luna) sessions are now priced.** The price schema gained
+  per-request context tiers (`context_tiers`, `input_cache_write`), so Codex request
+  envelopes select the cited `>272K` Standard tier per request; the unpersisted
+  cache-write quantity stays outside the floor with a caveat. GPT-5.5 remains
+  tokens-only because its published long-context threshold is full-session scoped,
+  which a request stream cannot select honestly (PR #242, cited from the official
+  model pages in `data/prices/openai.json`).
+- **Statusline model segment + the meter** (SPEC-0076, PR #233): the statusline can
+  show the session's model mix, and the landing page gained the meter story and
+  redesign.
+- **PR-receipt provenance footer** (SPEC-0078, PR #236): posted receipts carry a
+  footer stating how the numbers were produced and where the raw data lives.
+- **Samosa story page** (SPEC-0079, PRs #238/#240): a Ko-fi tip jar behind an
+  own-surfaces-only story page; a single Sponsor row and README section link to it.
+  Receipts, PR comments, and artifacts never carry the tip link by default.
+- **Landing SEO/AEO** (SPEC-0080, PR #243): share cards, JSON-LD, sitemap, `llms.txt`.
+- Exports: schema v2 adds `minUsd` lower-bound estimates (`kind: "lower-bound"`,
+  `basis: "standard-api-list-price-equivalent"`), exact parent/child/combined
+  unpriced-token vectors, explicit dollar/token scopes, combined pricing-coverage
+  fields, and tool-CSV granularity warnings (PR #242).
+
+### fix
+
+- **Cost attribution across all agents** (PR #242, fixes #239): PR anchors resolve
+  one recovered SHA-alias truth for contributor selection, slicing, per-commit rows,
+  and same-session amend lineage (with HEAD-change barriers so a branch switch can
+  never pull a foreign commit into a slice). Codex parsing gains replay dedupe,
+  inherited-baseline removal, model/provider switching, exact cumulative/last
+  reconciliation, and fail-closed handling of malformed/reset/mixed streams — every
+  observable envelope is retained as tokens even when pricing must be refused.
+  Claude Code deduplicates by `message.id` and keeps id-less usage as one
+  unattributed envelope; malformed counters can never become priceable zeroes.
+  OpenCode prices provider-aware and reconciles aggregates componentwise —
+  contradictory vectors are excluded, never fabricated.
+- **Uncited cache rates contribute zero with a caveat** — no fallback to an uncited
+  input rate, ever (I2).
+- Displayed ledger rows sum exactly to `TOTAL`, and no displayed amount ever exceeds
+  its raw value; tiny positive floors keep up to twelve decimals rather than
+  collapsing to `$0.0000` (PR #242).
+- Detector language: flagged patterns read `FLAGGED PATTERN COST ≈ … · not proven
+  savings` — no "waste floor" claim (PR #242).
+- **PR receipt attachment is reliable across Codex and CI** (PR #232).
+
+### BREAKING / migration from schemaVersion 1
+
+`--json` `schemaVersion` is now `2`. `totalUsd` is scoped to the **parent session
+only** and is an explicit lower bound (rounded down); the old combined meaning lives
+in `combinedPricedUsd` / `combinedPricedCostEstimate`. Scripts that consumed v1's
+`totalUsd` should check `schemaVersion` and read the combined fields if they want
+parent+subagent totals. All dollar fields carry lower-bound semantics objects; known
+unpriced usage is exported beside the floor instead of disappearing. Details in
+`docs/json-schema.md`.
+
 ## v0.8.2 — 2026-07-10
 
 Patch: **the auto-attach hook now fires on bare-`HEAD` branch publishes** —

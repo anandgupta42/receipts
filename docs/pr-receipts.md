@@ -20,7 +20,10 @@ current repo/worktree and PR branch, renders the exact comment body, then upsert
 marked PR comment through `gh`.
 
 `npx` needs Node/npm. Posting needs the [`gh` CLI](https://cli.github.com/) authenticated
-to your repo (`gh auth login`); no other tokens or servers are involved. Re-running after
+to your repo (`gh auth login`); no other tokens are involved, and receipt data goes only
+to GitHub. (Like every command, `pr` may also flush the content-free
+[usage telemetry](telemetry.md) unless disabled — that endpoint never receives receipt
+data.) Re-running after
 more commits edits the same comment in place — no comment spam. If auto-selection finds
 more than one matching session (or you want a specific one), pass `--session <id>` (an id
 from `aireceipts --list`):

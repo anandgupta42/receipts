@@ -32,7 +32,10 @@ compaction count when any fired). Then comes `FLAGGED PATTERN COST ≈ $X`: the
 largest priced subtotal among the stuck-loop and context-thrash detector
 classes. The approximation is intentional. A detector identifies a pattern to
 inspect; it does not prove the pattern was avoidable, so this subtotal is not a
-savings floor, savings ceiling, or percentage of total. It never adds classes
+savings floor, savings ceiling, or percentage of total. This is why the same
+dollar figure can carry two symbols: an itemized `⚠` row uses `≥` (those turns
+verifiably cost at least that much) while any detector *summary* uses `≈` (the
+pattern is associated with that amount — not proven savings). It never adds classes
 that may overlap, and it excludes trivial-span dollars because those are
 counterfactual re-pricing rather than observed cost. Each flagged-pattern line is evidence with the
 same `⚠`/`≈` glyphs the receipt prints, and under each class a one-line `→`

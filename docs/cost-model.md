@@ -18,10 +18,11 @@ renders with `≥` because local agent transcripts do not establish the auth and
 billing route, negotiated plan, credits, service tier, regional uplift, or every
 provider-side usage dimension. Additional known omissions carry their own
 visible caveat or tokens-only subtotal. Silent wrongness is the forbidden state.
-SPEC-0044 makes that a mechanical property: every drop/degrade/lower-bound
-decision routes through a typed `ConfidenceEvent` (`src/pr/confidence.ts`), and
-a hygiene check + an exhaustive-switch test prevent a new silent drop from being
-introduced.
+SPEC-0044 makes that a mechanical property on the PR path: every PR-selection
+drop/degrade/lower-bound decision routes through a typed `ConfidenceEvent`
+(`src/pr/confidence.ts`), and a hygiene check + an exhaustive-switch test prevent
+a new silent drop from being introduced there. Single-session receipts surface
+the same information through their typed caveat list (`src/receipt/model.ts`).
 
 ## The ConfidenceEvent contract — every reason a number may be incomplete
 
@@ -36,8 +37,9 @@ introduced.
 | `dropped-transcript-records` (B3) | A **credited** session whose transcript had malformed/truncated evidence (a crash-torn JSONL line, an invalid token bucket, or a corrupt opencode DB row). Safe sibling token components may remain visible, but malformed components never price and wholly unreadable records contribute nothing. | The single-session receipt carries a muted "N transcript record(s) unreadable or malformed — omitted components may make total incomplete" caveat; the PR body counts affected credited sessions and floors the total `≥`. A clean transcript never trips it; a session that fails to load *entirely* is `unreadable-session`, not this. |
 | `partial-priced-coverage` | A credited contributor or subagent contains both turns with cited prices and turns that cannot be priced. The known `$` used to classify the whole atom as priced and hide its unpriced tokens from the PR token subtotal. | The PR renders both the known-dollar floor and the exact unpriced-token subtotal, plus a counted "partial price coverage" note. Fully priced and fully unpriced sessions remain unchanged. |
 
-`unobserved-cache-write-tokens` is a receipt-level observability caveat rather
-than a PR-selection `ConfidenceEvent`: a priced Codex GPT-5.6 receipt states that
+`unobserved-cache-write-tokens` is primarily a receipt-level observability
+caveat (it also exists in the `ConfidenceEvent` union so the PR path can carry
+it): a priced Codex GPT-5.6 receipt states that
 the rollout omits cache-write tokens, so the floor excludes any write premium.
 The structured caveat survives `--json`; the universal `CostEstimate` still
 supplies the lower-bound kind and basis.
