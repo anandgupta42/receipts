@@ -11,6 +11,7 @@ import { aggregateWaste, type WasteClassAggregate } from "../../aggregate/waste.
 import { listFullSessions } from "../../index.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { resolveSelector } from "../common/session.js";
+import { setExitClass } from "../exitClass.js";
 
 /**
  * SPEC-0013 R1: aggregate waste across the trailing-7-day window (SPEC-0008's
@@ -31,16 +32,19 @@ async function run(ctx: CommandContext): Promise<number> {
   const threshold = options.handoffThreshold ?? DEFAULT_HANDOFF_THRESHOLD;
   if (options.handoffThreshold !== undefined && (!Number.isInteger(threshold) || threshold < 1)) {
     ctx.stderr.write("invalid --handoff-threshold (expected a positive integer)\n");
+    setExitClass(ctx, "invalid-arguments");
     return 1;
   }
   const resolved = await resolveSelector(options.positional[0]);
   if ("error" in resolved) {
     ctx.stderr.write(`${resolved.error}\n`);
+    setExitClass(ctx, "no-session-match");
     return 1;
   }
   const session = await loadSession(resolved.summary);
   if (!session) {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
+    setExitClass(ctx, "other-controlled");
     return 1;
   }
   const model = await buildFullSessionReceiptModel(session);

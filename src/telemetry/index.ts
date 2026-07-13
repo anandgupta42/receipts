@@ -26,6 +26,7 @@ import { hashSignature } from "./signature.js";
 import type {
   ExportFormatValue,
   ExportSurfaceValue,
+  ExitClassValue,
   HookOperationValue,
   InputModeValue,
   IntegrationValue,
@@ -62,6 +63,8 @@ export interface RecordCliRunInput extends RunStartTelemetry {
   agentType: AgentSource | undefined;
   durationMs: number;
   ok: boolean;
+  /** Controlled non-zero classification only; thrown errors use `cli_error`. */
+  exitClass?: ExitClassValue;
   /** SPEC-0042 R5 — set only for the handoff command; enum, never content. */
   handoffFormat?: "text" | "json";
 }
@@ -85,6 +88,7 @@ export function recordCliRun(input: RecordCliRunInput): void {
       isCI: input.isCI,
       installHash: input.installHash,
       runOrdinalBucket: input.runOrdinalBucket,
+      ...(!input.ok && input.exitClass !== undefined ? { exitClass: input.exitClass } : {}),
       ...(input.handoffFormat !== undefined ? { handoffFormat: input.handoffFormat } : {}),
     },
   });

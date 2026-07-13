@@ -17,6 +17,7 @@ import { buildMiniSummary } from "../../receipt/mini.js";
 import { DEFAULT_FORMAT, parseFormat, renderSegments, SEGMENT_NAMES } from "../statuslineSegments.js";
 import { loadStatuslineFormatConfig } from "../statuslineConfig.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import { setExitClass } from "../exitClass.js";
 import type { InputModeValue, ResultValue } from "../../telemetry/schemas.js";
 
 export interface StatuslineTelemetryInfo {
@@ -235,14 +236,18 @@ export async function runStatusline(
   return 0;
 }
 
-function run(ctx: CommandContext): Promise<number> {
-  return runStatusline(
+async function run(ctx: CommandContext): Promise<number> {
+  const code = await runStatusline(
     ctx.stdin,
     loadFromDisk,
     (s) => ctx.stdout.write(s),
     (info) => ctx.telemetry.recordIntegrationSurfaceRendered({ integration: "statusline", ...info }),
     { format: ctx.options.format, cwd: ctx.options.cwd, writeError: (s) => ctx.stderr.write(s) },
   );
+  if (code !== 0) {
+    setExitClass(ctx, "invalid-arguments");
+  }
+  return code;
 }
 
 export const command: CommandDef = {

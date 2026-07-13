@@ -4,6 +4,7 @@
 import { runPrDetailed } from "../../pr/index.js";
 import type { CommandContext, CommandDef } from "../types.js";
 import { receiptTelemetryFromModels } from "../common/telemetry.js";
+import { setExitClass } from "../exitClass.js";
 
 async function run(ctx: CommandContext): Promise<number> {
   const result = await runPrDetailed({
@@ -50,6 +51,16 @@ async function run(ctx: CommandContext): Promise<number> {
     await ctx.telemetry.noteMilestone("first_artifact", "pr");
     ctx.telemetry.recordExportGenerated({ surface: "pr", format: "html", wroteFile: true, result: "success" });
     await ctx.telemetry.noteMilestone("first_export", "pr");
+  }
+  if (result.code !== 0) {
+    setExitClass(
+      ctx,
+      result.result === "invalid_args"
+        ? "invalid-arguments"
+        : result.result === "no_data"
+          ? "no-session-match"
+          : "other-controlled",
+    );
   }
   return result.code;
 }

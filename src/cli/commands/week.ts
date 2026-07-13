@@ -3,6 +3,7 @@
 import { buildWeekDigest } from "../../aggregate/week.js";
 import { renderWeek, weekToJson } from "../../receipt/week.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import { setExitClass } from "../exitClass.js";
 
 async function run(ctx: CommandContext): Promise<number> {
   const { options } = ctx;
@@ -11,6 +12,7 @@ async function run(ctx: CommandContext): Promise<number> {
     const parsed = Date.parse(options.since);
     if (Number.isNaN(parsed)) {
       ctx.stderr.write(`invalid --since date: "${options.since}"\n`);
+      setExitClass(ctx, "invalid-arguments");
       return 1;
     }
     sinceMs = parsed;

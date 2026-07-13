@@ -16,21 +16,25 @@
 
 Every field below is validated against a `.strict()` zod schema before it is queued. Extra keys are rejected, so a bug elsewhere cannot smuggle a new field into a payload.
 
-### `cli_run` — one per invocation of a catalogued command
+### `cli_run` — one per controlled return from a catalogued command
 
-Commands outside the fixed catalog below (currently `setup` and `integrations`)
-emit no `cli_run` at all — the strict schema drops unknown command names rather
-than widening itself.
+The fixed catalog covers every ordinary user-facing command listed below,
+including `setup` and `integrations`. Unrecognized or hidden internal command
+names never widen the schema: they are dropped rather than sent as raw text.
+Thrown paths emit `cli_error` only. `telemetry-show` and the hidden `hook
+pre-push` surface record nothing; scoped statusline polling records bounded
+events in-process but skips the network flush, so those events are not sent.
 
 | Field | Type | Values | Notes |
 |---|---|---|---|
 | `cliVersion` | string | semver | From this package's `package.json`. |
 | `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | Collapsed from `process.platform`. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
-| `commandClass` | enum | `backfill` \| `benchmark` \| `check-budget` \| `compare` \| `demo` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
+| `commandClass` | enum | `backfill` \| `benchmark` \| `check-budget` \| `compare` \| `demo` \| `handoff` \| `help` \| `install-hook` \| `integrations` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `setup` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket; never raw milliseconds. |
 | `ok` | boolean | | Whether the command returned exit code 0. |
+| `exitClass` | enum (optional) | `no-session-match` \| `invalid-arguments` \| `budget-exceeded` \| `not-comparable` \| `other-controlled` | Present only when `ok` is false for a controlled return: respectively, no matching session/query; rejected flags or options; `check-budget` over its cap; `compare` lacking two comparable sessions; or another deliberate non-zero outcome. Thrown errors omit this field and emit `cli_error` instead. Never free text. |
 | `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. Telemetry is enabled by default in CI, so this field distinguishes CI runs from human runs in the data. |
 | `installHash` | string | 64-hex sha256 or `unavailable` | Salted hash of the random local install id; raw id never leaves disk. |
 | `runOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime run ordinal bucket; never the raw count. |

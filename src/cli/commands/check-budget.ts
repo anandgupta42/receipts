@@ -2,6 +2,7 @@
 // (advisory). priority 160 (above quota and every subcommand), matches the flag.
 import { evaluateBudget } from "../../budget/index.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import { setExitClass } from "../exitClass.js";
 
 async function run(ctx: CommandContext): Promise<number> {
   const budget = await evaluateBudget(ctx.now());
@@ -15,7 +16,11 @@ async function run(ctx: CommandContext): Promise<number> {
   for (const line of budget.lines) {
     ctx.stdout.write(`${line}\n`);
   }
-  return budget.exceeded ? 1 : 0;
+  if (budget.exceeded) {
+    setExitClass(ctx, "budget-exceeded");
+    return 1;
+  }
+  return 0;
 }
 
 export const command: CommandDef = {

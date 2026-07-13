@@ -15,6 +15,7 @@ import { resolveSelector, resolveTemplate } from "../common/session.js";
 import { svgOutOf, writeSvg, writePng } from "../common/output.js";
 import { receiptTelemetryFromModels, templateTelemetryValue } from "../common/telemetry.js";
 import type { ExportFormatValue } from "../../telemetry/schemas.js";
+import { setExitClass } from "../exitClass.js";
 
 const CSV_MODE_HINT = "use --csv=session or --csv=tool";
 
@@ -40,12 +41,14 @@ async function run(ctx: CommandContext): Promise<number> {
   const resolvedTemplate = resolveTemplate(options.template);
   if ("error" in resolvedTemplate) {
     ctx.stderr.write(`${resolvedTemplate.error}\n`);
+    setExitClass(ctx, "invalid-arguments");
     return 1;
   }
   const template = resolvedTemplate.template;
   // SPEC-0054 R6 — the DETAILS section is designed for classic's layout only.
   if (options.details && template !== "classic") {
     ctx.stderr.write("--details supports the classic template only\n");
+    setExitClass(ctx, "invalid-arguments");
     return 1;
   }
   const resolved = await resolveSelector(options.positional[0]);
@@ -55,6 +58,7 @@ async function run(ctx: CommandContext): Promise<number> {
       return 0;
     }
     ctx.stderr.write(`${resolved.error}\n`);
+    setExitClass(ctx, "no-session-match");
     return 1;
   }
   // SPEC-0045 R3 — the no-selector default already loaded a readable session
@@ -62,6 +66,7 @@ async function run(ctx: CommandContext): Promise<number> {
   const session = resolved.session ?? (await loadSession(resolved.summary));
   if (!session) {
     ctx.stderr.write(`failed to load session "${resolved.summary.id}"\n`);
+    setExitClass(ctx, "other-controlled");
     return 1;
   }
   // SPEC-0061 — fold the session's subagents into the model before any format renders.
@@ -106,6 +111,7 @@ async function run(ctx: CommandContext): Promise<number> {
     const exporter = getExporter(`csv-${options.csvMode}`);
     if (!exporter) {
       ctx.stderr.write(`unknown --csv mode "${options.csvMode}" (${CSV_MODE_HINT})\n`);
+      setExitClass(ctx, "invalid-arguments");
       return 1;
     }
     // CSV is a data contract — budget advisory lines never ride along (SPEC-0009 x SPEC-0011).

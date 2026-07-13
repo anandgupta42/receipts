@@ -1,6 +1,7 @@
 import { INTEGRATION_RECIPES, INTEGRATION_TARGETS, integrationRecipe } from "../../setup/integrations.js";
 import { integrationsToJson, renderIntegrationMatrix, renderIntegrationRecipe } from "../../setup/render.js";
 import type { CommandContext, CommandDef } from "../types.js";
+import { setExitClass } from "../exitClass.js";
 
 async function run(ctx: CommandContext): Promise<number> {
   const target = ctx.options.positional[1];
@@ -8,6 +9,7 @@ async function run(ctx: CommandContext): Promise<number> {
     const recipe = integrationRecipe(target);
     if (!recipe) {
       ctx.stderr.write(`unknown integration target "${target}" (supported: ${INTEGRATION_TARGETS.join(", ")})\n`);
+      setExitClass(ctx, "invalid-arguments");
       return 1;
     }
     if (ctx.options.json) {

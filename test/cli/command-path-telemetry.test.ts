@@ -34,6 +34,8 @@ vi.mock("node:os", async (importOriginal) => {
 });
 
 import * as telemetry from "../../src/telemetry/index.js";
+import * as budget from "../../src/budget/index.js";
+import * as preview from "../../src/receipt/preview.js";
 import { peekQueuedEvents, __resetQueueForTests } from "../../src/telemetry/sender.js";
 import { validateEvent, RECEIPT_SURFACE_VALUES, COUNT_BUCKET_VALUES, ORDINAL_BUCKET_VALUES, type TelemetryEvent } from "../../src/telemetry/schemas.js";
 import { main } from "../../src/cli/index.js";
@@ -128,6 +130,82 @@ describe("SPEC-0043 command-path telemetry", () => {
     expect((runs[0].properties as Record<string, unknown>).commandClass).toBe("receipt");
   });
 
+  it("a setup run emits cli_run with its own commandClass", async () => {
+    expect(await main(["setup", "--json"])).toBe(0);
+
+    const runs = peekQueuedEvents().filter((event) => event.name === "cli_run");
+    expect(runs).toHaveLength(1);
+    expect(runs[0]?.properties).toEqual(expect.objectContaining({ commandClass: "setup", ok: true }));
+  });
+
+  it("classifies a selector miss as no-session-match", async () => {
+    expect(await main(["definitely-not-a-session"])).toBe(1);
+
+    const run = peekQueuedEvents().find((event) => event.name === "cli_run");
+    expect(run?.properties).toEqual(
+      expect.objectContaining({ commandClass: "receipt", ok: false, exitClass: "no-session-match" }),
+    );
+  });
+
+  it("classifies a rejected option value as invalid-arguments", async () => {
+    expect(await main(["--template", "fancy"])).toBe(1);
+
+    const run = peekQueuedEvents().find((event) => event.name === "cli_run");
+    expect(run?.properties).toEqual(
+      expect.objectContaining({ commandClass: "receipt", ok: false, exitClass: "invalid-arguments" }),
+    );
+  });
+
+  it("classifies check-budget's designed exit 1 as budget-exceeded", async () => {
+    vi.spyOn(budget, "evaluateBudget").mockResolvedValue({
+      status: "ok",
+      lines: ["budget exceeded"],
+      exceeded: true,
+    });
+
+    expect(await main(["--check-budget"])).toBe(1);
+
+    const run = peekQueuedEvents().find((event) => event.name === "cli_run");
+    expect(run?.properties).toEqual(
+      expect.objectContaining({ commandClass: "check-budget", ok: false, exitClass: "budget-exceeded" }),
+    );
+  });
+
+  it("classifies compare without two sessions as not-comparable", async () => {
+    expect(await main(["compare"])).toBe(1);
+
+    const run = peekQueuedEvents().find((event) => event.name === "cli_run");
+    expect(run?.properties).toEqual(
+      expect.objectContaining({ commandClass: "compare", ok: false, exitClass: "not-comparable" }),
+    );
+  });
+
+  it("classifies an otherwise deliberate non-zero return as other-controlled", async () => {
+    const unsafeDir = join(home, "unsafe-backfill-output");
+    mkdirSync(unsafeDir, { recursive: true });
+    writeFileSync(join(unsafeDir, "keep.txt"), "user data");
+
+    expect(await main(["backfill", "--out", unsafeDir])).toBe(1);
+
+    const run = peekQueuedEvents().find((event) => event.name === "cli_run");
+    expect(run?.properties).toEqual(
+      expect.objectContaining({ commandClass: "backfill", ok: false, exitClass: "other-controlled" }),
+    );
+  });
+
+  it("a thrown error emits cli_error only and never carries exitClass", async () => {
+    vi.spyOn(preview, "previewModel").mockImplementation(() => {
+      throw new Error("boom");
+    });
+
+    expect(await main(["templates"])).toBe(1);
+
+    const events = peekQueuedEvents();
+    expect(events.filter((event) => event.name === "cli_error")).toHaveLength(1);
+    expect(events.filter((event) => event.name === "cli_run")).toHaveLength(0);
+    expect(JSON.stringify(events)).not.toContain("exitClass");
+  });
+
   it("SPEC-0075 R6: scoped statusline advances the local counter but skips the network flush", async () => {
     const transcriptPath = join(fixturesDir, "claude-code", "clean-multi-tool-2-models.jsonl");
     const before = await telemetry.readState(home);
@@ -142,6 +220,16 @@ describe("SPEC-0043 command-path telemetry", () => {
     const integration = peekQueuedEvents().find((event) => event.name === "integration_surface_rendered");
     expect(integration?.properties).toEqual(
       expect.objectContaining({ customFormat: false, scoped: true, configFile: false }),
+    );
+  });
+
+  it("invalid scoped statusline arguments are classified in-process but remain unflushed", async () => {
+    expect(await main(["statusline", "--cwd", ""])).toBe(1);
+
+    expect(telemetry.flushTelemetry).not.toHaveBeenCalled();
+    const run = peekQueuedEvents().find((event) => event.name === "cli_run");
+    expect(run?.properties).toEqual(
+      expect.objectContaining({ commandClass: "statusline", ok: false, exitClass: "invalid-arguments" }),
     );
   });
 
