@@ -10,8 +10,8 @@ pre-edit: no named edit tool observed
 
 (thinking/reply)..............≥ $0.0101  (3 turns)
 
-≈ re-priced eligible trivial spans.......≈ $0.0020
-  (3 tiny turns, priced at claude-haiku-4-5)
+≈ re-priced short tool-free turns........≈ $0.0020
+  (3 tool-free turns; ≤120 output tok each)
 --------------------------------------------------
 TOTAL....................................≥ $0.0101
 standard API-equivalent floor; not an invoice

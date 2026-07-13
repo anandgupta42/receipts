@@ -58,7 +58,7 @@ describe("R6 integration doc", () => {
   it("documents one assistant-agnostic instruction snippet", () => {
     expect(doc).toContain("Use the same instruction for every coding assistant");
     expect(doc).toContain(
-      "Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in the handoff.",
+      "Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in your final task summary.",
     );
     expect(doc).toContain("Codex, Claude Code, OpenCode, Cursor");
   });

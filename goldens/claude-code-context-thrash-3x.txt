@@ -10,8 +10,8 @@ pre-edit: no named edit tool observed
 
 (thinking/reply)..............≥ $0.9049  (8 turns)
 
-≈ context thrash: 3 compactions (4t).......≥ $0.39
-  context refilled ≥80% of peak within 5 turns
+≈ context refill: 3 compactions (4t).......≥ $0.39
+  prompt load ≥80% of prior peak within 5 turns
 --------------------------------------------------
 TOTAL....................................≥ $0.9049
 standard API-equivalent floor; not an invoice

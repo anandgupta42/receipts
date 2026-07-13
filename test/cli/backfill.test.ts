@@ -93,6 +93,7 @@ function fakeContext(argv: string[], opts: { realFs?: boolean } = {}) {
       recordPrFlowCompleted: () => {},
       recordHookConfigured: () => {},
       recordIntegrationSurfaceRendered: () => {},
+      recordReviewPatternEvaluated: () => {},
       noteMilestone: async (m) => {
         milestones.push(m);
       },

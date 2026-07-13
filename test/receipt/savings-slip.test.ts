@@ -25,6 +25,7 @@ import type {
 import type { TokenUsage } from "../../src/parse/types.js";
 import { emptyCostShape } from "../../src/pricing/costShape.js";
 import { HEURISTIC_PATTERN_PRICING_INTERPRETATION } from "../../src/receipt/costEstimate.js";
+import { REVIEW_REGISTRY } from "../../src/receipt/reviewRegistry.js";
 
 function usage(total: number): TokenUsage {
   return { input: total, output: 0, cacheRead: 0, cacheCreation: 0, total };
@@ -117,7 +118,7 @@ describe("SPEC-0059 R2 — headline + hedge arithmetic", () => {
     expect(lines[1]).toBe("  heuristic pattern subtotal · not proven savings");
     // The token-only line still renders as evidence (dottedLine ellipsizes the
     // long label at width 50, exactly as the receipt's own waste row does).
-    expect(lines.join("\n")).toContain("≈ context thrash: 2 compactions");
+    expect(lines.join("\n")).toContain("≈ context refill: 2 compactions");
   });
 
   it("couldHaveSavedOf: token subtotal is also overlap-safe and pct is always null", () => {
@@ -134,9 +135,9 @@ describe("SPEC-0059 R2 — headline + hedge arithmetic", () => {
 describe("SPEC-0059 R3 — evidence groups, ordering, rules", () => {
   it("orders groups by dollar subtotal descending; token-only groups last", () => {
     const out = savingsSlipLines([loop(0.1), trivial(0.3), thrash(null)], null).join("\n");
-    const trivialAt = out.indexOf("re-priced eligible trivial spans");
+    const trivialAt = out.indexOf("re-priced short tool-free turns");
     const loopAt = out.indexOf("Bash loop ×4");
-    const thrashAt = out.indexOf("context thrash");
+    const thrashAt = out.indexOf("context refill");
     expect(trivialAt).toBeGreaterThanOrEqual(0);
     expect(trivialAt).toBeLessThan(loopAt);
     expect(loopAt).toBeLessThan(thrashAt);
@@ -144,7 +145,7 @@ describe("SPEC-0059 R3 — evidence groups, ordering, rules", () => {
 
   it("a class's rule line renders once even when several of its lines fired", () => {
     const out = savingsSlipLines([loop(0.3), loop(0.1)], null).join("\n");
-    expect(out.match(/→ change or stop after two identical failures/g)).toHaveLength(1);
+    expect(out.match(/→ After two identical attempts/g)).toHaveLength(1);
     // Rows within the group are cost-descending.
     expect(out.indexOf("$0.30")).toBeLessThan(out.indexOf("$0.10"));
   });
@@ -159,18 +160,25 @@ describe("SPEC-0059 R3 — evidence groups, ordering, rules", () => {
     expect(Object.keys(rules)).toEqual(["stuck-loop", "trivial-spans", "context-thrash"]);
   });
 
-  it("every rule string is ≤ 48 chars and passes the banned-phrase guard (I3/I6)", () => {
+  it("uses canonical registry advice, wraps it, and passes the banned-phrase guard (I3/I6)", () => {
     // Model names and capability judgments are banned. "cheaper model" itself is
     // NOT banned here: SPEC-0000's routable-spend contract speaks in exactly
     // those terms for spans where capability barely matters — the rule routes
     // work, it never claims a model would have completed the task.
     const banned = ["would have", "should have used", "claude", "gpt", "gemini", "codex", "opus", "sonnet", "haiku", "better", "worse"];
-    for (const line of Object.values(SLIP_RULE_LINES)) {
-      expect([...line].length).toBeLessThanOrEqual(48);
-      const lower = line.toLowerCase();
+    expect(SLIP_RULE_LINES).toEqual({
+      "stuck-loop": REVIEW_REGISTRY.patterns["repeated-identical-attempt"].recommendation,
+      "trivial-spans": REVIEW_REGISTRY.patterns["short-tool-free-turn-cost"].recommendation,
+      "context-thrash": REVIEW_REGISTRY.patterns["context-refill-cluster"].recommendation,
+    });
+    for (const recommendation of Object.values(SLIP_RULE_LINES)) {
+      const lower = recommendation.toLowerCase();
       for (const phrase of banned) {
         expect(lower).not.toContain(phrase);
       }
+    }
+    for (const line of savingsSlipLines([loop(0.3), trivial(0.1), thrash(0.2)], null)) {
+      expect([...line].length).toBeLessThanOrEqual(50);
     }
   });
 });
@@ -274,7 +282,7 @@ describe("SPEC-0059 R6 — artifact parity", () => {
     });
     expect(html).toContain("<h2>handoff — flagged pattern cost ≈ $0.41</h2>");
     expect(html).toContain("FLAGGED PATTERN COST");
-    expect(html).toContain("→ change or stop after two identical failures");
+    expect(html).toContain("→ After two identical attempts, inspect the");
   });
 
   it("renders no handoff section when the slip is absent", () => {
@@ -296,8 +304,8 @@ describe("SPEC-0059 R7 — JSON surface", () => {
     expect(json.couldHaveSaved.tokens).toBe(1000);
     expect(json.couldHaveSaved.pctOfTotal).toBeNull();
     expect(json.wasteLines.map((w) => w.rule)).toEqual([
-      "change or stop after two identical failures",
-      "route short replies to a cheaper model",
+      REVIEW_REGISTRY.patterns["repeated-identical-attempt"].recommendation,
+      REVIEW_REGISTRY.patterns["short-tool-free-turn-cost"].recommendation,
     ]);
     expect(json.wasteLines.every((w) => w.costInterpretation === HEURISTIC_PATTERN_PRICING_INTERPRETATION)).toBe(true);
   });

@@ -307,7 +307,7 @@ footer{
         <li><a href="06-week.html">Aggregate the week</a></li>
         <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
-        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
         <li><a href="15-integrations.html">Choose an integration</a></li>
@@ -319,6 +319,7 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
@@ -334,19 +335,33 @@ footer{
     <article class="doc-content">
 <h1 id="diagnostics-and-adoption-telemetry">Diagnostics and adoption telemetry</h1>
 
-<p><code>aireceipts</code> can send small, content-free telemetry events to help us find bugs and understand which CLI features are actually used. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here disagrees with <code>src/telemetry/</code>, that is a bug.</p>
+<p><code>aireceipts</code> can send small, content-free telemetry events to help us find bugs and understand which CLI features are actually used. Schema-enumerated product metadata may include exact aggregate counts when a named product decision needs them; the schema must keep transcript evidence and identity structurally impossible. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here disagrees with <code>src/telemetry/</code>, that is a bug.</p>
 
 <h2 id="tldr">tl;dr</h2>
 
 <ul>
-  <li><strong>On by default</strong>, but every event is one of a fixed nine-event catalog: <code>cli_run</code>, <code>cli_error</code>, <code>parse_failure</code>, <code>receipt_generated</code>, <code>export_generated</code>, <code>pr_flow_completed</code>, <code>hook_configured</code>, <code>integration_surface_rendered</code>, <code>activation_milestone</code>.</li>
-  <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or session timestamps. (The App Insights wire format requires one client-stamped send time per envelope — the flush moment, nothing about your session's timeline; see &quot;What is never sent&quot;.)</li>
+  <li><strong>On by default</strong>, but every event is one of a fixed ten-event catalog: <code>cli_run</code>, <code>cli_error</code>, <code>parse_failure</code>, <code>receipt_generated</code>, <code>export_generated</code>, <code>pr_flow_completed</code>, <code>hook_configured</code>, <code>integration_surface_rendered</code>, <code>activation_milestone</code>, <code>review_pattern_evaluated</code>.</li>
+  <li><strong>Never sent</strong>: transcript content, prompts, messages, tool inputs/outputs, tool/shell command text, raw argv, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, or session timestamps. The review event sends only a fixed pattern key/version, source family, evaluation state, and exact aggregate count. (The App Insights wire format requires one client-stamped send time per envelope — the flush moment, nothing about your session's timeline; see &quot;What is never sent&quot;.)</li>
   <li><strong>Pseudonymous install identity</strong>: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete <code>~/.aireceipts/state.json</code> to reset it.</li>
   <li><strong>Disable anytime</strong>: <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code>. Either one results in <strong>zero network calls</strong> and prevents install-id creation on a fresh install.</li>
   <li><strong>On by default in CI too</strong>: <code>CI</code>/<code>GITHUB_ACTIONS</code> environments are treated the same as any other — telemetry is enabled by default there. Use a kill switch (<code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code>) to disable it in CI. (Before v0.7.0 it defaulted off in CI; reversed — see SPEC-0002.)</li>
   <li><strong>Inspect before you decide</strong>: <code>aireceipts --telemetry-show</code> prints exactly what the current run would send, and sends nothing.</li>
   <li><strong>Bounded and fail-safe</strong>: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code.</li>
 </ul>
+
+<h2 id="metadata-governance">Metadata governance</h2>
+
+<p>Product metadata is allowed in telemetry when all of these are true:</p>
+
+<ul>
+  <li>A spec names the product decision the field will support.</li>
+  <li>The field has a strict, documented schema; dimensions are fixed enums, versions, booleans, buckets, bounded hashes, or aggregate safe integers—never free text.</li>
+  <li>Exact counts are aggregate detector/product measurements, not content excerpts or identity proxies. General usage counters remain bucketed unless a spec explicitly approves an exact field.</li>
+  <li>Transcript evidence, prompts/messages, tool inputs/outputs, tool/shell command text, raw argv, paths, repositories, session identity, raw model strings, timestamps, and costs remain structurally impossible.</li>
+  <li>The first-run disclosure, exact-payload preview, kill switches, and leakage tests move with the schema change.</li>
+</ul>
+
+<p>This makes “metadata” a reviewed schema category, not a blanket permission to upload anything that is not called content.</p>
 
 <h2 id="event-catalog">Event catalog</h2>
 
@@ -362,14 +377,14 @@ footer{
     <tr><td><code>cliVersion</code></td><td>string</td><td>semver</td><td>From this package's <code>package.json</code>.</td></tr>
     <tr><td><code>os</code></td><td>enum</td><td><code>darwin</code> | <code>linux</code> | <code>win32</code> | <code>other</code></td><td>Collapsed from <code>process.platform</code>.</td></tr>
     <tr><td><code>nodeMajor</code></td><td>integer</td><td>e.g. <code>22</code></td><td>Major Node version only.</td></tr>
-    <tr><td><code>commandClass</code></td><td>enum</td><td><code>backfill</code> | <code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>demo</code> | <code>handoff</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>version</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
+    <tr><td><code>commandClass</code></td><td>enum</td><td><code>backfill</code> | <code>benchmark</code> | <code>check-budget</code> | <code>compare</code> | <code>demo</code> | <code>help</code> | <code>install-hook</code> | <code>list</code> | <code>methodology</code> | <code>mini</code> | <code>pr</code> | <code>quota</code> | <code>receipt</code> | <code>review</code> | <code>stats</code> | <code>statusline</code> | <code>telemetry-show</code> | <code>templates</code> | <code>uninstall-hook</code> | <code>version</code> | <code>week</code></td><td>Selected command name only; never raw argv or flag values.</td></tr>
     <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td>Which agent format was parsed, if known.</td></tr>
     <tr><td><code>durationBucket</code></td><td>enum</td><td><code>&lt;100ms</code> | <code>100-500ms</code> | <code>500ms-2s</code> | <code>2-10s</code> | <code>&gt;10s</code></td><td>Coarse bucket; never raw milliseconds.</td></tr>
     <tr><td><code>ok</code></td><td>boolean</td><td></td><td>Whether the command returned exit code 0.</td></tr>
     <tr><td><code>isCI</code></td><td>boolean</td><td></td><td>True when <code>CI</code> or <code>GITHUB_ACTIONS</code> is set and not false. Telemetry is enabled by default in CI, so this field distinguishes CI runs from human runs in the data.</td></tr>
     <tr><td><code>installHash</code></td><td>string</td><td>64-hex sha256 or <code>unavailable</code></td><td>Salted hash of the random local install id; raw id never leaves disk.</td></tr>
     <tr><td><code>runOrdinalBucket</code></td><td>enum</td><td><code>1</code> | <code>2-3</code> | <code>4-10</code> | <code>11-50</code> | <code>&gt;50</code> | <code>unavailable</code></td><td>Lifetime run ordinal bucket; never the raw count.</td></tr>
-    <tr><td><code>handoffFormat</code></td><td>enum (optional)</td><td><code>text</code> | <code>json</code></td><td>SPEC-0042: emission mode, present only on handoff-command runs — never content.</td></tr>
+    <tr><td><code>reviewFormat</code></td><td>enum (optional)</td><td><code>text</code> | <code>json</code></td><td>Session-review emission mode only. Aggregate shadow-rule measurements use the separate event below.</td></tr>
   </tbody>
 </table></div>
 
@@ -444,7 +459,6 @@ footer{
     <tr><td><code>commentResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
     <tr><td><code>artifactResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
     <tr><td><code>shareResult</code></td><td>enum</td><td><code>success</code> | <code>failed</code> | <code>skipped</code></td><td></td></tr>
-    <tr><td><code>handoffSectionIncluded</code></td><td>boolean</td><td></td><td>SPEC-0059: the rendered body carried the handoff section (rendering rate only — never engagement, never contents).</td></tr>
     <tr><td><code>result</code></td><td>enum</td><td><code>success</code> | <code>no_data</code> | <code>invalid_args</code> | <code>declined</code> | <code>external_missing</code> | <code>external_failed</code> | <code>write_failed</code> | <code>internal_error</code></td><td></td></tr>
   </tbody>
 </table></div>
@@ -488,6 +502,25 @@ footer{
   </tbody>
 </table></div>
 
+<h3 id="reviewpatternevaluated-one-per-shadow-rule-per-successful-session-review"><code>review_pattern_evaluated</code> — one per shadow rule per successful session review</h3>
+
+<p>Every successful <code>aireceipts review</code> evaluates the registry's shadow rules and queues one event for each of them, even when the result is zero or the trace lacks the required capability. Evaluated rows, including zero matches, are the denominator for a per-rule hit percentage; unavailable rows are reported separately as capability coverage. The percentage is calculated in the telemetry workspace and is not duplicated in the payload. Hidden compatibility invocations enter the same path. Failed invocations that never load and evaluate a session have no detector result to record; their <code>cli_run</code> still records the failed invocation.</p>
+
+<p>These are delivered, invocation-weighted measurements: rerunning review on the same session adds another row, while opt-outs and dropped sends add none. They do not measure unique-session prevalence and cannot replace the frozen-corpus accuracy audit required before a shadow rule becomes user-visible.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><code>registryVersion</code></td><td>integer</td><td>currently <code>1</code></td><td>Version of the code-owned review registry.</td></tr>
+    <tr><td><code>patternId</code></td><td>enum</td><td>registry key whose rollout state is <code>shadow</code></td><td>Fixed code-owned key, never transcript text.</td></tr>
+    <tr><td><code>ruleVersion</code></td><td>integer</td><td>currently <code>1</code></td><td>Must exactly match the selected registry entry.</td></tr>
+    <tr><td><code>rolloutState</code></td><td>literal</td><td><code>shadow</code></td><td>Visible/disabled rules cannot enter this event.</td></tr>
+    <tr><td><code>agentType</code></td><td>enum</td><td><code>claude-code</code> | <code>codex</code> | <code>cursor</code> | <code>gemini</code> | <code>opencode</code> | <code>unknown</code></td><td>Source family only.</td></tr>
+    <tr><td><code>evaluationStatus</code></td><td>enum</td><td><code>evaluated</code> | <code>unavailable</code></td><td><code>unavailable</code> means the trace lacked a required capability, not that the rule did not match.</td></tr>
+    <tr><td><code>findingCount</code></td><td>exact non-negative safe integer</td><td><code>0</code> or greater</td><td>Aggregate post-supersession matches for this rule in the selected session. Forced to <code>0</code> when unavailable. No evidence, turn indices, commands, paths, recommendations, costs, or session identity accompany it.</td></tr>
+  </tbody>
+</table></div>
+
 <h2 id="install-identifier">Install identifier</h2>
 
 <p>On the first telemetry-enabled run, aireceipts creates a random UUID in <code>~/.aireceipts/state.json</code>. It is never derived from hostname, username, MAC address, machine id, repo, path, or transcript data. The wire payload carries only:</p>
@@ -507,7 +540,7 @@ footer{
   <li>once-only activation milestone booleans</li>
 </ul>
 
-<p>These exact counts stay on your machine. The <code>aireceipts stats</code> command prints the local receipt/run counters and labels them &quot;on this machine.&quot; Telemetry payloads use only buckets.</p>
+<p>The <code>aireceipts stats</code> counters stay on your machine and are sent only as ordinal buckets. The <code>aireceipts stats</code> command prints them and labels them &quot;on this machine.&quot; Decision-scoped aggregate detector counts are the explicit exception: <code>review_pattern_evaluated.findingCount</code> is exact and disclosed above.</p>
 
 <h2 id="what-is-never-sent">What is never sent</h2>
 
@@ -516,6 +549,7 @@ footer{
 <ul>
   <li>Transcript content or any excerpt of it</li>
   <li>Prompts or user/assistant message text</li>
+  <li>Tool inputs/outputs, tool/shell command text, or raw argv</li>
   <li>File paths</li>
   <li>Repo names or URLs</li>
   <li>Hostnames</li>
@@ -523,7 +557,7 @@ footer{
   <li>Session IDs</li>
   <li>Dollar amounts or cost/pricing data</li>
   <li>Raw model strings</li>
-  <li>Raw counts</li>
+  <li>Arbitrary or unlisted session metrics (only explicitly documented aggregate counts are allowed)</li>
   <li>Raw timestamps</li>
 </ul>
 

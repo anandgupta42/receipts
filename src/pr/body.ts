@@ -9,6 +9,7 @@ import type { TokenUsage } from "../parse/types.js";
 import type { Block } from "../receipt/blocks.js";
 import type { ModelMixEntry, WasteLine } from "../receipt/model.js";
 import { couldHaveSavedOf, couldHaveSavedValue, prCoverageLine, savingsSlipLines } from "../receipt/handoff.js";
+import type { PrReviewView } from "../receipt/review.js";
 import { formatInt, formatSharePercent, formatUsdFloor, formatUsdFloorLedger, STANDARD_API_LOWER_BOUND_NOTE, usdFloorDecimals } from "../receipt/format.js";
 import { cacheServedText, compactDuration } from "../receipt/present.js";
 import { INSTALL_FOOTER_TEXT, PR_ATTRIBUTION_LINE, REPOSITORY_DISPLAY } from "../receipt/branding.js";
@@ -548,6 +549,8 @@ export interface PrBodyExtras {
   details?: DetailReceipt[];
   /** SPEC-0059 R5 — handoff slip facts; omitted under `--no-details` (index.ts gates it). */
   handoff?: HandoffSectionData;
+  /** SPEC-0083 — registry-backed prevention review. New PRs use this field. */
+  review?: PrReviewView;
   /** SPEC-0070 R2 — opt the `buy me a samosa` tip link back onto the comment; off by default. */
   samosa?: boolean;
 }
@@ -645,6 +648,11 @@ function handoffSection(slip: HandoffSlipView, budget: number): string | null {
   return [...section].length + 1 <= budget ? section : null;
 }
 
+function reviewSection(review: PrReviewView, budget: number): string | null {
+  const section = [`<details><summary>${review.summary}</summary>`, "", FENCE, review.text, FENCE, "", "</details>"].join("\n");
+  return [...section].length + 1 <= budget ? section : null;
+}
+
 /**
  * The complete comment body: marker line, fenced receipt blocks, the R5
  * details section, the SPEC-0059 handoff section (waste-carrying PRs only),
@@ -656,7 +664,7 @@ function handoffSection(slip: HandoffSlipView, budget: number): string | null {
 export function renderPrBodyDetailed(
   input: PrBodyInput,
   extras: PrBodyExtras = {},
-): { body: string; handoffSectionIncluded: boolean } {
+): { body: string; reviewSectionIncluded: boolean } {
   const linkLine = extras.artifactLink
     ? `full receipt: [${extras.artifactLink.fileName}](${extras.artifactLink.url})`
     : undefined;
@@ -665,7 +673,7 @@ export function renderPrBodyDetailed(
   // states what the FINAL body actually contains — a dropped section must
   // never leave a "section below" pointing at nothing.
   let section: string | null = null;
-  let handoff: string | null = null;
+  let review: string | null = null;
   if (extras.details !== undefined && extras.details.length > 0) {
     const budgetFence = renderPrReceiptText({ ...input, detailsBelow: true });
     const used =
@@ -676,10 +684,12 @@ export function renderPrBodyDetailed(
     section = detailsSection(extras.details, COMMENT_SIZE_CAP - used, extras.samosa === true);
     // SPEC-0059 R5 — a sibling of the full-receipts section, decided against
     // what that section actually consumed (+2: its trailing blank-line join).
-    if (section !== null && extras.handoff !== undefined) {
+    if (section !== null && extras.review !== undefined) {
+      review = reviewSection(extras.review, COMMENT_SIZE_CAP - used - [...section].length - 2);
+    } else if (section !== null && extras.handoff !== undefined) {
       const slip = buildHandoffSlip(extras.handoff, input);
       if (slip !== null) {
-        handoff = handoffSection(slip, COMMENT_SIZE_CAP - used - [...section].length - 2);
+        review = handoffSection(slip, COMMENT_SIZE_CAP - used - [...section].length - 2);
       }
     }
   }
@@ -690,15 +700,15 @@ export function renderPrBodyDetailed(
     // one, the link after </details> renders as raw text, not a link.
     lines.push(section, "");
   }
-  if (handoff !== null) {
-    lines.push(handoff, "");
+  if (review !== null) {
+    lines.push(review, "");
   }
   if (linkLine !== undefined) {
     lines.push(linkLine);
   }
   lines.push(PR_ATTRIBUTION_LINE);
   lines.push("");
-  return { body: lines.join("\n"), handoffSectionIncluded: handoff !== null };
+  return { body: lines.join("\n"), reviewSectionIncluded: review !== null };
 }
 
 export function renderPrBody(input: PrBodyInput, extras: PrBodyExtras = {}): string {

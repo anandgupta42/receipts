@@ -57,7 +57,7 @@ Exact paragraph, verbatim (link text and href verbatim):
   receipt end to end; forcing PR-first would fight the design. The README reordered a
   bullet list (SPEC-0048 R2); the landing page keeps its session-receipt narrative and
   gains the dogfood proof as the credibility line on the tile that already earns it.
-- **Crediting ccusage on the landing page.** The ccusage differentiation lives in the
+- **Crediting usage dashboards on the landing page.** The category differentiation lives in the
   README Related-work section and `docs/faq.md` (SPEC-0048 R3/R4) — where a
   comparison-shopping reader actually lands. The landing page is a 30-second conversion
   surface (SPEC-0021 Purpose); competitor copy there dilutes it. Recorded as a
@@ -97,7 +97,7 @@ withdrawn rather than growing the page's style surface for one sentence.
 "every PR", "runs on it" → zero hits on the current page). The change is text + one
 anchor inside an existing `.scn` tile, reusing an existing class, so the CSS guard
 (`scripts/check-landing-css.mjs`, font-size + grid only) and R5's no-external-requests
-property are structurally unaffected. The ccusage and hero-reorder decisions are
+property are structurally unaffected. The usage-dashboard and hero-reorder decisions are
 recorded as deliberate non-goals with reasons.
 
 **2026-07-05 · design adaptation (lead):** the original draft placed the proof as a

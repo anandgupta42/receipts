@@ -10,7 +10,9 @@
 // `--session <id>` still resolves exactly one session (R5).
 import * as path from "node:path";
 import type { Session, SessionSummary } from "../parse/types.js";
+import { mapWithConcurrency } from "../parse/util.js";
 import { buildReceiptModel, sliceSessionForReceipt } from "../receipt/model.js";
+import { buildPrReview, buildReviewReport, type PrReviewView } from "../receipt/review.js";
 import { renderReceipt } from "../receipt/render.js";
 import { cacheServedPct, compactDuration } from "../receipt/present.js";
 import { formatDuration, formatShortTokens } from "../receipt/format.js";
@@ -26,12 +28,9 @@ import { rollupChildren, type RollupWindow, type SubagentRow } from "./rollup.js
 import { nestedCandidates } from "./nested.js";
 import { discoverChildFiles, isChildPath } from "../parse/children.js";
 import {
-  buildHandoffSlip,
   renderPrBodyDetailed,
   subagentDetailsTable,
   type ContributorView,
-  type HandoffSectionData,
-  type HandoffSlipView,
   type PrBodyExtras,
   type PrBodyInput,
 } from "./body.js";
@@ -92,7 +91,7 @@ export interface PrRunResult {
   artifactResult: StepResultValue;
   shareResult: StepResultValue;
   /** SPEC-0059 R8 — the rendered body carried the handoff section (the kill criterion's observable denominator). */
-  handoffSectionIncluded: boolean;
+  reviewSectionIncluded: boolean;
   result: ResultValue;
 }
 
@@ -121,7 +120,7 @@ function prResult(input: Partial<PrRunResult> & { code: number; result: ResultVa
     contributorCount: 0,
     commentResult: "skipped",
     artifactResult: "skipped",
-    handoffSectionIncluded: false,
+    reviewSectionIncluded: false,
     shareResult: "skipped",
     ...input,
   };
@@ -387,7 +386,7 @@ function publishAndLink(
   bodyInput: PrBodyInput,
   sessions: ArtifactSession[],
   deps: PrDeps,
-  extras?: { notAttributable?: string[]; perCommitJson?: string; handoff?: HandoffSlipView; samosa?: boolean },
+  extras?: { notAttributable?: string[]; perCommitJson?: string; review?: PrReviewView; samosa?: boolean },
 ): { fileName: string; url: string; ownerRepo: string } | null {
   const pr = resolvePr(deps.runGh);
   if (!pr.ok) {
@@ -605,14 +604,13 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     turnCount: entries.reduce((sum, e) => sum + countedTurns(e.raw), 0),
     toolCallCount: entries.reduce((sum, e) => sum + countedToolCalls(e.raw), 0),
   };
-  // SPEC-0059 R5 — the handoff slip's raw facts, from the same sliced models
-  // the details section prints. Built here so the artifact (R6) and the
-  // comment section share one aggregation.
-  const handoffData: HandoffSectionData = {
-    wasteLines: fenceOrdered.flatMap((e) => e.model.wasteLines),
-    sessionCount: entries.length,
-    turnCount: receipt.turnCount,
-  };
+  const reviewSessions = fenceOrdered.map((entry) =>
+    entry.raw.slice.kind === "slice"
+      ? sliceSessionForReceipt(entry.raw.session, entry.raw.slice)
+      : entry.raw.session,
+  );
+  const reviewReports = await mapWithConcurrency(reviewSessions, 4, (session) => buildReviewReport(session));
+  const review = buildPrReview(reviewReports);
 
   // SPEC-0027 R3: push the artifact BEFORE rendering the one final body, so
   // the printed and posted bodies are identical and the link only renders
@@ -646,9 +644,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     link = publishAndLink(bodyInput, sessions, deps, {
       notAttributable: notAttributable.length === fenceOrdered.length ? notAttributable : notAttributable.length > 0 ? notAttributable : undefined,
       perCommitJson: islandData.length > 0 ? JSON.stringify(islandData) : undefined,
-      // SPEC-0059 R6 — same slip, same builder; the artifact always carries its
-      // full receipts, so its handoff section ignores --no-details too.
-      handoff: buildHandoffSlip(handoffData, bodyInput) ?? undefined,
+      review: review ?? undefined,
       // SPEC-0070 R3 — opt-in footer tip link, off by default.
       samosa: opts.samosa === true,
     });
@@ -667,9 +663,6 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
         // SPEC-0060 R3 — the per-child breakdown the fence no longer draws.
         subagents: e.view.subagents.length > 0 ? subagentDetailsTable(e.view.subagents) : undefined,
       }));
-  // SPEC-0059 R5 — the comment's handoff section is a sibling of the details
-  // section and shares its --no-details gate; R8's boolean is the assembler's
-  // own decision, not a scan of the body.
   const extras: PrBodyExtras = {
     // Project to the declared `{ fileName, url }` — `link` also carries a runtime
     // `ownerRepo` (used for the share-hint check below, not by the renderer). Storing it
@@ -677,7 +670,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     // SPEC-0066's strict CI validator rejects (Codex review).
     artifactLink: link ? { fileName: link.fileName, url: link.url } : undefined,
     details,
-    handoff: opts.details === false ? undefined : handoffData,
+    review: opts.details === false ? undefined : review ?? undefined,
     // SPEC-0070 R2/R4 — opt-in comment tip link. OMITTED (undefined, like
     // artifactLink/handoff above) when off, never `false`: a default store=ref
     // payload then carries no new key, stays byte-identical to a pre-feature ref,
@@ -685,7 +678,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     // `--samosa` ref grows the field, and it re-renders the link CI-side.
     samosa: opts.samosa === true ? true : undefined,
   };
-  const { body, handoffSectionIncluded } = renderPrBodyDetailed(bodyInput, extras);
+  const { body, reviewSectionIncluded } = renderPrBodyDetailed(bodyInput, extras);
 
   // SPEC-0065 R1 — `store=ref`: in addition to (never instead of) the comment
   // path below, which stays the unconditional default, write the exact
@@ -731,7 +724,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       contributorCount: entries.length,
       receipt,
       artifactResult,
-      handoffSectionIncluded,
+      reviewSectionIncluded,
       result: "success",
     });
   }
@@ -746,7 +739,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
       receipt,
       commentResult: "failed",
       artifactResult,
-      handoffSectionIncluded,
+      reviewSectionIncluded,
       result: comment.missing ? "external_missing" : "external_failed",
     });
   }
@@ -789,7 +782,7 @@ export async function runPrDetailed(opts: PrOptions, deps: PrDeps = defaultPrDep
     commentResult: "success",
     artifactResult,
     shareResult,
-    handoffSectionIncluded,
+    reviewSectionIncluded,
     result: artifactFailed ? "external_failed" : "success",
   });
 }

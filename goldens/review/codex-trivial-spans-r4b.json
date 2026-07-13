@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "review": {
+    "registryVersion": 1,
+    "source": "codex",
+    "findings": {
+      "short-tool-free-turn-cost": {
+        "ruleVersion": 1,
+        "category": "cost-opportunity",
+        "title": "Short replies used a higher-priced option",
+        "whatHappened": "One or more replies used no tools, were 120 output tokens or fewer, and have a cheaper same-provider price calculation for the exact recorded tokens.",
+        "whyItMatters": "The same recorded token volume has a lower list-price arithmetic result, although task quality is unknown.",
+        "recommendation": "Keep short replies minimal. If your setup can route work by price tier, consider its lower-cost option for this narrow kind of reply.",
+        "evidenceStrength": "exact-structure-and-arithmetic",
+        "claimLimit": "A short answer can still require difficult reasoning; this never claims another model would complete the task.",
+        "evidence": {
+          "eventCount": 1,
+          "actionCount": 0,
+          "turnIndices": [
+            0,
+            1,
+            2
+          ],
+          "totalTurnCount": 3,
+          "tools": [],
+          "totalToolCount": 0,
+          "facts": [
+            {
+              "name": "qualifying-turns",
+              "value": 3
+            }
+          ]
+        },
+        "impact": {
+          "role": "same-token-reprice",
+          "tokens": {
+            "input": 360,
+            "output": 128,
+            "cacheRead": 420,
+            "cacheCreation": 0,
+            "cacheCreation5m": null,
+            "cacheCreation1h": null,
+            "total": 908
+          },
+          "observedUsd": 0.0024955,
+          "repricedUsd": 0.0008775
+        }
+      }
+    },
+    "coverage": {
+      "evaluated": {
+        "count": 5,
+        "patternIds": [
+          "repeated-identical-attempt",
+          "repeated-identical-error",
+          "consecutive-tool-errors",
+          "context-refill-cluster",
+          "short-tool-free-turn-cost"
+        ]
+      },
+      "unavailable": {
+        "count": 1,
+        "patternIds": [
+          "same-file-reread-without-recorded-change"
+        ]
+      }
+    }
+  }
+}

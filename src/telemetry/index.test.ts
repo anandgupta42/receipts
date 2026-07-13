@@ -13,6 +13,7 @@ import {
   recordIntegrationSurfaceRendered,
   recordParseFailure,
   recordPrFlowCompleted,
+  recordReviewPatternEvaluated,
   showTelemetryPayload,
   type RecordCliErrorInput,
   type RecordCliRunInput,
@@ -70,19 +71,47 @@ describe("recordCliRun builds a valid cli_run event from raw runtime inputs", ()
   });
 });
 
-describe("SPEC-0042 R5 — handoffFormat pass-through", () => {
-  it("records the enum for handoff runs and validates against the strict schema", () => {
-    recordCliRun({ command: "handoff", agentType: undefined, durationMs: 10, ok: true, handoffFormat: "json", ...RUN_BASE });
+describe("SPEC-0083 R13 — reviewFormat pass-through", () => {
+  it("records the enum for review runs and validates against the strict schema", () => {
+    recordCliRun({ command: "review", agentType: undefined, durationMs: 10, ok: true, reviewFormat: "json", ...RUN_BASE });
     const [event] = peekQueuedEvents();
-    expect((event?.properties as Record<string, unknown>).commandClass).toBe("handoff");
-    expect((event?.properties as Record<string, unknown>).handoffFormat).toBe("json");
+    expect((event?.properties as Record<string, unknown>).commandClass).toBe("review");
+    expect((event?.properties as Record<string, unknown>).reviewFormat).toBe("json");
     expect(validateEvent(event as TelemetryEvent)).toBe(true);
   });
 
   it("omits the field entirely when not supplied (absent, not null)", () => {
     recordCliRun({ command: "receipt", agentType: undefined, durationMs: 10, ok: true, ...RUN_BASE });
     const [event] = peekQueuedEvents();
-    expect("handoffFormat" in (event?.properties as Record<string, unknown>)).toBe(false);
+    expect("reviewFormat" in (event?.properties as Record<string, unknown>)).toBe(false);
+    expect(validateEvent(event as TelemetryEvent)).toBe(true);
+  });
+});
+
+describe("SPEC-0083 R13 — registry-keyed aggregate review measurements", () => {
+  it("records the exact zero-inclusive count without evidence or identity", () => {
+    recordReviewPatternEvaluated({
+      registryVersion: 1,
+      patternId: "last-change-not-checked",
+      ruleVersion: 1,
+      rolloutState: "shadow",
+      agentType: "opencode",
+      evaluationStatus: "evaluated",
+      findingCount: 0,
+    });
+    const [event] = peekQueuedEvents();
+    expect(event).toEqual({
+      name: "review_pattern_evaluated",
+      properties: {
+        registryVersion: 1,
+        patternId: "last-change-not-checked",
+        ruleVersion: 1,
+        rolloutState: "shadow",
+        agentType: "opencode",
+        evaluationStatus: "evaluated",
+        findingCount: 0,
+      },
+    });
     expect(validateEvent(event as TelemetryEvent)).toBe(true);
   });
 });
@@ -159,7 +188,6 @@ describe("SPEC-0043 recorders", () => {
       commentResult: "skipped",
       artifactResult: "skipped",
       shareResult: "skipped",
-      handoffSectionIncluded: false,
       result: "success",
     });
     recordHookConfigured({ operation: "install", promptOutcome: "accepted", result: "success" });
@@ -171,6 +199,15 @@ describe("SPEC-0043 recorders", () => {
       customFormat: false,
       scoped: true,
       configFile: true,
+    });
+    recordReviewPatternEvaluated({
+      registryVersion: 1,
+      patternId: "last-check-still-failing",
+      ruleVersion: 1,
+      rolloutState: "shadow",
+      agentType: "codex",
+      evaluationStatus: "evaluated",
+      findingCount: 1,
     });
 
     const names = peekQueuedEvents().map((e) => e.name);

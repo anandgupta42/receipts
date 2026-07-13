@@ -15,26 +15,46 @@ import {
   vendorForTurn,
 } from "./resolve.js";
 
-/** Deterministically stringify `value` with object keys sorted, so structurally-identical tool inputs compare equal regardless of key order. */
-function stableStringify(value: unknown): string {
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((v) => stableStringify(v)).join(",")}]`;
-  }
-  const keys = Object.keys(value as Record<string, unknown>).sort();
-  const body = keys.map((k) => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(",");
-  return `{${body}}`;
-}
-
-/** `stableStringify` never throws for the caller — a non-serializable input (e.g. a circular reference) degrades to `String(input)` rather than crashing (I1). */
-function normalizedInput(input: unknown): string {
-  try {
-    return stableStringify(input);
-  } catch {
-    return String(input);
-  }
+/** Canonicalize recorded JSON without inventing an identity for missing or non-JSON input. */
+export function canonicalRecordedInput(input: unknown): string | null {
+  const ancestors = new Set<object>();
+  const visit = (value: unknown): string | null => {
+    if (value === null) {
+      return "null";
+    }
+    if (typeof value === "string" || typeof value === "boolean") {
+      return JSON.stringify(value);
+    }
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? JSON.stringify(value) : null;
+    }
+    if (typeof value !== "object") {
+      return null;
+    }
+    if (ancestors.has(value)) {
+      return null;
+    }
+    ancestors.add(value);
+    try {
+      if (Array.isArray(value)) {
+        const members = value.map(visit);
+        return members.some((member) => member === null) ? null : `[${members.join(",")}]`;
+      }
+      const record = value as Record<string, unknown>;
+      const members: string[] = [];
+      for (const key of Object.keys(record).sort()) {
+        const member = visit(record[key]);
+        if (member === null) {
+          return null;
+        }
+        members.push(`${JSON.stringify(key)}:${member}`);
+      }
+      return `{${members.join(",")}}`;
+    } finally {
+      ancestors.delete(value);
+    }
+  };
+  return input === undefined ? null : visit(input);
 }
 
 const STUCK_LOOP_MIN_RUN = 3;
@@ -53,7 +73,7 @@ export interface StuckLoopFinding {
 
 interface FlatCall {
   tool: string;
-  normalizedInput: string;
+  normalizedInput: string | null;
   /** SPEC-0068 — raw call input (for read `file_path` / shell `command` extraction). */
   input?: unknown;
   /** SPEC-0068 — a real shell execution (may mutate files). */
@@ -80,7 +100,7 @@ async function flattenCalls(session: Session, dataDir: string): Promise<FlatCall
     for (const call of turn.toolCalls) {
       out.push({
         tool: call.name,
-        normalizedInput: normalizedInput(call.input),
+        normalizedInput: canonicalRecordedInput(call.input),
         input: call.input,
         shell: call.shell,
         status: call.status,
@@ -109,21 +129,31 @@ export async function detectStuckLoops(session: Session, dataDir: string = defau
   let i = 0;
   while (i < calls.length) {
     let j = i + 1;
-    while (j < calls.length && calls[j].tool === calls[i].tool && calls[j].normalizedInput === calls[i].normalizedInput) {
+    while (
+      calls[i].tool.trim().length > 0 &&
+      calls[i].normalizedInput !== null &&
+      j < calls.length &&
+      calls[j].tool === calls[i].tool &&
+      calls[j].normalizedInput === calls[i].normalizedInput
+    ) {
       j++;
     }
     const runLength = j - i;
     if (runLength >= STUCK_LOOP_MIN_RUN) {
       const run = calls.slice(i, j);
-      const anyUnpriced = run.some((c) => c.usd === null);
-      const tokens = run.reduce((sum, c) => addUsage(sum, c.tokens), emptyUsage());
-      const first = run[0];
-      const last = run[run.length - 1];
-      const wallClockMs = first.startedAt !== undefined && last.endedAt !== undefined ? last.endedAt - first.startedAt : null;
+      const triggering = run.slice(STUCK_LOOP_MIN_RUN - 1);
+      const anyUnpriced = triggering.some((c) => c.usd === null);
+      const tokens = triggering.reduce((sum, c) => addUsage(sum, c.tokens), emptyUsage());
+      const first = triggering[0];
+      const last = triggering[triggering.length - 1];
+      const wallClockMs =
+        first.startedAt !== undefined && last.endedAt !== undefined
+          ? Math.max(0, last.endedAt - first.startedAt)
+          : null;
       findings.push({
         tool: run[0].tool,
         runLength,
-        usd: anyUnpriced ? null : run.reduce((sum, c) => sum + (c.usd as number), 0),
+        usd: anyUnpriced ? null : triggering.reduce((sum, c) => sum + (c.usd as number), 0),
         tokens,
         wallClockMs,
         turnIndices: [...new Set(run.map((c) => c.turnIndex))].sort((a, b) => a - b),
@@ -254,6 +284,11 @@ const TRIVIAL_SPAN_MAX_OUTPUT_TOKENS = 120;
 export interface TrivialSpansFinding {
   eligibleTurnCount: number;
   tokens: TokenUsage;
+  /** Directly priced observed cost of the qualifying units. */
+  observedUsd: number;
+  /** Same-token arithmetic using each unit's provider-local lower-priced row. */
+  repricedUsd: number;
+  /** @deprecated compatibility alias for `repricedUsd`. */
   usd: number;
   cheaperModel: string;
   /** SPEC-0017 R6 — the eligible tool-free turn indices, for cross-class overlap detection. */
@@ -271,19 +306,14 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
   if (session.unpriceable) {
     return null;
   }
-  const sourceVendor = vendorForSource(session.source);
-  if (!sourceVendor) {
-    return null;
-  }
-  const cheapest = await cheapestCurrentRow(sourceVendor, dataDir);
-  if (!cheapest) {
-    return null;
-  }
 
   let eligibleTurnCount = 0;
   let tokens = emptyUsage();
-  let usd = 0;
+  let observedUsd = 0;
+  let repricedUsd = 0;
   const turnIndices: number[] = [];
+  const cheaperModels = new Set<string>();
+  const cheapestByVendor = new Map<string, Awaited<ReturnType<typeof cheapestCurrentRow>>>();
 
   for (const turn of session.turns) {
     if (turn.toolCalls.length > 0) {
@@ -304,30 +334,53 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
       continue;
     }
     let identitiesEligible = true;
+    let turnObservedUsd = 0;
+    let turnRepricedUsd = 0;
+    const turnVendors = new Set<string>();
+    const turnCheaperModels = new Set<string>();
     for (const unit of units) {
       const model = unit.model;
       const dateISO = isoDateOf(unit.timestamp);
       const vendor = vendorForTurn(session.source, model, unit.pricingProvider);
-      if (!model || !dateISO || vendor !== sourceVendor) {
+      if (!model || !dateISO || !vendor) {
+        identitiesEligible = false;
+        break;
+      }
+      turnVendors.add(vendor);
+      if (turnVendors.size > 1) {
         identitiesEligible = false;
         break;
       }
       const row = await resolvePrice(vendor, model, dateISO, dataDir);
-      if (!row || !(cheapest.row.input < row.input)) {
+      let cheapest = cheapestByVendor.get(vendor);
+      if (cheapest === undefined) {
+        cheapest = await cheapestCurrentRow(vendor, dataDir);
+        cheapestByVendor.set(vendor, cheapest);
+      }
+      if (!row || !cheapest) {
         identitiesEligible = false;
         break;
       }
+      const observed = costOf(unit.usage, row);
+      const repriced = costOf(unit.usage, cheapest.row);
+      if (!(repriced < observed)) {
+        identitiesEligible = false;
+        break;
+      }
+      turnObservedUsd += observed;
+      turnRepricedUsd += repriced;
+      turnCheaperModels.add(cheapest.model);
     }
     if (!identitiesEligible) {
       continue;
     }
     eligibleTurnCount += 1;
     tokens = addUsage(tokens, turn.usage);
-    const repriced = costTurnAtRow(turn, cheapest.row);
-    if (repriced === null) {
-      return null;
+    observedUsd += turnObservedUsd;
+    repricedUsd += turnRepricedUsd;
+    for (const model of turnCheaperModels) {
+      cheaperModels.add(model);
     }
-    usd += repriced;
     turnIndices.push(turn.index);
   }
 
@@ -335,7 +388,15 @@ export async function detectTrivialSpans(session: Session, dataDir: string = def
     return null;
   }
 
-  return { eligibleTurnCount, tokens, usd, cheaperModel: cheapest.model, turnIndices };
+  return {
+    eligibleTurnCount,
+    tokens,
+    observedUsd,
+    repricedUsd,
+    usd: repricedUsd,
+    cheaperModel: [...cheaperModels].sort().join(" / "),
+    turnIndices,
+  };
 }
 
 // SPEC-0017 R3/R4 — provisional, evidence-bound constants (not user knobs). See
@@ -354,7 +415,7 @@ export interface ContextThrashFinding {
   turnSpan: number;
   /** The unioned, contributing (usage-bearing) post-compaction turn indices — the cost basis. */
   turnIndices: number[];
-  /** Prompt-only tokens re-spent rebuilding context (output stripped), summed over `turnIndices`. */
+  /** Prompt-only tokens in the measured post-compaction windows (output stripped), summed over `turnIndices`. */
   tokens: TokenUsage;
   /** `null` unless every contributing turn resolves a cited price row — no partial-dollar line (I2). */
   usd: number | null;
@@ -380,14 +441,13 @@ function promptOnlyUsage(usage: TokenUsage): TokenUsage {
 }
 
 /**
- * R3/R5 — context-thrash: compaction churn where prompt-side context refills near
- * its pre-compaction peak, i.e. the session is paying to *rebuild* context rather
- * than doing new work. A compaction is refill-positive when the pre-compaction
+ * R3/R5 — a context-refill cluster where prompt-side load returns near its
+ * pre-compaction peak. A compaction is refill-positive when the pre-compaction
  * prompt-side peak is positive and some turn in the next `K` reaches
  * `REFILL_RATIO` of it (R3 — proximity alone never fires). A thrash window is a
  * contiguous run of ≥ 2 refill-positive compactions whose successive `turnIndex`
  * gaps are all `≤ T`. Its cost is the union of the `K`-turn post-compaction slices
- * after each **non-first** compaction (the repeated rebuilds), each turn sliced to
+ * after each **non-first** compaction (the measured repeated windows), each turn sliced to
  * prompt-only tokens and priced by the existing cache-tier logic; `usd` is `null`
  * unless every contributing turn resolves a cited row (R5, no partial dollar).
  * Returns one finding per fired window (windows never share turns — a gap `> T`
@@ -442,8 +502,7 @@ export async function detectContextThrash(session: Session, dataDir: string = de
   const findings: ContextThrashFinding[] = [];
   for (const window of windows) {
     // R5 — union the K-turn slices after each NON-FIRST compaction, so overlapping
-    // slices never double-count; the first compaction's rebuild is expected, the
-    // repeats are the waste.
+    // slices never double-count. This is a measured window, not an avoidability claim.
     const unioned = new Set<number>();
     for (let k = 1; k < window.length; k++) {
       const start = window[k].turnIndex;

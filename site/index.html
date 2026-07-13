@@ -111,7 +111,7 @@
   .prshot{display:block;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;overflow:hidden;box-shadow:0 26px 54px -40px rgba(23,24,26,.35)}
   .prshot img{display:block;width:100%;height:auto}
 
-  /* handoff cards */
+  /* review cards */
   .hands{display:grid;grid-template-columns:1fr 1fr;gap:18px}
   @media (max-width:760px){ .hands{grid-template-columns:1fr} }
   .hand{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:16px 18px}
@@ -307,28 +307,29 @@ same tokens on claude-haiku-4-5..≥ $0.0392
   </div>
 </section>
 
-<!-- ============ HANDOFF ============ -->
-<section id="handoff">
+<!-- ============ REVIEW ============ -->
+<section id="review">
   <div class="wrap split rv">
     <div>
-      <p class="eyebrow"><span class="red">//</span> the handoff</p>
-      <h2 class="head">Tomorrow doesn&rsquo;t repeat today.</h2>
-      <p class="lede">Every receipt ends with flags a machine can act on. <code>--handoff</code>
-      turns them into a paste-ready block for your agent&rsquo;s memory file — a repeated Bash
-      loop can become a standing rule tonight without claiming proven savings.</p>
+      <p class="eyebrow"><span class="red">//</span> session review</p>
+      <h2 class="head">Find the problem. Prevent the repeat.</h2>
+      <p class="lede"><code>aireceipts review</code> checks a completed session for concrete
+      recorded problems, shows the evidence, and recommends one practical prevention step.
+      Every claim also says what the trace cannot prove.</p>
     </div>
     <div class="hands">
       <div class="hand">
-        <h4>TODAY</h4>
-        <pre><span class="red">⚠ Bash loop ×5 · ≈ $0.08</span>
-# paste into CLAUDE.md:
-- Bash loop ×5: change the input
-  before a 3rd retry.</pre>
+        <h4>WHAT HAPPENED</h4>
+        <pre><span class="red">Same failed action retried unchanged</span>
+Evidence: attempts 2
+Why it matters: no recorded
+change or passing check between.</pre>
       </div>
       <div class="hand">
-        <h4>TOMORROW</h4>
-        <pre>Bash loop ............. none
-flagged pattern ....... none</pre>
+        <h4>PREVENT IT NEXT TIME</h4>
+        <pre>Inspect the error, then change
+the input or approach before
+trying the same action again.</pre>
       </div>
     </div>
   </div>

@@ -1,4 +1,5 @@
 import type { AgentSource } from "../parse/types.js";
+import { REVIEW_REGISTRY, type ReviewPatternId } from "../receipt/reviewRegistry.js";
 import { resolveTelemetryConfig } from "./config.js";
 import {
   bucketCount,
@@ -62,8 +63,8 @@ export interface RecordCliRunInput extends RunStartTelemetry {
   agentType: AgentSource | undefined;
   durationMs: number;
   ok: boolean;
-  /** SPEC-0042 R5 — set only for the handoff command; enum, never content. */
-  handoffFormat?: "text" | "json";
+  /** SPEC-0083 R13 — set only for review; enum, never content. */
+  reviewFormat?: "text" | "json";
 }
 
 /** Records one `cli_run` event (R2). Unknown command names drop the event rather than leaking raw argv text. */
@@ -85,7 +86,7 @@ export function recordCliRun(input: RecordCliRunInput): void {
       isCI: input.isCI,
       installHash: input.installHash,
       runOrdinalBucket: input.runOrdinalBucket,
-      ...(input.handoffFormat !== undefined ? { handoffFormat: input.handoffFormat } : {}),
+      ...(input.reviewFormat !== undefined ? { reviewFormat: input.reviewFormat } : {}),
     },
   });
 }
@@ -197,8 +198,6 @@ export interface RecordPrFlowCompletedInput {
   commentResult: StepResultValue;
   artifactResult: StepResultValue;
   shareResult: StepResultValue;
-  /** SPEC-0059 R8. */
-  handoffSectionIncluded: boolean;
   result: ResultValue;
 }
 
@@ -213,7 +212,6 @@ export function recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void {
       commentResult: input.commentResult,
       artifactResult: input.artifactResult,
       shareResult: input.shareResult,
-      handoffSectionIncluded: input.handoffSectionIncluded,
       result: input.result,
     },
   });
@@ -244,6 +242,27 @@ export interface RecordIntegrationSurfaceRenderedInput {
 
 export function recordIntegrationSurfaceRendered(input: RecordIntegrationSurfaceRenderedInput): void {
   recordEvent({ name: "integration_surface_rendered", properties: input });
+}
+
+export interface RecordReviewPatternEvaluatedInput {
+  registryVersion: typeof REVIEW_REGISTRY.registryVersion;
+  patternId: ReviewPatternId;
+  ruleVersion: number;
+  rolloutState: "shadow";
+  agentType: AgentSource;
+  evaluationStatus: "evaluated" | "unavailable";
+  findingCount: number;
+}
+
+/** Records the exact aggregate count for one registry-owned shadow rule (SPEC-0083 R13). */
+export function recordReviewPatternEvaluated(input: RecordReviewPatternEvaluatedInput): void {
+  recordEvent({
+    name: "review_pattern_evaluated",
+    properties: {
+      ...input,
+      agentType: toAgentTypeTelemetry(input.agentType),
+    },
+  });
 }
 
 export interface RecordActivationMilestoneInput {

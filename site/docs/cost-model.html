@@ -307,7 +307,7 @@ footer{
         <li><a href="06-week.html">Aggregate the week</a></li>
         <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
-        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
         <li><a href="15-integrations.html">Choose an integration</a></li>
@@ -319,6 +319,7 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
@@ -436,7 +437,7 @@ footer{
 
 <h2 id="usage-domain-guard">Usage-domain guard</h2>
 
-<p>Before any price row is multiplied, token components must be finite, non-negative integers; <code>total</code> must equal the four priced components; and the reported 5m/1h cache-write subsets may not exceed total cache creation. Invalid usage stays unpriced instead of being clamped into invented tokens or producing a negative/NaN dollar. The same guard covers the direct <code>costOf</code> paths used by trivial-span and price-delta arithmetic. A trivial-span dollar additionally requires every request unit in the turn to have its own model, timestamp, and provider evidence, resolve to the source vendor, and resolve a cited row more expensive than the comparison row; one missing/routed unit suppresses the whole finding. Partial-price sessions suppress the whole-session price delta because their dollar basis excludes real turns.</p>
+<p>Before any price row is multiplied, token components must be finite, non-negative integers; <code>total</code> must equal the four priced components; and the reported 5m/1h cache-write subsets may not exceed total cache creation. Invalid usage stays unpriced instead of being clamped into invented tokens or producing a negative/NaN dollar. The same guard covers the direct <code>costOf</code> paths used by short-tool-free-turn and price-delta arithmetic. A short-turn comparison additionally requires every request unit in that turn to have its own model, timestamp, and provider evidence and a cited row above a lower-priced row for that same provider; one incomplete unit suppresses the whole turn. Different turns may resolve through different providers. Partial-price sessions suppress the whole-session price delta because their dollar basis excludes real turns.</p>
 
 <h2 id="the-validation-matrix-spec-0044-r3r5">The validation matrix (SPEC-0044 R3–R5)</h2>
 

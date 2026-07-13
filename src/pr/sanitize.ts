@@ -210,6 +210,13 @@ const handoffSectionDataSchema = z
   })
   .strict();
 
+const reviewViewSchema = z
+  .object({
+    summary: str(),
+    text: str(),
+  })
+  .strict();
+
 const artifactLinkSchema = z
   .object({
     fileName: str(),
@@ -222,6 +229,7 @@ const prBodyExtrasSchema = z
     artifactLink: artifactLinkSchema.optional(),
     details: boundedArray(detailReceiptSchema).optional(),
     handoff: handoffSectionDataSchema.optional(),
+    review: reviewViewSchema.optional(),
     // SPEC-0070 R4 — the opt-in tip-link flag round-trips through the ref payload;
     // omitted on older refs → deserializes as off (the new default).
     samosa: z.boolean().optional(),
@@ -409,6 +417,11 @@ export function sanitizePrReceiptPayload(payload: PrReceiptPayload): PrReceiptPa
         line.cheaperModel = sanitizeMarkdown(line.cheaperModel, SANITIZED_FIELD_CAP);
       }
     }
+  }
+
+  if (sanitized.extras.review) {
+    sanitized.extras.review.summary = sanitizeMarkdown(sanitized.extras.review.summary, SANITIZED_FIELD_CAP);
+    sanitized.extras.review.text = sanitizeFenced(sanitized.extras.review.text, SANITIZED_TEXT_CAP);
   }
 
   if (sanitized.extras.artifactLink) {

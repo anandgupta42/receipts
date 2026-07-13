@@ -15,6 +15,7 @@ import {
   STANDARD_API_LIST_PRICE_EQUIVALENT,
 } from "./costEstimate.js";
 import { SCHEMA_VERSION } from "./schemaVersion.js";
+import { REVIEW_PATTERNS, type ReviewPatternId } from "./reviewRegistry.js";
 
 // Re-exported so existing importers keep one canonical path; the constant itself
 // lives in the zod-free `schemaVersion.ts` (see the rationale there).
@@ -315,6 +316,123 @@ export const handoffJsonSchema = z
   })
   .strict();
 
+const reviewPatternIds = REVIEW_PATTERNS.map(({ id }) => id) as [ReviewPatternId, ...ReviewPatternId[]];
+const reviewPatternIdSchema = z.enum(reviewPatternIds);
+const reviewFactNameSchema = z.enum([
+  "attempts",
+  "compactions",
+  "consecutive-errors",
+  "failed-checks",
+  "qualifying-turns",
+  "repeated-reads",
+  "retries-after-first-error",
+  "source-writes",
+  "triggering-attempts",
+  "window-turns",
+]);
+
+const reviewEvidenceSchema = z
+  .object({
+    eventCount: z.number().int().nonnegative(),
+    actionCount: z.number().int().nonnegative(),
+    turnIndices: z.array(z.number().int().nonnegative()).max(20),
+    totalTurnCount: z.number().int().nonnegative(),
+    tools: z.array(z.string().max(64)).max(8),
+    totalToolCount: z.number().int().nonnegative(),
+    facts: z.array(
+      z
+        .object({
+          name: reviewFactNameSchema,
+          value: z.number().int().nonnegative(),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+const reviewImpactSchema = z.discriminatedUnion("role", [
+  z
+    .object({
+      role: z.literal("observed-attributed"),
+      tokens: tokenUsageSchema,
+      usd: z.number().nonnegative().nullable(),
+      durationMs: z.number().nonnegative().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      role: z.literal("observed-window"),
+      tokens: tokenUsageSchema,
+      usd: z.number().nonnegative().nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      role: z.literal("same-token-reprice"),
+      tokens: tokenUsageSchema,
+      observedUsd: z.number().nonnegative(),
+      repricedUsd: z.number().nonnegative(),
+    })
+    .strict(),
+]);
+
+const reviewFindingSchema = z
+  .object({
+    ruleVersion: z.number().int().positive(),
+    category: z.enum(["issue", "cost-opportunity", "observation"]),
+    title: z.string(),
+    whatHappened: z.string(),
+    whyItMatters: z.string(),
+    recommendation: z.string(),
+    evidenceStrength: z.string(),
+    claimLimit: z.string(),
+    evidence: reviewEvidenceSchema,
+    impact: reviewImpactSchema.optional(),
+    recurrence: z
+      .object({
+        distinctSessionCount: z.number().int().positive(),
+        windowDays: z.number().int().positive(),
+        recommendation: z.string(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+const reviewFindingShape = Object.fromEntries(
+  reviewPatternIds.map((id) => [id, reviewFindingSchema.optional()]),
+) as Record<ReviewPatternId, z.ZodOptional<typeof reviewFindingSchema>>;
+
+/** SPEC-0083 R12 — privacy-safe, pattern-keyed session review JSON. */
+export const reviewJsonSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    review: z
+      .object({
+        registryVersion: z.literal(1),
+        source: z.enum(AGENT_SOURCES),
+        findings: z.object(reviewFindingShape).strict(),
+        coverage: z
+          .object({
+            evaluated: z
+              .object({
+                count: z.number().int().nonnegative(),
+                patternIds: z.array(reviewPatternIdSchema),
+              })
+              .strict(),
+            unavailable: z
+              .object({
+                count: z.number().int().nonnegative(),
+                patternIds: z.array(reviewPatternIdSchema),
+              })
+              .strict(),
+          })
+          .strict(),
+      })
+      .strict(),
+  })
+  .strict();
+
 /** `aireceipts compare <a> <b> --json` — two receipt bodies plus a factual delta line (R3; no ranking field, I6). */
 export const compareJsonSchema = z
   .object({
@@ -409,5 +527,5 @@ export function allExportFieldNames(): Set<string> {
   const names = collectFieldNames(receiptJsonSchema);
   collectFieldNames(compareJsonSchema, names);
   collectFieldNames(backfillJsonSchema, names);
-  return collectFieldNames(handoffJsonSchema, names);
+  return collectFieldNames(reviewJsonSchema, names);
 }

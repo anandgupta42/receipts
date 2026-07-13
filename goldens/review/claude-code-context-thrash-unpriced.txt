@@ -1,0 +1,16 @@
+SESSION REVIEW
+Source: Claude Code
+
+THINGS TO IMPROVE
+
+Working context grew back near its earlier size after being reduced
+  What happened: The session reduced its working context at least twice. Within five turns each time, the recorded working-context size grew back to at least 80% of its earlier high point.
+  Evidence: context reductions: 3 · turns in measured windows: 4 · recorded turns: 5, 6, 7, 8
+  Why it matters: Repeatedly returning to a large working context can make one session expensive and harder to steer.
+  Prevent it next time: Split unrelated tasks into separate sessions. After context is reduced, bring back only evidence needed for the current task.
+  Observed cost in the measured window: 700,000 tokens
+  What this does not prove: The trace does not prove that the refilled context was old, unnecessary, or unrelated to new work.
+
+COVERAGE
+Checks run: 6
+Checks unavailable for this trace: 0

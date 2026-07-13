@@ -7,6 +7,7 @@
 // byte-identical file (I1), golden-gated (I5).
 import type { ReceiptModel } from "../receipt/model.js";
 import { renderReceipt } from "../receipt/render.js";
+import type { PrReviewView } from "../receipt/review.js";
 import { samosaGlyphMarkup } from "../receipt/samosa-glyph.js";
 import { REPOSITORY_URL } from "../receipt/branding.js";
 import { renderPrReceiptText, type HandoffSlipView, type PrBodyInput } from "./body.js";
@@ -30,6 +31,8 @@ export interface ArtifactInput {
   perCommitJson?: string;
   /** SPEC-0059 R6 — the savings slip, same strings the comment section fences (`buildHandoffSlip`). */
   handoff?: HandoffSlipView;
+  /** SPEC-0083 — registry-backed prevention review shown by new artifacts. */
+  review?: PrReviewView;
   /** SPEC-0070 R3 — opt the samosa glyph + tip link back onto the footer; off by default (footer is then link-free). */
   samosa?: boolean;
 }
@@ -76,10 +79,10 @@ export function renderPrArtifactHtml(input: ArtifactInput): string {
     .join("\n");
   // SPEC-0059 R6 — the savings slip, after the per-session receipts (the same
   // position the comment gives it); heading is the comment's summary line.
-  const handoff =
-    input.handoff !== undefined
-      ? `<section><h2>${escapeHtml(input.handoff.summary)}</h2><div><pre>${escapeHtml(input.handoff.text)}</pre></div></section>`
-      : "";
+  const review = input.review ?? input.handoff;
+  const reviewSection = review !== undefined
+    ? `<section><h2>${escapeHtml(review.summary)}</h2><div><pre>${escapeHtml(review.text)}</pre></div></section>`
+    : "";
   const bucket =
     input.notAttributable !== undefined && input.notAttributable.length > 0
       ? `<section><h2>not commit-attributable</h2><div><pre>${escapeHtml(input.notAttributable.join("\n"))}</pre></div></section>`
@@ -106,7 +109,7 @@ export function renderPrArtifactHtml(input: ArtifactInput): string {
     `<p class="sub">receipt artifact · PR #${input.prNumber}</p>`,
     `<section><div><pre>${rollup}</pre></div></section>`,
     sections,
-    handoff,
+    reviewSection,
     bucket,
     island,
     // SPEC-0034 R3 / SPEC-0078 R4 — links are explicit user actions; all page

@@ -66,10 +66,10 @@ describe("detectStuckLoops", () => {
     const [finding] = findings;
     expect(finding.tool).toBe("bash");
     expect(finding.runLength).toBe(3);
-    // turnUsd = rate(1.0, 3e6) = 3.0, split evenly across 3 calls = 1.0 each -> sum 3.0.
-    expect(finding.usd).toBeCloseTo(3.0, 10);
-    expect(finding.tokens.input).toBe(3_000_000);
-    expect(finding.wallClockMs).toBe(5000 - 1000);
+    // Only the third-and-later triggering attempts are attributed.
+    expect(finding.usd).toBeCloseTo(1.0, 10);
+    expect(finding.tokens.input).toBe(1_000_000);
+    expect(finding.wallClockMs).toBe(5000 - 3000);
   });
 
   it("does not fire on a run of only 2 identical consecutive calls", async () => {
@@ -108,8 +108,8 @@ describe("detectStuckLoops", () => {
     expect(findings[1].tool).toBe("bash");
     expect(findings[1].runLength).toBe(3);
     // The two 3-runs must not have collapsed into one 6-run around the interrupting "edit" call.
-    expect(findings[0].usd).toBeCloseTo(3.0, 10);
-    expect(findings[1].usd).toBeCloseTo(3.0, 10);
+    expect(findings[0].usd).toBeCloseTo(1.0, 10);
+    expect(findings[1].usd).toBeCloseTo(1.0, 10);
   });
 
   it("breaks a run when the input changes even though the tool name stays the same", async () => {
@@ -145,6 +145,14 @@ describe("detectStuckLoops", () => {
     expect(findings[0].runLength).toBe(3);
   });
 
+  it("does not invent identity for three calls whose recorded input is missing", async () => {
+    const turn: Turn = {
+      index: 0,
+      toolCalls: [call("bash"), call("bash"), call("bash")],
+    };
+    expect(await detectStuckLoops(session({ turns: [turn] }), dataDir)).toEqual([]);
+  });
+
   it("keeps usd null but still accumulates tokens when a run spans an unpriced turn", async () => {
     const pricedTurn: Turn = {
       index: 0,
@@ -166,8 +174,8 @@ describe("detectStuckLoops", () => {
     const [finding] = findings;
     expect(finding.runLength).toBe(3);
     expect(finding.usd).toBeNull();
-    // Tokens accumulate regardless of pricing: 1e6 (priced turn, split 2 ways) x2 + 1e6 (unpriced turn) = 3e6.
-    expect(finding.tokens.input).toBe(3_000_000);
+    // Only the third triggering attempt is attributed; it is in the unpriced turn.
+    expect(finding.tokens.input).toBe(1_000_000);
     // SPEC-0017 R6 — the run spans both turns; turnIndices are distinct and sorted.
     expect(finding.turnIndices).toEqual([0, 1]);
   });
@@ -193,7 +201,7 @@ describe("detectStuckLoops", () => {
 
     const [finding] = await detectStuckLoops(session({ turns: [turn] }), dataDir);
     expect(finding.usd).toBeNull();
-    expect(finding.tokens.input).toBe(3_000_000);
+    expect(finding.tokens.input).toBe(1_000_000);
   });
 
   it("detects loop structure with usd always null for an unpriceable/cursor session", async () => {
@@ -227,6 +235,18 @@ describe("detectStuckLoops", () => {
     expect(findings).toHaveLength(1);
     expect(findings[0].wallClockMs).toBeNull();
   });
+
+  it("clamps a reversed triggering duration to zero", async () => {
+    const turn: Turn = {
+      index: 0,
+      toolCalls: [
+        call("bash", { input: { cmd: "x" } }),
+        call("bash", { input: { cmd: "x" } }),
+        call("bash", { input: { cmd: "x" }, startedAt: 20, endedAt: 10 }),
+      ],
+    };
+    expect((await detectStuckLoops(session({ turns: [turn] }), dataDir))[0].wallClockMs).toBe(0);
+  });
 });
 
 describe("detectTrivialSpans guard chain", () => {
@@ -244,9 +264,10 @@ describe("detectTrivialSpans guard chain", () => {
     expect(result).toBeNull();
   });
 
-  it("returns null when the source has no vendor (cursor)", async () => {
+  it("uses a directly resolvable turn provider without a source-wide vendor gate", async () => {
     const result = await detectTrivialSpans(session({ turns: [eligibleTurn], source: "cursor" }), dataDir);
-    expect(result).toBeNull();
+    expect(result?.eligibleTurnCount).toBe(1);
+    expect(result?.observedUsd).toBeGreaterThan(result?.repricedUsd ?? Number.POSITIVE_INFINITY);
   });
 
   it("returns null when the vendor has no price table at all", async () => {
@@ -409,6 +430,8 @@ describe("detectTrivialSpans guard chain", () => {
     expect(result?.tokens).toMatchObject({ input: 500, output: 220, cacheRead: 0, cacheCreation: 0, total: 720 });
     // costOf at haiku's row (input 1.0, output 5.0): rate(1,500)=0.0005 + rate(5,220)=0.0011 = 0.0016.
     expect(result?.usd).toBeCloseTo(0.0016, 10);
+    expect(result?.repricedUsd).toBeCloseTo(0.0016, 10);
+    expect(result?.observedUsd).toBeGreaterThan(result?.repricedUsd ?? Number.POSITIVE_INFINITY);
   });
 });
 

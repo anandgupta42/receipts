@@ -43,6 +43,7 @@ function fakeContext(argv: string[], env: NodeJS.ProcessEnv): { ctx: CommandCont
       recordPrFlowCompleted: () => {},
       recordHookConfigured: () => {},
       recordIntegrationSurfaceRendered: () => {},
+      recordReviewPatternEvaluated: () => {},
       noteMilestone: async () => {},
     },
     renderHelp: () => "",

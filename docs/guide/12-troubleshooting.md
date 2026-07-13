@@ -69,7 +69,7 @@ means "I won't invent a number," not "something failed." Add a price for the mod
 The very first time you run aireceipts, it prints this once:
 
 ```
-aireceipts sends anonymous, content-free diagnostics and feature-usage events (command, coarse buckets, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md
+aireceipts sends content-free diagnostics and feature-usage events (command, coarse buckets, aggregate review-rule counts, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md
 ```
 
 It never prints again after that. To turn telemetry off entirely (zero network

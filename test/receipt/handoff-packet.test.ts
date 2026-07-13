@@ -54,7 +54,9 @@ describe("SPEC-0042 R1 — state header", () => {
       "",
       "⚠ Bash loop ×5....................≥ $0.08 (3m 45s)",
       "  at turns 2-6",
-      "  → change or stop after two identical failures",
+      "  → After two identical attempts, inspect the",
+      "    result and change the input or approach before",
+      "    trying again.",
       "",
       "covers: 6 turns · 5 tool calls · 2 compactions · 1 flagged-pattern line",
     ]);
@@ -120,7 +122,9 @@ describe("SPEC-0042 R6 — SPEC-0013 contracts preserved byte-for-byte", () => {
       "",
       "⚠ Bash loop ×5....................≥ $0.08 (3m 45s)",
       "  at turns 2-6",
-      "  → change or stop after two identical failures",
+      "  → After two identical attempts, inspect the",
+      "    result and change the input or approach before",
+      "    trying again.",
     ]);
   });
 });

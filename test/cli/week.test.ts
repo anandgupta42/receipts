@@ -47,13 +47,16 @@ describe("parse — week (R7)", () => {
   });
 });
 
-describe("parse — handoff (SPEC-0013)", () => {
-  it("defaults handoffThreshold to undefined (renderer applies its own default)", async () => {
-    expect(await resolveCommand(["--handoff"])).toBe("handoff");
+describe("parse — session review (SPEC-0083)", () => {
+  it("selects the public command and maps the hidden alias to the same command", async () => {
+    expect(await resolveCommand(["review"])).toBe("review");
+    expect(await resolveCommand(["--handoff"])).toBe("review");
+    expect(parseOptions(["review"]).reviewThreshold).toBeUndefined();
     expect(parseOptions(["--handoff"]).handoffThreshold).toBeUndefined();
   });
 
-  it("parses --handoff-threshold in both spaced and = forms", () => {
+  it("parses the public threshold and both hidden alias forms into one value", () => {
+    expect(parseOptions(["review", "--review-threshold", "6"]).reviewThreshold).toBe(6);
     expect(parseOptions(["--handoff", "--handoff-threshold", "5"]).handoffThreshold).toBe(5);
     expect(parseOptions(["--handoff", "--handoff-threshold=2"]).handoffThreshold).toBe(2);
   });

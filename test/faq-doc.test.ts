@@ -9,7 +9,7 @@ const doc = readFileSync("docs/faq.md", "utf8");
 
 // SPEC-0048 Design — the eight questions, verbatim.
 const QUESTIONS = [
-  "How is this different from ccusage or my agent's built-in `/usage`?",
+  "How is this different from usage dashboards or my agent's built-in `/usage`?",
   "I'm on a flat-rate subscription — what do the dollar figures mean for me?",
   "Does aireceipts send anything off my machine?",
   "Can I trust the numbers? Could someone fake a receipt?",

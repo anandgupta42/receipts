@@ -269,7 +269,7 @@ that tells you exactly what it knows.
 25. **Malformed usage must never become a dollar.** Non-finite, negative, or
     fractional token components, inconsistent totals, and cache-tier subsets
     larger than cache creation are rejected at the shared pricing boundary.
-    The turn remains tokens-only; price-delta/trivial-span side paths use the
+    The turn remains tokens-only; price-delta/short-turn side paths use the
     same guard, so they cannot reintroduce a negative/NaN/fabricated `$`.
 26. **A transcript or subagent tree that is absent leaves no evidence.** If the
     agent never persisted the file, or the file/directory was deleted or moved,
@@ -288,19 +288,15 @@ that tells you exactly what it knows.
     disabled and the final local envelope is retained as unattributed tokens.
     No reset behavior is guessed. *Direction:* conservative under-pricing.
     *Marker:* request-reconciliation caveat.
-29. **The handoff headline is a heuristic pattern subtotal, not savings.**
-    Stuck-loop and context-thrash findings can cover the same tokens, while
-    trivial-span dollars are counterfactual re-pricing rather than observed
-    cost. `FLAGGED PATTERN COST ≈ $X` therefore takes the largest priced
-    stuck-loop/context-thrash class subtotal, excludes trivial-span re-pricing,
-    and never adds overlapping classes. The `≈` and the adjacent "heuristic
-    pattern subtotal · not proven savings" are mandatory: the detector cannot
-    prove avoidability, so even this overlap-safe amount is not a savings floor.
-    Its legacy `pctOfTotal` machine field is always `null`. *Direction:* no
-    directional savings claim. *Marker:* the disclaimer below the headline.
-30. **Trivial-span repricing is all-or-nothing per request unit.** Every unit in
-    the candidate turn must carry its own model/date/provider evidence, resolve
-    to the agent's direct source vendor, and have a cited row above the comparison
-    row. One missing, routed, or mismatched unit suppresses the dollar finding;
-    a partial turn is never presented as fully repriced. *Direction:* conservative.
-    *Marker:* no trivial-span finding when the evidence gate fails.
+29. **Session-review impact roles are separate facts, not one savings number.**
+    Observed cost attributed to actions, observed cost inside a measured window,
+    and same-token listed-price arithmetic answer different questions. Review text,
+    JSON, recurrence, and PR output do not add those roles together or call any
+    combined amount wasted, avoidable, or saved. *Direction:* no directional
+    savings claim. *Marker:* each optional impact carries its own role label.
+30. **Short-tool-free-turn repricing is all-or-nothing per turn.** Every request
+    unit in the candidate turn must carry its own model/date/provider evidence and
+    have a cited row above a lower-priced row for the same provider. One incomplete
+    unit suppresses that turn; a partial turn is never presented as fully repriced.
+    Provider evidence is evaluated per turn, not assumed from the transcript source.
+    *Direction:* conservative. *Marker:* no short-turn finding when the evidence gate fails.

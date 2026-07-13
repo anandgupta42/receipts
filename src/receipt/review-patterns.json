@@ -1,0 +1,815 @@
+{
+  "registryVersion": 1,
+  "patterns": {
+    "repeated-identical-attempt": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "enabled",
+        "reason": "Existing detector after its missing-input and wording defects are fixed."
+      },
+      "category": "issue",
+      "title": "Same action repeated without a change",
+      "description": "The same tool ran at least three times in a row with identical recorded input.",
+      "whyItMatters": "Repeating an unchanged action can use more time and tokens without trying a new approach.",
+      "recommendation": "After two identical attempts, inspect the result and change the input or approach before trying again.",
+      "extractor": {
+        "id": "repeatedIdenticalAttemptV1",
+        "parameters": {
+          "minimumRunLength": 3,
+          "requireRecordedInput": true
+        }
+      },
+      "requiredCapabilities": [
+        "tool-name",
+        "tool-input"
+      ],
+      "evidenceStrength": "exact-structure",
+      "claimLimit": "This proves repetition, not that the repeated action was unnecessary or failed.",
+      "impact": {
+        "role": "observed-attributed",
+        "metrics": [
+          "attempts",
+          "turns",
+          "tokens",
+          "usd",
+          "durationMs"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 10
+    },
+    "repeated-identical-error": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "enabled",
+        "reason": "Explicit error status makes the prevention advice stronger than the generic repeated-attempt pattern."
+      },
+      "category": "issue",
+      "title": "The same failed action was tried again unchanged",
+      "description": "The same recorded action failed at least twice within the next ten actions. No file change or passing check was recorded between those failures.",
+      "whyItMatters": "Trying the same failed action again without recorded progress is a useful point to change approach.",
+      "recommendation": "After the same action fails twice without recorded progress, inspect the error and change the input or approach, or record the blocker before trying again.",
+      "extractor": {
+        "id": "repeatedIdenticalErrorV1",
+        "parameters": {
+          "minimumOccurrences": 2,
+          "windowActions": 10,
+          "requiredStatus": "error",
+          "resetOnDirectWrite": true,
+          "resetOnSuccessfulValidation": true
+        }
+      },
+      "requiredCapabilities": [
+        "tool-name",
+        "tool-input",
+        "tool-status",
+        "canonical-write",
+        "canonical-validation"
+      ],
+      "evidenceStrength": "exact-structure-and-status",
+      "claimLimit": "Some failures may be deliberate tests; this does not prove the retry was unreasonable.",
+      "impact": {
+        "role": "observed-attributed",
+        "metrics": [
+          "attempts",
+          "turns",
+          "tokens",
+          "usd",
+          "durationMs"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [
+        "repeated-identical-attempt",
+        "consecutive-tool-errors"
+      ],
+      "order": 20
+    },
+    "consecutive-tool-errors": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "diagnostic",
+        "reason": "Actionable, but expected negative tests and exploratory probes need a clear caveat."
+      },
+      "category": "observation",
+      "title": "Several actions failed in a row",
+      "description": "Three or more recorded actions failed one after another.",
+      "whyItMatters": "A chain of errors is a useful point to pause before more retries compound the problem.",
+      "recommendation": "After two failures in a row, pause, inspect them, and change one variable before continuing.",
+      "extractor": {
+        "id": "consecutiveToolErrorsV1",
+        "parameters": {
+          "minimumRunLength": 3
+        }
+      },
+      "requiredCapabilities": [
+        "tool-status"
+      ],
+      "evidenceStrength": "exact-status",
+      "claimLimit": "The failures may be deliberate tests and may not share a cause.",
+      "impact": {
+        "role": "observed-attributed",
+        "metrics": [
+          "attempts",
+          "turns",
+          "tokens",
+          "usd",
+          "durationMs"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 30
+    },
+    "search-streak-without-change-or-check": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "In the local audit, 525 of 629 qualifying roots later reached a write or validation; the rule mostly described normal research rather than a problem."
+      },
+      "category": "observation",
+      "title": "Long search streak before the next concrete step",
+      "description": "Ten searches or file reads occurred in a row without a recorded write or validation command.",
+      "whyItMatters": "Long exploration streaks are a useful checkpoint because a session can keep gathering context without testing a hypothesis.",
+      "recommendation": "After ten searches or reads without a change or check, summarize what is known and choose one concrete next step before searching more.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "canonical-read-or-search",
+        "canonical-write",
+        "canonical-validation"
+      ],
+      "evidenceStrength": "exact-structure",
+      "claimLimit": "This does not prove that any search or read was unnecessary.",
+      "impact": {
+        "role": "observed-attributed",
+        "metrics": [
+          "actions",
+          "turns",
+          "tokens",
+          "usd",
+          "durationMs"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 40
+    },
+    "repeated-search-query": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Promotion needs reliable resets for writes, compactions, successful state changes, and external-data refreshes across every source."
+      },
+      "category": "issue",
+      "title": "The same search was repeated",
+      "description": "The same normalized search query appeared at least twice within ten actions without an intervening write or compaction.",
+      "whyItMatters": "Repeating the same search without changing the workspace is unlikely to reveal a different result.",
+      "recommendation": "Reuse the prior result or change the query, scope, or hypothesis before searching again.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "canonical-search",
+        "canonical-write"
+      ],
+      "evidenceStrength": "exact-structure",
+      "claimLimit": "External files or search indexes could have changed without a recorded workspace write.",
+      "impact": {
+        "role": "observed-attributed",
+        "metrics": [
+          "searches",
+          "turns",
+          "tokens",
+          "usd",
+          "durationMs"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 50
+    },
+    "same-file-reread-without-recorded-change": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "diagnostic",
+        "reason": "Already extracted as a low-confidence receipt diagnostic; range changes and external mutations remain legitimate explanations."
+      },
+      "category": "observation",
+      "title": "The same file was read repeatedly without a recorded change",
+      "description": "The same file was read at least three times within ten actions, with no recorded change to that file between reads.",
+      "whyItMatters": "Repeated full reads can put already-read material back into the session's working context.",
+      "recommendation": "Before reading the same file again, record what fresh information is needed; prefer a narrower range when only one section matters.",
+      "extractor": {
+        "id": "sameFileRereadV2",
+        "parameters": {
+          "windowActions": 10,
+          "minimumReads": 3
+        }
+      },
+      "requiredCapabilities": [
+        "canonical-file-read",
+        "canonical-file-write"
+      ],
+      "evidenceStrength": "exact-structure-partial-world",
+      "claimLimit": "Different ranges, deliberate re-grounding, and unrecorded external changes can make a reread useful.",
+      "impact": {
+        "role": "observed-attributed",
+        "metrics": [
+          "reads",
+          "turns",
+          "tokens",
+          "usd"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 60
+    },
+    "last-change-not-checked": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "shadow",
+        "reason": "The final local measurement found only 14 Codex examples, below the approved minimum of 20 examples for every supported trace family."
+      },
+      "category": "issue",
+      "title": "The final code change had no later recorded check",
+      "description": "The session changed a source-code file and did not record a passing test, type check, or lint check afterward.",
+      "whyItMatters": "The saved evidence cannot show that the final version of the code passed a relevant check.",
+      "recommendation": "After the last code change, run the narrowest relevant check; if no check applies, record that reason explicitly.",
+      "extractor": {
+        "id": "lastChangeNotCheckedV1",
+        "parameters": {
+          "sourceWritesOnly": true,
+          "requireSuccessfulValidationAfterFinalWrite": true
+        }
+      },
+      "requiredCapabilities": [
+        "canonical-source-write",
+        "canonical-validation",
+        "tool-status"
+      ],
+      "evidenceStrength": "exact-structure-classifier-bounded",
+      "claimLimit": "A useful check may be unrecognized, and some code-like changes may not require an executable test.",
+      "impact": {
+        "role": "none",
+        "metrics": [
+          "writesAfterLastCheck",
+          "turns"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 70
+    },
+    "last-check-still-failing": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "shadow",
+        "reason": "The final local measurement found only three examples in total, too few to judge whether the recommendation is dependable across trace families."
+      },
+      "category": "issue",
+      "title": "The last recorded check was still failing",
+      "description": "For at least one kind of test, type check, or lint check, the last recorded result was a failure.",
+      "whyItMatters": "The recorded evidence ends with a known failing check.",
+      "recommendation": "Fix the failure and rerun the check, run a narrower relevant check, or record the blocker before ending the session.",
+      "extractor": {
+        "id": "lastCheckStillFailingV1",
+        "parameters": {
+          "groupByNormalizedCheck": true
+        }
+      },
+      "requiredCapabilities": [
+        "canonical-validation",
+        "tool-status"
+      ],
+      "evidenceStrength": "exact-status-classifier-bounded",
+      "claimLimit": "A failing check can be an intentional test written before the fix, or a blocker the user accepted.",
+      "impact": {
+        "role": "none",
+        "metrics": [
+          "failedChecks",
+          "turns"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [
+        "last-change-not-checked"
+      ],
+      "order": 80
+    },
+    "unresolved-tool-call": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "A running status can mean an active capture, a truncated transcript, or an adapter pairing gap; no cross-source terminal-session proof exists yet."
+      },
+      "category": "issue",
+      "title": "An action has no recorded completion",
+      "description": "One or more tool calls still have a recorded running status at the end of the transcript.",
+      "whyItMatters": "The trace does not contain a final result for those actions.",
+      "recommendation": "Before ending, verify or cancel every action that lacks a recorded terminal result.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "tool-status",
+        "terminal-session-proof"
+      ],
+      "evidenceStrength": "exact-status-partial-world",
+      "claimLimit": "The transcript may have been captured while work was still running; do not call the action abandoned.",
+      "impact": {
+        "role": "none",
+        "metrics": [
+          "calls",
+          "turns"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 90
+    },
+    "many-writes-without-recorded-plan": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Prose plans and planner-tool availability differ by agent, and many bounded tasks legitimately need no separate structured plan."
+      },
+      "category": "observation",
+      "title": "Many changes were made without a recorded plan",
+      "description": "At least five file writes occurred without a preceding structured plan or TODO tool call when that tool surface was available.",
+      "whyItMatters": "A short plan can keep a multi-change task from losing requirements or verification steps.",
+      "recommendation": "Before a task that needs several changes, record a short ordered plan and keep it current as work changes.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "canonical-file-write",
+        "structured-plan-surface"
+      ],
+      "evidenceStrength": "exact-structure-tool-gated",
+      "claimLimit": "The task may be simple enough that a separate recorded plan would add no value.",
+      "impact": {
+        "role": "none",
+        "metrics": [
+          "writes",
+          "turns"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 100
+    },
+    "failed-read-write-oscillation": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Cross-source write failure and reversal effects are not normalized reliably enough."
+      },
+      "category": "issue",
+      "title": "The session cycled around the same failed edit",
+      "description": "For one file, at least two read-write-read cycles contain a middle write explicitly labeled failed or reverted.",
+      "whyItMatters": "Repeatedly returning to the same failed edit is a strong sign that the current approach needs a new hypothesis.",
+      "recommendation": "After a failed edit cycle repeats, stop editing, restate the failure evidence, and choose a different change before continuing.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "canonical-file-read",
+        "canonical-file-write",
+        "write-effect"
+      ],
+      "evidenceStrength": "unavailable",
+      "claimLimit": "No claim is emitted while failed and reverted write effects are incomplete.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 110
+    },
+    "context-refill-cluster": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "enabled",
+        "reason": "Existing detector with its causal wording and impact semantics corrected."
+      },
+      "category": "issue",
+      "title": "Working context grew back near its earlier size after being reduced",
+      "description": "The session reduced its working context at least twice. Within five turns each time, the recorded working-context size grew back to at least 80% of its earlier high point.",
+      "whyItMatters": "Repeatedly returning to a large working context can make one session expensive and harder to steer.",
+      "recommendation": "Split unrelated tasks into separate sessions. After context is reduced, bring back only evidence needed for the current task.",
+      "extractor": {
+        "id": "contextRefillClusterV1",
+        "parameters": {
+          "lookaheadTurns": 5,
+          "refillRatio": 0.8,
+          "maximumCompactionGapTurns": 25,
+          "minimumCompactions": 2
+        }
+      },
+      "requiredCapabilities": [
+        "compaction-events",
+        "turn-usage"
+      ],
+      "evidenceStrength": "exact-structure-estimated-cause",
+      "claimLimit": "The trace does not prove that the refilled context was old, unnecessary, or unrelated to new work.",
+      "impact": {
+        "role": "observed-window",
+        "metrics": [
+          "compactions",
+          "turns",
+          "tokens",
+          "usd"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 120
+    },
+    "short-tool-free-turn-cost": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "enabled",
+        "reason": "Existing deterministic same-token repricing opportunity after its content claims and source-wide vendor gate are corrected."
+      },
+      "category": "cost-opportunity",
+      "title": "Short replies used a higher-priced option",
+      "description": "One or more replies used no tools, were 120 output tokens or fewer, and have a cheaper same-provider price calculation for the exact recorded tokens.",
+      "whyItMatters": "The same recorded token volume has a lower list-price arithmetic result, although task quality is unknown.",
+      "recommendation": "Keep short replies minimal. If your setup can route work by price tier, consider its lower-cost option for this narrow kind of reply.",
+      "extractor": {
+        "id": "shortToolFreeTurnCostV2",
+        "parameters": {
+          "maximumOutputTokens": 120,
+          "requireDirectSingleProviderPricing": true
+        }
+      },
+      "requiredCapabilities": [
+        "turn-tool-count",
+        "turn-output-tokens",
+        "pricing-units"
+      ],
+      "evidenceStrength": "exact-structure-and-arithmetic",
+      "claimLimit": "A short answer can still require difficult reasoning; this never claims another model would complete the task.",
+      "impact": {
+        "role": "same-token-reprice",
+        "metrics": [
+          "turns",
+          "tokens",
+          "observedUsd",
+          "repricedUsd"
+        ]
+      },
+      "recurrence": {
+        "eligible": true,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 130
+    },
+    "large-tool-output": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Adapters and source stores truncate or omit output differently, so recorded character counts are not comparable enough even for shadow promotion work."
+      },
+      "category": "observation",
+      "title": "A tool returned a very large recorded output",
+      "description": "A single tool result crossed a frozen recorded-size threshold in a source that preserves output completeness.",
+      "whyItMatters": "Large outputs can fill context with material that is not needed for the next decision.",
+      "recommendation": "Narrow the command, file range, or result limit so the next run returns only the evidence needed.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "complete-tool-output"
+      ],
+      "evidenceStrength": "source-capability-dependent",
+      "claimLimit": "Recorded characters are not tokens, and a large output can be necessary.",
+      "impact": {
+        "role": "none",
+        "metrics": [
+          "outputs",
+          "recordedCharacters",
+          "turns"
+        ]
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 140
+    },
+    "shell-over-structured-tool": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "External evidence shows this mainly reflects the agent scaffold, not a per-session failure."
+      },
+      "category": "observation",
+      "title": "A shell command duplicated an available structured tool",
+      "description": "A shell read or search command was used while an equivalent structured tool was exposed.",
+      "whyItMatters": "Structured tools can provide more bounded and consistently recorded evidence.",
+      "recommendation": "Prefer the available structured read or search tool when it can express the same bounded request.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "tool-surface",
+        "canonical-shell-command"
+      ],
+      "evidenceStrength": "unavailable-for-value-claim",
+      "claimLimit": "No finding is emitted because shell use can be the correct scaffold convention.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 150
+    },
+    "unsupported-completion-claim": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "The normalized model intentionally omits assistant prose, and a fixed text regex would still not prove the claim false."
+      },
+      "category": "observation",
+      "title": "Completion was stated without a later recorded check",
+      "description": "Final assistant text matches a completion phrase and no successful recognized validation follows the last source write.",
+      "whyItMatters": "Completion language is not evidence that the final code was checked.",
+      "recommendation": "Tie completion statements to a recorded passing check or state clearly that verification was not run.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "assistant-text",
+        "canonical-source-write",
+        "canonical-validation"
+      ],
+      "evidenceStrength": "unavailable",
+      "claimLimit": "No assistant text is ingested or rendered for this detector.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 160
+    },
+    "semantic-phase-oscillation": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Published versions require model-generated semantic phase labels and would violate deterministic zero-model-call operation."
+      },
+      "category": "observation",
+      "title": "The session repeatedly switched between the same work phases",
+      "description": "The same two semantic phases alternate at least three times within six actions.",
+      "whyItMatters": "Repeated switching can indicate that the current hypothesis is not converging.",
+      "recommendation": "Pause after repeated phase switches, state one hypothesis and its decisive check, then follow that path before switching again.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "semantic-phase-labels"
+      ],
+      "evidenceStrength": "model-labeler-required",
+      "claimLimit": "Never run this detector in the deterministic product path.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 170
+    },
+    "semantic-fruitless-exploration": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Published versions require model-generated semantic labels and later-intent judgments."
+      },
+      "category": "observation",
+      "title": "Exploration did not connect to later implementation",
+      "description": "At least four of five semantically labeled code reads never appear in a later implementation step.",
+      "whyItMatters": "Exploration that never informs a change can consume context without narrowing the task.",
+      "recommendation": "After several exploratory reads, summarize which evidence changes the implementation plan and drop paths that do not.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "semantic-action-labels"
+      ],
+      "evidenceStrength": "model-labeler-required",
+      "claimLimit": "Never run this detector in the deterministic product path.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 180
+    },
+    "reference-scope-drift": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "A single local session has no trustworthy gold or successful reference scope."
+      },
+      "category": "observation",
+      "title": "Work moved outside a reference change scope",
+      "description": "Recorded writes target files outside an explicit reference or gold change set.",
+      "whyItMatters": "Unexpected scope expansion is a useful review checkpoint when a valid reference exists.",
+      "recommendation": "Before changing files outside the agreed scope, record why the expansion is necessary and verify the added surface.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "canonical-file-write",
+        "explicit-reference-scope"
+      ],
+      "evidenceStrength": "reference-required",
+      "claimLimit": "Do not infer task scope from a single session or live repository state.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 190
+    },
+    "reference-relative-rapid-rewrite": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "A quick rewrite can be normal; published disambiguation requires a reference run."
+      },
+      "category": "observation",
+      "title": "A change was quickly overwritten or reversed",
+      "description": "A file write is overwritten or reversed within three actions and a valid reference run does not show the same rewrite.",
+      "whyItMatters": "Quick reversals can identify unstable edits that deserve a more explicit hypothesis.",
+      "recommendation": "Before rewriting the same change again, state what the previous edit disproved and run a focused check.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "write-effect",
+        "explicit-reference-run"
+      ],
+      "evidenceStrength": "reference-required",
+      "claimLimit": "No single-session finding is emitted because rapid correction can be healthy work.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 200
+    },
+    "open-task-at-end": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Structured task state is not normalized and sampled snapshots can be stale after later activity."
+      },
+      "category": "issue",
+      "title": "Recorded tasks were still open at the end",
+      "description": "The latest trustworthy structured task snapshot contains pending or in-progress items at session end.",
+      "whyItMatters": "Open tracked work can be forgotten when the session is treated as complete.",
+      "recommendation": "Before ending, complete each open task or record its blocker and next concrete action.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "normalized-task-state",
+        "task-state-freshness"
+      ],
+      "evidenceStrength": "unavailable",
+      "claimLimit": "Never treat a stale task snapshot as current state.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 210
+    },
+    "interrupted-work": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Explicit interruption lifecycle events are not normalized consistently across sources."
+      },
+      "category": "issue",
+      "title": "An interrupted operation had no recorded resumption",
+      "description": "An explicit interrupted or aborted event has no later matching resumed completion.",
+      "whyItMatters": "Interrupted work can leave a partial change or missing result behind.",
+      "recommendation": "After an interruption, resume the operation or record the blocker and the next safe action.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "normalized-interruption-lifecycle"
+      ],
+      "evidenceStrength": "unavailable",
+      "claimLimit": "A truncated transcript may omit a completion that occurred later.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 220
+    },
+    "subagent-delivery-gap": {
+      "ruleVersion": 1,
+      "rollout": {
+        "state": "disabled",
+        "reason": "Child lifecycle and parent-delivery evidence are not normalized across sources."
+      },
+      "category": "issue",
+      "title": "A child result was not recorded as delivered to its parent",
+      "description": "A child run records completion but the parent trace has no matching delivery event.",
+      "whyItMatters": "Completed delegated work can be lost if its result never reaches the parent session.",
+      "recommendation": "Before ending, confirm that every completed child result was received or record which delivery failed.",
+      "extractor": null,
+      "requiredCapabilities": [
+        "normalized-child-lifecycle",
+        "parent-delivery-events"
+      ],
+      "evidenceStrength": "unavailable",
+      "claimLimit": "Do not infer delivery failure from child existence alone.",
+      "impact": {
+        "role": "none",
+        "metrics": []
+      },
+      "recurrence": {
+        "eligible": false,
+        "windowDays": 7,
+        "minimumDistinctSessions": 3
+      },
+      "supersedes": [],
+      "order": 230
+    }
+  }
+}

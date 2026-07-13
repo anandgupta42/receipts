@@ -36,6 +36,7 @@ function fakeContext(argv: string[], stdin: NodeJS.ReadStream): { ctx: CommandCo
       recordPrFlowCompleted: () => {},
       recordHookConfigured: () => {},
       recordIntegrationSurfaceRendered: () => {},
+      recordReviewPatternEvaluated: () => {},
       noteMilestone: async () => {},
     },
     renderHelp: () => "",

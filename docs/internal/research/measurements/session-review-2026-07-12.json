@@ -1,0 +1,126 @@
+{
+  "spec": "SPEC-0083",
+  "baselineSha": "908838eec1ff9ce21e8809b7b17e05ecfd16306d",
+  "measuredAt": "2026-07-13T07:03:01.093Z",
+  "registryVersion": 1,
+  "privacy": {
+    "retainedFields": [
+      "source-family",
+      "booleans",
+      "counts",
+      "versions",
+      "timings",
+      "peak-rss"
+    ],
+    "retainedContentOrPaths": false
+  },
+  "configuration": {
+    "runs": 2,
+    "concurrency": 4,
+    "sources": [
+      "claude-code",
+      "codex",
+      "opencode"
+    ]
+  },
+  "snapshot": {
+    "inputListFrozen": true,
+    "discoveredRootSessions": 5394,
+    "loadedRootSessions": 5394,
+    "loadFailureCount": 0,
+    "discoveredBySource": {
+      "claude-code": 446,
+      "codex": 829,
+      "opencode": 4119
+    },
+    "loadedBySource": {
+      "claude-code": 446,
+      "codex": 829,
+      "opencode": 4119
+    },
+    "digest": "4683a5f62880bcbe07e6fab68e0047f1223df7c9b32211dbba0619732eee6044",
+    "discoveryStableAcrossRun": true
+  },
+  "determinism": {
+    "identicalAcrossRuns": true,
+    "aggregateDigest": "61ef760b90e847ae2181a0929e34a15a64cc0dee136af0d6313a8d746b87fbb3",
+    "wallTimeMs": [
+      21019.6,
+      19895.9
+    ],
+    "discoveryMs": 12956,
+    "maxRssMiB": 1566.8
+  },
+  "coverage": {
+    "overall": {
+      "baselineSessions": 172,
+      "baselineReachPct": 3.19,
+      "visibleSessions": 220,
+      "visibleIncrementalSessions": 48,
+      "visibleReachPct": 4.08,
+      "visibleGainPoints": 0.89,
+      "visibleGateMet": false,
+      "visibleOrShadowSessions": 1183,
+      "visibleOrShadowIncrementalSessions": 1011,
+      "visibleOrShadowReachPct": 21.93,
+      "visibleOrShadowGainPoints": 18.74,
+      "visibleOrShadowGateWouldBeMet": true
+    },
+    "visiblePatternSessions": {
+      "repeated-identical-attempt": 42,
+      "repeated-identical-error": 28,
+      "consecutive-tool-errors": 34,
+      "same-file-reread-without-recorded-change": 21,
+      "context-refill-cluster": 1,
+      "short-tool-free-turn-cost": 132
+    },
+    "shadowPatternSessions": {
+      "last-change-not-checked": 1006,
+      "last-check-still-failing": 3
+    },
+    "bySource": {
+      "claude-code": {
+        "loaded": 446,
+        "baselineSessions": 128,
+        "visibleSessions": 136,
+        "visibleOrShadowSessions": 153,
+        "lastChangeNotCheckedSessions": 33,
+        "lastCheckStillFailingSessions": 3
+      },
+      "codex": {
+        "loaded": 829,
+        "baselineSessions": 31,
+        "visibleSessions": 31,
+        "visibleOrShadowSessions": 43,
+        "lastChangeNotCheckedSessions": 14,
+        "lastCheckStillFailingSessions": 0
+      },
+      "opencode": {
+        "loaded": 4119,
+        "baselineSessions": 13,
+        "visibleSessions": 53,
+        "visibleOrShadowSessions": 987,
+        "lastChangeNotCheckedSessions": 959,
+        "lastCheckStillFailingSessions": 0
+      }
+    }
+  },
+  "promotionAudit": {
+    "requiredRealPositivesPerSource": 20,
+    "availableLastChangePositivesBySource": {
+      "claude-code": 33,
+      "codex": 14,
+      "opencode": 959
+    },
+    "adversarialBoundaryFixtures": 36,
+    "fixturePredicateMismatches": 0,
+    "realPositiveAuditCompleted": false,
+    "recommendationApplicabilityRate": null,
+    "promotionEligible": false,
+    "blockingReasons": [
+      "The Codex source family has only 14 positive examples, below the approved minimum of 20.",
+      "Without the hidden tail checks, visible coverage misses both approved coverage thresholds."
+    ],
+    "decision": "Keep both tail checks shadow-only and keep SPEC-0083 building. Do not claim increased coverage."
+  }
+}

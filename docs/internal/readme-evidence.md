@@ -45,16 +45,16 @@ renderer didn't produce it, the README can't show it.
 ## Prior art & the prepared launch-thread reply (SPEC-0030 R2)
 
 Positioning rules: never argue priority or state of mind; cite the lineage
-(ccusage → claude-receipts → the cost-diff-PR-bot pattern from infra tooling); make the difference
+(terminal usage trackers → receipt artifacts → the cost-diff-PR-bot pattern from infra tooling); make the difference
 categorical ("a souvenir vs bookkeeping"). Facts checked 2026-07-03:
 claude-receipts created 2026-01-29, 616 stars, no HN front-page moment
 (4 and 1 points on its two submissions), thermal-printer novelty over
-ccusage, Claude-only, by its author's own README "a creative side project."
+terminal usage reports, Claude-only, by its author's own README "a creative side project."
 
 Paste-ready reply for "this already exists":
 
-> claude-receipts is great — it's in our Related Work next to ccusage,
-> which powers it. Different jobs though: claude-receipts is a souvenir (a
+> claude-receipts is great — it's in our Related Work. Different jobs though:
+> claude-receipts is a souvenir (a
 > thermal-printed memento of a Claude Code session; go see the photos,
 > they're wonderful). aireceipts is bookkeeping: its own parsers across
 > Claude Code / Codex / Cursor / opencode, prices from cited and dated

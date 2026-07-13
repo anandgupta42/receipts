@@ -13,8 +13,8 @@ rankings.
 Every handoff tool on the market — Amp's `/handoff`, claude-handoff, handoff-md,
 claude-mem, Matt Pocock's handoff skill — calls an LLM to write the handoff, and
 users report exactly the fidelity failures you'd expect ("the summary always lost my
-instructions"). Every cost tool — ccusage, CodeBurn, claude-receipts — stops at
-dollars and does no handoff. Nobody occupies the intersection: a **deterministic,
+instructions"). Existing usage-accounting tools stop at dollars and do no handoff.
+Nobody occupies the intersection: a **deterministic,
 dollar-denominated resume packet extracted (not generated) from the transcript
 already on disk**. aireceipts already owns both halves. Amp retiring compaction in
 favor of a first-class handoff primitive (Nov 2025), and Anthropic closing both the
@@ -303,6 +303,6 @@ spec-input requirements — pin dated citations before quoting externally.
 
 - Amp handoff: https://ampcode.com/news/handoff · https://tessl.io/blog/amp-retires-compaction-for-a-cleaner-handoff-in-the-coding-agent-context-race/
 - Anthropic "not planned" issues: anthropics/claude-code #44200, #18550; resume-summary ask #46831; handoff verbs #11455; native /handover #54254
-- Competitors/prior art: analyzer.spec-kitty.ai · github.com/chrishutchinson/claude-receipts · github.com/willseltzer/claude-handoff · github.com/guvencem/handoff-md · github.com/thedotmack/claude-mem · ccusage.com · github.com/getagentseal/codeburn · github.com/jazzyalex/agent-sessions · github.com/riponcm/projectmem
+- Selected handoff prior art: analyzer.spec-kitty.ai · github.com/chrishutchinson/claude-receipts · github.com/willseltzer/claude-handoff · github.com/guvencem/handoff-md · github.com/thedotmack/claude-mem · github.com/jazzyalex/agent-sessions · github.com/riponcm/projectmem
 - Research: "Handoff Debt" (arXiv 2026) · CWL "Beyond Compaction" (arXiv:2606.11213) · AgentDiet · AWM (arXiv:2409.07429) · ExpeL (AAAI 2024) · Reflexion (NeurIPS 2023) · MAST (arXiv:2503.13657) · Context Rot (Chroma, 2025) · "How Coding Agents Fail Their Users" (arXiv:2605.29442) · PROJECTMEM (arXiv:2606.12329) · Gloaguen et al. via iwoszapar.com/p/context-engineering-research-2026
 - Codex compaction gap + trace facts: local trace analysis 2026-07-04 (~/.claude/projects, ~/.codex/sessions, ~/.local/share/<opencode-fork>)

@@ -22,9 +22,9 @@ Receiptify/Wrapped, GH job summaries):**
   specific enough to feel personal; regenerable views drive re-sharing
   (nogood.io/blog/spotify-wrapped-marketing-strategy).
 
-**Competitors (ccusage, Claude-Code-Usage-Monitor, Cline, Langfuse/Helicone):**
+**Adjacent usage dashboards and observability tools:**
 - Standard stat lines we lack: input/output/cache-read/cache-write composition,
-  per-model cost split (`ccusage --breakdown`), burn rate, per-session token shape.
+  per-model cost split, burn rate, per-session token shape.
 - Their burn rates are live forward projections — banned here (I1/I3); the safe
   subset is historical arithmetic labeled as such.
 

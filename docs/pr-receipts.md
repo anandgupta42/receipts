@@ -75,7 +75,7 @@ npx aireceipts-cli pr
 Use the same instruction for every coding assistant:
 
 ```text
-Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in the handoff.
+Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in your final task summary.
 ```
 
 ### Optional convenience: git alias
@@ -251,7 +251,7 @@ and keep the same working directory; output redirections are ignored and the hoo
 
 Add this second producer path to `AGENTS.md`:
 
-> Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in the handoff.
+> Before you finish a PR-producing task, run `npx aireceipts-cli pr --post` from the repo worktree and include any failure message in your final task summary.
 
 ### Step 4 — Tell contributors
 
@@ -348,10 +348,11 @@ decision record is [SPEC-0052](../specs/SPEC-0052-github-app-deferral.md).
   full receipt, and — for a session that launched subagents — a `subagents (N)`
   table under its receipt, sorted by cost and capped at 20 rows where the last
   row carries the remainder's sum (a capped list never silently drops value).
-- When a counted session fires a detector, a collapsed `handoff — flagged
-  pattern cost ≈ …` section. Its headline is an overlap-safe heuristic subtotal
-  with the explicit line `not proven savings`; it is not a savings floor or
-  ceiling.
+- When a counted session has a supported registry finding, a collapsed
+  `session review — N patterns to prevent` section. It states how many sessions
+  and recorded matches support each pattern, gives the canonical prevention
+  step, and names what the trace cannot prove. Different impact roles are not
+  combined into a savings number.
 
 ## How sessions are matched to a PR
 

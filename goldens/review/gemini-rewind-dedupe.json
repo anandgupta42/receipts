@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "review": {
+    "registryVersion": 1,
+    "source": "gemini",
+    "findings": {},
+    "coverage": {
+      "evaluated": {
+        "count": 2,
+        "patternIds": [
+          "consecutive-tool-errors",
+          "short-tool-free-turn-cost"
+        ]
+      },
+      "unavailable": {
+        "count": 4,
+        "patternIds": [
+          "repeated-identical-attempt",
+          "repeated-identical-error",
+          "same-file-reread-without-recorded-change",
+          "context-refill-cluster"
+        ]
+      }
+    }
+  }
+}

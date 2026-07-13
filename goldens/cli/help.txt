@@ -12,10 +12,9 @@ Usage:
                                          receipt file per session + index.txt)
   aireceipts stats                      local usage counters (receipts generated on this machine)
   aireceipts compare <a> <b> [--json|--csv]  side-by-side (or stacked) comparison
-  aireceipts --handoff [selector] [--handoff-threshold N] [--json]
-                                        paste-ready block of detector-flagged patterns;
-                                         suggests CLAUDE.md rules for detector classes
-                                         recurring in N+ recent sessions (default 3)
+  aireceipts review [selector] [--review-threshold N] [--json]
+                                        find recorded session problems and
+                                         recommend how to prevent them next time
   aireceipts --quota                    current Claude Code rate-limit window usage
                                          (statusline stdin mode only; silent if unavailable)
   aireceipts [selector] --svg [-o f]    write a shareable SVG receipt (default receipt.svg)

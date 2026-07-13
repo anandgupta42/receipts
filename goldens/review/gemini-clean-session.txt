@@ -1,0 +1,8 @@
+SESSION REVIEW
+Source: Gemini CLI
+
+No supported issues found in the recorded evidence.
+
+COVERAGE
+Checks run: 2
+Checks unavailable for this trace: 4

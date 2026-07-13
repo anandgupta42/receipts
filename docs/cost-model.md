@@ -275,11 +275,11 @@ non-negative integers; `total` must equal the four priced components; and the
 reported 5m/1h cache-write subsets may not exceed total cache creation. Invalid
 usage stays unpriced instead of being clamped into invented tokens or producing
 a negative/NaN dollar. The same guard covers the direct `costOf` paths used by
-trivial-span and price-delta arithmetic. A trivial-span dollar additionally
-requires every request unit in the turn to have its own model, timestamp, and
-provider evidence, resolve to the source vendor, and resolve a cited row more
-expensive than the comparison row; one missing/routed unit suppresses the whole
-finding. Partial-price sessions suppress the
+short-tool-free-turn and price-delta arithmetic. A short-turn comparison additionally
+requires every request unit in that turn to have its own model, timestamp, and
+provider evidence and a cited row above a lower-priced row for that same provider;
+one incomplete unit suppresses the whole turn. Different turns may resolve through
+different providers. Partial-price sessions suppress the
 whole-session price delta because their dollar basis excludes real turns.
 
 ## The validation matrix (SPEC-0044 R3–R5)

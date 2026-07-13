@@ -1,16 +1,35 @@
 # Diagnostics and adoption telemetry
 
-`aireceipts` can send small, content-free telemetry events to help us find bugs and understand which CLI features are actually used. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here disagrees with `src/telemetry/`, that is a bug.
+`aireceipts` can send small, content-free telemetry events to help us find bugs and understand which CLI features are actually used. Schema-enumerated product metadata may include exact aggregate counts when a named product decision needs them; the schema must keep transcript evidence and identity structurally impossible. This document is the full, authoritative description of what is sent, when, and how to turn it off. If anything here disagrees with `src/telemetry/`, that is a bug.
 
 ## tl;dr
 
-- **On by default**, but every event is one of a fixed nine-event catalog: `cli_run`, `cli_error`, `parse_failure`, `receipt_generated`, `export_generated`, `pr_flow_completed`, `hook_configured`, `integration_surface_rendered`, `activation_milestone`.
-- **Never sent**: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or session timestamps. (The App Insights wire format requires one client-stamped send time per envelope — the flush moment, nothing about your session's timeline; see "What is never sent".)
+- **On by default**, but every event is one of a fixed ten-event catalog: `cli_run`, `cli_error`, `parse_failure`, `receipt_generated`, `export_generated`, `pr_flow_completed`, `hook_configured`, `integration_surface_rendered`, `activation_milestone`, `review_pattern_evaluated`.
+- **Never sent**: transcript content, prompts, messages, tool inputs/outputs, tool/shell command text, raw argv, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, or session timestamps. The review event sends only a fixed pattern key/version, source family, evaluation state, and exact aggregate count. (The App Insights wire format requires one client-stamped send time per envelope — the flush moment, nothing about your session's timeline; see "What is never sent".)
 - **Pseudonymous install identity**: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete `~/.aireceipts/state.json` to reset it.
 - **Disable anytime**: `AIRECEIPTS_TELEMETRY=off` (or `0`/`false`) or `DO_NOT_TRACK=1`. Either one results in **zero network calls** and prevents install-id creation on a fresh install.
 - **On by default in CI too**: `CI`/`GITHUB_ACTIONS` environments are treated the same as any other — telemetry is enabled by default there. Use a kill switch (`AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1`) to disable it in CI. (Before v0.7.0 it defaulted off in CI; reversed — see SPEC-0002.)
 - **Inspect before you decide**: `aireceipts --telemetry-show` prints exactly what the current run would send, and sends nothing.
 - **Bounded and fail-safe**: sending is capped at 300ms and can never throw, hang the CLI, or change its exit code.
+
+## Metadata governance
+
+Product metadata is allowed in telemetry when all of these are true:
+
+- A spec names the product decision the field will support.
+- The field has a strict, documented schema; dimensions are fixed enums, versions,
+  booleans, buckets, bounded hashes, or aggregate safe integers—never free text.
+- Exact counts are aggregate detector/product measurements, not content excerpts or
+  identity proxies. General usage counters remain bucketed unless a spec explicitly
+  approves an exact field.
+- Transcript evidence, prompts/messages, tool inputs/outputs, tool/shell command text, raw argv, paths,
+  repositories, session identity, raw model strings, timestamps, and costs remain
+  structurally impossible.
+- The first-run disclosure, exact-payload preview, kill switches, and leakage tests move
+  with the schema change.
+
+This makes “metadata” a reviewed schema category, not a blanket permission to upload
+anything that is not called content.
 
 ## Event catalog
 
@@ -27,14 +46,14 @@ than widening itself.
 | `cliVersion` | string | semver | From this package's `package.json`. |
 | `os` | enum | `darwin` \| `linux` \| `win32` \| `other` | Collapsed from `process.platform`. |
 | `nodeMajor` | integer | e.g. `22` | Major Node version only. |
-| `commandClass` | enum | `backfill` \| `benchmark` \| `check-budget` \| `compare` \| `demo` \| `handoff` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
+| `commandClass` | enum | `backfill` \| `benchmark` \| `check-budget` \| `compare` \| `demo` \| `help` \| `install-hook` \| `list` \| `methodology` \| `mini` \| `pr` \| `quota` \| `receipt` \| `review` \| `stats` \| `statusline` \| `telemetry-show` \| `templates` \| `uninstall-hook` \| `version` \| `week` | Selected command name only; never raw argv or flag values. |
 | `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Which agent format was parsed, if known. |
 | `durationBucket` | enum | `<100ms` \| `100-500ms` \| `500ms-2s` \| `2-10s` \| `>10s` | Coarse bucket; never raw milliseconds. |
 | `ok` | boolean | | Whether the command returned exit code 0. |
 | `isCI` | boolean | | True when `CI` or `GITHUB_ACTIONS` is set and not false. Telemetry is enabled by default in CI, so this field distinguishes CI runs from human runs in the data. |
 | `installHash` | string | 64-hex sha256 or `unavailable` | Salted hash of the random local install id; raw id never leaves disk. |
 | `runOrdinalBucket` | enum | `1` \| `2-3` \| `4-10` \| `11-50` \| `>50` \| `unavailable` | Lifetime run ordinal bucket; never the raw count. |
-| `handoffFormat` | enum (optional) | `text` \| `json` | SPEC-0042: emission mode, present only on handoff-command runs — never content. |
+| `reviewFormat` | enum (optional) | `text` \| `json` | Session-review emission mode only. Aggregate shadow-rule measurements use the separate event below. |
 
 ### `cli_error` — one per uncaught top-level CLI error
 
@@ -94,7 +113,6 @@ than widening itself.
 | `commentResult` | enum | `success` \| `failed` \| `skipped` | |
 | `artifactResult` | enum | `success` \| `failed` \| `skipped` | |
 | `shareResult` | enum | `success` \| `failed` \| `skipped` | |
-| `handoffSectionIncluded` | boolean | | SPEC-0059: the rendered body carried the handoff section (rendering rate only — never engagement, never contents). |
 | `result` | enum | `success` \| `no_data` \| `invalid_args` \| `declined` \| `external_missing` \| `external_failed` \| `write_failed` \| `internal_error` | |
 
 ### `hook_configured` — one per hook install/uninstall command
@@ -130,6 +148,32 @@ network events.
 | `command` | enum | same command enum as `cli_run.commandClass` | Command that caused the milestone. |
 | `installAgeBucket` | enum | `first_day` \| `2-7d` \| `8-30d` \| `31-90d` \| `>90d` \| `unavailable` | Derived locally from `firstRunAt`; raw date is not sent. |
 
+### `review_pattern_evaluated` — one per shadow rule per successful session review
+
+Every successful `aireceipts review` evaluates the registry's shadow rules and queues
+one event for each of them, even when the result is zero or the trace lacks the required
+capability. Evaluated rows, including zero matches, are the denominator for a per-rule
+hit percentage; unavailable rows are reported separately as capability coverage. The
+percentage is calculated in the telemetry workspace and is not duplicated in the payload.
+Hidden compatibility invocations enter the same path. Failed invocations that
+never load and evaluate a session have no detector result to record; their `cli_run`
+still records the failed invocation.
+
+These are delivered, invocation-weighted measurements: rerunning review on the same
+session adds another row, while opt-outs and dropped sends add none. They do not measure
+unique-session prevalence and cannot replace the frozen-corpus accuracy audit required
+before a shadow rule becomes user-visible.
+
+| Field | Type | Values | Notes |
+|---|---|---|---|
+| `registryVersion` | integer | currently `1` | Version of the code-owned review registry. |
+| `patternId` | enum | registry key whose rollout state is `shadow` | Fixed code-owned key, never transcript text. |
+| `ruleVersion` | integer | currently `1` | Must exactly match the selected registry entry. |
+| `rolloutState` | literal | `shadow` | Visible/disabled rules cannot enter this event. |
+| `agentType` | enum | `claude-code` \| `codex` \| `cursor` \| `gemini` \| `opencode` \| `unknown` | Source family only. |
+| `evaluationStatus` | enum | `evaluated` \| `unavailable` | `unavailable` means the trace lacked a required capability, not that the rule did not match. |
+| `findingCount` | exact non-negative safe integer | `0` or greater | Aggregate post-supersession matches for this rule in the selected session. Forced to `0` when unavailable. No evidence, turn indices, commands, paths, recommendations, costs, or session identity accompany it. |
+
 ## Install identifier
 
 On the first telemetry-enabled run, aireceipts creates a random UUID in `~/.aireceipts/state.json`. It is never derived from hostname, username, MAC address, machine id, repo, path, or transcript data. The wire payload carries only:
@@ -149,7 +193,7 @@ That hash intentionally links events from the same install over time so adoption
 - `firstRunAt`
 - once-only activation milestone booleans
 
-These exact counts stay on your machine. The `aireceipts stats` command prints the local receipt/run counters and labels them "on this machine." Telemetry payloads use only buckets.
+The `aireceipts stats` counters stay on your machine and are sent only as ordinal buckets. The `aireceipts stats` command prints them and labels them "on this machine." Decision-scoped aggregate detector counts are the explicit exception: `review_pattern_evaluated.findingCount` is exact and disclosed above.
 
 ## What is never sent
 
@@ -157,6 +201,7 @@ Permanently, structurally banned:
 
 - Transcript content or any excerpt of it
 - Prompts or user/assistant message text
+- Tool inputs/outputs, tool/shell command text, or raw argv
 - File paths
 - Repo names or URLs
 - Hostnames
@@ -164,7 +209,7 @@ Permanently, structurally banned:
 - Session IDs
 - Dollar amounts or cost/pricing data
 - Raw model strings
-- Raw counts
+- Arbitrary or unlisted session metrics (only explicitly documented aggregate counts are allowed)
 - Raw timestamps
 
 ## Kill switches

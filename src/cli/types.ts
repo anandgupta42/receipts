@@ -11,6 +11,7 @@ import type {
   RecordIntegrationSurfaceRenderedInput,
   RecordPrFlowCompletedInput,
   RecordReceiptGeneratedInput,
+  RecordReviewPatternEvaluatedInput,
 } from "../telemetry/index.js";
 import type { MilestoneValue } from "../telemetry/schemas.js";
 
@@ -32,7 +33,7 @@ export interface CommandContext {
   };
   /** A single `[y/N]` confirmation read from `stdin` (hook install, and any new command). */
   prompt(question: string): Promise<boolean>;
-  /** Telemetry surface a command may read (recording/flush stays in `main()` — R6). */
+  /** Typed command telemetry seam; lifecycle run/error recording and the bounded flush stay in `main()` (R6). */
   readonly telemetry: {
     showPayload(env: NodeJS.ProcessEnv): { enabled: boolean; events: readonly unknown[] };
     noteReceiptGenerated(input: Omit<RecordReceiptGeneratedInput, "receiptOrdinal">, command?: string): Promise<void>;
@@ -40,6 +41,7 @@ export interface CommandContext {
     recordPrFlowCompleted(input: RecordPrFlowCompletedInput): void;
     recordHookConfigured(input: RecordHookConfiguredInput): void;
     recordIntegrationSurfaceRendered(input: RecordIntegrationSurfaceRenderedInput): void;
+    recordReviewPatternEvaluated(input: RecordReviewPatternEvaluatedInput): void;
     noteMilestone(milestone: MilestoneValue, command: string): Promise<void>;
   };
   /** The assembled `--help` text (registry-driven), for the help command. */

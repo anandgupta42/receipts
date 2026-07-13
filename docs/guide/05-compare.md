@@ -90,4 +90,4 @@ See [Share and export](11-share-and-export.md) for themes and formats.
 ## Next
 
 - **[Aggregate the week](06-week.md)** — compare against a whole week, not one session.
-- **[Fix it next time](09-handoff.md)** — turn a detector-flagged pattern into a rule for your agent.
+- **[Review a completed session](09-review.md)** — find recorded problems and prevent them next time.

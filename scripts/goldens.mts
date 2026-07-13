@@ -12,7 +12,8 @@ import { attachSubagentRollup } from "../src/receipt/subagents.js";
 import { renderReceipt } from "../src/receipt/render.js";
 import { renderReceiptSvg, renderCompareSvg } from "../src/receipt/svg.js";
 import { renderMiniReceipt } from "../src/receipt/mini.js";
-import { renderHandoff } from "../src/receipt/handoff.js";
+import { buildReviewReport, renderReview } from "../src/receipt/review.js";
+import type { Session } from "../src/parse/types.js";
 import { TEMPLATE_NAMES } from "../src/receipt/blocks.js";
 import { renderPrArtifactHtml } from "../src/pr/html.js";
 import { renderPerCommitLines } from "../src/pr/perCommit.js";
@@ -28,6 +29,8 @@ mkdirSync("goldens/mini", { recursive: true });
 let drift = 0;
 let count = 0;
 const loadedModels = new Map<string, ReceiptModel>();
+const loadedSessions = new Map<string, Session>();
+const nameOf = (path: string): string => path.split("/").pop()!.replace(/\.jsonl$/, "");
 
 /** Byte-compare (or rewrite under --update) one golden file. */
 function check(file: string, content: string): void {
@@ -54,10 +57,28 @@ for (const e of corpus) {
   // SPEC-0061 — compose the subagent rollup exactly as the CLI does; fixtures
   // without a `subagents/` dir return unchanged, so their goldens stay byte-stable.
   const model = await attachSubagentRollup(await buildReceiptModel(session), session.filePath);
+  loadedSessions.set(`${e.source}:${e.path}`, session);
   loadedModels.set(`${e.source}:${e.path}`, model);
   const stem = `${e.source}-${e.path.split("/").pop()!.replace(/\.jsonl$/, "")}`;
   check(`goldens/${stem}.txt`, renderReceipt(model, { color: false }) + "\n");
   check(`goldens/mini/${stem}.txt`, renderMiniReceipt(model) + "\n");
+}
+
+// SPEC-0083 R14 — text and JSON review contracts across every eval-corpus
+// source, including clean, priced, unpriced, loop, compaction, and hostile
+// sessions. Reports are per-session here; recurrence has its own fixed-window
+// unit fixtures.
+mkdirSync("goldens/review", { recursive: true });
+for (const e of corpus) {
+  const session = loadedSessions.get(`${e.source}:${e.path}`);
+  if (!session) {
+    console.error(`goldens: missing loaded review session ${e.path}`);
+    process.exit(1);
+  }
+  const stem = `${e.source}-${nameOf(e.path)}`;
+  const report = await buildReviewReport(session);
+  check(`goldens/review/${stem}.txt`, renderReview(report) + "\n");
+  check(`goldens/review/${stem}.json`, JSON.stringify(report, null, 2) + "\n");
 }
 
 async function modelFor(source: AgentSource, path: string): Promise<ReceiptModel> {
@@ -69,8 +90,6 @@ async function modelFor(source: AgentSource, path: string): Promise<ReceiptModel
   return buildReceiptModel(session);
 }
 
-const nameOf = (path: string): string => path.split("/").pop()!.replace(/\.jsonl$/, "");
-
 // SVG export — a priced fixture in both themes, plus a two-card compare (SPEC-0003).
 mkdirSync("goldens/svg", { recursive: true });
 const PRICED = { source: "claude-code" as AgentSource, path: "test/fixtures/claude-code/clean-multi-tool-2-models.jsonl" };
@@ -81,22 +100,6 @@ for (const theme of ["light", "dark"] as const) {
 }
 const loopModel = await modelFor(LOOP.source, LOOP.path);
 check(`goldens/svg/compare-${nameOf(PRICED.path)}-vs-${nameOf(LOOP.path)}.svg`, renderCompareSvg(pricedModel, loopModel));
-
-// SPEC-0042 R1/R2 — the resume packet's state-header + coverage wording is
-// golden-pinned on the loop fixture (has waste, so the packet renders).
-{
-  const loopSession = await loadById(LOOP.source, LOOP.path);
-  if (!loopSession) {
-    console.error("goldens: failed to load loop session for handoff golden");
-    process.exit(1);
-  }
-  const counts = {
-    turns: loopSession.turns.length,
-    toolCalls: loopSession.totals.toolCallCount,
-    compactions: loopSession.compactions?.length ?? 0,
-  };
-  check(`goldens/handoff-${LOOP.source}-${nameOf(LOOP.path)}.txt`, renderHandoff(loopModel, [], counts) + "\n");
-}
 
 // SPEC-0020 R5: {grocery, datavis} × {terminal, SVG light} on the priced fixture
 // (4 new artifacts). classic's existing goldens above are the refactor's

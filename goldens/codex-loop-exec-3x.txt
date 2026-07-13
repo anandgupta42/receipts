@@ -10,7 +10,7 @@ pre-edit: no named edit tool observed
 
 exec_command..................≥ $0.0102  (3 calls)
 
-⚠ exec_command loop ×3.............≥ $0.0102 (30s)
+⚠ exec_command loop ×3..............≥ $0.0034 (6s)
   at turn 1
 --------------------------------------------------
 TOTAL....................................≥ $0.0102

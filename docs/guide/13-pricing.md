@@ -153,11 +153,14 @@ other model would have completed the task, used the same tokens, or produced the
 same result. Read it as "the Standard API floor if those same observable tokens
 had been priced at that model's rate," nothing more.
 
-The `trivial spans` detector uses the same strict boundary. It emits a dollar
-only when every request unit in the candidate turn carries its own model/date/
-provider evidence, resolves to the agent's direct source vendor, and has a cited
-row that is more expensive than the comparison row. One missing or routed unit
-suppresses the finding instead of pricing a partial turn.
+The short tool-free-turn check uses the same strict boundary. A turn qualifies
+structurally only when it used no tools and recorded at most 120 output tokens.
+It emits a dollar comparison only when every request unit in that turn carries
+its own model, date, and provider evidence and has a cited row more expensive
+than a lower-priced row for that same provider. One incomplete unit suppresses
+that turn rather than presenting a partial comparison as complete. Different
+turns are evaluated independently, so a source-wide provider assumption is not
+required.
 
 ## Why it may differ from your bill
 

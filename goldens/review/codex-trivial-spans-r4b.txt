@@ -1,0 +1,16 @@
+SESSION REVIEW
+Source: Codex
+
+COST OPPORTUNITIES
+
+Short replies used a higher-priced option
+  What happened: One or more replies used no tools, were 120 output tokens or fewer, and have a cheaper same-provider price calculation for the exact recorded tokens.
+  Evidence: qualifying short replies: 3 · recorded turns: 1, 2, 3
+  Why it matters: The same recorded token volume has a lower list-price arithmetic result, although task quality is unknown.
+  Prevent it next time: Keep short replies minimal. If your setup can route work by price tier, consider its lower-cost option for this narrow kind of reply.
+  Same recorded tokens at listed prices: ≥ $0.0024 observed; ≥ $0.0008 at the lower-priced same-provider row · 908 tokens
+  What this does not prove: A short answer can still require difficult reasoning; this never claims another model would complete the task.
+
+COVERAGE
+Checks run: 5
+Checks unavailable for this trace: 1

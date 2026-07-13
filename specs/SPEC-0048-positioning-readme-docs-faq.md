@@ -28,7 +28,7 @@ Maintainer direction (2026-07-05): the README currently reads as a session-cost 
 first; the thing no other tool does — **the receipt attached to a unit of work, proven
 by this repo's own PRs** — appears only in Contributing. Reorder the public surface so
 work-unit receipts lead, credit adjacent tools plainly, and answer the questions real
-users ask (how is this different from ccusage; I'm on a flat plan, why dollars; does it
+users ask (how is this different from usage dashboards; I'm on a flat plan, why dollars; does it
 phone home; why tokens and no dollars) in one question-first FAQ. Everything stated must
 be derivable from committed repo bytes or the committed docs — **no internal strategy,
 launch material, or unverifiable market claims anywhere in user-facing docs.**
@@ -42,10 +42,9 @@ launch material, or unverifiable market claims anywhere in user-facing docs.**
 - **R2 — "What you get" leads with the PR receipt.** The existing PR-receipts bullet
   (README.md:88-90) moves to the top of the list, wording unchanged except the Design
   edit; the per-session anatomy bullet follows it. No bullet is added or removed.
-- **R3 — Related work credits ccusage directly.** The Related-work paragraph
-  (README.md:138-142) gains one sentence (Design, verbatim) crediting ccusage as the
-  usage-dashboard standard in its own right — today it is only mentioned parenthetically
-  as claude-receipts' data source. Factual, generous, no comparative adjectives (I6).
+- **R3 — Related work describes usage dashboards directly.** The Related-work paragraph
+  (README.md:138-142) gains one sentence (Design, verbatim) crediting the adjacent
+  usage-dashboard category in its own right. Factual, generous, no comparative adjectives (I6).
 - **R4 — `docs/faq.md`, question-first.** A new FAQ with exactly the eight questions in
   Design. Each answer: ≤10 lines, links the one canonical doc that owns the topic
   (`docs/telemetry.md`, `docs/trust.md`, `docs/guide/13-pricing.md`,
@@ -79,17 +78,16 @@ exports. The PR-receipts bullet keeps its floors sentence unchanged.
 
 R3 sentence, appended to Related work:
 
-> [ccusage](https://github.com/ryoppippi/ccusage) is the standard for daily and weekly
-> usage dashboards across coding agents; aireceipts answers a different question — what
+> Daily and weekly usage dashboards aggregate spend across coding-agent sessions;
+> aireceipts answers a different question — what
 > a specific session or PR cost, with every number traceable.
 
 R4 — the eight questions, verbatim headings, with what each answer must contain:
 
-1. **"How is this different from ccusage or my agent's built-in `/usage`?"** — both are
+1. **"How is this different from usage dashboards or my agent's built-in `/usage`?"** — both are
    usage dashboards over time; aireceipts is a receipt for a unit of work (a session, a
    PR) with per-tool attribution, cited prices, and byte-deterministic output. Links
-   the ccusage repo directly (README section links don't survive the site's flat
-   basename rewrite) + `docs/trust.md`. States facts about what each reads/prints; no
+   `docs/trust.md`. States facts about what each category reads/prints; no
    ranking or quality adjectives (I6).
 2. **"I'm on a flat-rate subscription — what do the dollar figures mean for me?"** —
    dollars are API-equivalent arithmetic from your real token counts (labeled, never a
@@ -155,7 +153,7 @@ question-first."*
 | R1 sentence present | README "Why this exists" | Design sentence, verbatim, linking docs/pr-receipts.md |
 | R1 guard green | `test/readme-guard.test.ts` | all cases pass; no budget constant edited |
 | R2 bullet order | README "What you get" | PR-receipts bullet first; same bullet count |
-| R3 ccusage credit | README Related work | Design sentence verbatim; no comparative adjectives |
+| R3 usage-dashboard credit | README Related work | Design sentence verbatim; no comparative adjectives |
 | R4 file + questions | `docs/faq.md` | exists; eight Design headings, verbatim |
 | R4 answer length | each FAQ answer | ≤10 lines each |
 | R4 canonical links | each FAQ answer | links its Design-named canonical doc |

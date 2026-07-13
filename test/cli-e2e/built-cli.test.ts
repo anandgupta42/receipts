@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { handoffJsonSchema, receiptJsonSchema, SCHEMA_VERSION } from "../../src/receipt/exportSchema.js";
+import { receiptJsonSchema, reviewJsonSchema, SCHEMA_VERSION } from "../../src/receipt/exportSchema.js";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const fixturesDir = path.join(repoRoot, "test", "fixtures");
@@ -852,13 +852,12 @@ describe("built CLI e2e", () => {
     expect(setup.latest?.combinedUnpricedTokens.total).toBeGreaterThanOrEqual(setup.latest?.parentUnpricedTokens.total ?? 0);
     expect(setup.latest?.combinedTotalTokens).toBeGreaterThan(setup.latest?.totalTokens.total ?? 0);
 
-    const handoff = await runCli(["--handoff", loopParent], home);
-    expectSuccess(handoff);
-    const expectedHandoffFloor = (Math.floor((compared.b.combinedPricedUsd as number) * 100 + 1e-9) / 100).toFixed(2);
-    expect(handoff.stdout).toContain(`total ≥ $${expectedHandoffFloor}`);
-    expect(handoff.stdout).toContain("2 subagents");
-    expect(handoff.stdout).toContain("parent turns");
-    expect(handoff.stdout.match(/2 subagents/gu)).toHaveLength(2);
+    const review = await runCli(["review", loopParent], home);
+    expectSuccess(review);
+    expect(review.stdout).toContain("SESSION REVIEW");
+    expect(review.stdout).toContain("The same failed action was tried again unchanged");
+    expect(review.stdout).toContain("Prevent it next time:");
+    expect(review.stdout).not.toContain(loopParent);
 
     const benchmark = readJson<{ properties: { costPerTurnBucket: string; pricingCoverage: string } }>(
       await runCli(["benchmark", cleanParent, "--dry-run"], home),
@@ -867,62 +866,37 @@ describe("built CLI e2e", () => {
     expect(benchmark.properties.pricingCoverage).toBe("full");
   });
 
-  it("SPEC-0042: --handoff --json emits the schema-valid resume packet; text form carries header + coverage", async () => {
+  it("SPEC-0083: review emits strict prevention JSON/text and the hidden alias is byte-identical", async () => {
     const home = await makeHome();
     await stageClaudeSession(home, "loop-bash-5x.jsonl", "loop.jsonl");
 
-    const jsonRun = await runCli(["--handoff", "--json"], home);
+    const jsonRun = await runCli(["review", "--json"], home);
     expect(jsonRun.code, jsonRun.stderr).toBe(0);
     const parsed = JSON.parse(jsonRun.stdout) as Record<string, unknown>;
-    expect(() => handoffJsonSchema.parse(parsed)).not.toThrow();
-    expect(parsed.coverage).toEqual({
-      scope: "parent-session",
-      turns: 6,
-      toolCalls: 5,
-      compactions: 0,
-      wasteLines: 1,
-    });
-    expect(parsed.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(Object.keys(parsed)).toEqual([
-      "schemaVersion",
-      "source",
-      "sessionId",
-      "title",
-      "startedAtMs",
-      "durationMs",
-      "totals",
-      "pricingCoverage",
-      "unpricedTokens",
-      "unpricedTokensScope",
-      "combinedUnpricedTokens",
-      "combinedUnpricedTokensScope",
-      "combinedPricingCoverage",
-      "totalUsd",
-      "totalCostEstimate",
-      "totalUsdScope",
-      "combinedPricedUsd",
-      "combinedPricedCostEstimate",
-      "combinedTotalTokens",
-      "combinedScope",
-      "subagents",
-      "wasteLines",
-      "wasteLinesScope",
-      "couldHaveSaved",
-      "suggestions",
-      "threshold",
-      "coverage",
-      "aggregates",
-    ]);
+    expect(() => reviewJsonSchema.parse(parsed)).not.toThrow();
+    expect(parsed.schemaVersion).toBe(1);
+    expect(Object.keys(parsed)).toEqual(["schemaVersion", "review"]);
+    const review = parsed.review as {
+      registryVersion: number;
+      source: string;
+      findings: Record<string, unknown>;
+      coverage: { evaluated: { count: number } };
+    };
+    expect(Object.keys(review)).toEqual(["registryVersion", "source", "findings", "coverage"]);
+    expect(review.coverage.evaluated.count).toBe(6);
+    expect(review.findings["repeated-identical-error"]).toBeDefined();
     expect(jsonRun.stdout).not.toMatch(/"(cwd|gitBranch|isSidechain|parentSessionId|agentId|parentFilePath)"/);
 
-    const textRun = await runCli(["--handoff"], home);
+    const hiddenJsonRun = await runCli(["--handoff", "--json"], home);
+    expect(hiddenJsonRun.stdout).toBe(jsonRun.stdout);
+
+    const textRun = await runCli(["review"], home);
     expect(textRun.code, textRun.stderr).toBe(0);
-    expect(textRun.stdout).toContain("handoff: ");
-    expect(textRun.stdout).toContain("total ≥ $");
-    // SPEC-0059 R1/R3 — the slip headline and the class's rule line ride the packet.
-    expect(textRun.stdout).toContain("FLAGGED PATTERN COST");
-    expect(textRun.stdout).toContain("→ change or stop after two identical failures");
-    expect(textRun.stdout).toContain("covers: 6 turns · 5 tool calls · 0 compactions · 1 flagged-pattern line");
+    expect(textRun.stdout).toContain("SESSION REVIEW");
+    expect(textRun.stdout).toContain("THINGS TO IMPROVE");
+    expect(textRun.stdout).toContain("Prevent it next time:");
+    expect(textRun.stdout).toContain("Checks run: 6");
+    expect((await runCli(["--handoff"], home)).stdout).toBe(textRun.stdout);
   });
 
   it("treats malformed budget config as stderr-only advisory and still renders the receipt", async () => {

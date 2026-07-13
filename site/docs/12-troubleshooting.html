@@ -307,7 +307,7 @@ footer{
         <li><a href="06-week.html">Aggregate the week</a></li>
         <li><a href="07-statusline.html">Keep the meter running</a></li>
         <li><a href="08-budget.html">Set and watch a budget</a></li>
-        <li><a href="09-handoff.html">Fix it next time (handoff)</a></li>
+        <li><a href="09-review.html">Review a completed session</a></li>
         <li><a href="10-templates.html">Use a template</a></li>
         <li><a href="11-share-and-export.html">Share and export</a></li>
         <li><a href="15-integrations.html">Choose an integration</a></li>
@@ -319,6 +319,7 @@ footer{
         <li><a href="json-schema.html">Export schema (--json / --csv)</a></li>
         <li><a href="statusline.html">Statusline — the meter</a></li>
         <li><a href="pr-receipts.html">PR receipts — attach the building session's receipt to a PR</a></li>
+        <li><a href="review-patterns.html">Session review pattern reference</a></li>
         <li><a href="org-rollout.html">Rolling out receipt checks across a fleet of repos</a></li>
         <li><a href="telemetry.html">Diagnostics and adoption telemetry</a></li>
         <li><a href="CHANGELOG.html">Changelog</a></li>
@@ -373,7 +374,7 @@ no price table matched</code></pre>
 
 <p>The very first time you run aireceipts, it prints this once:</p>
 
-<pre class="doc-code"><code>aireceipts sends anonymous, content-free diagnostics and feature-usage events (command, coarse buckets, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md</code></pre>
+<pre class="doc-code"><code>aireceipts sends content-free diagnostics and feature-usage events (command, coarse buckets, aggregate review-rule counts, and a random install identifier — never transcript content, prompts, file paths, repo names, or dollar amounts). Disable anytime with AIRECEIPTS_TELEMETRY=off or DO_NOT_TRACK=1. Run --telemetry-show to see exactly what a run would send. Details: docs/telemetry.md</code></pre>
 
 <p>It never prints again after that. To turn telemetry off entirely (zero network calls — not &quot;less,&quot; zero), set either environment variable:</p>
 

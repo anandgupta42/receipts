@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "review": {
+    "registryVersion": 1,
+    "source": "opencode",
+    "findings": {
+      "repeated-identical-attempt": {
+        "ruleVersion": 1,
+        "category": "issue",
+        "title": "Same action repeated without a change",
+        "whatHappened": "The same tool ran at least three times in a row with identical recorded input.",
+        "whyItMatters": "Repeating an unchanged action can use more time and tokens without trying a new approach.",
+        "recommendation": "After two identical attempts, inspect the result and change the input or approach before trying again.",
+        "evidenceStrength": "exact-structure",
+        "claimLimit": "This proves repetition, not that the repeated action was unnecessary or failed.",
+        "evidence": {
+          "eventCount": 1,
+          "actionCount": 3,
+          "turnIndices": [
+            0,
+            1,
+            2
+          ],
+          "totalTurnCount": 3,
+          "tools": [
+            "bash"
+          ],
+          "totalToolCount": 1,
+          "facts": [
+            {
+              "name": "attempts",
+              "value": 3
+            },
+            {
+              "name": "triggering-attempts",
+              "value": 1
+            }
+          ]
+        },
+        "impact": {
+          "role": "observed-attributed",
+          "tokens": {
+            "input": 600,
+            "output": 150,
+            "cacheRead": 0,
+            "cacheCreation": 0,
+            "cacheCreation5m": null,
+            "cacheCreation1h": null,
+            "total": 750
+          },
+          "usd": 0.00315,
+          "durationMs": 7000
+        }
+      }
+    },
+    "coverage": {
+      "evaluated": {
+        "count": 4,
+        "patternIds": [
+          "repeated-identical-attempt",
+          "repeated-identical-error",
+          "consecutive-tool-errors",
+          "short-tool-free-turn-cost"
+        ]
+      },
+      "unavailable": {
+        "count": 2,
+        "patternIds": [
+          "same-file-reread-without-recorded-change",
+          "context-refill-cluster"
+        ]
+      }
+    }
+  }
+}

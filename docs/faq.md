@@ -4,11 +4,10 @@ Seeing an error or an odd receipt? That's
 [troubleshooting](guide/12-troubleshooting.md) — symptom-first. This page is
 question-first. (SPEC-0048.)
 
-## How is this different from ccusage or my agent's built-in `/usage`?
+## How is this different from usage dashboards or my agent's built-in `/usage`?
 
-Those are usage dashboards: [ccusage](https://github.com/ryoppippi/ccusage) and
-your agent's built-ins aggregate what you spent over time — today, this week,
-this billing window. aireceipts prints a receipt
+Usage dashboards and your agent's built-ins aggregate what you spent over time —
+today, this week, this billing window. aireceipts prints a receipt
 for a **unit of work** — one session or one pull request — with observable
 Standard-API floor attributed per
 tool call, prices taken from cited and dated tables, and byte-deterministic output.
@@ -29,8 +28,8 @@ subscriber. How every dollar is computed: [pricing](guide/13-pricing.md).
 ## Does aireceipts send anything off my machine?
 
 The product path is fully offline. The only network call is content-free telemetry
-from a fixed nine-event catalog — never transcript content, prompts, file paths,
-repo names, or dollar amounts. It is on by default; `aireceipts --telemetry-show`
+from a fixed ten-event catalog, including disclosed aggregate review-rule counts —
+never transcript content, prompts, file paths, repo names, or dollar amounts. It is on by default; `aireceipts --telemetry-show`
 prints exactly what the current run would send (and sends nothing), and
 `AIRECEIPTS_TELEMETRY=off` or `DO_NOT_TRACK=1` means zero network calls. The
 authoritative schema, field by field: [telemetry.md](telemetry.md).
