@@ -1,9 +1,11 @@
 # SPEC-0019 R5 + SPEC-0066 — the PR receipt check. A receipt is GENERATED on the
 # developer's machine (transcripts never reach the runner, I1/I4). This workflow only
-# transports it: if the branch carries a git-ref receipt (refs/receipts/<slug>, written by
+# transports it: if the branch carries a git-ref receipt (refs/aireceipts/<slug>, written by
 # the local store=ref producer / pre-push hook), CI fetches + SANITIZES + renders it, then
 # posts the comment. A receipt posted locally (`pr --post`) is honored as-is. Notice-only
 # by default; opt into same-repo enforcement with AIRECEIPTS_REQUIRE_PR_RECEIPT=true.
+# Enforcement skips branches matching AIRECEIPTS_RECEIPT_EXEMPT_GLOBS (default `release/*`):
+# release checkouts have no capturable agent session, so no receipt is expected there.
 #
 # TRUST BOUNDARY (Codex review). The untrusted, mutable `@latest` npm package renders in a
 # SEPARATE JOB (`render`) that has NO write token and only `contents: read`; its output
@@ -91,7 +93,9 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           BASE_REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
           REQUIRE_PR_RECEIPT: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT }}
+          RECEIPT_EXEMPT_GLOBS: ${{ vars.AIRECEIPTS_RECEIPT_EXEMPT_GLOBS }}
         run: |
           set -uo pipefail
           MARKER='<!-- aireceipts-dogfood -->'
@@ -100,7 +104,9 @@ jobs:
           receipt_verdict() {
             gh api --paginate "repos/${BASE_REPO}/issues/${PR_NUMBER}/comments" > comments.json || echo "[]" > comments.json
             args=(comments.json --head-repo "$HEAD_REPO" --base-repo "$BASE_REPO")
-            if [ "${REQUIRE_PR_RECEIPT:-}" = "true" ]; then args+=(--require-same-repo); fi
+            if [ "${REQUIRE_PR_RECEIPT:-}" = "true" ]; then
+              args+=(--require-same-repo --head-ref "$HEAD_REF" --exempt-globs "${RECEIPT_EXEMPT_GLOBS:-release/*}")
+            fi
             node scripts/check-pr-receipt.mjs "${args[@]}"
           }
 

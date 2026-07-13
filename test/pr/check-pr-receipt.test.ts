@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   DOGFOOD_MARKER as SCRIPT_MARKER,
   hasReceiptComment,
+  isExemptRef,
   receiptCheckVerdict,
 } from "../../scripts/check-pr-receipt.mjs";
 import { DOGFOOD_MARKER as BODY_MARKER } from "../../src/pr/body.js";
@@ -54,6 +55,40 @@ describe("receiptCheckVerdict", () => {
       "missing-notice",
     );
     expect(receiptCheckVerdict("[]")).toBe("missing-notice");
+  });
+
+  it("keeps exempt branches notice-only under enforcement", () => {
+    const opts = { headRepo: "owner/repo", baseRepo: "owner/repo", requireSameRepo: true };
+    expect(receiptCheckVerdict("[]", { ...opts, headRef: "release/v0.10.0", exemptGlobs: "release/*" })).toBe(
+      "missing-notice",
+    );
+    expect(
+      receiptCheckVerdict("[]", { ...opts, headRef: "chore/release-v1", exemptGlobs: "release/* chore/release-*" }),
+    ).toBe("missing-notice");
+  });
+
+  it("still requires non-exempt branches under enforcement", () => {
+    const opts = { headRepo: "owner/repo", baseRepo: "owner/repo", requireSameRepo: true };
+    expect(receiptCheckVerdict("[]", { ...opts, headRef: "feat/x", exemptGlobs: "release/*" })).toBe(
+      "missing-required",
+    );
+    // No globs configured, or no head ref supplied: enforcement is unchanged.
+    expect(receiptCheckVerdict("[]", { ...opts, headRef: "release/v0.10.0" })).toBe("missing-required");
+    expect(receiptCheckVerdict("[]", { ...opts, exemptGlobs: "release/*" })).toBe("missing-required");
+  });
+});
+
+describe("isExemptRef", () => {
+  it("matches shell-style globs, anchored", () => {
+    expect(isExemptRef("release/v0.10.0", "release/*")).toBe(true);
+    expect(isExemptRef("feat/release/x", "release/*")).toBe(false);
+    expect(isExemptRef("release", "release/*")).toBe(false);
+    expect(isExemptRef("ci/nightly", "release/* ci/*")).toBe(true);
+  });
+
+  it("treats regex metacharacters in globs literally", () => {
+    expect(isExemptRef("releaseXv1", "release.v*")).toBe(false);
+    expect(isExemptRef("release.v1", "release.v*")).toBe(true);
   });
 });
 
