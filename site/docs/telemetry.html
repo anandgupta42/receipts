@@ -340,7 +340,7 @@ footer{
 
 <ul>
   <li><strong>On by default</strong>, but every event is one of a fixed nine-event catalog: <code>cli_run</code>, <code>cli_error</code>, <code>parse_failure</code>, <code>receipt_generated</code>, <code>export_generated</code>, <code>pr_flow_completed</code>, <code>hook_configured</code>, <code>integration_surface_rendered</code>, <code>activation_milestone</code>.</li>
-  <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or raw timestamps.</li>
+  <li><strong>Never sent</strong>: transcript content, prompts, file paths, repo names, hostnames, usernames, session IDs, dollar amounts, raw model strings, raw counts, or session timestamps. (The App Insights wire format requires one client-stamped send time per envelope — the flush moment, nothing about your session's timeline; see &quot;What is never sent&quot;.)</li>
   <li><strong>Pseudonymous install identity</strong>: when telemetry is enabled, a random install id is stored locally and sent only as a salted sha256 hash so events from the same install can be counted over time. Delete <code>~/.aireceipts/state.json</code> to reset it.</li>
   <li><strong>Disable anytime</strong>: <code>AIRECEIPTS_TELEMETRY=off</code> (or <code>0</code>/<code>false</code>) or <code>DO_NOT_TRACK=1</code>. Either one results in <strong>zero network calls</strong> and prevents install-id creation on a fresh install.</li>
   <li><strong>On by default in CI too</strong>: <code>CI</code>/<code>GITHUB_ACTIONS</code> environments are treated the same as any other — telemetry is enabled by default there. Use a kill switch (<code>AIRECEIPTS_TELEMETRY=off</code> or <code>DO_NOT_TRACK=1</code>) to disable it in CI. (Before v0.7.0 it defaulted off in CI; reversed — see SPEC-0002.)</li>
@@ -352,7 +352,9 @@ footer{
 
 <p>Every field below is validated against a <code>.strict()</code> zod schema before it is queued. Extra keys are rejected, so a bug elsewhere cannot smuggle a new field into a payload.</p>
 
-<h3 id="clirun-one-per-normal-cli-invocation"><code>cli_run</code> — one per normal CLI invocation</h3>
+<h3 id="clirun-one-per-invocation-of-a-catalogued-command"><code>cli_run</code> — one per invocation of a catalogued command</h3>
+
+<p>Commands outside the fixed catalog below (currently <code>setup</code> and <code>integrations</code>) emit no <code>cli_run</code> at all — the strict schema drops unknown command names rather than widening itself.</p>
 
 <div class="table-wrap"><table>
   <thead><tr><th>Field</th><th>Type</th><th>Values</th><th>Notes</th></tr></thead>
@@ -555,7 +557,7 @@ DO_NOT_TRACK=1 aireceipts ...</code></pre>
   <li>The send is bounded to <strong>300ms</strong>. If the network call is slow or hangs, it is abandoned; the CLI does not wait for it, and nothing is retried in the background.</li>
   <li>Every failure mode is swallowed inside the telemetry module. Telemetry can never throw, block the CLI, or change its exit code.</li>
   <li>The transport is Azure Application Insights, reached via a connection string (<code>InstrumentationKey=...;IngestionEndpoint=https://.../</code>) POSTed to <code>&lt;ingestionEndpoint&gt;/v2/track</code>.</li>
-  <li>Like any HTTPS/App Insights request, the transport stamps an arrival time for the batch. The &quot;no raw timestamps&quot; rule covers payload fields chosen by aireceipts, not transport metadata created by the service.</li>
+  <li>The App Insights wire format requires a <code>time</code> field per envelope; the sender stamps it client-side at flush (<code>src/telemetry/sender.ts</code>). It records when the batch was sent — not when your session ran, started, or ended. The &quot;no timestamps&quot; rule covers aireceipts' own event payload fields (<code>properties</code>), which carry only coarse buckets and no time fields.</li>
 </ul>
 
 <h2 id="connection-string-honesty">Connection-string honesty</h2>

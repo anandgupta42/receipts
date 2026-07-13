@@ -362,8 +362,10 @@ prediction of what you'll do next.
 
 ## Notes
 
-- One line, one on-disk read per invocation — this is a snapshot, not a live
-  view. Nothing streams mid-session (see the CLI's non-goals).
+- One line per invocation, read freshly from disk — this is a snapshot, not a
+  live view. Nothing streams mid-session (see the CLI's non-goals). A render may
+  read several local files (the config, candidate transcripts, subagent
+  transcripts) but never watches, polls, or holds anything open.
 - A session with no priced component renders tokens-only. If some components
   price and others do not, the cited floor remains visible beside the exact
   known-unpriced token count; `aireceipts` never assigns those tokens a guessed

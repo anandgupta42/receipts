@@ -116,7 +116,7 @@ SPEC-0068 — same-FILE re-reads (same normalized path, any range) with no recor
 | Field | Type | Notes |
 |---|---|---|
 | `count` | number | No-recorded-cause re-reads (2nd..Nth reads of a path). |
-| `turnIndices` | array | 1-/0-based transcript turn indices of the counted re-reads, ascending. |
+| `turnIndices` | array | Zero-based transcript turn indices of the counted re-reads, ascending. (Human-rendered receipts print the same turns one-based.) |
 | `tokens` | TokenUsage | Per-call token share of the counted re-reads. |
 | `usd` | number \| null | Compatibility scalar containing the priced lower-bound share; null if any counted re-read is unpriced (I2). |
 | `costEstimate` | CostEstimate \| null | Structured lower-bound semantics for the adjacent `usd`, or null when unpriced. |

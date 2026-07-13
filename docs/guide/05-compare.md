@@ -26,7 +26,7 @@ Edit..........................≥ $0.0455  (2 calls)
 Write.........................≥ $0.0290  (2 calls)
 Read...........................≥ $0.0192  (1 call)
 --------------------------------------------------
-TOTAL....................................≥ $0.1767
+TOTAL....................................≥ $0.1764
 standard API-equivalent floor; not an invoice
 same tokens on claude-haiku-4-5..........≥ $0.0392
   (78% lower observable floor)
@@ -62,7 +62,10 @@ Add email format validation…'s standard-API floor is 1.9× Can you fix the fla
 ```
 
 The closing line is the whole point: the first observable floor is **1.9×** the second
-(`≥ $0.1767` vs `≥ $0.0945`). This is a ratio of cited floor arithmetic, not a ratio
+(`≥ $0.1767` vs `≥ $0.0945`). Compare works on the raw session floors, which can sit
+a fraction of a cent above each ledger's displayed `TOTAL` (the ledger is derived
+from its displayed rows so they always sum exactly; both are true floors of the same
+session). This is a ratio of cited floor arithmetic, not a ratio
 of invoices, and aireceipts emits it only when both parent-plus-subagent ledgers
 have full pricing coverage. If either side is partial, the closing line says the
 sessions are not directly comparable and lists each side's known `≥ $` subtotal

@@ -1,7 +1,7 @@
 ---
 id: SPEC-0079
 title: "The samosa story page: a live tip jar, on the project's own surfaces only"
-status: building
+status: shipped
 milestone: M5
 depends: [SPEC-0034, SPEC-0070]
 ---
@@ -159,11 +159,11 @@ Card structure (existing aesthetic — monospace, paper card, drawn glyph on top
 
 ## Success criteria
 
-- [ ] The story page ships the Design copy: zero scripts, one external href (the live
+- [x] The story page ships the Design copy: zero scripts, one external href (the live
       Ko-fi jar), glyph paths drift-guarded.
-- [ ] README and FUNDING.yml carry their links; readme-guard green with the new assertion.
-- [ ] No PR-posted surface changes: SPEC-0070 tests and all goldens pass untouched.
-- [ ] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
+- [x] README and FUNDING.yml carry their links; readme-guard green with the new assertion.
+- [x] No PR-posted surface changes: SPEC-0070 tests and all goldens pass untouched.
+- [x] `npx tsc --noEmit`, `npx eslint . --max-warnings 0`, `npx vitest run`,
       `node scripts/verify-goldens.mjs`,
       `node scripts/determinism-check.mjs --runs=10 -- node scripts/verify-goldens.mjs`,
       `node scripts/spec-lint.mjs`, `node scripts/hygiene.mjs` all pass unmasked

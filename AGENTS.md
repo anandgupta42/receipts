@@ -81,7 +81,7 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 *Updated only by the `release` skill. Keep this section, and only this section, current
 after each release — don't hand-edit it elsewhere.*
 
-- **Shipped (npm `aireceipts-cli`, v0.8.2):** the receipt engine and its whole surface
+- **Shipped (npm `aireceipts-cli`, v0.9.0):** the receipt engine and its whole surface
   are live — parse adapters (Claude Code, Codex, Cursor, Gemini, opencode), cited price
   tables, per-tool attribution, waste lines (stuck-loop, trivial-spans, context-thrash
   incl. Codex compactions), price-delta + routable-spend (now with `% less`), `compare`,
@@ -116,7 +116,13 @@ after each release — don't hand-edit it elsewhere.*
   was orphaned by `--amend`/rebase, with an authorship guard so a cherry-pick can't steal credit
   from a session that already directly claimed the commit (a narrower residual — a cherry-pick
   onto a branch SHA the true author never claims — is documented in the spec's Non-goals)
-  (SPEC-0072, v0.6.0). 43 specs at `status: shipped`.
+  (SPEC-0072, v0.6.0); **lower-bound receipts** — every dollar is an explicit
+  Standard-API-equivalent floor (`≥ $X`), exports move to schema v2, GPT-5.6 prices via
+  cited per-request context tiers, ledger rows sum exactly to `TOTAL`, and parsing fails
+  closed on contradictory trace evidence while retaining observable tokens (#242, v0.9.0);
+  plus, all v0.9.0: the **statusline model segment + landing meter** (SPEC-0076), the
+  **PR-receipt provenance footer** (SPEC-0078), the **samosa story page** (SPEC-0079), and
+  **landing SEO/AEO** (SPEC-0080). 47 specs at `status: shipped`.
 - **In progress (`building`):** SPEC-0044 cost-attribution confidence — its
   implemented slices ship in v0.2.0 (ConfidenceEvent contract + no-silent-drop,
   cost matrix, rows-sum-to-total, cache-write caveat, parse-skip/load-failure

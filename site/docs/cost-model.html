@@ -338,7 +338,7 @@ footer{
 
 <h2 id="the-one-rule">The one rule</h2>
 
-<p>Every computed dollar is a <strong>Standard API list-price-equivalent lower bound</strong>, never an invoice or an exact-billing claim. Internally, its raw arithmetic must reconcile to observable tokens × applicable rates from the cited, dated Standard API row; a cached-read or cache-write component with no cited applicable rate contributes zero, never a guessed input-rate fallback. Externally, every amount renders with <code>≥</code> because local agent transcripts do not establish the auth and billing route, negotiated plan, credits, service tier, regional uplift, or every provider-side usage dimension. Additional known omissions carry their own visible caveat or tokens-only subtotal. Silent wrongness is the forbidden state. SPEC-0044 makes that a mechanical property: every drop/degrade/lower-bound decision routes through a typed <code>ConfidenceEvent</code> (<code>src/pr/confidence.ts</code>), and a hygiene check + an exhaustive-switch test prevent a new silent drop from being introduced.</p>
+<p>Every computed dollar is a <strong>Standard API list-price-equivalent lower bound</strong>, never an invoice or an exact-billing claim. Internally, its raw arithmetic must reconcile to observable tokens × applicable rates from the cited, dated Standard API row; a cached-read or cache-write component with no cited applicable rate contributes zero, never a guessed input-rate fallback. Externally, every amount renders with <code>≥</code> because local agent transcripts do not establish the auth and billing route, negotiated plan, credits, service tier, regional uplift, or every provider-side usage dimension. Additional known omissions carry their own visible caveat or tokens-only subtotal. Silent wrongness is the forbidden state. SPEC-0044 makes that a mechanical property on the PR path: every PR-selection drop/degrade/lower-bound decision routes through a typed <code>ConfidenceEvent</code> (<code>src/pr/confidence.ts</code>), and a hygiene check + an exhaustive-switch test prevent a new silent drop from being introduced there. Single-session receipts surface the same information through their typed caveat list (<code>src/receipt/model.ts</code>).</p>
 
 <h2 id="the-confidenceevent-contract-every-reason-a-number-may-be-incomplete">The ConfidenceEvent contract — every reason a number may be incomplete</h2>
 
@@ -356,7 +356,7 @@ footer{
   </tbody>
 </table></div>
 
-<p><code>unobserved-cache-write-tokens</code> is a receipt-level observability caveat rather than a PR-selection <code>ConfidenceEvent</code>: a priced Codex GPT-5.6 receipt states that the rollout omits cache-write tokens, so the floor excludes any write premium. The structured caveat survives <code>--json</code>; the universal <code>CostEstimate</code> still supplies the lower-bound kind and basis.</p>
+<p><code>unobserved-cache-write-tokens</code> is primarily a receipt-level observability caveat (it also exists in the <code>ConfidenceEvent</code> union so the PR path can carry it): a priced Codex GPT-5.6 receipt states that the rollout omits cache-write tokens, so the floor excludes any write premium. The structured caveat survives <code>--json</code>; the universal <code>CostEstimate</code> still supplies the lower-bound kind and basis.</p>
 
 <h2 id="per-agent-extraction-depth-what-can-be-priced">Per-agent extraction depth (what can be priced)</h2>
 
