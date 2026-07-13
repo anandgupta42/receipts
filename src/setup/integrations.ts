@@ -30,7 +30,7 @@ const AGENT_PRE_PUSH_HOOK_JSON = [
   '        "hooks": [',
   "          {",
   '            "type": "command",',
-  '            "command": "npx -y aireceipts-cli@latest hook pre-push",',
+  '            "command": "npx -y aireceipts-cli@latest hook pre-push || true",',
   '            "timeout": 60',
   "          }",
   "        ]",
