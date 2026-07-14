@@ -23,11 +23,12 @@ import { promisify } from "node:util";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const r = (p) => join(ROOT, p);
 
-// Ceilings: the final post-cost-correctness tarball is 72 files / 564 KB.
-// Keep narrow headroom so normal runtime growth fits while a real regression
-// (sourcemaps back, a stray directory) still trips the release gate.
+// Ceilings: v0.10.0 shipped 72 files / ~580 KB; the SPEC-0036 exempt-glob
+// port to pr-check nudged it just past the old 580 line. Keep narrow headroom
+// so normal runtime growth fits while a real regression (sourcemaps back, a
+// stray directory) still trips the release gate.
 export const MAX_TARBALL_FILES = 80;
-export const MAX_UNPACKED_KB = 580;
+export const MAX_UNPACKED_KB = 590;
 // NOTICE ships because Apache-2.0 §4(d) requires redistributions to include it.
 export const FILES_ALLOWLIST = ["dist", "data/prices", "data/demo", "README.md", "LICENSE", "NOTICE"];
 
