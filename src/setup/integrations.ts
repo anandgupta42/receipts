@@ -81,6 +81,9 @@ const NPM_NATIVE_PR_CHECK_CALLER_YAML = [
   "        env:",
   "          GH_TOKEN: ${{ github.token }}",
   "          AIRECEIPTS_REQUIRE_PR_RECEIPT: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT }}",
+  "          # Optional: branches exempt from enforcement (anchored globs, space-",
+  "          # separated). pr-check defaults to release/* when this is unset.",
+  "          AIRECEIPTS_RECEIPT_EXEMPT_GLOBS: ${{ vars.AIRECEIPTS_RECEIPT_EXEMPT_GLOBS }}",
 ].join("\n");
 
 export const INTEGRATION_RECIPES: readonly IntegrationRecipe[] = [

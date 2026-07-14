@@ -297,7 +297,9 @@ or `.codex/hooks.json` hook entry.
 **Turn it up when you want — opt-in and escapable:**
 
 - **Enforce** — set the repo variable `AIRECEIPTS_REQUIRE_PR_RECEIPT=true` to make same-repo
-  PRs require an attached receipt. In the npm-native workflow, the variable is forwarded
+  PRs require an attached receipt. Branches matching `AIRECEIPTS_RECEIPT_EXEMPT_GLOBS`
+  (space-separated anchored globs; default `release/*` when unset) stay notice-only:
+  release checkouts have no capturable agent session, so no receipt can exist for them. In the npm-native workflow, the variable is forwarded
   to `pr-check` and disables `continue-on-error` for same-repo PRs, so a missing comment
   really fails the check. If a receipt comment is already attached but a fresh update
   transiently fails (e.g. a GitHub write error), the check accepts the existing comment

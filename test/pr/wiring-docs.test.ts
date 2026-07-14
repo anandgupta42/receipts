@@ -37,6 +37,9 @@ describe("R4 harness wiring", () => {
   it("the npm-native adopter workflow only masks failures in notice-only mode", () => {
     const wf = read("docs/adopt/pr-check-caller.yml");
     expect(wf).toContain('AIRECEIPTS_REQUIRE_PR_RECEIPT: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT }}');
+    // SPEC-0036 R2 amendment: without this forwarding line, a custom repo
+    // variable never reaches pr-check and custom exemptions are silently ignored.
+    expect(wf).toContain('AIRECEIPTS_RECEIPT_EXEMPT_GLOBS: ${{ vars.AIRECEIPTS_RECEIPT_EXEMPT_GLOBS }}');
     expect(wf).toContain(
       "continue-on-error: ${{ vars.AIRECEIPTS_REQUIRE_PR_RECEIPT != 'true' || github.event.pull_request.head.repo.full_name != github.repository }}",
     );
