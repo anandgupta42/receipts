@@ -81,7 +81,7 @@ No duplicated truths: one renderer, one price schema, one numbering scheme for s
 *Updated only by the `release` skill. Keep this section, and only this section, current
 after each release — don't hand-edit it elsewhere.*
 
-- **Shipped (npm `aireceipts-cli`, v0.10.0):** the receipt engine and its whole surface
+- **Shipped (npm `aireceipts-cli`, v0.11.0):** the receipt engine and its whole surface
   are live — parse adapters (Claude Code, Codex, Cursor, Gemini, opencode), cited price
   tables, per-tool attribution, waste lines (stuck-loop, trivial-spans, context-thrash
   incl. Codex compactions), price-delta + routable-spend (now with `% less`), `compare`,
@@ -94,9 +94,10 @@ after each release — don't hand-edit it elsewhere.*
   artifact/share), SVG/PNG export, receipt templates, the landing + docs sites,
   adoption telemetry + a local `stats` counter command (SPEC-0043), and disclosed
   opt-out diagnostics telemetry; **seamless PR receipts** — a deterministic `store=ref`
-  producer writing `refs/receipts/<slug>`, a pre-push auto-attach hook, and CI rendering +
+  producer writing `refs/aireceipts/<slug>`, a pre-push auto-attach hook, and CI rendering +
   posting the receipt from the ref via `GITHUB_TOKEN` behind a hardened trust-boundary
-  sanitizer with opt-in **same-repo** enforcement (SPEC-0065/0066 — the capability ships in
+  sanitizer with opt-in **same-repo** enforcement, release-branch exempt globs since
+  v0.11.0 (SPEC-0036 R2 amendment; SPEC-0065/0066 — the capability ships in
   v0.4.0; both specs stay `building` for their final slices, listed below); a **self-contained
   npm-native `pr-check`** an adopter runs in its own workflow with no reusable-workflow `uses:`
   and no org Actions-policy gate (SPEC-0064, shipped v0.5.0, #176); a **richer default
