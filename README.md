@@ -101,6 +101,10 @@ attaches the observable cost floor of the sessions behind a PR as a comment. Gen
 drop-in [CI check](docs/adopt/pr-receipt-check-caller.yml) can require every PR to
 carry one — a real one, live:
 [PR #189](https://github.com/anandgupta42/receipts/pull/189#issuecomment-4921391222).
+Want it automatic? A paste-ready
+[pre-push hook](docs/pr-receipts.md#in-your-own-repo-any-agent-paste-ready) pushes the
+receipt ref on every branch push, from any agent, and the CI check posts the comment for
+you.
 
 ## What it tells you
 
