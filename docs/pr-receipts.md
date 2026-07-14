@@ -141,17 +141,25 @@ exit 0
 chmod +x .git/hooks/pre-push
 ```
 
-Every branch push now also pushes `refs/aireceipts/<slug>`, and the committed
+On every branch push the hook tries to attach: when a local session matches the
+checked-out branch it writes `refs/aireceipts/<slug>` and pushes that ref to
+`origin`, and the committed
 [PR check workflow](https://github.com/anandgupta42/receipts/blob/main/docs/adopt/pr-check-caller.yml)
-renders and posts the receipt comment on the PR with no further step. Honest
-scope: receipts are generated locally, never in CI, so this covers pushes from
-the machines that hold the agent transcripts, one clone at a time (git does not
-sync hooks). Teammates either paste the same file into their clones or rely on
-the committed agent hooks below, which travel with the repo. A global install
+renders and posts the receipt comment on the PR with no further step. When no
+session matches (or anything else goes wrong) it does nothing, silently — the
+push always proceeds either way. Honest scope: receipts are generated locally,
+never in CI, so this covers pushes from the machines that hold the agent
+transcripts, one clone at a time (git does not sync hooks; in a linked worktree,
+`.git` is a file — put the hook in the main clone's `.git/hooks/`, which all
+worktrees share, and note that a `core.hooksPath` setting overrides `.git/hooks`
+entirely). Teammates either paste the same file into their clones or rely on the
+committed agent hooks below, which travel with the repo. A global install
 (`npm i -g aireceipts-cli`) keeps the hook fast; without one it falls back to
 `npx`. If the repo already manages hooks (husky, a central `core.hooksPath`
-dispatcher), don't replace them — chain this file from the existing hook; it
-tolerates being run with stdin closed.
+dispatcher), don't replace them: save this as its own executable file (for
+example `.git/hooks/aireceipts-pre-push`) and have the existing hook **execute**
+it as a child process — don't `source` it, its final `exit 0` would end your
+dispatcher. It tolerates being run with stdin closed.
 
 ### Optional: publish a durable receipt page
 
