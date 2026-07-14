@@ -3,6 +3,27 @@
 All notable changes to `aireceipts-cli`. Factual, grouped by conventional-commit
 type (I6: a log, not marketing). Dates are UTC.
 
+## v0.11.0 — 2026-07-13
+
+Minor: **enforcement learned about release branches** (PRs #259, #261, SPEC-0036
+R2 amendment). With `AIRECEIPTS_REQUIRE_PR_RECEIPT=true`, branches matching
+`release/*` now stay notice-only instead of failing the check: release checkouts
+are authored without a capturable agent session, so no receipt can exist for
+them. Override with the `AIRECEIPTS_RECEIPT_EXEMPT_GLOBS` repo variable or the
+hidden `pr-check --exempt-globs` flag (space-separated anchored globs, `*`
+wildcards only; set it to an empty string to enforce everywhere, restoring the
+old strict behavior). The matcher is a linear-time two-pointer scan, no RegExp,
+so pathological patterns cannot blow up matching; the logic exists once per
+runtime (`scripts/check-pr-receipt.mjs` for the reusable workflow,
+`src/pr/exemptGlobs.ts` compiled into `pr-check`) with a parity suite pinning
+the two to identical verdicts. The adopter caller snippet and
+`aireceipts integrations` output forward the new variable. Also in this range
+(#259, repo infra, not in the npm artifact): the dogfood attach pipeline got a
+`core.hooksPath` self-heal and exempt-glob support in the reusable check
+workflow, closing the failure class that silently dropped PR receipts for a
+week (an absolute hooksPath plus a parked main checkout). Receipt rendering
+untouched: 102 goldens byte-identical.
+
 ## v0.10.0 — 2026-07-13
 
 Minor: **the adoption funnel is now measurable** (PR #257). `setup` and
