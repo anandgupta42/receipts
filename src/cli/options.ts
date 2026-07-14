@@ -57,6 +57,8 @@ export interface CliOptions {
   readonly prNumber?: string;
   /** SPEC-0064 R4: hidden `pr-check --require-same-repo` enforcement flag. */
   readonly requireSameRepo: boolean;
+  /** SPEC-0036 R2 amendment: hidden `pr-check --exempt-globs "release/*"` enforcement carve-out. */
+  readonly exemptGlobs?: string;
   /** SPEC-0056: `aireceipts backfill --limit N` caps the swept set to the N most recent matches. */
   readonly limit?: number;
   /** SPEC-0056: `aireceipts backfill --out <dir>` — distinct from `output` (SVG/PNG's `-o`/`--output`). */
@@ -118,6 +120,7 @@ export function parseOptions(argv: string[]): CliOptions {
   let prHeadRef: string | undefined;
   let prNumber: string | undefined;
   let requireSameRepo = false;
+  let exemptGlobs: string | undefined;
   let limit: number | undefined;
   let outDir: string | undefined;
   let format: string | undefined;
@@ -203,6 +206,10 @@ export function parseOptions(argv: string[]): CliOptions {
       prNumber = arg.slice("--pr=".length);
     } else if (arg === "--require-same-repo") {
       requireSameRepo = true;
+    } else if (arg === "--exempt-globs") {
+      exemptGlobs = argv[++i];
+    } else if (arg.startsWith("--exempt-globs=")) {
+      exemptGlobs = arg.slice("--exempt-globs=".length);
     } else if (arg === "--session") {
       const value = argv[++i];
       if (value !== undefined) {
@@ -282,6 +289,7 @@ export function parseOptions(argv: string[]): CliOptions {
     prHeadRef,
     prNumber,
     requireSameRepo,
+    exemptGlobs,
     limit,
     outDir,
     help,

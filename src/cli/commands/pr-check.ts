@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fetchAndRenderReceipt, type FetchRenderDeps, type FetchRenderOutcome } from "../../pr/postRef.js";
 import { fetchReceiptRef, readReceiptRef } from "../../pr/store.js";
 import { findMarkerComment, type HttpFetch, upsertMarkerComment } from "../../pr/commentApi.js";
+import { isExemptRef } from "../../pr/exemptGlobs.js";
 import type { CommandContext, CommandDef } from "../types.js";
 
 interface TempRepo {
@@ -39,6 +40,7 @@ interface ResolvedContext {
   headRef: string;
   token: string;
   requireSameRepo: boolean;
+  exemptGlobs: string;
   sameRepo: boolean;
 }
 
@@ -84,6 +86,9 @@ function resolveContext(ctx: CommandContext): { ok: true; value: ResolvedContext
   const headRef = ctx.options.prHeadRef ?? ctx.env.GITHUB_HEAD_REF ?? event.headRef;
   const token = ctx.env.GH_TOKEN ?? ctx.env.GITHUB_TOKEN;
   const requireSameRepo = ctx.options.requireSameRepo || ctx.env.AIRECEIPTS_REQUIRE_PR_RECEIPT === "true";
+  // SPEC-0036 R2 amendment: enforcement carve-out, default release/* (same
+  // default the reusable workflow applies when the repo variable is unset).
+  const exemptGlobs = ctx.options.exemptGlobs ?? ctx.env.AIRECEIPTS_RECEIPT_EXEMPT_GLOBS ?? "release/*";
 
   const missing: string[] = [];
   if (!baseRepo) missing.push("base repo (--base-repo or GITHUB_REPOSITORY)");
@@ -104,6 +109,7 @@ function resolveContext(ctx: CommandContext): { ok: true; value: ResolvedContext
       headRef,
       token,
       requireSameRepo,
+      exemptGlobs,
       sameRepo: headRepo === baseRepo,
     },
   };
@@ -132,7 +138,7 @@ async function missingVerdict(ctx: CommandContext, resolved: ResolvedContext, de
     return 0;
   }
 
-  if (resolved.requireSameRepo && resolved.sameRepo) {
+  if (resolved.requireSameRepo && resolved.sameRepo && !isExemptRef(resolved.headRef, resolved.exemptGlobs)) {
     ctx.stdout.write("missing-required\n");
     ctx.stderr.write("pr-check: receipt comment missing for this same-repo PR.\n");
     ctx.stderr.write("Run `npx aireceipts-cli pr --post` locally and rerun this check, or run `npx aireceipts-cli pr --store ref --push-ref` and push again.\n");
