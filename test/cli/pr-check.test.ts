@@ -177,6 +177,55 @@ describe("SPEC-0064 pr-check", () => {
     expect(err()).toContain("pr --store ref --push-ref");
   });
 
+  it("keeps enforced release branches notice-only via the default exempt glob (SPEC-0036 R2 amendment)", async () => {
+    const { ctx, out } = fakeContext(["pr-check", "--require-same-repo"], {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_EVENT_PATH: eventFile("owner/repo", "release/v0.10.1"),
+      GITHUB_TOKEN: "tok",
+    });
+
+    const exit = await runPrCheck(ctx, {
+      makeTempRepo: tempRepoDeps().makeTempRepo,
+      fetchAndRender: () => ({ code: 2, message: "no ref" }),
+      findMarker: async () => null,
+    });
+
+    expect(exit).toBe(0);
+    expect(out()).toBe("missing-notice\n");
+  });
+
+  it("honors --exempt-globs and AIRECEIPTS_RECEIPT_EXEMPT_GLOBS overrides", async () => {
+    const flagCase = fakeContext(["pr-check", "--require-same-repo", "--exempt-globs", "ci/*"], {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_EVENT_PATH: eventFile("owner/repo", "ci/nightly"),
+      GITHUB_TOKEN: "tok",
+    });
+    expect(
+      await runPrCheck(flagCase.ctx, {
+        makeTempRepo: tempRepoDeps().makeTempRepo,
+        fetchAndRender: () => ({ code: 2, message: "no ref" }),
+        findMarker: async () => null,
+      }),
+    ).toBe(0);
+    expect(flagCase.out()).toBe("missing-notice\n");
+
+    // An explicit override REPLACES the default: release/* is enforced again.
+    const overridden = fakeContext(["pr-check", "--require-same-repo"], {
+      GITHUB_REPOSITORY: "owner/repo",
+      GITHUB_EVENT_PATH: eventFile("owner/repo", "release/v1"),
+      GITHUB_TOKEN: "tok",
+      AIRECEIPTS_RECEIPT_EXEMPT_GLOBS: "ci/*",
+    });
+    expect(
+      await runPrCheck(overridden.ctx, {
+        makeTempRepo: tempRepoDeps().makeTempRepo,
+        fetchAndRender: () => ({ code: 2, message: "no ref" }),
+        findMarker: async () => null,
+      }),
+    ).toBe(1);
+    expect(overridden.out()).toBe("missing-required\n");
+  });
+
   it("enables same-repo enforcement from the documented repo variable", async () => {
     const { ctx, out } = fakeContext(["pr-check"], {
       GITHUB_REPOSITORY: "owner/repo",

@@ -41,11 +41,15 @@ approval converted that implementation from provisional to accepted.
   `npx aireceipts pr --post` locally and rerun the check.
   Amendment (maintainer-directed, 2026-07-13): branches matching repository variable
   `AIRECEIPTS_RECEIPT_EXEMPT_GLOBS` (space-separated anchored globs, `*` wildcards only;
-  the workflow defaults to `release/*` when the variable is unset) stay notice-only even
-  under enforcement. Release checkouts are authored without a capturable agent session,
-  so no receipt can exist for them; a hard requirement there would block every release
-  PR. Keep patterns narrow so feature work cannot slip through. The verdict logic lives
-  in `scripts/check-pr-receipt.mjs` (`isExemptRef`), gated by unit tests.
+  both check surfaces default to `release/*` when the variable is unset) stay notice-only
+  even under enforcement. Release checkouts are authored without a capturable agent
+  session, so no receipt can exist for them; a hard requirement there would block every
+  release PR. Keep patterns narrow so feature work cannot slip through. The verdict
+  logic exists twice by design, once per runtime: `scripts/check-pr-receipt.mjs`
+  (`isExemptRef`, runs uncompiled from a checkout in the reusable workflow) and
+  `src/pr/exemptGlobs.ts` (ships compiled in the npm-native `pr-check`, SPEC-0064,
+  which also accepts `--exempt-globs`); a parity suite
+  (`test/pr/exempt-globs.test.ts`) keeps the two agreeing.
 - **R3 - Fork PRs remain notice-only.** Fork PRs never fail this check, even when R2 is
   enabled. The workflow may not assume a fork contributor has local agent sessions for
   the base repo, and it may not pressure them to upload transcripts.
