@@ -112,6 +112,55 @@ step. It's best-effort and **never blocks the push** — a missing session, a re
 never runs a fetched hook automatically, so this one command is unavoidable; the CI check
 is the install-free layer that catches a missed receipt regardless.)
 
+#### In your own repo (any agent, paste-ready)
+
+The same always-on layer for a repo that has adopted aireceipts. This is the
+agent-agnostic option: it fires on every `git push`, whether the push came from
+Claude Code, Codex, another tool, or your own shell. Save this as
+`.git/hooks/pre-push` in your clone and make it executable:
+
+```sh
+#!/bin/sh
+# aireceipts: attach the session receipt ref (refs/aireceipts/<slug>) on push.
+# Best-effort: never blocks a push, silent on every failure path.
+# Recursion guard: the nested `git push` of the receipt ref inherits this env
+# flag, so the guard holds even when a hook dispatcher runs this file with
+# stdin closed.
+[ -n "${AIRECEIPTS_PREPUSH_ACTIVE:-}" ] && exit 0
+AIRECEIPTS_PREPUSH_ACTIVE=1
+export AIRECEIPTS_PREPUSH_ACTIVE
+if command -v aireceipts >/dev/null 2>&1; then
+  aireceipts pr --store ref --push-ref >/dev/null 2>&1 || true
+elif command -v npx >/dev/null 2>&1; then
+  npx -y aireceipts-cli@latest pr --store ref --push-ref >/dev/null 2>&1 || true
+fi
+exit 0
+```
+
+```sh
+chmod +x .git/hooks/pre-push
+```
+
+On every branch push the hook tries to attach: when a local session matches the
+checked-out branch it writes `refs/aireceipts/<slug>` and pushes that ref to
+`origin`, and the committed
+[PR check workflow](https://github.com/anandgupta42/receipts/blob/main/docs/adopt/pr-check-caller.yml)
+renders and posts the receipt comment on the PR with no further step. When no
+session matches (or anything else goes wrong) it does nothing, silently — the
+push always proceeds either way. Honest scope: receipts are generated locally,
+never in CI, so this covers pushes from the machines that hold the agent
+transcripts, one clone at a time (git does not sync hooks; in a linked worktree,
+`.git` is a file — put the hook in the main clone's `.git/hooks/`, which all
+worktrees share, and note that a `core.hooksPath` setting overrides `.git/hooks`
+entirely). Teammates either paste the same file into their clones or rely on the
+committed agent hooks below, which travel with the repo. A global install
+(`npm i -g aireceipts-cli`) keeps the hook fast; without one it falls back to
+`npx`. If the repo already manages hooks (husky, a central `core.hooksPath`
+dispatcher), don't replace them: save this as its own executable file (for
+example `.git/hooks/aireceipts-pre-push`) and have the existing hook **execute**
+it as a child process — don't `source` it, its final `exit 0` would end your
+dispatcher. It tolerates being run with stdin closed.
+
 ### Optional: publish a durable receipt page
 
 ```sh
